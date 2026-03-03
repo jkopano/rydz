@@ -1,0 +1,105 @@
+#include <gtest/gtest.h>
+
+#include "rydz_ecs/condition.hpp"
+#include "rydz_ecs/system.hpp"
+#include "rydz_ecs/world.hpp"
+
+using namespace ecs;
+
+// ============================================================
+// Condition tests (mirrors condition_test.rs)
+// ============================================================
+
+struct Flag {
+  bool value = false;
+};
+
+struct Counter {
+  int value = 0;
+};
+
+TEST(ConditionTest, RunOnce) {
+  World world;
+  int run_count = 0;
+
+  auto system = make_system_run_if([&]() { run_count++; },
+                                   [ran = false]() mutable -> bool {
+                                     if (!ran) {
+                                       ran = true;
+                                       return true;
+                                     }
+                                     return false;
+                                   });
+
+  system->run(world);
+  EXPECT_EQ(run_count, 1);
+
+  system->run(world);
+  EXPECT_EQ(run_count, 1); // didn't run again
+
+  system->run(world);
+  EXPECT_EQ(run_count, 1); // still didn't
+}
+
+TEST(ConditionTest, RunOnceBuiltin) {
+  World world;
+  int run_count = 0;
+
+  auto cond = run_once();
+  auto sys = make_system([&]() { run_count++; });
+  auto conditioned =
+      std::make_unique<ConditionedSystem>(std::move(sys), std::move(cond));
+
+  conditioned->run(world);
+  EXPECT_EQ(run_count, 1);
+
+  conditioned->run(world);
+  EXPECT_EQ(run_count, 1);
+}
+
+TEST(ConditionTest, MakeConditionTrue) {
+  World world;
+  bool ran = false;
+
+  auto cond = make_condition([]() -> bool { return true; });
+  auto sys = make_system([&]() { ran = true; });
+  auto conditioned =
+      std::make_unique<ConditionedSystem>(std::move(sys), std::move(cond));
+
+  conditioned->run(world);
+  EXPECT_TRUE(ran);
+}
+
+TEST(ConditionTest, MakeConditionFalse) {
+  World world;
+  bool ran = false;
+
+  auto cond = make_condition([]() -> bool { return false; });
+  auto sys = make_system([&]() { ran = true; });
+  auto conditioned =
+      std::make_unique<ConditionedSystem>(std::move(sys), std::move(cond));
+
+  conditioned->run(world);
+  EXPECT_FALSE(ran);
+}
+
+TEST(ConditionTest, ConditionWithResource) {
+  World world;
+  world.insert_resource(Flag{true});
+  int run_count = 0;
+
+  auto cond =
+      make_condition([](Res<Flag> flag) -> bool { return flag->value; });
+  auto sys = make_system([&]() { run_count++; });
+  auto conditioned =
+      std::make_unique<ConditionedSystem>(std::move(sys), std::move(cond));
+
+  conditioned->run(world);
+  EXPECT_EQ(run_count, 1);
+
+  // Set flag to false
+  world.get_resource<Flag>()->value = false;
+
+  conditioned->run(world);
+  EXPECT_EQ(run_count, 1); // didn't run
+}

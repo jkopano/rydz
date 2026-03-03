@@ -1,0 +1,27 @@
+add_rules("mode.debug", "mode.release")
+
+add_requires("raylib-cpp")
+add_requires("taskflow")
+add_requires("gtest")
+add_requires("benchmark")
+
+target("pag")
+    set_kind("binary")
+    set_languages("c++20")
+    add_files("src/*.cpp")
+    add_packages("raylib-cpp", "taskflow")
+    add_includedirs("lib")
+
+target("pag_tests")
+    set_kind("binary")
+    set_languages("c++20")
+    add_files("tests/*.cpp")
+    add_packages("gtest", "taskflow", "raylib-cpp")
+    add_includedirs("lib")
+
+target("pag_benchmarks")
+    set_kind("binary")
+    set_languages("c++20")
+    add_files("benches/*.cpp")
+    add_packages("benchmark", "taskflow", "raylib-cpp")
+    add_includedirs("lib")
