@@ -3,24 +3,16 @@
 
 using namespace ecs;
 
-// ============================================================
-// Tag components
-// ============================================================
-
 struct MapTag {};
 struct HouseTag {};
 struct CarTag {};
 struct RotateMarker {};
 
-// ============================================================
-// Camera controller (mirrors test_plugin/zad2/camera.rs)
-// ============================================================
-
 struct CameraController {
   float move_speed = 20.0f;
   float mouse_sensitivity = 0.003f;
-  float yaw = -90.0f;   // degrees
-  float pitch = -20.0f; // degrees
+  float yaw = -90.0f;
+  float pitch = -20.0f;
   bool enabled = true;
 };
 
@@ -112,11 +104,6 @@ inline void toggle_camera_system(World &world, NonSendMarker) {
   }
 }
 
-// ============================================================
-// Map (mirrors test_plugin/zad2/map.rs)
-// Loads race_map.glb from res/models/
-// ============================================================
-
 inline void spawn_map(Cmd cmd, ResMut<Assets<Model>> model_assets,
                       NonSendMarker) {
   Model map_model = LoadModel("res/models/race_map.glb");
@@ -128,11 +115,6 @@ inline void spawn_map(Cmd cmd, ResMut<Assets<Model>> model_assets,
                 .scale = {0.03f, 0.03f, 0.03f},
             });
 }
-
-// ============================================================
-// Houses (mirrors test_plugin/zad2/renderables/cube.rs)
-// Spawn houses on 'H' key, despawn on 'X' key
-// ============================================================
 
 struct HouseHandles {
   Handle<Model> house;
@@ -150,10 +132,9 @@ inline void spawn_houses_on_input(Cmd cmd, ResMut<Assets<Model>> model_assets,
     handles->loaded = true;
   }
 
-  // Spawn a grid of houses (100 x 100 = 10,000)
   float spacing = 20.0f;
   float scale = 0.015f;
-  int grid = 50;
+  int grid = 100;
 
   for (int x = -grid; x < grid; ++x) {
     for (int z = -grid; z < grid; ++z) {
@@ -165,11 +146,6 @@ inline void spawn_houses_on_input(Cmd cmd, ResMut<Assets<Model>> model_assets,
     }
   }
 }
-
-// ============================================================
-// Car (mirrors test_plugin/zad2/car.rs)
-// Loads first-car.glb, spawns once on 'G' key
-// ============================================================
 
 struct CarHandles {
   Handle<Model> car;
@@ -199,11 +175,6 @@ void spawn_car_on_input(Cmd cmd, ResMut<Assets<Model>> model_assets,
   car_handles->spawned = true;
 }
 
-// ============================================================
-// Lights (mirrors test_plugin/zad2/renderables/cube.rs)
-// Spawn lights on 'L' key (once)
-// ============================================================
-
 struct LightsSpawned {
   bool done = false;
 };
@@ -213,14 +184,12 @@ void spawn_lights_on_input(Cmd cmd, ResMut<LightsSpawned> lights,
   if (lights->done || !IsKeyPressed(KEY_L))
     return;
 
-  // Directional light
   cmd.spawn(DirectionalLight{
       .color = {255, 242, 230, 255},
       .direction = {-0.3f, -1.0f, -0.5f},
       .intensity = 0.8f,
   });
 
-  // Point lights
   cmd.spawn(PointLight{.color = {255, 230, 150, 255},
                        .intensity = 5000.0f,
                        .range = 150.0f},
@@ -247,42 +216,28 @@ void rotate_marked(Query<Mut<Transform3D>, RotateMarker> query,
   });
 }
 
-// ============================================================
-// Camera setup
-// ============================================================
-
 void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(Camera3DComponent{60.0f}, ActiveCamera{},
             Transform3D::from_xyz(8, 6, 8).look_at({0, 0, 0}),
             CameraController{});
   DisableCursor();
 }
-
-// ============================================================
-// Scene plugin — assembles everything
-// ============================================================
-
 inline void scene_plugin(App &app) {
-  // Resources
   app.insert_resource(HouseHandles{});
   app.insert_resource(CarHandles{});
   app.insert_resource(LightsSpawned{});
 
-  // Startup
   app.add_systems(ScheduleLabel::Startup, setup_camera);
   app.add_systems(ScheduleLabel::Startup,
                   into_system(spawn_map).run_if(run_once()));
 
-  // Update — camera
   app.add_systems(ScheduleLabel::Update, camera_controller_system);
   app.add_systems(ScheduleLabel::Update, camera_mouse_system);
   app.add_systems(ScheduleLabel::Update, toggle_camera_system);
 
-  // Update — spawning
   app.add_systems(ScheduleLabel::Update, spawn_houses_on_input);
   app.add_systems(ScheduleLabel::Update, spawn_car_on_input);
   app.add_systems(ScheduleLabel::Update, spawn_lights_on_input);
 
-  // Update — animation
   app.add_systems(ScheduleLabel::Update, rotate_marked);
 }

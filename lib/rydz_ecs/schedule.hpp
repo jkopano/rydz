@@ -1,11 +1,11 @@
 #pragma once
 #include "condition.hpp"
 #include "system.hpp"
+#include <absl/container/flat_hash_map.h>
 #include <functional>
 #include <memory>
 #include <string>
 #include <taskflow/taskflow.hpp>
-#include <unordered_map>
 #include <vector>
 
 namespace ecs {
@@ -38,7 +38,22 @@ inline tf::Executor &global_executor() {
 }
 
 class Schedule {
-  std::vector<std::unique_ptr<ISystem>> systems_;
+  struct SystemEntry {
+    std::unique_ptr<ISystem> system;
+    SystemAccess access;
+  };
+
+  struct Segment {
+    size_t start = 0;
+    size_t end = 0;
+    bool inline_run = false;
+    tf::Taskflow taskflow;
+  };
+
+  std::vector<SystemEntry> entries_;
+  std::vector<Segment> segments_;
+  World *current_world_ = nullptr;
+  bool needs_rebuild_ = true;
 
 public:
   Schedule() = default;
@@ -47,104 +62,103 @@ public:
   Schedule &operator=(Schedule &&) = default;
 
   void add_system(std::unique_ptr<ISystem> system) {
-    systems_.push_back(std::move(system));
+    SystemEntry entry{std::move(system), {}};
+    entry.access = entry.system->access();
+    entries_.push_back(std::move(entry));
+    needs_rebuild_ = true;
   }
 
   template <typename F> void add_system_fn(F &&func) {
     if constexpr (is_system_descriptor_v<std::decay_t<F>>) {
-      systems_.push_back(func.build());
+      add_system(func.build());
     } else {
-      systems_.push_back(make_system(std::forward<F>(func)));
+      add_system(make_system(std::forward<F>(func)));
     }
   }
 
   template <typename F, typename Cond>
   void add_system_fn_if(F &&func, Cond &&cond) {
-    systems_.push_back(
+    add_system(
         make_system_run_if(std::forward<F>(func), std::forward<Cond>(cond)));
   }
 
   void run(World &world) {
-    const size_t n = systems_.size();
-    if (n == 0)
+    if (entries_.empty())
       return;
 
-    std::vector<SystemAccess> accesses;
-    accesses.reserve(n);
-    bool any_main_thread_only = false;
-    for (auto &sys : systems_) {
-      accesses.push_back(sys->access());
-      if (accesses.back().main_thread_only)
-        any_main_thread_only = true;
+    current_world_ = &world;
+    if (needs_rebuild_) {
+      rebuild_graph();
+      needs_rebuild_ = false;
     }
 
-    auto run_segment = [&](size_t start, size_t end) {
-      const size_t count = end - start;
-      if (count == 0)
-        return;
-      if (count == 1) {
-        systems_[start]->run(world);
-        return;
+    for (auto &segment : segments_) {
+      if (segment.inline_run) {
+        for (size_t i = segment.start; i < segment.end; ++i)
+          entries_[i].system->run(world);
+      } else {
+        global_executor().run(segment.taskflow).wait();
       }
-
-      tf::Taskflow taskflow;
-      std::vector<tf::Task> tasks;
-      tasks.reserve(count);
-
-      for (size_t i = 0; i < count; ++i) {
-        ISystem *sys_ptr = systems_[start + i].get();
-        tasks.push_back(
-            taskflow.emplace([sys_ptr, &world]() { sys_ptr->run(world); }));
-      }
-
-      for (size_t j = 1; j < count; ++j) {
-        const auto &acc_j = accesses[start + j];
-        if (acc_j.exclusive) {
-          for (size_t i = 0; i < j; ++i) {
-            tasks[i].precede(tasks[j]);
-          }
-          continue;
-        }
-
-        for (size_t i = 0; i < j; ++i) {
-          const auto &acc_i = accesses[start + i];
-          if (acc_i.exclusive || !acc_i.is_compatible(acc_j)) {
-            tasks[i].precede(tasks[j]);
-          }
-        }
-      }
-
-      global_executor().run(taskflow).wait();
-    };
-
-    if (!any_main_thread_only) {
-      run_segment(0, n);
-      return;
-    }
-
-    size_t i = 0;
-    while (i < n) {
-      if (accesses[i].main_thread_only) {
-        systems_[i]->run(world);
-        ++i;
-        continue;
-      }
-
-      size_t j = i + 1;
-      while (j < n && !accesses[j].main_thread_only) {
-        ++j;
-      }
-      run_segment(i, j);
-      i = j;
     }
   }
 
-  size_t system_count() const { return systems_.size(); }
-  bool empty() const { return systems_.empty(); }
+  size_t system_count() const { return entries_.size(); }
+  bool empty() const { return entries_.empty(); }
+
+private:
+  void rebuild_graph() {
+    segments_.clear();
+    segments_.reserve(entries_.size());
+
+    const size_t n = entries_.size();
+    size_t start = 0;
+    while (start < n) {
+      if (entries_[start].access.main_thread_only) {
+        size_t end = start + 1;
+        while (end < n && entries_[end].access.main_thread_only)
+          ++end;
+        segments_.push_back(Segment{start, end, true, {}});
+        start = end;
+      } else {
+        size_t end = start + 1;
+        while (end < n && !entries_[end].access.main_thread_only)
+          ++end;
+        if (end - start == 1) {
+          segments_.push_back(Segment{start, end, true, {}});
+        } else {
+          Segment segment{start, end, false, {}};
+          build_parallel_segment(segment);
+          segments_.push_back(std::move(segment));
+        }
+        start = end;
+      }
+    }
+  }
+
+  void build_parallel_segment(Segment &segment) {
+    segment.taskflow.clear();
+    const size_t count = segment.end - segment.start;
+    std::vector<tf::Task> tasks;
+    tasks.reserve(count);
+    for (size_t i = segment.start; i < segment.end; ++i) {
+      tasks.push_back(segment.taskflow.emplace(
+          [this, i] { entries_[i].system->run(*current_world_); }));
+    }
+
+    for (size_t j = 1; j < count; ++j) {
+      for (size_t i = 0; i < j; ++i) {
+        const auto &a = entries_[segment.start + i].access;
+        const auto &b = entries_[segment.start + j].access;
+        if (a.exclusive || b.exclusive || !a.is_compatible(b))
+          tasks[i].precede(tasks[j]);
+      }
+    }
+  }
 };
 
 class Schedules {
-  std::unordered_map<ScheduleLabel, Schedule> schedules_;
+  absl::flat_hash_map<ScheduleLabel, Schedule, std::hash<ScheduleLabel>>
+      schedules_;
 
 public:
   Schedule &entry(ScheduleLabel label) { return schedules_[label]; }

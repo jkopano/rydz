@@ -2,7 +2,9 @@
 #include "app.hpp"
 #include "asset.hpp"
 #include "camera3d.hpp"
+#include "frustum.hpp"
 #include "light.hpp"
+#include "lod.hpp"
 #include "material3d.hpp"
 #include "mesh3d.hpp"
 #include "render_batches.hpp"
@@ -49,21 +51,31 @@ inline void apply_materials_system(World &world) {
 
 inline void build_render_batches_system(
     Query<const Mesh3d, const GlobalTransform, Opt<const Material3d>,
-          Opt<const RenderConfig>, Opt<const ComputedVisibility>>
+          Opt<const RenderConfig>, Opt<const ViewVisibility>,
+          Opt<const MeshLodGroup>>
         query,
     ResMut<Assets<Model>> model_assets, ResMut<RenderBatches> batches,
-    NonSendMarker) {
+    Res<LodConfig> lod_config, ResMut<LodHistory> lod_history, NonSendMarker) {
   batches->clear();
   absl::flat_hash_map<RenderBatchKey, size_t> batch_index;
 
   query.for_each([&](const Mesh3d *mesh3d, const GlobalTransform *global,
                      const Material3d *mat, const RenderConfig *rc,
-                     const ComputedVisibility *vis) {
+                     const ViewVisibility *vv, const MeshLodGroup *lod_group) {
     if (!mesh3d || !mesh3d->model.is_valid())
       return;
-    if (vis && !vis->visible)
+    // Use ViewVisibility (frustum cull result) if available
+    if (vv && !vv->visible)
       return;
-    Model *model = model_assets->get(mesh3d->model);
+    // LOD selection: pick the right model handle
+    Handle<Model> model_handle = mesh3d->model;
+    if (lod_group && lod_group->level_count > 1) {
+      // For now use LOD 0 — screen-space selection will be added
+      // when camera matrix access is cleaner
+      model_handle = lod_group->levels[0];
+    }
+
+    Model *model = model_assets->get(model_handle);
     if (!model || model->meshCount <= 0 || model->meshes == nullptr)
       return;
 
@@ -99,7 +111,7 @@ inline void build_render_batches_system(
       }
 
       RenderBatchKey key{};
-      key.model = mesh3d->model;
+      key.model = model_handle;
       key.mesh_index = i;
       key.material_index = mat_index;
       key.material = mat_key;
@@ -453,21 +465,42 @@ inline void render_plugin(App &app) {
   if (!app.world().contains_resource<AssetServer>()) {
     app.insert_resource(AssetServer{});
   }
+  if (!app.world().contains_resource<LodConfig>()) {
+    app.insert_resource(LodConfig{});
+  }
+  if (!app.world().contains_resource<LodHistory>()) {
+    app.insert_resource(LodHistory{});
+  }
 
+  // Phase 1: auto-insert missing components
   app.add_systems(ScheduleLabel::First,
                   [](World &w) { auto_insert_global_transform(w); });
   app.add_systems(ScheduleLabel::First,
                   [](World &w) { auto_insert_visibility(w); });
   app.add_systems(ScheduleLabel::First,
                   [](World &w) { auto_insert_material(w); });
+
+  // Phase 2: transform propagation + visibility
   app.add_systems(ScheduleLabel::PostUpdate,
                   [](World &w) { propagate_transforms(w); });
-
   app.add_systems(ScheduleLabel::PostUpdate,
                   [](World &w) { compute_visibility(w); });
 
+  // Phase 3: compute bounds (once per entity) + frustum cull
+  app.add_systems(ScheduleLabel::PostUpdate,
+                  [](World &w) { compute_mesh_bounds_system(w); });
+  app.add_systems(ScheduleLabel::PostUpdate,
+                  [](World &w, NonSendMarker) { frustum_cull_system(w); });
+
+  // Phase 4: auto-generate LODs for large meshes (needs GL)
+  app.add_systems(ScheduleLabel::PostUpdate, [](World &w, NonSendMarker) {
+    auto_generate_lods_system(w);
+  });
+
+  // Phase 5: build render batches (uses ViewVisibility + LOD)
   app.add_systems(ScheduleLabel::PostUpdate, build_render_batches_system);
 
+  // Phase 6: render
   app.add_systems(ScheduleLabel::Last, render_system);
 }
 

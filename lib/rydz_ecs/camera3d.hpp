@@ -5,10 +5,10 @@
 namespace ecs {
 
 struct Camera3DComponent {
-  float fov = 45.0f;
+  double fov = 45.0;
   int projection = CAMERA_PERSPECTIVE;
-  float near_plane = 0.1f;
-  float far_plane = 1000.0f;
+  double near_plane = 0.1;
+  double far_plane = 1000.0;
 };
 
 struct ActiveCamera {};
@@ -19,7 +19,7 @@ inline Camera3D build_camera(Vector3 position, Vector3 forward, Vector3 up,
   cam.position = position;
   cam.target = Vector3Add(position, forward);
   cam.up = up;
-  cam.fovy = comp.fov;
+  cam.fovy = static_cast<float>(comp.fov);
   cam.projection = comp.projection;
   return cam;
 }
