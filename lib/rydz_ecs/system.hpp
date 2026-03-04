@@ -2,10 +2,13 @@
 #include "access.hpp"
 #include "query.hpp"
 #include "world.hpp"
+#include <concepts>
 #include <functional>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <type_traits>
+#include <utility>
 
 namespace ecs {
 
@@ -112,6 +115,10 @@ template <typename R, typename... Args> struct function_traits_impl {
   static constexpr size_t arity = sizeof...(Args);
 
   template <size_t N> using arg = std::tuple_element_t<N, args_tuple>;
+
+  template <typename Fn> static void apply(Fn &&fn) {
+    std::forward<Fn>(fn).template operator()<Args...>();
+  }
 };
 
 } // namespace detail
@@ -150,6 +157,12 @@ template <typename F> struct function_traits<F &&> : function_traits<F> {};
 template <typename T>
 using bare_param_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
+template <typename T>
+concept SystemParameter = requires(World &w, SystemAccess &acc) {
+  SystemParamTraits<bare_param_t<T>>::retrieve(w);
+  SystemParamTraits<bare_param_t<T>>::access(acc);
+};
+
 template <typename F> class FunctionSystem : public ISystem {
   F func_;
   std::string name_;
@@ -160,25 +173,26 @@ public:
         name_(name.empty() ? typeid(F).name() : std::move(name)) {}
 
   void run(World &world) override {
-    run_impl(world, (typename function_traits<F>::args_tuple *)nullptr);
+    function_traits<F>::apply(
+        [&]<SystemParameter... Args>() { run_with_args<Args...>(world); });
   }
 
   std::string name() const override { return name_; }
 
   SystemAccess access() const override {
     SystemAccess acc;
-    access_impl(acc, (typename function_traits<F>::args_tuple *)nullptr);
+    function_traits<F>::apply(
+        [&]<SystemParameter... Args>() { access_with_args<Args...>(acc); });
     return acc;
   }
 
 private:
-  template <typename... Args>
-  void run_impl(World &world, std::tuple<Args...> *) {
+  template <SystemParameter... Args> void run_with_args(World &world) {
     func_(SystemParamTraits<bare_param_t<Args>>::retrieve(world)...);
   }
 
-  template <typename... Args>
-  static void access_impl(SystemAccess &acc, std::tuple<Args...> *) {
+  template <SystemParameter... Args>
+  static void access_with_args(SystemAccess &acc) {
     (SystemParamTraits<bare_param_t<Args>>::access(acc), ...);
   }
 };
