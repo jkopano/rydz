@@ -8,6 +8,8 @@
 #include <taskflow/taskflow.hpp>
 #include <vector>
 
+using namespace std;
+
 namespace ecs {
 
 enum class ScheduleLabel {
@@ -43,10 +45,15 @@ class Schedule {
     SystemAccess access;
   };
 
+  enum class SegmentKind {
+    Inline,
+    Parallel,
+  };
+
   struct Segment {
     size_t start = 0;
     size_t end = 0;
-    bool inline_run = false;
+    SegmentKind kind = SegmentKind::Inline;
     tf::Taskflow taskflow;
   };
 
@@ -57,7 +64,6 @@ class Schedule {
 
 public:
   Schedule() = default;
-
   Schedule(Schedule &&) = default;
   Schedule &operator=(Schedule &&) = default;
 
@@ -93,7 +99,7 @@ public:
     }
 
     for (auto &segment : segments_) {
-      if (segment.inline_run) {
+      if (segment.kind == SegmentKind::Inline) {
         for (size_t i = segment.start; i < segment.end; ++i)
           entries_[i].system->run(world);
       } else {
@@ -108,29 +114,25 @@ public:
 private:
   void rebuild_graph() {
     segments_.clear();
-    segments_.reserve(entries_.size());
 
-    const size_t n = entries_.size();
-    size_t start = 0;
-    while (start < n) {
-      if (entries_[start].access.main_thread_only) {
-        size_t end = start + 1;
-        while (end < n && entries_[end].access.main_thread_only)
-          ++end;
-        segments_.push_back(Segment{start, end, true, {}});
-        start = end;
+    auto chunked_view =
+        entries_ | std::views::chunk_by([](const auto &a, const auto &b) {
+          return a.access.main_thread_only == b.access.main_thread_only;
+        });
+
+    for (auto chunk : chunked_view) {
+      size_t start =
+          static_cast<size_t>(std::distance(entries_.data(), &chunk.front()));
+      size_t end = start + chunk.size();
+
+      bool is_main = chunk.front().access.main_thread_only;
+
+      if (is_main || (chunk.size() == 1)) {
+        segments_.push_back({start, end, SegmentKind::Inline, {}});
       } else {
-        size_t end = start + 1;
-        while (end < n && !entries_[end].access.main_thread_only)
-          ++end;
-        if (end - start == 1) {
-          segments_.push_back(Segment{start, end, true, {}});
-        } else {
-          Segment segment{start, end, false, {}};
-          build_parallel_segment(segment);
-          segments_.push_back(std::move(segment));
-        }
-        start = end;
+        Segment segment{start, end, SegmentKind::Parallel, {}};
+        build_parallel_segment(segment);
+        segments_.push_back(std::move(segment));
       }
     }
   }
@@ -138,15 +140,16 @@ private:
   void build_parallel_segment(Segment &segment) {
     segment.taskflow.clear();
     const size_t count = segment.end - segment.start;
-    std::vector<tf::Task> tasks;
+    std::vector<tf::Task> tasks{};
     tasks.reserve(count);
-    for (size_t i = segment.start; i < segment.end; ++i) {
+
+    for (size_t i : std::views::iota(segment.start, segment.end)) {
       tasks.push_back(segment.taskflow.emplace(
           [this, i] { entries_[i].system->run(*current_world_); }));
     }
 
-    for (size_t j = 1; j < count; ++j) {
-      for (size_t i = 0; i < j; ++i) {
+    for (size_t j : std::views::iota(1u, count)) {
+      for (size_t i : std::views::iota(0u, j)) {
         const auto &a = entries_[segment.start + i].access;
         const auto &b = entries_[segment.start + j].access;
         if (a.exclusive || b.exclusive || !a.is_compatible(b))
