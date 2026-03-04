@@ -10,6 +10,7 @@ struct SystemAccess {
   std::set<std::type_index> resources_read;
   std::set<std::type_index> resources_write;
   bool exclusive = false;
+  bool main_thread_only = false;
 
   template <typename T> void add_component_read() {
     components_read.insert(std::type_index(typeid(T)));
@@ -28,9 +29,11 @@ struct SystemAccess {
   }
 
   void set_exclusive() { exclusive = true; }
+  void set_main_thread_only() { main_thread_only = true; }
 
   void merge(const SystemAccess &other) {
     exclusive |= other.exclusive;
+    main_thread_only |= other.main_thread_only;
     components_read.insert(other.components_read.begin(),
                            other.components_read.end());
     components_write.insert(other.components_write.begin(),

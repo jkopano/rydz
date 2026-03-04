@@ -3,7 +3,8 @@
 #include "hierarchy.hpp"
 #include "world.hpp"
 #include <functional>
-#include <raylib-cpp/raylib-cpp.hpp>
+#include <raylib.h>
+#include <raymath.h>
 #include <unordered_map>
 
 namespace ecs {

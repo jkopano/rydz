@@ -1,0 +1,15 @@
+CompileFlags:
+  Add: 
+    - "-Wall"
+    - "-Wextra"
+    - "-Wpedantic"
+    - "-Wconversion"        # Wyłapuje ciche ucinanie danych (np. int do short)
+    - "-Wsign-conversion"   # Wyłapuje mieszanie int z unsigned int
+    - "-Wshadow"            # Kiedy zmienna lokalna ma taką samą nazwę jak pole klasy
+    - "-Wnon-virtual-dtor"  # Zapobiega wyciekom przy dziedziczeniu
+    - "-Wold-style-cast"    # Zmusza do używania static_cast zamiast (int)x
+    - "-Wcast-align"
+    - "-Wunused"
+    - "-Woverloaded-virtual"
+    - "-Wdouble-promotion"
+    - "-Wformat=2"

@@ -1,8 +1,17 @@
 #pragma once
 #include "system.hpp"
+#include <any>
+#include <atomic>
 #include <cstdint>
+#include <deque>
+#include <filesystem>
+#include <fstream>
 #include <functional>
-#include <raylib-cpp/raylib-cpp.hpp>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <unordered_map>
 #include <vector>
 
 namespace ecs {
@@ -16,7 +25,7 @@ template <typename T> struct Handle {
 };
 
 template <typename T> class Assets {
-  std::vector<T> items_;
+  std::deque<std::optional<T>> items_;
 
 public:
   Handle<T> add(T item) {
@@ -25,37 +34,174 @@ public:
     return Handle<T>{idx};
   }
 
+  void set(Handle<T> handle, T item) {
+    if (handle.id >= items_.size()) {
+      items_.resize(handle.id + 1, std::nullopt);
+    }
+    items_[handle.id] = std::move(item);
+  }
+
   T *get(Handle<T> handle) {
-    if (!handle.is_valid() || handle.id >= items_.size())
+    if (!handle.is_valid() || handle.id >= items_.size() ||
+        !items_[handle.id].has_value())
       return nullptr;
-    return &items_[handle.id];
+    return &items_[handle.id].value();
   }
 
   const T *get(Handle<T> handle) const {
-    if (!handle.is_valid() || handle.id >= items_.size())
+    if (!handle.is_valid() || handle.id >= items_.size() ||
+        !items_[handle.id].has_value())
       return nullptr;
-    return &items_[handle.id];
+    return &items_[handle.id].value();
   }
 
-  size_t count() const { return items_.size(); }
+  bool contains(Handle<T> handle) const {
+    return handle.is_valid() && handle.id < items_.size() &&
+           items_[handle.id].has_value();
+  }
+
+  size_t count() const {
+    size_t n = 0;
+    for (auto &s : items_)
+      if (s.has_value())
+        ++n;
+    return n;
+  }
+
+  bool empty() const { return count() == 0; }
+};
+
+class IAssetLoader {
+public:
+  virtual ~IAssetLoader() = default;
+  virtual std::vector<std::string> extensions() const = 0;
+  virtual std::any load(const std::vector<uint8_t> &data,
+                        const std::string &path) = 0;
+  virtual void insert_into_world(World &world, uint32_t handle_id,
+                                 std::any asset) = 0;
+};
+
+template <typename Derived, typename T>
+class AssetLoader : public IAssetLoader {
+public:
+  std::any load(const std::vector<uint8_t> &data,
+                const std::string &path) override {
+    return std::any(static_cast<Derived *>(this)->load_asset(data, path));
+  }
+
+  void insert_into_world(World &world, uint32_t handle_id,
+                         std::any asset) override {
+    auto *assets = world.get_resource<Assets<T>>();
+    if (assets) {
+      assets->set(Handle<T>{handle_id}, std::any_cast<T>(std::move(asset)));
+    }
+  }
 };
 
 class AssetServer {
+  struct LoadedAsset {
+    uint32_t handle_id;
+    std::any asset;
+    std::shared_ptr<IAssetLoader> loader;
+  };
+
+  std::unordered_map<std::string, std::shared_ptr<IAssetLoader>> loaders_;
+  std::mutex completed_mutex_;
+  std::vector<LoadedAsset> completed_;
+  std::atomic<uint32_t> next_id_{0};
+  std::string root_path_;
+
 public:
-  Handle<Texture2D> load_texture(Assets<Texture2D> &textures,
-                                 const char *path) {
-    Texture2D tex = LoadTexture(path);
-    return textures.add(tex);
+  explicit AssetServer(std::string root_path = ".")
+      : root_path_(std::move(root_path)) {}
+
+  AssetServer(AssetServer &&other) noexcept
+      : loaders_(std::move(other.loaders_)),
+        completed_(std::move(other.completed_)),
+        next_id_(other.next_id_.load()),
+        root_path_(std::move(other.root_path_)) {}
+
+  AssetServer &operator=(AssetServer &&other) noexcept {
+    loaders_ = std::move(other.loaders_);
+    completed_ = std::move(other.completed_);
+    next_id_.store(other.next_id_.load());
+    root_path_ = std::move(other.root_path_);
+    return *this;
   }
 
-  Handle<Model> load_model(Assets<Model> &models, const char *path) {
-    Model model = LoadModel(path);
-    return models.add(model);
+  void register_loader(std::shared_ptr<IAssetLoader> loader) {
+    for (auto &ext : loader->extensions()) {
+      loaders_[ext] = loader;
+    }
   }
 
-  Handle<Sound> load_sound(Assets<Sound> &sounds, const char *path) {
-    Sound snd = LoadSound(path);
-    return sounds.add(snd);
+  template <typename L, typename... Args> void register_loader(Args &&...args) {
+    register_loader(std::make_shared<L>(std::forward<Args>(args)...));
+  }
+
+  template <typename T> Handle<T> load(const std::string &path) {
+    uint32_t id = next_id_.fetch_add(1);
+    Handle<T> handle{id};
+
+    auto ext = get_extension(path);
+    auto it = loaders_.find(ext);
+    if (it == loaders_.end()) {
+      return handle;
+    }
+
+    auto loader = it->second;
+    auto full_path = root_path_ + "/" + path;
+
+    std::thread([this, id, full_path, loader]() {
+      auto data = read_file(full_path);
+      if (data.empty())
+        return;
+
+      try {
+        auto asset = loader->load(data, full_path);
+        std::lock_guard<std::mutex> lock(completed_mutex_);
+        completed_.push_back({id, std::move(asset), loader});
+      } catch (...) {
+      }
+    }).detach();
+
+    return handle;
+  }
+
+  void update(World &world) {
+    std::vector<LoadedAsset> assets;
+    {
+      std::lock_guard<std::mutex> lock(completed_mutex_);
+      assets.swap(completed_);
+    }
+    for (auto &loaded : assets) {
+      loaded.loader->insert_into_world(world, loaded.handle_id,
+                                       std::move(loaded.asset));
+    }
+  }
+
+  bool has_loader(const std::string &ext) const {
+    return loaders_.count(ext) > 0;
+  }
+
+private:
+  static std::string get_extension(const std::string &path) {
+    auto pos = path.rfind('.');
+    if (pos == std::string::npos)
+      return "";
+    return path.substr(pos + 1);
+  }
+
+  static std::vector<uint8_t> read_file(const std::string &path) {
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file.is_open())
+      return {};
+    auto size = file.tellg();
+    file.seekg(0);
+    std::vector<uint8_t> data(static_cast<size_t>(size));
+    file.read(reinterpret_cast<char *>(data.data()),
+              static_cast<std::streamsize>(size));
+    return data;
   }
 };
 

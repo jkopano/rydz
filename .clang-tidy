@@ -1,0 +1,20 @@
+---
+# Włączamy potężne grupy analiz (plus oznacza włączenie, minus wyłączenie)
+Checks: >
+  -*,
+  bugprone-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  concurrency-*,
+  misc-*,
+  cert-*,
+  -cppcoreguidelines-owning-memory,
+  -modernize-use-trailing-return-type
+
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
+AnalyzeTemporaryDtors: true
+...

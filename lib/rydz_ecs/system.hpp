@@ -9,6 +9,9 @@
 
 namespace ecs {
 
+// Marker parameter to force a system to run on the main thread.
+struct NonSendMarker {};
+
 template <typename T> struct Res {
   const T *ptr;
   const T &operator*() const { return *ptr; }
@@ -89,6 +92,16 @@ template <> struct SystemParamTraits<World> {
   static bool available(const World &) { return true; }
 
   static void access(SystemAccess &acc) { acc.set_exclusive(); }
+};
+
+template <> struct SystemParamTraits<NonSendMarker> {
+  using Item = NonSendMarker;
+
+  static Item retrieve(World & /*world*/) { return {}; }
+
+  static bool available(const World & /*world*/) { return true; }
+
+  static void access(SystemAccess &acc) { acc.set_main_thread_only(); }
 };
 
 namespace detail {

@@ -1,7 +1,9 @@
 #pragma once
 #include "asset.hpp"
 #include <concepts>
-#include <raylib-cpp/raylib-cpp.hpp>
+#include <raylib.h>
+#include <raymath.h>
+#include <rlgl.h>
 
 namespace ecs {
 
@@ -10,7 +12,17 @@ concept Material =
     requires(const M m, Model &model, Assets<Texture2D> *textures) {
       { m.color() } -> std::convertible_to<Color>;
       { m.apply(model, textures) } -> std::same_as<void>;
+      { m.vertex_source() } -> std::convertible_to<const char *>;
+      { m.fragment_source() } -> std::convertible_to<const char *>;
+      { m.shader() } -> std::convertible_to<const Shader *>;
     };
+
+/// Pre-loads the shader for Material type M on the main (GL) thread.
+/// Usage: app.add_systems(ScheduleLabel::Startup,
+/// preload_material_shader<MyMat>);
+template <Material M> inline void preload_material_shader(NonSendMarker) {
+  M{}.shader();
+}
 
 struct StandardMaterial {
   Color base_color = WHITE;
@@ -24,6 +36,12 @@ struct StandardMaterial {
   Color color() const { return base_color; }
 
   void apply(Model &model, Assets<Texture2D> *tex_assets) const {
+    Shader &shader = standard_shader();
+    if (model.materials) {
+      for (int i = 0; i < model.materialCount; ++i) {
+        model.materials[i].shader = shader;
+      }
+    }
     model.materials[0].maps[MATERIAL_MAP_DIFFUSE].color = base_color;
 
     if (tex_assets && texture.is_valid()) {
@@ -37,6 +55,46 @@ struct StandardMaterial {
       if (tex)
         model.materials[0].maps[MATERIAL_MAP_NORMAL].texture = *tex;
     }
+  }
+
+  // Shader paths — nullptr means use raylib's default shader
+  const char *vertex_source() const { return "res/shaders/pbr.vert"; }
+  const char *fragment_source() const { return "res/shaders/pbr.frag"; }
+
+  const Shader *shader() const { return &standard_shader(); }
+
+private:
+  static Shader &standard_shader() {
+    static Shader shader = {};
+    static bool loaded = false;
+    if (!loaded) {
+      shader = LoadShader("res/shaders/pbr.vert", "res/shaders/pbr.frag");
+
+      if (shader.locs == nullptr) {
+        shader.locs = (int *)RL_CALLOC(RL_MAX_SHADER_LOCATIONS, sizeof(int));
+        for (int i = 0; i < RL_MAX_SHADER_LOCATIONS; ++i)
+          shader.locs[i] = -1;
+      }
+
+      shader.locs[SHADER_LOC_VERTEX_POSITION] =
+          GetShaderLocationAttrib(shader, "vertexPosition");
+      shader.locs[SHADER_LOC_VERTEX_NORMAL] =
+          GetShaderLocationAttrib(shader, "vertexNormal");
+      shader.locs[SHADER_LOC_VERTEX_TEXCOORD01] =
+          GetShaderLocationAttrib(shader, "vertexTexCoord");
+      shader.locs[SHADER_LOC_MATRIX_MVP] = GetShaderLocation(shader, "mvp");
+      shader.locs[SHADER_LOC_COLOR_DIFFUSE] =
+          GetShaderLocation(shader, "colDiffuse");
+      shader.locs[SHADER_LOC_MAP_DIFFUSE] =
+          GetShaderLocation(shader, "texture0");
+      shader.locs[SHADER_LOC_MAP_NORMAL] =
+          GetShaderLocation(shader, "u_normal_texture");
+      shader.locs[SHADER_LOC_MATRIX_MODEL] =
+          GetShaderLocationAttrib(shader, "instanceTransform");
+
+      loaded = true;
+    }
+    return shader;
   }
 };
 

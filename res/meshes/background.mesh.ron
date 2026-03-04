@@ -1,0 +1,28 @@
+(
+    submeshes: [
+        (
+            vertices: [
+                // Pozycje od -1 do 1 pokrywają cały ekran
+                (position: (-1.0, -1.0, 0.0), normal: (0.0, 0.0, 1.0), uv: (0.0, 0.0)), // Lewy dół
+                (position: (1.0, -1.0, 0.0), normal: (0.0, 0.0, 1.0), uv: (1.0, 0.0)),  // Prawy dół
+                (position: (1.0, 1.0, 0.0), normal: (0.0, 0.0, 1.0), uv: (1.0, 1.0)),   // Prawy góra
+                (position: (-1.0, 1.0, 0.0), normal: (0.0, 0.0, 1.0), uv: (0.0, 1.0)),  // Lewy góra
+            ],
+            indices: [
+                0, 1, 2,
+                2, 3, 0
+            ],
+            material: Some("materials/stone.material.ron"),
+            primitive: Triangle,
+            bounds: (
+                min: (-1.0, -1.0, 0.0),
+                max: (1.0, 1.0, 0.0),
+            ),
+        ),
+    ],
+    bounds: (
+        min: (-1.0, -1.0, 0.0),
+        max: (1.0, 1.0, 0.0),
+    ),
+    index_type: U32,
+)

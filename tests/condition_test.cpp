@@ -103,3 +103,64 @@ TEST(ConditionTest, ConditionWithResource) {
   conditioned->run(world);
   EXPECT_EQ(run_count, 1); // didn't run
 }
+
+// ============================================================
+// into_system().run_if() builder tests
+// ============================================================
+
+TEST(ConditionTest, IntoSystemRunIfLambda) {
+  World world;
+  int run_count = 0;
+
+  auto desc = into_system([&]() { run_count++; }).run_if([]() -> bool {
+    return false;
+  });
+
+  auto system = desc.build();
+
+  system->run(world);
+  EXPECT_EQ(run_count, 0); // condition is false, shouldn't run
+}
+
+TEST(ConditionTest, IntoSystemRunIfTrue) {
+  World world;
+  int run_count = 0;
+
+  auto system = into_system([&]() {
+                  run_count++;
+                }).run_if([]() -> bool {
+                    return true;
+                  }).build();
+
+  system->run(world);
+  EXPECT_EQ(run_count, 1);
+
+  system->run(world);
+  EXPECT_EQ(run_count, 2);
+}
+
+TEST(ConditionTest, IntoSystemRunOnce) {
+  World world;
+  int run_count = 0;
+
+  auto system = into_system([&]() { run_count++; }).run_if(run_once()).build();
+
+  system->run(world);
+  EXPECT_EQ(run_count, 1);
+
+  system->run(world);
+  EXPECT_EQ(run_count, 1); // didn't run again
+}
+
+TEST(ConditionTest, IntoSystemNoCondition) {
+  World world;
+  int run_count = 0;
+
+  auto system = into_system([&]() { run_count++; }).build();
+
+  system->run(world);
+  EXPECT_EQ(run_count, 1);
+
+  system->run(world);
+  EXPECT_EQ(run_count, 2);
+}

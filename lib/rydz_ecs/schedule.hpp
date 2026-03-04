@@ -51,7 +51,11 @@ public:
   }
 
   template <typename F> void add_system_fn(F &&func) {
-    systems_.push_back(make_system(std::forward<F>(func)));
+    if constexpr (is_system_descriptor_v<std::decay_t<F>>) {
+      systems_.push_back(func.build());
+    } else {
+      systems_.push_back(make_system(std::forward<F>(func)));
+    }
   }
 
   template <typename F, typename Cond>
@@ -65,48 +69,74 @@ public:
     if (n == 0)
       return;
 
-    if (n == 1) {
-      systems_[0]->run(world);
-      return;
-    }
-
     std::vector<SystemAccess> accesses;
     accesses.reserve(n);
+    bool any_main_thread_only = false;
     for (auto &sys : systems_) {
       accesses.push_back(sys->access());
+      if (accesses.back().main_thread_only)
+        any_main_thread_only = true;
     }
 
-    tf::Taskflow taskflow;
-    std::vector<tf::Task> tasks;
-    tasks.reserve(n);
-
-    for (size_t i = 0; i < n; ++i) {
-      ISystem *sys_ptr = systems_[i].get();
-      tasks.push_back(
-          taskflow.emplace([sys_ptr, &world]() { sys_ptr->run(world); }));
-    }
-
-    for (size_t j = 1; j < n; ++j) {
-      if (accesses[j].exclusive) {
-        for (size_t i = 0; i < j; ++i) {
-          tasks[i].precede(tasks[j]);
-        }
-        continue;
+    auto run_segment = [&](size_t start, size_t end) {
+      const size_t count = end - start;
+      if (count == 0)
+        return;
+      if (count == 1) {
+        systems_[start]->run(world);
+        return;
       }
 
-      for (size_t i = 0; i < j; ++i) {
-        if (accesses[i].exclusive) {
-          tasks[i].precede(tasks[j]);
+      tf::Taskflow taskflow;
+      std::vector<tf::Task> tasks;
+      tasks.reserve(count);
+
+      for (size_t i = 0; i < count; ++i) {
+        ISystem *sys_ptr = systems_[start + i].get();
+        tasks.push_back(
+            taskflow.emplace([sys_ptr, &world]() { sys_ptr->run(world); }));
+      }
+
+      for (size_t j = 1; j < count; ++j) {
+        const auto &acc_j = accesses[start + j];
+        if (acc_j.exclusive) {
+          for (size_t i = 0; i < j; ++i) {
+            tasks[i].precede(tasks[j]);
+          }
           continue;
         }
 
-        if (!accesses[i].is_compatible(accesses[j])) {
-          tasks[i].precede(tasks[j]);
+        for (size_t i = 0; i < j; ++i) {
+          const auto &acc_i = accesses[start + i];
+          if (acc_i.exclusive || !acc_i.is_compatible(acc_j)) {
+            tasks[i].precede(tasks[j]);
+          }
         }
       }
+
+      global_executor().run(taskflow).wait();
+    };
+
+    if (!any_main_thread_only) {
+      run_segment(0, n);
+      return;
     }
 
-    global_executor().run(taskflow).wait();
+    size_t i = 0;
+    while (i < n) {
+      if (accesses[i].main_thread_only) {
+        systems_[i]->run(world);
+        ++i;
+        continue;
+      }
+
+      size_t j = i + 1;
+      while (j < n && !accesses[j].main_thread_only) {
+        ++j;
+      }
+      run_segment(i, j);
+      i = j;
+    }
   }
 
   size_t system_count() const { return systems_.size(); }
@@ -135,7 +165,11 @@ namespace detail {
 
 template <typename F>
 void add_system_to_schedule(Schedule &schedule, F &&func) {
-  schedule.add_system_fn(std::forward<F>(func));
+  if constexpr (is_system_descriptor_v<std::decay_t<F>>) {
+    schedule.add_system(func.build());
+  } else {
+    schedule.add_system_fn(std::forward<F>(func));
+  }
 }
 
 } // namespace detail

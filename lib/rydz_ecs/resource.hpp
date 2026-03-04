@@ -1,33 +1,43 @@
 #pragma once
-#include <any>
+#include <memory>
 #include <optional>
-#include <stdexcept>
 #include <typeindex>
 #include <unordered_map>
 
 namespace ecs {
 
 class Resources {
-  std::unordered_map<std::type_index, std::any> data_;
+  struct IResource {
+    virtual ~IResource() = default;
+  };
+
+  template <typename T> struct ResourceImpl : IResource {
+    T data;
+    explicit ResourceImpl(T &&val) : data(std::move(val)) {}
+  };
+
+  std::unordered_map<std::type_index, std::unique_ptr<IResource>> data_;
 
 public:
   template <typename T> void insert(T resource) {
-    data_.insert_or_assign(std::type_index(typeid(T)),
-                           std::make_any<T>(std::move(resource)));
+    data_[std::type_index(typeid(T))] =
+        std::make_unique<ResourceImpl<T>>(std::move(resource));
   }
 
   template <typename T> T *get() {
     auto it = data_.find(std::type_index(typeid(T)));
     if (it == data_.end())
       return nullptr;
-    return std::any_cast<T>(&it->second);
+    auto *impl = static_cast<ResourceImpl<T> *>(it->second.get());
+    return &impl->data;
   }
 
   template <typename T> const T *get() const {
     auto it = data_.find(std::type_index(typeid(T)));
     if (it == data_.end())
       return nullptr;
-    return std::any_cast<T>(&it->second);
+    auto *impl = static_cast<const ResourceImpl<T> *>(it->second.get());
+    return &impl->data;
   }
 
   template <typename T> bool contains() const {
@@ -38,7 +48,8 @@ public:
     auto it = data_.find(std::type_index(typeid(T)));
     if (it == data_.end())
       return std::nullopt;
-    auto val = std::any_cast<T>(std::move(it->second));
+    auto *impl = static_cast<ResourceImpl<T> *>(it->second.get());
+    std::optional<T> val = std::move(impl->data);
     data_.erase(it);
     return val;
   }

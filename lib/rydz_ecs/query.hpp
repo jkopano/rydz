@@ -30,12 +30,15 @@ template <typename T> struct WorldQueryTraits {
     const VecStorage<T> *storage = nullptr;
 
     void init(const World &world) { storage = world.get_vec_storage<T>(); }
+
     Item fetch(Entity entity) const {
       return storage ? storage->get(entity) : nullptr;
     }
+
     bool matches(Entity entity) const {
       return storage && storage->has(entity);
     }
+
     size_t capacity() const { return storage ? storage->data_size() : 0; }
     bool is_required() const { return true; }
   };

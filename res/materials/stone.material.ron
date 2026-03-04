@@ -1,0 +1,17 @@
+(
+    base_color_texture: Some("textures/stone.jpg"),
+    base_color_factor: (1.0, 1.0, 1.0, 1.0),
+
+    roughness_metallic_texture: None,
+    metallic_factor: 0.0,
+    roughness_factor: 0.8,
+
+    normal_texture: None,
+    normal_factor: 1.0,
+
+    occlusion_texture: None,
+    occlusion_factor: 1.0,
+
+    emissive_texture: None,
+    emissive_factor: (0.0, 0.0, 0.0),
+)

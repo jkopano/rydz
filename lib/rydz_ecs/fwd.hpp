@@ -23,8 +23,7 @@ class Resources;
 
 class World;
 
-template <typename T> struct Read;
-template <typename T> struct Write;
+template <typename T> struct Mut;
 template <typename Inner> struct Opt;
 template <typename T> struct With;
 template <typename T> struct Without;

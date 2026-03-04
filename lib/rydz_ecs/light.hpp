@@ -1,5 +1,6 @@
 #pragma once
-#include <raylib-cpp/raylib-cpp.hpp>
+#include <raylib.h>
+#include <raymath.h>
 
 namespace ecs {
 

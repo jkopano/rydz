@@ -40,6 +40,8 @@
 #include "rydz_ecs/material3d.hpp"
 #include "rydz_ecs/mesh3d.hpp"
 #include "rydz_ecs/name.hpp"
+#include "rydz_ecs/render_batches.hpp"
+#include "rydz_ecs/render_config.hpp"
 #include "rydz_ecs/render_plugin.hpp"
 #include "rydz_ecs/transform.hpp"
 #include "rydz_ecs/visibility.hpp"
