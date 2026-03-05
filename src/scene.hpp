@@ -208,14 +208,6 @@ void spawn_lights_on_input(Cmd cmd, ResMut<LightsSpawned> lights,
   lights->done = true;
 }
 
-void rotate_marked(Query<Mut<Transform3D>, RotateMarker> query,
-                   Res<Time> time) {
-  query.for_each([&](Transform3D *t, const RotateMarker *) {
-    Quaternion rot = QuaternionFromEuler(0, time->delta_seconds * 0.5f, 0);
-    t->rotation = QuaternionMultiply(t->rotation, rot);
-  });
-}
-
 void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(Camera3DComponent{60.0f}, ActiveCamera{},
             Transform3D::from_xyz(8, 6, 8).look_at({0, 0, 0}),
@@ -238,6 +230,4 @@ inline void scene_plugin(App &app) {
   app.add_systems(ScheduleLabel::Update, spawn_houses_on_input);
   app.add_systems(ScheduleLabel::Update, spawn_car_on_input);
   app.add_systems(ScheduleLabel::Update, spawn_lights_on_input);
-
-  app.add_systems(ScheduleLabel::Update, rotate_marked);
 }

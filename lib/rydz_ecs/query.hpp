@@ -7,6 +7,7 @@
 #include <optional>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 namespace ecs {
 
@@ -182,45 +183,63 @@ template <typename F1, typename F2> struct QueryFilterTraits<Or<F1, F2>> {
   }
 };
 
-template <typename T> struct is_filters : std::false_type {};
-
-template <typename... Fs> struct is_filters<Filters<Fs...>> : std::true_type {};
+template <typename T> struct is_filter : std::false_type {};
+template <typename T> struct is_filter<With<T>> : std::true_type {};
+template <typename T> struct is_filter<Without<T>> : std::true_type {};
+template <typename T> struct is_filter<Added<T>> : std::true_type {};
+template <typename T> struct is_filter<Changed<T>> : std::true_type {};
+template <typename F1, typename F2> struct is_filter<Or<F1, F2>> : std::true_type {};
+template <typename... Fs> struct is_filter<Filters<Fs...>> : std::true_type {};
 
 namespace detail {
 
-template <bool LastIsFilter, typename... Qs> struct QueryDecompose;
+template <typename F, typename FiltersT> struct MergeFilters;
 
-template <typename ItemsTuple, typename Head, typename... Tail>
-struct CollectItems;
-
-template <typename... Items, typename Last>
-struct CollectItems<std::tuple<Items...>, Last> {
-  using ItemTuple = std::tuple<Items...>;
-  using FilterType = Last;
+template <typename F, typename... Fs>
+struct MergeFilters<F, Filters<Fs...>> {
+  using type = Filters<F, Fs...>;
 };
 
-template <typename... Items, typename Head, typename Next, typename... Tail>
-struct CollectItems<std::tuple<Items...>, Head, Next, Tail...>
-    : CollectItems<std::tuple<Items..., Head>, Next, Tail...> {};
+template <typename... Fs1, typename... Fs2>
+struct MergeFilters<Filters<Fs1...>, Filters<Fs2...>> {
+  using type = Filters<Fs1..., Fs2...>;
+};
 
-template <typename... Qs>
-struct QueryDecompose<true, Qs...> : CollectItems<std::tuple<>, Qs...> {};
+template <typename... Qs> struct SplitTrailingFilters;
 
-template <typename... Qs> struct QueryDecompose<false, Qs...> {
-  using ItemTuple = std::tuple<Qs...>;
-  using FilterType = Filters<>;
+template <> struct SplitTrailingFilters<> {
+  using Items = std::tuple<>;
+  using Filters = Filters<>;
+};
+
+template <typename T, typename... Rest>
+struct SplitTrailingFilters<T, Rest...> {
+  using Tail = SplitTrailingFilters<Rest...>;
+  static constexpr bool tail_has_items =
+      !std::is_same_v<typename Tail::Items, std::tuple<>>;
+  static constexpr bool is_filter_v = is_filter<T>::value;
+
+  static_assert(!(tail_has_items && is_filter_v),
+                "Query filters must be trailing parameters");
+
+  using Items = std::conditional_t<
+      is_filter_v && !tail_has_items,
+      typename Tail::Items,
+      decltype(std::tuple_cat(std::declval<std::tuple<T>>(),
+                              std::declval<typename Tail::Items>()))>;
+
+  using Filters = std::conditional_t<
+      is_filter_v && !tail_has_items,
+      typename MergeFilters<T, typename Tail::Filters>::type,
+      typename Tail::Filters>;
 };
 
 } // namespace detail
 
 template <typename... Qs> class Query {
-  static constexpr bool last_is_filter =
-      is_filters<typename std::tuple_element<sizeof...(Qs) - 1,
-                                             std::tuple<Qs...>>::type>::value;
-
-  using Decomposed = detail::QueryDecompose<last_is_filter, Qs...>;
-  using ItemTuple = typename Decomposed::ItemTuple;
-  using FilterT = typename Decomposed::FilterType;
+  using Decomposed = detail::SplitTrailingFilters<Qs...>;
+  using ItemTuple = typename Decomposed::Items;
+  using FilterT = typename Decomposed::Filters;
 
   const World *world_;
 
