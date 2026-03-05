@@ -12,7 +12,6 @@
 
 namespace ecs {
 
-// Marker parameter to force a system to run on the main thread.
 struct NonSendMarker {};
 
 template <typename T> struct Res {
@@ -37,7 +36,7 @@ public:
   virtual SystemAccess access() const { return {}; }
 };
 
-template <typename P> struct SystemParamTraits;
+template <typename P> struct SystemParamTraits {};
 
 template <typename T> struct SystemParamTraits<Res<T>> {
   using Item = Res<T>;

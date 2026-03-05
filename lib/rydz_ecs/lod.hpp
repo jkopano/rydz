@@ -1,7 +1,6 @@
 #pragma once
 #include "asset.hpp"
 #include "camera3d.hpp"
-#include "frustum.hpp"
 #include "mesh3d.hpp"
 #include "transform.hpp"
 #include <absl/container/flat_hash_map.h>
@@ -41,14 +40,14 @@ struct MeshLodGroup {
 
 /// Resource: per-entity LOD history for hysteresis.
 struct LodHistory {
-  absl::flat_hash_map<Entity, int> map;
+  absl::flat_hash_map<Entity, int, std::hash<Entity>> map;
 };
 
 // ====== LOD mesh generation via meshoptimizer ======
 
 /// Simplify a raylib Mesh to a target ratio. Returns a new Mesh.
 /// The original mesh must have indices. If it doesn't, returns a copy.
-inline ::Mesh simplify_mesh(const ::Mesh &src, float target_ratio) {
+inline Mesh simplify_mesh(const Mesh &src, float target_ratio) {
   if (!src.vertices || src.vertexCount <= 0)
     return src;
 
@@ -89,7 +88,7 @@ inline ::Mesh simplify_mesh(const ::Mesh &src, float target_ratio) {
   }
 
   // Build new mesh
-  ::Mesh out = {};
+  Mesh out = {};
   out.vertexCount = static_cast<int>(new_vertex_count);
   out.triangleCount = static_cast<int>(simplified.size() / 3);
 
@@ -243,10 +242,10 @@ inline void auto_generate_lods_system(World &world) {
     group.level_count = 1;
 
     for (int lod = 1; lod < LOD_LEVELS; ++lod) {
-      ::Model lod_model = {};
+      Model lod_model = {};
       lod_model.meshCount = model->meshCount;
       lod_model.meshes =
-          static_cast<::Mesh *>(RL_CALLOC(model->meshCount, sizeof(::Mesh)));
+          static_cast<Mesh *>(RL_CALLOC(model->meshCount, sizeof(Mesh)));
 
       bool any_valid = false;
       for (int mi = 0; mi < model->meshCount; ++mi) {

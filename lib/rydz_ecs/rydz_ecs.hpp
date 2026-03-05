@@ -1,8 +1,5 @@
 #pragma once
 
-// rydz_ecs — Master include
-// C++20 header-only ECS library with raylib rendering layer
-
 // Phase 1: Core
 #include "rydz_ecs/access.hpp"
 #include "rydz_ecs/entity.hpp"

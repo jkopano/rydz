@@ -8,7 +8,7 @@
 namespace ecs {
 
 template <typename M>
-concept Material =
+concept IMaterial =
     requires(const M m, Model &model, Assets<Texture2D> *textures) {
       { m.color() } -> std::convertible_to<Color>;
       { m.apply(model, textures) } -> std::same_as<void>;
@@ -17,10 +17,7 @@ concept Material =
       { m.shader() } -> std::convertible_to<const Shader *>;
     };
 
-/// Pre-loads the shader for Material type M on the main (GL) thread.
-/// Usage: app.add_systems(ScheduleLabel::Startup,
-/// preload_material_shader<MyMat>);
-template <Material M> inline void preload_material_shader(NonSendMarker) {
+template <IMaterial M> inline void preload_material_shader(NonSendMarker) {
   M{}.shader();
 }
 
@@ -98,9 +95,9 @@ private:
   }
 };
 
-static_assert(Material<StandardMaterial>);
+static_assert(IMaterial<StandardMaterial>);
 
-template <Material M> struct MeshMaterial3d {
+template <IMaterial M> struct MeshMaterial3d {
   M material;
 
   MeshMaterial3d() = default;

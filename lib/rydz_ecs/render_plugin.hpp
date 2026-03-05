@@ -157,8 +157,8 @@ inline void render_system(
     }
   });
 
-  auto fallback_material = []() -> ::Material & {
-    static ::Material fallback = {};
+  auto fallback_material = []() -> Material & {
+    static Material fallback = {};
     static bool init = false;
     if (!init) {
       fallback.shader.id = rlGetShaderIdDefault();
@@ -226,7 +226,7 @@ inline void render_system(
       continue;
 
     const Mesh &mesh = model->meshes[key.mesh_index];
-    const ::Material *src_mat = nullptr;
+    const Material *src_mat = nullptr;
     if (model->materials && model->materialCount > 0 &&
         key.material_index >= 0 && key.material_index < model->materialCount) {
       src_mat = &model->materials[key.material_index];
@@ -236,7 +236,7 @@ inline void render_system(
     }
 
     std::array<MaterialMap, 12> local_maps;
-    ::Material draw_mat = *src_mat;
+    Material draw_mat = *src_mat;
     memcpy(local_maps.data(), src_mat->maps, sizeof(local_maps));
     draw_mat.maps = local_maps.data();
 

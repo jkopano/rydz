@@ -27,7 +27,7 @@ struct ViewVisibility {
 inline BVec3 to_bvec(Vector3 v) { return BVec3(v.x, v.y, v.z); }
 inline Vector3 to_rl(BVec3 v) { return {v[0], v[1], v[2]}; }
 
-inline BBox3 compute_local_bbox(const ::Mesh &mesh) {
+inline BBox3 compute_local_bbox(const Mesh &mesh) {
   if (!mesh.vertices || mesh.vertexCount <= 0)
     return BBox3::make_empty();
 
