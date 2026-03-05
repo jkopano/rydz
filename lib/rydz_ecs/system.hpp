@@ -99,9 +99,9 @@ template <> struct SystemParamTraits<World> {
 template <> struct SystemParamTraits<NonSendMarker> {
   using Item = NonSendMarker;
 
-  static Item retrieve(World & /*world*/) { return {}; }
+  static Item retrieve(World &) { return {}; }
 
-  static bool available(const World & /*world*/) { return true; }
+  static bool available(const World &) { return true; }
 
   static void access(SystemAccess &acc) { acc.set_main_thread_only(); }
 };

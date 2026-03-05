@@ -9,6 +9,9 @@
 #include <bvh/v2/vec.h>
 #include <raylib.h>
 #include <raymath.h>
+#include <taskflow/algorithm/for_each.hpp>
+#include <taskflow/taskflow.hpp>
+#include <vector>
 
 namespace ecs {
 
@@ -180,27 +183,47 @@ inline void frustum_cull_system(World &world) {
   if (!bounds_storage || !gt_storage)
     return;
 
-  for (auto e : bounds_storage->entity_indices()) {
-    auto *mb = bounds_storage->get(e);
-    auto *gt = gt_storage->get(e);
-    if (!mb || !gt)
-      continue;
+  auto entities = bounds_storage->entity_indices();
+  if (entities.empty())
+    return;
 
-    if (cv_storage) {
-      auto *cv = cv_storage->get(e);
-      if (cv && !cv->visible) {
-        world.insert_component(e, ViewVisibility{false});
-        continue;
-      }
-    }
+  std::vector<ViewVisibility> results(entities.size());
+  std::vector<uint8_t> has_result(entities.size(), 0);
 
-    BBox3 world_bbox = transform_bbox(mb->bbox, gt->matrix);
-    auto c = world_bbox.get_center();
-    Vector3 center = {c[0], c[1], c[2]};
-    float radius = bbox_radius(world_bbox);
+  tf::Taskflow taskflow;
+  taskflow.for_each_index(
+      size_t{0}, entities.size(), size_t{1}, [&](size_t idx) {
+        Entity e = entities[idx];
+        auto *mb = bounds_storage->get(e);
+        auto *gt = gt_storage->get(e);
+        if (!mb || !gt)
+          return;
 
-    bool visible = sphere_in_frustum(center, radius, planes);
-    world.insert_component(e, ViewVisibility{visible});
+        if (cv_storage) {
+          auto *cv = cv_storage->get(e);
+          if (cv && !cv->visible) {
+            results[idx] = ViewVisibility{false};
+            has_result[idx] = 1;
+            return;
+          }
+        }
+
+        BBox3 world_bbox = transform_bbox(mb->bbox, gt->matrix);
+        auto c = world_bbox.get_center();
+        Vector3 center = {c[0], c[1], c[2]};
+        float radius = bbox_radius(world_bbox);
+
+        results[idx] = ViewVisibility{
+            sphere_in_frustum(center, radius, planes)};
+        has_result[idx] = 1;
+      });
+
+  static tf::Executor executor;
+  executor.run(taskflow).wait();
+
+  for (size_t i = 0; i < entities.size(); ++i) {
+    if (has_result[i])
+      world.insert_component(entities[i], results[i]);
   }
 }
 

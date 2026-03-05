@@ -1,5 +1,6 @@
 #pragma once
 #include "entity.hpp"
+#include "helpers.hpp"
 #include "resource.hpp"
 #include "storage.hpp"
 #include "ticks.hpp"
@@ -28,6 +29,8 @@ public:
     return change_tick_;
   }
 
+  // <RESOURCY>
+
   template <typename T> void insert_resource(T resource) {
     resources.insert<T>(std::move(resource));
   }
@@ -45,6 +48,8 @@ public:
   template <typename T> std::optional<T> remove_resource() {
     return resources.remove<T>();
   }
+
+  // </RESOURCY>
 
   Entity spawn() { return entities.create(); }
 
@@ -125,30 +130,23 @@ public:
     return it->second->get_ticks(entity);
   }
 
-  IStorage *get_storage(std::type_index key) {
-    auto it = storages_.find(key);
-    return it != storages_.end() ? it->second.get() : nullptr;
+  template <typename Self>
+  auto *get_storage(this Self &&self, std::type_index key) {
+    using ReturnType = copy_const_t<Self, IStorage>;
+
+    auto it = self.storages_.find(key);
+    return (it == self.storages_.end())
+               ? nullptr
+               : static_cast<ReturnType *>(it->second.get());
   }
 
-  const IStorage *get_storage(std::type_index key) const {
-    auto it = storages_.find(key);
-    return it != storages_.end() ? it->second.get() : nullptr;
-  }
+  template <typename T, typename Self> auto *get_vec_storage(this Self &&self) {
+    using ReturnType = copy_const_t<Self, VecStorage<T>>;
 
-  template <typename T> VecStorage<T> *get_vec_storage() {
-    auto key = std::type_index(typeid(T));
-    auto it = storages_.find(key);
-    if (it == storages_.end())
-      return nullptr;
-    return static_cast<VecStorage<T> *>(it->second.get());
-  }
-
-  template <typename T> const VecStorage<T> *get_vec_storage() const {
-    auto key = std::type_index(typeid(T));
-    auto it = storages_.find(key);
-    if (it == storages_.end())
-      return nullptr;
-    return static_cast<const VecStorage<T> *>(it->second.get());
+    auto it = self.storages_.find(std::type_index(typeid(T)));
+    return (it == self.storages_.end())
+               ? nullptr
+               : static_cast<ReturnType *>(it->second.get());
   }
 };
 

@@ -54,21 +54,15 @@ camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
   });
 }
 
-inline void camera_mouse_system(World &world, NonSendMarker) {
-  auto *ctrl_storage = world.get_vec_storage<CameraController>();
-  auto *transform_storage = world.get_vec_storage<Transform3D>();
-  if (!ctrl_storage || !transform_storage)
-    return;
-
+inline void
+camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
+                    NonSendMarker) {
   Vector2 mouse_delta = GetMouseDelta();
-  if (mouse_delta.x == 0 && mouse_delta.y == 0)
-    return;
-
-  for (auto e : ctrl_storage->entity_indices()) {
-    auto *ctrl = const_cast<CameraController *>(ctrl_storage->get(e));
-    auto *t = transform_storage->get(e);
+  query.for_each([&](CameraController *ctrl, Transform3D *t) {
     if (!ctrl || !t || !ctrl->enabled)
-      continue;
+      return;
+    if (mouse_delta.x == 0 && mouse_delta.y == 0)
+      return;
 
     ctrl->yaw -= mouse_delta.x * ctrl->mouse_sensitivity * 57.2958f;
     ctrl->pitch -= mouse_delta.y * ctrl->mouse_sensitivity * 57.2958f;
@@ -80,28 +74,22 @@ inline void camera_mouse_system(World &world, NonSendMarker) {
 
     t->rotation =
         QuaternionFromEuler(ctrl->pitch * DEG2RAD, ctrl->yaw * DEG2RAD, 0.0f);
-  }
+  });
 }
 
-inline void toggle_camera_system(World &world, NonSendMarker) {
+inline void toggle_camera_system(Query<Mut<CameraController>> query,
+                                 NonSendMarker) {
   if (!IsKeyPressed(KEY_ESCAPE))
     return;
 
-  auto *ctrl_storage = world.get_vec_storage<CameraController>();
-  if (!ctrl_storage)
-    return;
-
-  for (auto e : ctrl_storage->entity_indices()) {
-    auto *ctrl = const_cast<CameraController *>(ctrl_storage->get(e));
-    if (!ctrl)
-      continue;
+  query.for_each([&](CameraController *ctrl) {
     ctrl->enabled = !ctrl->enabled;
 
     if (ctrl->enabled)
       DisableCursor();
     else
       EnableCursor();
-  }
+  });
 }
 
 inline void spawn_map(Cmd cmd, ResMut<Assets<Model>> model_assets,
@@ -153,8 +141,8 @@ struct CarHandles {
   bool spawned = false;
 };
 
-void spawn_car_on_input(Cmd cmd, ResMut<Assets<Model>> model_assets,
-                        ResMut<CarHandles> car_handles, NonSendMarker) {
+inline void spawn_car_on_input(Cmd cmd, ResMut<Assets<Model>> model_assets,
+                               ResMut<CarHandles> car_handles, NonSendMarker) {
   if (car_handles->spawned)
     return;
   if (!IsKeyPressed(KEY_G))
@@ -179,8 +167,8 @@ struct LightsSpawned {
   bool done = false;
 };
 
-void spawn_lights_on_input(Cmd cmd, ResMut<LightsSpawned> lights,
-                           NonSendMarker) {
+inline void spawn_lights_on_input(Cmd cmd, ResMut<LightsSpawned> lights,
+                                  NonSendMarker) {
   if (lights->done || !IsKeyPressed(KEY_L))
     return;
 
@@ -208,12 +196,13 @@ void spawn_lights_on_input(Cmd cmd, ResMut<LightsSpawned> lights,
   lights->done = true;
 }
 
-void setup_camera(Cmd cmd, NonSendMarker) {
-  cmd.spawn(Camera3DComponent{60.0f}, ActiveCamera{},
+inline void setup_camera(Cmd cmd, NonSendMarker) {
+  cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
             Transform3D::from_xyz(8, 6, 8).look_at({0, 0, 0}),
             CameraController{});
   DisableCursor();
 }
+
 inline void scene_plugin(App &app) {
   app.insert_resource(HouseHandles{});
   app.insert_resource(CarHandles{});

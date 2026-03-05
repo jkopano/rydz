@@ -11,7 +11,48 @@
 
 namespace ecs {
 
-template <typename T> struct Mut {};
+template <typename T> struct Mut {
+  T *ptr = nullptr;
+  VecStorage<T> *storage = nullptr;
+  Entity entity{};
+  Tick tick{};
+  bool dirty = false;
+
+  Mut() = default;
+  Mut(T *p, VecStorage<T> *s, Entity e, Tick t)
+      : ptr(p), storage(s), entity(e), tick(t) {}
+
+  T &get() {
+    dirty = true;
+    return *ptr;
+  }
+  const T &get() const { return *ptr; }
+
+  T *operator->() {
+    dirty = true;
+    return ptr;
+  }
+  const T *operator->() const { return ptr; }
+
+  T &operator*() {
+    dirty = true;
+    return *ptr;
+  }
+  const T &operator*() const { return *ptr; }
+
+  explicit operator bool() const { return ptr != nullptr; }
+
+  operator T *() {
+    dirty = true;
+    return ptr;
+  }
+  operator const T *() const { return ptr; }
+
+  ~Mut() {
+    if (dirty && storage && ptr)
+      storage->mark_changed(entity, tick);
+  }
+};
 template <typename Inner> struct Opt {};
 
 template <typename T> struct With {};
@@ -47,18 +88,21 @@ template <typename T> struct WorldQueryTraits {
 
 // Mut<T> = mutable access (T*)
 template <typename T> struct WorldQueryTraits<Mut<T>> {
-  using Item = T *;
+  using Item = Mut<T>;
 
   static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
 
   struct Fetcher {
     VecStorage<T> *storage = nullptr;
+    Tick tick{};
 
     void init(const World &world) {
       storage = const_cast<World &>(world).get_vec_storage<T>();
+      tick = world.read_change_tick();
     }
     Item fetch(Entity entity) const {
-      return storage ? storage->get(entity) : nullptr;
+      return Item{storage ? storage->get(entity) : nullptr, storage, entity,
+                  tick};
     }
     bool matches(Entity entity) const {
       return storage && storage->has(entity);
@@ -89,18 +133,21 @@ template <typename T> struct WorldQueryTraits<Opt<T>> {
 
 // Opt<Mut<T>> = optional mutable (T*, nullable)
 template <typename T> struct WorldQueryTraits<Opt<Mut<T>>> {
-  using Item = T *;
+  using Item = Mut<T>;
 
   static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
 
   struct Fetcher {
     VecStorage<T> *storage = nullptr;
+    Tick tick{};
 
     void init(const World &world) {
       storage = const_cast<World &>(world).get_vec_storage<T>();
+      tick = world.read_change_tick();
     }
     Item fetch(Entity entity) const {
-      return storage ? storage->get(entity) : nullptr;
+      return Item{storage ? storage->get(entity) : nullptr, storage, entity,
+                  tick};
     }
     bool matches(Entity) const { return true; }
     size_t capacity() const { return SIZE_MAX; }
