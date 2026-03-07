@@ -1,6 +1,6 @@
 #pragma once
-#include "app.hpp"
-#include "asset.hpp"
+#include "rydz_ecs/app.hpp"
+#include "rydz_ecs/asset.hpp"
 #include "camera3d.hpp"
 #include "frustum.hpp"
 #include "light.hpp"
@@ -9,9 +9,9 @@
 #include "mesh3d.hpp"
 #include "render_batches.hpp"
 #include "render_config.hpp"
-#include "transform.hpp"
-#include "types.hpp"
-#include "visibility.hpp"
+#include "rydz_ecs/transform.hpp"
+#include "rydz_ecs/types.hpp"
+#include "rydz_ecs/visibility.hpp"
 #include <absl/container/flat_hash_map.h>
 #include <array>
 #include <cstring>

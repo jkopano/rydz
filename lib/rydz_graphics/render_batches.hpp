@@ -1,5 +1,5 @@
 #pragma once
-#include "asset.hpp"
+#include "rydz_ecs/asset.hpp"
 #include "render_config.hpp"
 #include <absl/hash/hash.h>
 #include <cstdint>

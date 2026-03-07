@@ -1,5 +1,6 @@
 #pragma once
 #include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_graphics/rydz_graphics.hpp"
 
 using namespace ecs;
 

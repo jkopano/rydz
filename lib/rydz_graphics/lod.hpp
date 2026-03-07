@@ -1,8 +1,8 @@
 #pragma once
-#include "asset.hpp"
+#include "rydz_ecs/asset.hpp"
 #include "camera3d.hpp"
 #include "mesh3d.hpp"
-#include "transform.hpp"
+#include "rydz_ecs/transform.hpp"
 #include <absl/container/flat_hash_map.h>
 #include <algorithm>
 #include <array>

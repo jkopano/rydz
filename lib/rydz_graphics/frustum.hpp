@@ -1,9 +1,9 @@
 #pragma once
-#include "asset.hpp"
+#include "rydz_ecs/asset.hpp"
 #include "camera3d.hpp"
 #include "mesh3d.hpp"
-#include "transform.hpp"
-#include "visibility.hpp"
+#include "rydz_ecs/transform.hpp"
+#include "rydz_ecs/visibility.hpp"
 #include <array>
 #include <bvh/v2/bbox.h>
 #include <bvh/v2/vec.h>

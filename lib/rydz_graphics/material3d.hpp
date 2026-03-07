@@ -1,5 +1,5 @@
 #pragma once
-#include "asset.hpp"
+#include "rydz_ecs/asset.hpp"
 #include <concepts>
 #include <raylib.h>
 #include <raymath.h>
