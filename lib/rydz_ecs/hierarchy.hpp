@@ -22,7 +22,7 @@ struct Children {
 inline Children children_of(const World &world, Entity parent) {
   Children result;
 
-  auto *storage = world.get_vec_storage<Parent>();
+  auto *storage = world.get_storage<Parent>();
   if (!storage)
     return result;
 

@@ -68,7 +68,7 @@ static void BM_HashMapStorageIteration10Pct(benchmark::State &state) {
 
   for (auto _ : state) {
     // For HashMapStorage we iterate manually since Query uses VecStorage
-    auto *pos_storage = world.get_vec_storage<Position>();
+    auto *pos_storage = world.get_storage<Position>();
     if (!pos_storage)
       continue;
 

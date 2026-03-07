@@ -60,49 +60,29 @@ public:
     entities.destroy(entity);
   }
 
-  template <typename T> VecStorage<T> &ensure_vec_storage() {
+  template <typename T> auto &ensure_storage() {
+    using TargetStorage = storage_t<T>;
     auto key = std::type_index(typeid(T));
-    auto it = storages_.find(key);
-    if (it == storages_.end()) {
-      auto storage = std::make_unique<VecStorage<T>>();
-      auto *ptr = storage.get();
-      storages_.emplace(key, std::move(storage));
-      return *ptr;
-    }
-    return *static_cast<VecStorage<T> *>(it->second.get());
-  }
 
-  template <typename T> HashMapStorage<T> &ensure_hashmap_storage() {
-    auto key = std::type_index(typeid(T));
     auto it = storages_.find(key);
     if (it == storages_.end()) {
-      auto storage = std::make_unique<HashMapStorage<T>>();
+      auto storage = std::make_unique<TargetStorage>();
       auto *ptr = storage.get();
       storages_.emplace(key, std::move(storage));
       return *ptr;
     }
-    return *static_cast<HashMapStorage<T> *>(it->second.get());
+    return *static_cast<TargetStorage *>(it->second.get());
   }
 
   template <typename T> void insert_component(Entity entity, T component) {
-    auto &storage = ensure_vec_storage<T>();
+    auto &storage = ensure_storage<T>();
     storage.insert(entity, std::move(component), change_tick_);
   }
 
-  template <typename T> T *get_component(Entity entity) {
-    auto key = std::type_index(typeid(T));
-    auto it = storages_.find(key);
-    if (it == storages_.end())
-      return nullptr;
-    return static_cast<VecStorage<T> *>(it->second.get())->get(entity);
-  }
-
-  template <typename T> const T *get_component(Entity entity) const {
-    auto key = std::type_index(typeid(T));
-    auto it = storages_.find(key);
-    if (it == storages_.end())
-      return nullptr;
-    return static_cast<const VecStorage<T> *>(it->second.get())->get(entity);
+  template <typename T, typename Self>
+  auto *get_component(this Self &&self, Entity entity) {
+    auto *storage = self.template get_storage<T>();
+    return (storage == nullptr) ? nullptr : storage->get(entity);
   }
 
   template <typename T> void remove_component(Entity entity) {
@@ -130,17 +110,7 @@ public:
     return it->second->get_ticks(entity);
   }
 
-  template <typename Self>
-  auto *get_storage(this Self &&self, std::type_index key) {
-    using ReturnType = copy_const_t<Self, IStorage>;
-
-    auto it = self.storages_.find(key);
-    return (it == self.storages_.end())
-               ? nullptr
-               : static_cast<ReturnType *>(it->second.get());
-  }
-
-  template <typename T, typename Self> auto *get_vec_storage(this Self &&self) {
+  template <typename T, typename Self> auto *get_storage(this Self &&self) {
     using ReturnType = copy_const_t<Self, VecStorage<T>>;
 
     auto it = self.storages_.find(std::type_index(typeid(T)));

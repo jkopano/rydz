@@ -9,6 +9,7 @@ struct CarTag {};
 struct RotateMarker {};
 
 struct CameraController {
+  using Storage = VecStorage<CameraController>;
   float move_speed = 20.0f;
   float mouse_sensitivity = 0.003f;
   float yaw = -90.0f;
@@ -19,20 +20,19 @@ struct CameraController {
 inline void
 camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
                          Res<Time> time, NonSendMarker) {
-  query.for_each([&](Transform3D *t, const CameraController *ctrl) {
+  query.for_each([&](Transform3D *t, CameraController const *ctrl) {
     if (!ctrl->enabled)
       return;
 
     float dt = time->delta_seconds;
     float speed = ctrl->move_speed;
 
-    if (IsKeyDown(KEY_LEFT_CONTROL))
-      speed *= 3.0f;
-
+    Vector3 move = {0, 0, 0};
     Vector3 forward = t->forward();
     Vector3 right = t->right();
 
-    Vector3 move = {0, 0, 0};
+    if (IsKeyDown(KEY_LEFT_CONTROL))
+      speed *= 3.0f;
     if (IsKeyDown(KEY_W))
       move = Vector3Add(move, forward);
     if (IsKeyDown(KEY_S))
@@ -59,9 +59,7 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
                     NonSendMarker) {
   Vector2 mouse_delta = GetMouseDelta();
   query.for_each([&](CameraController *ctrl, Transform3D *t) {
-    if (!ctrl || !t || !ctrl->enabled)
-      return;
-    if (mouse_delta.x == 0 && mouse_delta.y == 0)
+    if (!ctrl->enabled || (mouse_delta.x == 0 && mouse_delta.y == 0))
       return;
 
     ctrl->yaw -= mouse_delta.x * ctrl->mouse_sensitivity * 57.2958f;

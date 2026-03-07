@@ -71,7 +71,7 @@ template <typename T> struct WorldQueryTraits {
   struct Fetcher {
     const VecStorage<T> *storage = nullptr;
 
-    void init(const World &world) { storage = world.get_vec_storage<T>(); }
+    void init(const World &world) { storage = world.get_storage<T>(); }
 
     Item fetch(Entity entity) const {
       return storage ? storage->get(entity) : nullptr;
@@ -97,7 +97,7 @@ template <typename T> struct WorldQueryTraits<Mut<T>> {
     Tick tick{};
 
     void init(const World &world) {
-      storage = const_cast<World &>(world).get_vec_storage<T>();
+      storage = const_cast<World &>(world).get_storage<T>();
       tick = world.read_change_tick();
     }
     Item fetch(Entity entity) const {
@@ -121,7 +121,7 @@ template <typename T> struct WorldQueryTraits<Opt<T>> {
   struct Fetcher {
     const VecStorage<T> *storage = nullptr;
 
-    void init(const World &world) { storage = world.get_vec_storage<T>(); }
+    void init(const World &world) { storage = world.get_storage<T>(); }
     Item fetch(Entity entity) const {
       return storage ? storage->get(entity) : nullptr;
     }
@@ -142,7 +142,7 @@ template <typename T> struct WorldQueryTraits<Opt<Mut<T>>> {
     Tick tick{};
 
     void init(const World &world) {
-      storage = const_cast<World &>(world).get_vec_storage<T>();
+      storage = const_cast<World &>(world).get_storage<T>();
       tick = world.read_change_tick();
     }
     Item fetch(Entity entity) const {

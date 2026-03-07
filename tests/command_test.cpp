@@ -47,7 +47,7 @@ TEST(CommandTest, SpawnWithComponents) {
 
   // Verify
   int health_count = 0;
-  auto *storage = world.get_vec_storage<Health>();
+  auto *storage = world.get_storage<Health>();
   if (storage) {
     storage->for_each([&](Entity, const Health &h) {
       EXPECT_EQ(h.value, 100);
@@ -57,7 +57,7 @@ TEST(CommandTest, SpawnWithComponents) {
   EXPECT_EQ(health_count, 1);
 
   int name_count = 0;
-  auto *name_storage = world.get_vec_storage<Name>();
+  auto *name_storage = world.get_storage<Name>();
   if (name_storage) {
     name_storage->for_each([&](Entity, const Name &n) {
       EXPECT_EQ(n, (Name{"Hero"}));
@@ -84,7 +84,7 @@ TEST(CommandTest, SpawnMany) {
   queue->apply(world);
 
   int count = 0;
-  auto *storage = world.get_vec_storage<Value>();
+  auto *storage = world.get_storage<Value>();
   if (storage) {
     storage->for_each([&](Entity, const Value &) { count++; });
   }
@@ -145,7 +145,7 @@ TEST(CommandTest, SpawnEmptyThenInsert) {
   queue->apply(world);
 
   int count = 0;
-  auto *storage = world.get_vec_storage<Health>();
+  auto *storage = world.get_storage<Health>();
   if (storage) {
     storage->for_each([&](Entity, const Health &h) {
       EXPECT_EQ(h.value, 50);

@@ -38,7 +38,7 @@ static void BM_SimpleIteration(benchmark::State &state) {
 
   for (auto _ : state) {
     Query<Mut<Position>, Velocity> query(world);
-    query.for_each([](Position *pos, const Velocity *vel) {
+    query.for_each([](Position *pos, Velocity const *vel) {
       pos->x += vel->x;
       pos->y += vel->y;
       pos->z += vel->z;

@@ -45,7 +45,7 @@ static void BM_QueryIterationReadWrite10000(benchmark::State &state) {
 
   for (auto _ : state) {
     Query<Mut<Position>, Velocity> query(world);
-    query.for_each([](Position *pos, const Velocity *vel) {
+    query.for_each([](Position *pos, Velocity const *vel) {
       pos->x += vel->x;
       pos->y += vel->y;
       pos->z += vel->z;
@@ -66,7 +66,7 @@ static void BM_QueryIterationReadOnly10000(benchmark::State &state) {
 
   for (auto _ : state) {
     Query<Position, Velocity> query(world);
-    query.for_each([](const Position *pos, const Velocity *vel) {
+    query.for_each([](Position const *pos, Velocity const *vel) {
       benchmark::DoNotOptimize(pos->x + vel->x);
     });
   }

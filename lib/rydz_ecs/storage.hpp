@@ -206,4 +206,15 @@ public:
   }
 };
 
+template <typename T, typename = void> struct storage_trait {
+  using type = VecStorage<T>;
+};
+
+template <typename T>
+struct storage_trait<T, std::void_t<typename T::Storage>> {
+  using type = typename T::Storage;
+};
+
+template <typename T> using storage_t = typename storage_trait<T>::type;
+
 } // namespace ecs

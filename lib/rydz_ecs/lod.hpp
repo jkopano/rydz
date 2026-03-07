@@ -199,8 +199,8 @@ inline int apply_lod_hysteresis(Entity entity, int desired_level,
 /// Runs on main thread (needs GL for UploadMesh).
 /// Deduplicates by model handle ID — LODs generated once per unique model.
 inline void auto_generate_lods_system(World &world) {
-  auto *mesh_storage = world.get_vec_storage<Mesh3d>();
-  auto *lod_storage = world.get_vec_storage<MeshLodGroup>();
+  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *lod_storage = world.get_storage<MeshLodGroup>();
   auto *model_assets = world.get_resource<Assets<Model>>();
   auto *config = world.get_resource<LodConfig>();
   if (!mesh_storage || !model_assets || !config)
@@ -221,7 +221,7 @@ inline void auto_generate_lods_system(World &world) {
     auto cache_it = lod_cache.find(mesh3d->model.id);
     if (cache_it != lod_cache.end()) {
       world.insert_component(e, cache_it->second);
-      lod_storage = world.get_vec_storage<MeshLodGroup>();
+      lod_storage = world.get_storage<MeshLodGroup>();
       continue;
     }
 
@@ -268,7 +268,7 @@ inline void auto_generate_lods_system(World &world) {
 
     lod_cache[mesh3d->model.id] = group;
     world.insert_component(e, group);
-    lod_storage = world.get_vec_storage<MeshLodGroup>();
+    lod_storage = world.get_storage<MeshLodGroup>();
   }
 }
 

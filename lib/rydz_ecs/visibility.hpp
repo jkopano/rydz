@@ -21,7 +21,7 @@ struct ComputedVisibility {
 
 inline void compute_visibility(World &world) {
   std::unordered_map<Entity, Visibility> visibilities;
-  auto *vis_storage = world.get_vec_storage<Visibility>();
+  auto *vis_storage = world.get_storage<Visibility>();
   if (!vis_storage)
     return;
 
@@ -33,7 +33,7 @@ inline void compute_visibility(World &world) {
   }
 
   std::unordered_map<Entity, Entity> parents;
-  auto *parent_storage = world.get_vec_storage<Parent>();
+  auto *parent_storage = world.get_storage<Parent>();
   if (parent_storage) {
     auto p_entities = parent_storage->entity_indices();
     for (auto e : p_entities) {

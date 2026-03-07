@@ -27,8 +27,8 @@ struct ClearColor {
 };
 
 inline void apply_materials_system(World &world) {
-  auto *mesh_storage = world.get_vec_storage<Mesh3d>();
-  auto *mat_storage = world.get_vec_storage<Material3d>();
+  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *mat_storage = world.get_storage<Material3d>();
   auto *model_assets = world.get_resource<Assets<Model>>();
   auto *tex_assets = world.get_resource<Assets<Texture2D>>();
   if (!mesh_storage || !mat_storage || !model_assets)
@@ -389,8 +389,8 @@ inline void render_system(
 }
 
 inline void auto_insert_global_transform(World &world) {
-  auto *transform_storage = world.get_vec_storage<Transform3D>();
-  auto *global_storage = world.get_vec_storage<GlobalTransform>();
+  auto *transform_storage = world.get_storage<Transform3D>();
+  auto *global_storage = world.get_storage<GlobalTransform>();
   if (!transform_storage)
     return;
 
@@ -398,14 +398,14 @@ inline void auto_insert_global_transform(World &world) {
   for (auto e : entities) {
     if (!global_storage || !global_storage->get(e)) {
       world.insert_component(e, GlobalTransform{});
-      global_storage = world.get_vec_storage<GlobalTransform>();
+      global_storage = world.get_storage<GlobalTransform>();
     }
   }
 }
 
 inline void auto_insert_visibility(World &world) {
-  auto *mesh_storage = world.get_vec_storage<Mesh3d>();
-  auto *vis_storage = world.get_vec_storage<Visibility>();
+  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *vis_storage = world.get_storage<Visibility>();
   if (!mesh_storage)
     return;
 
@@ -413,14 +413,14 @@ inline void auto_insert_visibility(World &world) {
   for (auto e : entities) {
     if (!vis_storage || !vis_storage->get(e)) {
       world.insert_component(e, Visibility::Visible);
-      vis_storage = world.get_vec_storage<Visibility>();
+      vis_storage = world.get_storage<Visibility>();
     }
   }
 }
 
 inline void auto_insert_material(World &world) {
-  auto *mesh_storage = world.get_vec_storage<Mesh3d>();
-  auto *mat_storage = world.get_vec_storage<Material3d>();
+  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *mat_storage = world.get_storage<Material3d>();
   if (!mesh_storage)
     return;
 
@@ -429,14 +429,14 @@ inline void auto_insert_material(World &world) {
     if (!mat_storage || !mat_storage->get(e)) {
       world.insert_component(e,
                              Material3d{StandardMaterial::from_color(WHITE)});
-      mat_storage = world.get_vec_storage<Material3d>();
+      mat_storage = world.get_storage<Material3d>();
     }
   }
 }
 
 inline void auto_insert_render_config(World &world) {
-  auto *mesh_storage = world.get_vec_storage<Mesh3d>();
-  auto *rc_storage = world.get_vec_storage<RenderConfig>();
+  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *rc_storage = world.get_storage<RenderConfig>();
   if (!mesh_storage)
     return;
 
@@ -444,7 +444,7 @@ inline void auto_insert_render_config(World &world) {
   for (auto e : entities) {
     if (!rc_storage || !rc_storage->get(e)) {
       world.insert_component(e, RenderConfig{});
-      rc_storage = world.get_vec_storage<RenderConfig>();
+      rc_storage = world.get_storage<RenderConfig>();
     }
   }
 }

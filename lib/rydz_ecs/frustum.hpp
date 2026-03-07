@@ -119,8 +119,8 @@ struct MeshBounds {
   BBox3 bbox = BBox3::make_empty();
 };
 inline void compute_mesh_bounds_system(World &world) {
-  auto *mesh_storage = world.get_vec_storage<Mesh3d>();
-  auto *bounds_storage = world.get_vec_storage<MeshBounds>();
+  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *bounds_storage = world.get_storage<MeshBounds>();
   auto *model_assets = world.get_resource<Assets<Model>>();
   if (!mesh_storage || !model_assets)
     return;
@@ -143,14 +143,14 @@ inline void compute_mesh_bounds_system(World &world) {
     }
 
     world.insert_component(e, MeshBounds{combined});
-    bounds_storage = world.get_vec_storage<MeshBounds>();
+    bounds_storage = world.get_storage<MeshBounds>();
   }
 }
 
 inline void frustum_cull_system(World &world) {
-  auto *cam_storage = world.get_vec_storage<Camera3DComponent>();
-  auto *active_storage = world.get_vec_storage<ActiveCamera>();
-  auto *cam_tx_storage = world.get_vec_storage<Transform3D>();
+  auto *cam_storage = world.get_storage<Camera3DComponent>();
+  auto *active_storage = world.get_storage<ActiveCamera>();
+  auto *cam_tx_storage = world.get_storage<Transform3D>();
   if (!cam_storage || !active_storage || !cam_tx_storage)
     return;
 
@@ -177,9 +177,9 @@ inline void frustum_cull_system(World &world) {
   Matrix vp = MatrixMultiply(view, projection);
   auto planes = extract_frustum_planes(vp);
 
-  auto *bounds_storage = world.get_vec_storage<MeshBounds>();
-  auto *gt_storage = world.get_vec_storage<GlobalTransform>();
-  auto *cv_storage = world.get_vec_storage<ComputedVisibility>();
+  auto *bounds_storage = world.get_storage<MeshBounds>();
+  auto *gt_storage = world.get_storage<GlobalTransform>();
+  auto *cv_storage = world.get_storage<ComputedVisibility>();
   if (!bounds_storage || !gt_storage)
     return;
 

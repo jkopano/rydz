@@ -90,7 +90,7 @@ struct GlobalTransform {
 
 inline void propagate_transforms(World &world) {
   std::unordered_map<Entity, Matrix> local_matrices;
-  auto *transform_storage = world.get_vec_storage<Transform3D>();
+  auto *transform_storage = world.get_storage<Transform3D>();
   if (transform_storage) {
     for (auto e : transform_storage->entity_indices()) {
       auto *t = transform_storage->get(e);
@@ -100,7 +100,7 @@ inline void propagate_transforms(World &world) {
   }
 
   std::unordered_map<Entity, Entity> parents;
-  auto *parent_storage = world.get_vec_storage<Parent>();
+  auto *parent_storage = world.get_storage<Parent>();
   if (parent_storage) {
     for (auto e : parent_storage->entity_indices()) {
       auto *p = parent_storage->get(e);

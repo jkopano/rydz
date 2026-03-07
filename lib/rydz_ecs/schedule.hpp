@@ -84,8 +84,7 @@ public:
 
   template <typename F, typename Cond>
   void add_system_fn_if(F &&func, Cond &&cond) {
-    add_system(
-        make_system_run_if(std::forward<F>(func), std::forward<Cond>(cond)));
+    add_system(make_system_run_if(std::forward(func), std::forward(cond)));
   }
 
   void run(World &world) {
@@ -100,7 +99,7 @@ public:
 
     for (auto &segment : segments_) {
       if (segment.kind == SegmentKind::Inline) {
-        for (size_t i = segment.start; i < segment.end; ++i)
+        for (size_t i : range(segment.start, segment.end))
           entries_[i].system->run(world);
       } else {
         global_executor().run(segment.taskflow).wait();
@@ -116,13 +115,15 @@ private:
     segments_.clear();
 
     auto chunked_view =
-        entries_ | std::views::chunk_by([](const auto &a, const auto &b) {
+        entries_ |
+        std::views::chunk_by([](const SystemEntry &a, const SystemEntry &b) {
           return a.access.main_thread_only == b.access.main_thread_only;
         });
 
     for (auto chunk : chunked_view) {
       size_t start =
           static_cast<size_t>(std::distance(entries_.data(), &chunk.front()));
+
       size_t end = start + chunk.size();
 
       bool is_main = chunk.front().access.main_thread_only;
@@ -143,13 +144,13 @@ private:
     std::vector<tf::Task> tasks{};
     tasks.reserve(count);
 
-    for (size_t i : std::views::iota(segment.start, segment.end)) {
+    for (size_t i : range(segment.start, segment.end)) {
       tasks.push_back(segment.taskflow.emplace(
           [this, i] { entries_[i].system->run(*current_world_); }));
     }
 
-    for (size_t j : std::views::iota(1u, count)) {
-      for (size_t i : std::views::iota(0u, j)) {
+    for (size_t j : range(1u, count)) {
+      for (size_t i : range(0u, j)) {
         const auto &a = entries_[segment.start + i].access;
         const auto &b = entries_[segment.start + j].access;
         if (a.exclusive || b.exclusive || !a.is_compatible(b))
