@@ -7266,4 +7266,467 @@ static ModelAnimation *LoadModelAnimationsM3D(const char *fileName, int *animCou
 }
 #endif
 
+// Load GLTF/GLB file as scene with mesh hierarchy metadata (no GPU upload)
+// NOTE: This function preserves node names and parent-child relationships in mesh metadata
+GltfScene LoadGltfScene(const char *fileName)
+{
+    GltfScene scene = { 0 };
+
+#if SUPPORT_FILEFORMAT_GLTF
+    // Macro to simplify attributes loading code
+    #define LOAD_ATTRIBUTE_SCENE(accesor, numComp, srcType, dstPtr) LOAD_ATTRIBUTE_CAST_SCENE(accesor, numComp, srcType, dstPtr, srcType)
+
+    #define LOAD_ATTRIBUTE_CAST_SCENE(accesor, numComp, srcType, dstPtr, dstType) \
+    { \
+        int n = 0; \
+        srcType *buffer = (srcType *)accesor->buffer_view->buffer->data + accesor->buffer_view->offset/sizeof(srcType) + accesor->offset/sizeof(srcType); \
+        for (unsigned int k = 0; k < accesor->count; k++) \
+        {\
+            for (int l = 0; l < numComp; l++) \
+            {\
+                dstPtr[numComp*k + l] = (dstType)buffer[n + l];\
+            }\
+            n += (int)(accesor->stride/sizeof(srcType));\
+        }\
+    }
+
+    int dataSize = 0;
+    unsigned char *fileData = LoadFileData(fileName, &dataSize);
+    if (fileData == NULL) return scene;
+
+    cgltf_options options = { 0 };
+    options.file.read = LoadFileGLTFCallback;
+    options.file.release = ReleaseFileGLTFCallback;
+    cgltf_data *data = NULL;
+    cgltf_result result = cgltf_parse(&options, fileData, dataSize, &data);
+
+    if (result == cgltf_result_success)
+    {
+        if (data->file_type == cgltf_file_type_glb) TRACELOG(LOG_INFO, "MODEL: [%s] GltfScene (glb) loaded successfully", fileName);
+        else if (data->file_type == cgltf_file_type_gltf) TRACELOG(LOG_INFO, "MODEL: [%s] GltfScene (glTF) loaded successfully", fileName);
+
+        result = cgltf_load_buffers(&options, data, fileName);
+        if (result != cgltf_result_success) TRACELOG(LOG_INFO, "MODEL: [%s] Failed to load mesh/material buffers", fileName);
+
+        int primitivesCount = 0;
+
+        for (unsigned int i = 0; i < data->nodes_count; i++)
+        {
+            cgltf_node *node = &(data->nodes[i]);
+            cgltf_mesh *mesh = node->mesh;
+            if (!mesh) continue;
+
+            for (unsigned int p = 0; p < mesh->primitives_count; p++)
+            {
+                if (mesh->primitives[p].has_draco_mesh_compression)
+                {
+                    TRACELOG(LOG_WARNING, "MODEL: [%s] Draco compression not supported", fileName);
+                    cgltf_free(data);
+                    UnloadFileData(fileData);
+                    return scene;
+                }
+                else if (mesh->primitives[p].type == cgltf_primitive_type_triangles) primitivesCount++;
+            }
+        }
+
+        scene.meshCount = primitivesCount;
+        scene.meshes = (Mesh *)RL_CALLOC(scene.meshCount, sizeof(Mesh));
+
+        scene.materialCount = (int)data->materials_count + 1;
+        scene.materials = (Material *)RL_CALLOC(scene.materialCount, sizeof(Material));
+        scene.materials[0] = LoadMaterialDefault();
+
+        scene.meshMaterial = (int *)RL_CALLOC(scene.meshCount, sizeof(int));
+
+        // Load materials
+        for (unsigned int i = 0, j = 1; i < data->materials_count; i++, j++)
+        {
+            scene.materials[j] = LoadMaterialDefault();
+            const char *texPath = GetDirectoryPath(fileName);
+
+            if (data->materials[i].has_pbr_metallic_roughness)
+            {
+                if (data->materials[i].pbr_metallic_roughness.base_color_texture.texture)
+                {
+                    Image imAlbedo = LoadImageFromCgltfImage(data->materials[i].pbr_metallic_roughness.base_color_texture.texture->image, texPath);
+                    if (imAlbedo.data != NULL)
+                    {
+                        scene.materials[j].maps[MATERIAL_MAP_ALBEDO].texture = LoadTextureFromImage(imAlbedo);
+                        UnloadImage(imAlbedo);
+                    }
+                }
+
+                scene.materials[j].maps[MATERIAL_MAP_ALBEDO].color.r = (unsigned char)(data->materials[i].pbr_metallic_roughness.base_color_factor[0]*255);
+                scene.materials[j].maps[MATERIAL_MAP_ALBEDO].color.g = (unsigned char)(data->materials[i].pbr_metallic_roughness.base_color_factor[1]*255);
+                scene.materials[j].maps[MATERIAL_MAP_ALBEDO].color.b = (unsigned char)(data->materials[i].pbr_metallic_roughness.base_color_factor[2]*255);
+                scene.materials[j].maps[MATERIAL_MAP_ALBEDO].color.a = (unsigned char)(data->materials[i].pbr_metallic_roughness.base_color_factor[3]*255);
+
+                if (data->materials[i].pbr_metallic_roughness.metallic_roughness_texture.texture)
+                {
+                    Image imMetallicRoughness = LoadImageFromCgltfImage(data->materials[i].pbr_metallic_roughness.metallic_roughness_texture.texture->image, texPath);
+                    if (imMetallicRoughness.data != NULL)
+                    {
+                        Image imMetallic = { 0 };
+                        Image imRoughness = { 0 };
+
+                        imMetallic.data = RL_MALLOC(imMetallicRoughness.width*imMetallicRoughness.height);
+                        imRoughness.data = RL_MALLOC(imMetallicRoughness.width*imMetallicRoughness.height);
+
+                        imMetallic.width = imRoughness.width = imMetallicRoughness.width;
+                        imMetallic.height = imRoughness.height = imMetallicRoughness.height;
+                        imMetallic.format = imRoughness.format = PIXELFORMAT_UNCOMPRESSED_GRAYSCALE;
+                        imMetallic.mipmaps = imRoughness.mipmaps = 1;
+
+                        for (int x = 0; x < imRoughness.width; x++)
+                        {
+                            for (int y = 0; y < imRoughness.height; y++)
+                            {
+                                Color color = GetImageColor(imMetallicRoughness, x, y);
+                                ((unsigned char *)imRoughness.data)[y*imRoughness.width + x] = color.g;
+                                ((unsigned char *)imMetallic.data)[y*imMetallic.width + x] = color.b;
+                            }
+                        }
+
+                        scene.materials[j].maps[MATERIAL_MAP_ROUGHNESS].texture = LoadTextureFromImage(imRoughness);
+                        scene.materials[j].maps[MATERIAL_MAP_METALNESS].texture = LoadTextureFromImage(imMetallic);
+
+                        UnloadImage(imRoughness);
+                        UnloadImage(imMetallic);
+                        UnloadImage(imMetallicRoughness);
+                    }
+
+                    scene.materials[j].maps[MATERIAL_MAP_ROUGHNESS].value = data->materials[i].pbr_metallic_roughness.roughness_factor;
+                    scene.materials[j].maps[MATERIAL_MAP_METALNESS].value = data->materials[i].pbr_metallic_roughness.metallic_factor;
+                }
+
+                if (data->materials[i].normal_texture.texture)
+                {
+                    Image imNormal = LoadImageFromCgltfImage(data->materials[i].normal_texture.texture->image, texPath);
+                    if (imNormal.data != NULL)
+                    {
+                        scene.materials[j].maps[MATERIAL_MAP_NORMAL].texture = LoadTextureFromImage(imNormal);
+                        UnloadImage(imNormal);
+                    }
+                }
+
+                if (data->materials[i].occlusion_texture.texture)
+                {
+                    Image imOcclusion = LoadImageFromCgltfImage(data->materials[i].occlusion_texture.texture->image, texPath);
+                    if (imOcclusion.data != NULL)
+                    {
+                        scene.materials[j].maps[MATERIAL_MAP_OCCLUSION].texture = LoadTextureFromImage(imOcclusion);
+                        UnloadImage(imOcclusion);
+                    }
+                }
+
+                if (data->materials[i].emissive_texture.texture)
+                {
+                    Image imEmissive = LoadImageFromCgltfImage(data->materials[i].emissive_texture.texture->image, texPath);
+                    if (imEmissive.data != NULL)
+                    {
+                        scene.materials[j].maps[MATERIAL_MAP_EMISSION].texture = LoadTextureFromImage(imEmissive);
+                        UnloadImage(imEmissive);
+                    }
+
+                    scene.materials[j].maps[MATERIAL_MAP_EMISSION].color.r = (unsigned char)(data->materials[i].emissive_factor[0]*255);
+                    scene.materials[j].maps[MATERIAL_MAP_EMISSION].color.g = (unsigned char)(data->materials[i].emissive_factor[1]*255);
+                    scene.materials[j].maps[MATERIAL_MAP_EMISSION].color.b = (unsigned char)(data->materials[i].emissive_factor[2]*255);
+                    scene.materials[j].maps[MATERIAL_MAP_EMISSION].color.a = 255;
+                }
+            }
+        }
+
+        // Build node-to-meshId lookup for parent resolution
+        int *nodeToMeshId = (int *)RL_CALLOC(data->nodes_count, sizeof(int));
+        for (unsigned int i = 0; i < data->nodes_count; i++) nodeToMeshId[i] = -1;
+
+        int meshId = 0;
+        for (unsigned int i = 0; i < data->nodes_count; i++)
+        {
+            cgltf_node *node = &(data->nodes[i]);
+            if (!node->mesh) continue;
+
+            for (unsigned int p = 0; p < node->mesh->primitives_count; p++)
+            {
+                if (node->mesh->primitives[p].type == cgltf_primitive_type_triangles)
+                {
+                    nodeToMeshId[i] = meshId;
+                    meshId++;
+                }
+            }
+        }
+
+        // Load meshes with hierarchy metadata
+        int meshIndex = 0;
+        for (unsigned int i = 0; i < data->nodes_count; i++)
+        {
+            cgltf_node *node = &(data->nodes[i]);
+            cgltf_mesh *mesh = node->mesh;
+            if (!mesh) continue;
+
+            cgltf_float worldTransform[16];
+            cgltf_node_transform_world(node, worldTransform);
+
+            Matrix worldMatrix = {
+                worldTransform[0], worldTransform[4], worldTransform[8], worldTransform[12],
+                worldTransform[1], worldTransform[5], worldTransform[9], worldTransform[13],
+                worldTransform[2], worldTransform[6], worldTransform[10], worldTransform[14],
+                worldTransform[3], worldTransform[7], worldTransform[11], worldTransform[15]
+            };
+
+            Matrix worldMatrixNormals = MatrixTranspose(MatrixInvert(worldMatrix));
+
+            for (unsigned int p = 0; p < mesh->primitives_count; p++)
+            {
+                if (mesh->primitives[p].type != cgltf_primitive_type_triangles) continue;
+
+                // Set mesh hierarchy metadata
+                scene.meshes[meshIndex].id = meshIndex;
+
+                // Walk up node tree to find nearest ancestor with a mesh
+                int parentMeshId = -1;
+                cgltf_node *parent = node->parent;
+                while (parent != NULL)
+                {
+                    int parentNodeIndex = (int)(parent - data->nodes);
+                    if (parentNodeIndex >= 0 && parentNodeIndex < (int)data->nodes_count && nodeToMeshId[parentNodeIndex] >= 0)
+                    {
+                        parentMeshId = nodeToMeshId[parentNodeIndex];
+                        break;
+                    }
+                    parent = parent->parent;
+                }
+                scene.meshes[meshIndex].parentId = parentMeshId;
+
+                // Set mesh name (prefer node name, fall back to mesh name)
+                memset(scene.meshes[meshIndex].name, 0, 64);
+                if (node->name != NULL) strncpy(scene.meshes[meshIndex].name, node->name, 63);
+                else if (mesh->name != NULL) strncpy(scene.meshes[meshIndex].name, mesh->name, 63);
+
+                // Load vertex attributes
+                for (unsigned int j = 0; j < mesh->primitives[p].attributes_count; j++)
+                {
+                    if (mesh->primitives[p].attributes[j].type == cgltf_attribute_type_position)
+                    {
+                        cgltf_accessor *attribute = mesh->primitives[p].attributes[j].data;
+
+                        if ((attribute->type == cgltf_type_vec3) && (attribute->component_type == cgltf_component_type_r_32f))
+                        {
+                            scene.meshes[meshIndex].vertexCount = (int)attribute->count;
+                            scene.meshes[meshIndex].vertices = (float *)RL_MALLOC(attribute->count*3*sizeof(float));
+                            LOAD_ATTRIBUTE_SCENE(attribute, 3, float, scene.meshes[meshIndex].vertices)
+
+                            float *vertices = scene.meshes[meshIndex].vertices;
+                            for (unsigned int k = 0; k < attribute->count; k++)
+                            {
+                                Vector3 vt = Vector3Transform((Vector3){ vertices[3*k], vertices[3*k+1], vertices[3*k+2] }, worldMatrix);
+                                vertices[3*k] = vt.x;
+                                vertices[3*k+1] = vt.y;
+                                vertices[3*k+2] = vt.z;
+                            }
+                        }
+                        else if ((attribute->type == cgltf_type_vec3) && (attribute->component_type == cgltf_component_type_r_16u))
+                        {
+                            scene.meshes[meshIndex].vertexCount = (int)attribute->count;
+                            scene.meshes[meshIndex].vertices = (float *)RL_MALLOC(attribute->count*3*sizeof(float));
+
+                            unsigned short *temp = (unsigned short *)RL_MALLOC(attribute->count*3*sizeof(unsigned short));
+                            LOAD_ATTRIBUTE_SCENE(attribute, 3, unsigned short, temp);
+                            for (unsigned int t = 0; t < attribute->count*3; t++) scene.meshes[meshIndex].vertices[t] = (float)temp[t];
+                            RL_FREE(temp);
+
+                            float *vertices = scene.meshes[meshIndex].vertices;
+                            for (unsigned int k = 0; k < attribute->count; k++)
+                            {
+                                Vector3 vt = Vector3Transform((Vector3){ vertices[3*k], vertices[3*k+1], vertices[3*k+2] }, worldMatrix);
+                                vertices[3*k] = vt.x;
+                                vertices[3*k+1] = vt.y;
+                                vertices[3*k+2] = vt.z;
+                            }
+                        }
+                    }
+                    else if (mesh->primitives[p].attributes[j].type == cgltf_attribute_type_normal)
+                    {
+                        cgltf_accessor *attribute = mesh->primitives[p].attributes[j].data;
+
+                        if ((attribute->type == cgltf_type_vec3) && (attribute->component_type == cgltf_component_type_r_32f))
+                        {
+                            scene.meshes[meshIndex].normals = (float *)RL_MALLOC(attribute->count*3*sizeof(float));
+                            LOAD_ATTRIBUTE_SCENE(attribute, 3, float, scene.meshes[meshIndex].normals)
+
+                            float *normals = scene.meshes[meshIndex].normals;
+                            for (unsigned int k = 0; k < attribute->count; k++)
+                            {
+                                Vector3 nt = Vector3Transform((Vector3){ normals[3*k], normals[3*k+1], normals[3*k+2] }, worldMatrixNormals);
+                                normals[3*k] = nt.x;
+                                normals[3*k+1] = nt.y;
+                                normals[3*k+2] = nt.z;
+                            }
+                        }
+                    }
+                    else if (mesh->primitives[p].attributes[j].type == cgltf_attribute_type_texcoord)
+                    {
+                        float *texcoordPtr = NULL;
+                        cgltf_accessor *attribute = mesh->primitives[p].attributes[j].data;
+
+                        if (attribute->type == cgltf_type_vec2)
+                        {
+                            if (attribute->component_type == cgltf_component_type_r_32f)
+                            {
+                                texcoordPtr = (float *)RL_MALLOC(attribute->count*2*sizeof(float));
+                                LOAD_ATTRIBUTE_SCENE(attribute, 2, float, texcoordPtr)
+                            }
+                            else if (attribute->component_type == cgltf_component_type_r_8u)
+                            {
+                                texcoordPtr = (float *)RL_MALLOC(attribute->count*2*sizeof(float));
+                                unsigned char *temp = (unsigned char *)RL_MALLOC(attribute->count*2*sizeof(unsigned char));
+                                LOAD_ATTRIBUTE_SCENE(attribute, 2, unsigned char, temp);
+                                for (unsigned int t = 0; t < attribute->count*2; t++) texcoordPtr[t] = (float)temp[t]/255.0f;
+                                RL_FREE(temp);
+                            }
+                            else if (attribute->component_type == cgltf_component_type_r_16u)
+                            {
+                                texcoordPtr = (float *)RL_MALLOC(attribute->count*2*sizeof(float));
+                                unsigned short *temp = (unsigned short *)RL_MALLOC(attribute->count*2*sizeof(unsigned short));
+                                LOAD_ATTRIBUTE_SCENE(attribute, 2, unsigned short, temp);
+                                for (unsigned int t = 0; t < attribute->count*2; t++) texcoordPtr[t] = (float)temp[t]/65535.0f;
+                                RL_FREE(temp);
+                            }
+                        }
+
+                        int index = mesh->primitives[p].attributes[j].index;
+                        if (index == 0) scene.meshes[meshIndex].texcoords = texcoordPtr;
+                        else if (index == 1) scene.meshes[meshIndex].texcoords2 = texcoordPtr;
+                        else if (texcoordPtr != NULL) RL_FREE(texcoordPtr);
+                    }
+                    else if (mesh->primitives[p].attributes[j].type == cgltf_attribute_type_color)
+                    {
+                        cgltf_accessor *attribute = mesh->primitives[p].attributes[j].data;
+
+                        if (attribute->type == cgltf_type_vec4)
+                        {
+                            if (attribute->component_type == cgltf_component_type_r_8u)
+                            {
+                                scene.meshes[meshIndex].colors = (unsigned char *)RL_MALLOC(attribute->count*4*sizeof(unsigned char));
+                                LOAD_ATTRIBUTE_SCENE(attribute, 4, unsigned char, scene.meshes[meshIndex].colors)
+                            }
+                            else if (attribute->component_type == cgltf_component_type_r_16u)
+                            {
+                                scene.meshes[meshIndex].colors = (unsigned char *)RL_MALLOC(attribute->count*4*sizeof(unsigned char));
+                                unsigned short *temp = (unsigned short *)RL_MALLOC(attribute->count*4*sizeof(unsigned short));
+                                LOAD_ATTRIBUTE_SCENE(attribute, 4, unsigned short, temp);
+                                for (unsigned int c = 0; c < attribute->count*4; c++) scene.meshes[meshIndex].colors[c] = (unsigned char)(((float)temp[c]/65535.0f)*255.0f);
+                                RL_FREE(temp);
+                            }
+                            else if (attribute->component_type == cgltf_component_type_r_32f)
+                            {
+                                scene.meshes[meshIndex].colors = (unsigned char *)RL_MALLOC(attribute->count*4*sizeof(unsigned char));
+                                float *temp = (float *)RL_MALLOC(attribute->count*4*sizeof(float));
+                                LOAD_ATTRIBUTE_SCENE(attribute, 4, float, temp);
+                                for (unsigned int c = 0; c < attribute->count*4; c++) scene.meshes[meshIndex].colors[c] = (unsigned char)(temp[c]*255.0f);
+                                RL_FREE(temp);
+                            }
+                        }
+                        else if (attribute->type == cgltf_type_vec3)
+                        {
+                            if (attribute->component_type == cgltf_component_type_r_32f)
+                            {
+                                scene.meshes[meshIndex].colors = (unsigned char *)RL_MALLOC(attribute->count*4*sizeof(unsigned char));
+                                float *temp = (float *)RL_MALLOC(attribute->count*3*sizeof(float));
+                                LOAD_ATTRIBUTE_SCENE(attribute, 3, float, temp);
+                                for (unsigned int c = 0, k = 0; c < (attribute->count*4 - 3); c += 4, k += 3)
+                                {
+                                    scene.meshes[meshIndex].colors[c] = (unsigned char)(temp[k]*255.0f);
+                                    scene.meshes[meshIndex].colors[c + 1] = (unsigned char)(temp[k + 1]*255.0f);
+                                    scene.meshes[meshIndex].colors[c + 2] = (unsigned char)(temp[k + 2]*255.0f);
+                                    scene.meshes[meshIndex].colors[c + 3] = 255;
+                                }
+                                RL_FREE(temp);
+                            }
+                        }
+                    }
+                }
+
+                // Load primitive indices
+                if ((mesh->primitives[p].indices != NULL) && (mesh->primitives[p].indices->buffer_view != NULL))
+                {
+                    cgltf_accessor *attribute = mesh->primitives[p].indices;
+                    scene.meshes[meshIndex].triangleCount = (int)attribute->count/3;
+
+                    if (attribute->component_type == cgltf_component_type_r_16u)
+                    {
+                        scene.meshes[meshIndex].indices = (unsigned short *)RL_MALLOC(attribute->count*sizeof(unsigned short));
+                        LOAD_ATTRIBUTE_SCENE(attribute, 1, unsigned short, scene.meshes[meshIndex].indices)
+                    }
+                    else if (attribute->component_type == cgltf_component_type_r_8u)
+                    {
+                        scene.meshes[meshIndex].indices = (unsigned short *)RL_MALLOC(attribute->count*sizeof(unsigned short));
+                        LOAD_ATTRIBUTE_CAST_SCENE(attribute, 1, unsigned char, scene.meshes[meshIndex].indices, unsigned short)
+                    }
+                    else if (attribute->component_type == cgltf_component_type_r_32u)
+                    {
+                        scene.meshes[meshIndex].indices = (unsigned short *)RL_MALLOC(attribute->count*sizeof(unsigned short));
+                        LOAD_ATTRIBUTE_CAST_SCENE(attribute, 1, unsigned int, scene.meshes[meshIndex].indices, unsigned short);
+                    }
+                }
+                else scene.meshes[meshIndex].triangleCount = scene.meshes[meshIndex].vertexCount/3;
+
+                // Assign material
+                for (unsigned int m = 0; m < data->materials_count; m++)
+                {
+                    if (&data->materials[m] == mesh->primitives[p].material)
+                    {
+                        scene.meshMaterial[meshIndex] = m + 1;
+                        break;
+                    }
+                }
+
+                meshIndex++;
+            }
+        }
+
+        RL_FREE(nodeToMeshId);
+        cgltf_free(data);
+    }
+    else TRACELOG(LOG_WARNING, "MODEL: [%s] Failed to load glTF data", fileName);
+
+    UnloadFileData(fileData);
+
+    #undef LOAD_ATTRIBUTE_SCENE
+    #undef LOAD_ATTRIBUTE_CAST_SCENE
+#else
+    TRACELOG(LOG_WARNING, "MODEL: [%s] GLTF format not supported, recompile with SUPPORT_FILEFORMAT_GLTF", fileName);
+#endif
+
+    return scene;
+}
+
+// Unload GLTF scene data from memory
+void UnloadGltfScene(GltfScene scene)
+{
+    for (int i = 0; i < scene.meshCount; i++)
+    {
+        RL_FREE(scene.meshes[i].vertices);
+        RL_FREE(scene.meshes[i].texcoords);
+        RL_FREE(scene.meshes[i].texcoords2);
+        RL_FREE(scene.meshes[i].normals);
+        RL_FREE(scene.meshes[i].tangents);
+        RL_FREE(scene.meshes[i].colors);
+        RL_FREE(scene.meshes[i].indices);
+        RL_FREE(scene.meshes[i].boneIndices);
+        RL_FREE(scene.meshes[i].boneWeights);
+        RL_FREE(scene.meshes[i].animVertices);
+        RL_FREE(scene.meshes[i].animNormals);
+        RL_FREE(scene.meshes[i].vboId);
+    }
+
+    for (int i = 0; i < scene.materialCount; i++) RL_FREE(scene.materials[i].maps);
+
+    RL_FREE(scene.meshes);
+    RL_FREE(scene.materials);
+    RL_FREE(scene.meshMaterial);
+
+    TRACELOG(LOG_INFO, "MODEL: Unloaded GltfScene from memory");
+}
+
 #endif // SUPPORT_MODULE_RMODELS

@@ -1,4 +1,5 @@
 #pragma once
+#include "gltf_asset.hpp"
 #include "rydz_ecs/asset.hpp"
 #include <raylib.h>
 
@@ -10,8 +11,8 @@ public:
     return {"png", "jpg", "jpeg", "bmp", "tga", "gif"};
   }
 
-  // NOTE: Raylib requires OpenGL context, so actual GPU upload happens
-  // on main thread. We store the path and load during insert_into_world.
+  bool is_async() const override { return false; }
+
   Texture2D load_asset(const std::vector<uint8_t> & /*data*/,
                        const std::string &path) {
     Texture2D tex{};
@@ -21,10 +22,11 @@ public:
   }
 
   void insert_into_world(World &world, uint32_t handle_id,
-                         std::any /*asset*/) override {
+                         std::any asset) override {
+    auto path = std::any_cast<std::string>(std::move(asset));
     auto *assets = world.get_resource<Assets<Texture2D>>();
     if (assets) {
-      Texture2D tex = LoadTexture(path_.c_str());
+      Texture2D tex = LoadTexture(path.c_str());
       assets->set(Handle<Texture2D>{handle_id}, tex);
     }
   }
@@ -36,8 +38,10 @@ private:
 class ModelLoader : public AssetLoader<ModelLoader, Model> {
 public:
   std::vector<std::string> extensions() const override {
-    return {"obj", "gltf", "glb", "iqm"};
+    return {"obj", "iqm"};
   }
+
+  bool is_async() const override { return false; }
 
   Model load_asset(const std::vector<uint8_t> & /*data*/,
                    const std::string &path) {
@@ -47,10 +51,11 @@ public:
   }
 
   void insert_into_world(World &world, uint32_t handle_id,
-                         std::any /*asset*/) override {
+                         std::any asset) override {
+    auto path = std::any_cast<std::string>(std::move(asset));
     auto *assets = world.get_resource<Assets<Model>>();
     if (assets) {
-      Model model = LoadModel(path_.c_str());
+      Model model = LoadModel(path.c_str());
       assets->set(Handle<Model>{handle_id}, model);
     }
   }
@@ -64,6 +69,8 @@ public:
   std::vector<std::string> extensions() const override {
     return {"wav", "ogg", "mp3"};
   }
+
+  bool is_async() const override { return true; }
 
   Sound load_asset(const std::vector<uint8_t> & /*data*/,
                    const std::string &path) {
@@ -88,6 +95,7 @@ private:
 inline void register_default_loaders(AssetServer &server) {
   server.register_loader<TextureLoader>();
   server.register_loader<ModelLoader>();
+  server.register_loader<GltfLoader>();
   server.register_loader<SoundLoader>();
 }
 

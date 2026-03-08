@@ -366,6 +366,11 @@ typedef struct Mesh {
     // OpenGL identifiers
     unsigned int vaoId;     // OpenGL Vertex Array Object id
     unsigned int *vboId;    // OpenGL Vertex Buffer Objects id (default vertex data)
+
+    // Scene hierarchy metadata
+    char name[64];          // Mesh name (from GLTF node/mesh name)
+    int id;                 // Mesh ID within the scene (-1 = unset)
+    int parentId;           // Parent mesh ID (-1 = top-level / scene root)
 } Mesh;
 
 // Shader
@@ -428,6 +433,15 @@ typedef struct Model {
     ModelAnimPose currentPose; // Current animation pose (Transform[])
     Matrix *boneMatrices;   // Bones animated transformation matrices
 } Model;
+
+// GltfScene, parsed GLTF file with hierarchy metadata (meshes have name/id/parentId)
+typedef struct GltfScene {
+    int meshCount;          // Number of meshes
+    int materialCount;      // Number of materials
+    Mesh *meshes;           // Meshes array (with name/id/parentId populated)
+    Material *materials;    // Materials array
+    int *meshMaterial;      // Mesh material number (mesh[i] uses materials[meshMaterial[i]])
+} GltfScene;
 
 // ModelAnimation, contains a full animation sequence
 typedef struct ModelAnimation {
@@ -1589,6 +1603,8 @@ RLAPI Model LoadModelFromMesh(Mesh mesh);                                       
 RLAPI bool IsModelValid(Model model);                                                       // Check if a model is valid (loaded in GPU, VAO/VBOs)
 RLAPI void UnloadModel(Model model);                                                        // Unload model (including meshes) from memory (RAM and/or VRAM)
 RLAPI BoundingBox GetModelBoundingBox(Model model);                                         // Compute model bounding box limits (considers all meshes)
+RLAPI GltfScene LoadGltfScene(const char *fileName);                                        // Load GLTF/GLB as scene with mesh hierarchy metadata (no GPU upload)
+RLAPI void UnloadGltfScene(GltfScene scene);                                                // Unload GLTF scene data from memory
 
 // Model drawing functions
 RLAPI void DrawModel(Model model, Vector3 position, float scale, Color tint);               // Draw a model (with texture if set)

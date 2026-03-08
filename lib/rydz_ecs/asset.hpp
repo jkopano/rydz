@@ -73,6 +73,7 @@ class IAssetLoader {
 public:
   virtual ~IAssetLoader() = default;
   virtual std::vector<std::string> extensions() const = 0;
+  virtual bool is_async() const = 0;
   virtual std::any load(const std::vector<uint8_t> &data,
                         const std::string &path) = 0;
   virtual void insert_into_world(World &world, uint32_t handle_id,
@@ -82,6 +83,8 @@ public:
 template <typename Derived, typename T>
 class AssetLoader : public IAssetLoader {
 public:
+  bool is_async() const override { return true; }
+
   std::any load(const std::vector<uint8_t> &data,
                 const std::string &path) override {
     return std::any(static_cast<Derived *>(this)->load_asset(data, path));
@@ -148,20 +151,28 @@ public:
     }
 
     auto loader = it->second;
-    auto full_path = root_path_ + "/" + path;
+    auto full_path = root_path_ + "/" + strip_fragment(path);
 
-    std::thread([this, id, full_path, loader]() {
-      auto data = read_file(full_path);
-      if (data.empty())
-        return;
+    if (!loader->is_async()) {
+      // Synchronous loading — queued for main thread processing
+      // The loader's insert_into_world will handle actual loading
+      std::lock_guard<std::mutex> lock(completed_mutex_);
+      completed_.push_back(
+          {id, std::any(std::string(full_path + get_fragment(path))), loader});
+    } else {
+      std::thread([this, id, full_path, path, loader]() {
+        auto data = read_file(full_path);
+        if (data.empty())
+          return;
 
-      try {
-        auto asset = loader->load(data, full_path);
-        std::lock_guard<std::mutex> lock(completed_mutex_);
-        completed_.push_back({id, std::move(asset), loader});
-      } catch (...) {
-      }
-    }).detach();
+        try {
+          auto asset = loader->load(data, full_path + get_fragment(path));
+          std::lock_guard<std::mutex> lock(completed_mutex_);
+          completed_.push_back({id, std::move(asset), loader});
+        } catch (...) {
+        }
+      }).detach();
+    }
 
     return handle;
   }
@@ -183,11 +194,26 @@ public:
   }
 
 private:
+  static std::string strip_fragment(const std::string &path) {
+    auto hash = path.find('#');
+    if (hash == std::string::npos)
+      return path;
+    return path.substr(0, hash);
+  }
+
+  static std::string get_fragment(const std::string &path) {
+    auto hash = path.find('#');
+    if (hash == std::string::npos)
+      return "";
+    return path.substr(hash);
+  }
+
   static std::string get_extension(const std::string &path) {
-    auto pos = path.rfind('.');
+    auto clean = strip_fragment(path);
+    auto pos = clean.rfind('.');
     if (pos == std::string::npos)
       return "";
-    return path.substr(pos + 1);
+    return clean.substr(pos + 1);
   }
 
   static std::vector<uint8_t> read_file(const std::string &path) {
