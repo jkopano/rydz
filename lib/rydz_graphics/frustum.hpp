@@ -1,7 +1,7 @@
 #pragma once
-#include "rydz_ecs/asset.hpp"
 #include "camera3d.hpp"
 #include "mesh3d.hpp"
+#include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/transform.hpp"
 #include "rydz_ecs/visibility.hpp"
 #include <array>
@@ -62,9 +62,22 @@ inline BBox3 transform_bbox(const BBox3 &local, const Matrix &m) {
   return result;
 }
 
-inline float bbox_radius(const BBox3 &bbox) {
-  auto d = bbox.get_diagonal();
-  return std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) * 0.5f;
+inline bool aabb_in_frustum(const BBox3 &bbox,
+                            const std::array<FrustumPlane, 6> &planes) {
+  for (const auto &plane : planes) {
+    // p-vertex: the corner of the AABB most in the direction of the plane
+    // normal
+    Vector3 p_vertex = {
+        plane.normal.x >= 0 ? bbox.max[0] : bbox.min[0],
+        plane.normal.y >= 0 ? bbox.max[1] : bbox.min[1],
+        plane.normal.z >= 0 ? bbox.max[2] : bbox.min[2],
+    };
+    float dist = plane.normal.x * p_vertex.x + plane.normal.y * p_vertex.y +
+                 plane.normal.z * p_vertex.z + plane.distance;
+    if (dist < 0)
+      return false; // entire box is behind this plane
+  }
+  return true;
 }
 
 inline std::array<FrustumPlane, 6> extract_frustum_planes(const Matrix &vp) {
@@ -209,22 +222,26 @@ inline void frustum_cull_system(World &world) {
         }
 
         BBox3 world_bbox = transform_bbox(mb->bbox, gt->matrix);
-        auto c = world_bbox.get_center();
-        Vector3 center = {c[0], c[1], c[2]};
-        float radius = bbox_radius(world_bbox);
 
-        results[idx] = ViewVisibility{
-            sphere_in_frustum(center, radius, planes)};
+        results[idx] = ViewVisibility{aabb_in_frustum(world_bbox, planes)};
         has_result[idx] = 1;
       });
 
   static tf::Executor executor;
   executor.run(taskflow).wait();
 
+  int dbg_visible = 0, dbg_culled = 0;
   for (size_t i = 0; i < entities.size(); ++i) {
-    if (has_result[i])
+    if (has_result[i]) {
       world.insert_component(entities[i], results[i]);
+      if (results[i].visible)
+        dbg_visible++;
+      else
+        dbg_culled++;
+    }
   }
+  TraceLog(LOG_DEBUG, "FRUSTUM: %d visible, %d culled, %d total entities",
+           dbg_visible, dbg_culled, (int)entities.size());
 }
 
 } // namespace ecs
