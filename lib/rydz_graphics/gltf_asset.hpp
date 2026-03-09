@@ -10,7 +10,14 @@ namespace ecs {
 
 // Parsed fragment from a path like "model.glb#Scene0/Mesh1"
 struct GltfFragment {
-  enum class Type { Scene, MeshByName, MeshByIndex, MaterialByName, MaterialByIndex, ByName };
+  enum class Type {
+    Scene,
+    MeshByName,
+    MeshByIndex,
+    MaterialByName,
+    MaterialByIndex,
+    ByName
+  };
   Type type;
   std::string name;
   int index = -1;
@@ -35,23 +42,19 @@ inline GltfFragment parse_gltf_fragment(const std::string &fragment) {
     return result;
   }
 
-  // Check for Scene/Mesh path format
   auto slash = frag.find('/');
   if (slash != std::string::npos) {
-    // e.g., "Scene0/Mesh1" - take the part after the last slash as mesh name
     result.type = GltfFragment::Type::MeshByName;
     result.name = frag.substr(slash + 1);
     return result;
   }
 
-  // Check if it starts with "Material"
   if (frag.rfind("Material", 0) == 0) {
     result.type = GltfFragment::Type::MaterialByName;
     result.name = frag;
     return result;
   }
 
-  // Check if it's a pure number (mesh by index)
   bool is_number = true;
   for (char c : frag) {
     if (!std::isdigit(c)) {
@@ -66,13 +69,11 @@ inline GltfFragment parse_gltf_fragment(const std::string &fragment) {
     return result;
   }
 
-  // Default: look up by name
   result.type = GltfFragment::Type::ByName;
   result.name = frag;
   return result;
 }
 
-// Split pipe-separated fragments: "#Mesh1|#Material0" -> ["#Mesh1", "#Material0"]
 inline std::vector<std::string> split_fragments(const std::string &fragment) {
   std::vector<std::string> result;
   if (fragment.empty())
@@ -94,7 +95,6 @@ inline std::vector<std::string> split_fragments(const std::string &fragment) {
   return result;
 }
 
-// Find a mesh in a GltfScene by fragment
 inline int find_mesh_in_scene(const GltfScene &scene,
                               const GltfFragment &frag) {
   switch (frag.type) {
@@ -116,12 +116,9 @@ inline int find_mesh_in_scene(const GltfScene &scene,
   }
 }
 
-// Find a material in a GltfScene by fragment
 inline int find_material_in_scene(const GltfScene &scene,
                                   const GltfFragment &frag) {
   if (frag.type == GltfFragment::Type::MaterialByName) {
-    // Materials don't have names in raylib, so use index from name
-    // e.g., "Material0" -> index 0, "Material1" -> index 1
     std::string num_part = frag.name.substr(8); // skip "Material"
     if (!num_part.empty()) {
       int idx = std::stoi(num_part);
@@ -132,14 +129,11 @@ inline int find_material_in_scene(const GltfScene &scene,
   return -1;
 }
 
-// SceneRoot: represents a loaded GLTF scene with handles to all sub-assets
 struct SceneRoot {
   std::vector<Handle<Mesh>> meshes;
   std::vector<Handle<Material>> materials;
 };
 
-// GltfLoader: loads GLTF/GLB files and supports fragment-based sub-asset extraction
-// is_async() = false because GPU operations (texture loading in materials) need main thread
 class GltfLoader : public IAssetLoader {
 public:
   std::vector<std::string> extensions() const override {

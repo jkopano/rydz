@@ -166,25 +166,21 @@ struct LightsSpawned {
   bool done = false;
 };
 
-inline void spawn_lights_on_input(Cmd cmd, ResMut<LightsSpawned> lights,
-                                  NonSendMarker) {
+inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<Model>> models,
+                                  ResMut<LightsSpawned> lights, NonSendMarker) {
   if (lights->done || !IsKeyPressed(KEY_L))
     return;
 
   cmd.spawn(DirectionalLight{
       .color = {255, 242, 230, 255},
       .direction = {-0.3f, -1.0f, -0.5f},
-      .intensity = 0.8f,
+      .intensity = 0.5f,
   });
 
-  cmd.spawn(PointLight{.color = {255, 230, 150, 255},
-                       .intensity = 5000.0f,
-                       .range = 150.0f},
-            Transform3D::from_xyz(0.0f, 30.0f, 80.0f));
-
-  cmd.spawn(PointLight{.color = {255, 75, 75, 255},
-                       .intensity = 800.0f,
-                       .range = 200.0f},
+  cmd.spawn(Mesh3d{models->add(mesh::cube())},
+            PointLight{.color = {255, 75, 75, 255},
+                       .intensity = 3800.0f,
+                       .range = 20000.0f},
             Transform3D::from_xyz(-50.0f, 50.0f, 0.0f));
 
   cmd.spawn(PointLight{.color = {75, 75, 255, 255},
@@ -200,6 +196,23 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
             Transform3D::from_xyz(8, 6, 8).look_at({0, 0, 0}),
             CameraController{});
   DisableCursor();
+}
+
+inline void spawn_cubes(Cmd cmd, ResMut<Assets<Model>> model_assets,
+                        ResMut<CarHandles> car_handles, NonSendMarker) {
+  if (!car_handles->loaded) {
+    Model car_model = LoadModel("res/models/first-car.glb");
+    car_handles->car = model_assets->add(std::move(car_model));
+    car_handles->loaded = true;
+  }
+
+  cmd.spawn(CarTag{}, Mesh3d{car_handles->car},
+            Transform3D{
+                .translation = {10.0f, 1.7f, 10.0f},
+                .scale = {3.0f, 3.0f, 3.0f},
+            });
+
+  car_handles->spawned = true;
 }
 
 inline void scene_plugin(App &app) {

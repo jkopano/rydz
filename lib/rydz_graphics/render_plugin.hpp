@@ -1,6 +1,4 @@
 #pragma once
-#include "rydz_ecs/app.hpp"
-#include "rydz_ecs/asset.hpp"
 #include "camera3d.hpp"
 #include "frustum.hpp"
 #include "light.hpp"
@@ -9,6 +7,8 @@
 #include "mesh3d.hpp"
 #include "render_batches.hpp"
 #include "render_config.hpp"
+#include "rydz_ecs/app.hpp"
+#include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/transform.hpp"
 #include "rydz_ecs/types.hpp"
 #include "rydz_ecs/visibility.hpp"
@@ -472,35 +472,20 @@ inline void render_plugin(App &app) {
     app.insert_resource(LodHistory{});
   }
 
-  // Phase 1: auto-insert missing components
-  app.add_systems(ScheduleLabel::First,
-                  [](World &w) { auto_insert_global_transform(w); });
-  app.add_systems(ScheduleLabel::First,
-                  [](World &w) { auto_insert_visibility(w); });
-  app.add_systems(ScheduleLabel::First,
-                  [](World &w) { auto_insert_material(w); });
+  app.add_systems(ScheduleLabel::First, auto_insert_global_transform);
+  app.add_systems(ScheduleLabel::First, auto_insert_visibility);
+  app.add_systems(ScheduleLabel::First, auto_insert_material);
 
-  // Phase 2: transform propagation + visibility
-  app.add_systems(ScheduleLabel::PostUpdate,
-                  [](World &w) { propagate_transforms(w); });
-  app.add_systems(ScheduleLabel::PostUpdate,
-                  [](World &w) { compute_visibility(w); });
+  app.add_systems(ScheduleLabel::PostUpdate, propagate_transforms);
+  app.add_systems(ScheduleLabel::PostUpdate, compute_visibility);
 
-  // Phase 3: compute bounds (once per entity) + frustum cull
-  app.add_systems(ScheduleLabel::PostUpdate,
-                  [](World &w) { compute_mesh_bounds_system(w); });
-  app.add_systems(ScheduleLabel::PostUpdate,
-                  [](World &w, NonSendMarker) { frustum_cull_system(w); });
+  app.add_systems(ScheduleLabel::PostUpdate, compute_mesh_bounds_system);
+  app.add_systems(ScheduleLabel::PostUpdate, frustum_cull_system);
 
-  // Phase 4: auto-generate LODs for large meshes (needs GL)
-  app.add_systems(ScheduleLabel::PostUpdate, [](World &w, NonSendMarker) {
-    auto_generate_lods_system(w);
-  });
+  app.add_systems(ScheduleLabel::PostUpdate, auto_generate_lods_system);
 
-  // Phase 5: build render batches (uses ViewVisibility + LOD)
   app.add_systems(ScheduleLabel::PostUpdate, build_render_batches_system);
 
-  // Phase 6: render
   app.add_systems(ScheduleLabel::Last, render_system);
 }
 
