@@ -29,6 +29,10 @@ struct StandardMaterial {
   float roughness = 0.5f;
 
   static StandardMaterial from_color(Color c) { return {.base_color = c}; }
+  static StandardMaterial from_texture(Handle<Texture2D> tex,
+                                       Color tint = WHITE) {
+    return {.base_color = tint, .texture = tex};
+  }
 
   Color color() const { return base_color; }
 

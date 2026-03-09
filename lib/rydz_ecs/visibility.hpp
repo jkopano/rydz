@@ -7,8 +7,6 @@
 
 namespace ecs {
 
-// ====== Visibility ======
-
 enum class Visibility {
   Inherited,
   Visible,

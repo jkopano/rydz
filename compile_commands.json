@@ -66,31 +66,6 @@
 },
 {
   "directory": "/home/kuba/Documents/studia/PAG/cpp",
-  "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/g++", "-c", "-m64", "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-O3", "-std=c++23", "-I", "build/.objs/main/linux/x86_64/release/lib/cxx", "-include", "pch.hpp", "-Ilib", "-Ilib/external/raylib/src", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-I", "/home/kuba/.xmake/packages/t/taskflow/v4.0.0/659212b31374427584fe8768f48ad7d4/include", "-I", "/home/kuba/.xmake/packages/a/abseil/20260107.1/3b239966ba254cc086fb193ee6058a02/include", "-I", "/home/kuba/.xmake/packages/m/meshoptimizer/v1.0.1/96695a6607714380936dbd9ac00ad328/include", "-I", "/home/kuba/.xmake/packages/b/bvh/2025.06.16/0461f82e04ea4816b6470b7be6679709/include", "-march=x86-64-v3", "-DNDEBUG", "-o", "build/.objs/main/linux/x86_64/release/src/main.cpp.o", "src/main.cpp"],
-  "file": "src/main.cpp"
-},
-{
-  "directory": "/home/kuba/Documents/studia/PAG/cpp",
-  "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/g++", "-c", "-m64", "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-O3", "-std=c++23", "-Ilib", "-Ilib/external/raylib/src", "-DBENCHMARK_STATIC_DEFINE", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-I", "/home/kuba/.xmake/packages/b/benchmark/v1.9.5/3342284b744d4dd2972a41ed57880659/include", "-I", "/home/kuba/.xmake/packages/t/taskflow/v4.0.0/659212b31374427584fe8768f48ad7d4/include", "-I", "/home/kuba/.xmake/packages/a/abseil/20260107.1/3b239966ba254cc086fb193ee6058a02/include", "-I", "/home/kuba/.xmake/packages/m/meshoptimizer/v1.0.1/96695a6607714380936dbd9ac00ad328/include", "-I", "/home/kuba/.xmake/packages/b/bvh/2025.06.16/0461f82e04ea4816b6470b7be6679709/include", "-march=x86-64-v3", "-DNDEBUG", "-o", "build/.objs/bench/linux/x86_64/release/benches/main.cpp.o", "benches/main.cpp"],
-  "file": "benches/main.cpp"
-},
-{
-  "directory": "/home/kuba/Documents/studia/PAG/cpp",
-  "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/g++", "-c", "-m64", "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-O3", "-std=c++23", "-Ilib", "-Ilib/external/raylib/src", "-DBENCHMARK_STATIC_DEFINE", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-I", "/home/kuba/.xmake/packages/b/benchmark/v1.9.5/3342284b744d4dd2972a41ed57880659/include", "-I", "/home/kuba/.xmake/packages/t/taskflow/v4.0.0/659212b31374427584fe8768f48ad7d4/include", "-I", "/home/kuba/.xmake/packages/a/abseil/20260107.1/3b239966ba254cc086fb193ee6058a02/include", "-I", "/home/kuba/.xmake/packages/m/meshoptimizer/v1.0.1/96695a6607714380936dbd9ac00ad328/include", "-I", "/home/kuba/.xmake/packages/b/bvh/2025.06.16/0461f82e04ea4816b6470b7be6679709/include", "-march=x86-64-v3", "-DNDEBUG", "-o", "build/.objs/bench/linux/x86_64/release/benches/sparse_bench.cpp.o", "benches/sparse_bench.cpp"],
-  "file": "benches/sparse_bench.cpp"
-},
-{
-  "directory": "/home/kuba/Documents/studia/PAG/cpp",
-  "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/g++", "-c", "-m64", "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-O3", "-std=c++23", "-Ilib", "-Ilib/external/raylib/src", "-DBENCHMARK_STATIC_DEFINE", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-I", "/home/kuba/.xmake/packages/b/benchmark/v1.9.5/3342284b744d4dd2972a41ed57880659/include", "-I", "/home/kuba/.xmake/packages/t/taskflow/v4.0.0/659212b31374427584fe8768f48ad7d4/include", "-I", "/home/kuba/.xmake/packages/a/abseil/20260107.1/3b239966ba254cc086fb193ee6058a02/include", "-I", "/home/kuba/.xmake/packages/m/meshoptimizer/v1.0.1/96695a6607714380936dbd9ac00ad328/include", "-I", "/home/kuba/.xmake/packages/b/bvh/2025.06.16/0461f82e04ea4816b6470b7be6679709/include", "-march=x86-64-v3", "-DNDEBUG", "-o", "build/.objs/bench/linux/x86_64/release/benches/ecs_bench.cpp.o", "benches/ecs_bench.cpp"],
-  "file": "benches/ecs_bench.cpp"
-},
-{
-  "directory": "/home/kuba/Documents/studia/PAG/cpp",
-  "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/g++", "-c", "-m64", "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-O3", "-std=c++23", "-Ilib", "-Ilib/external/raylib/src", "-DBENCHMARK_STATIC_DEFINE", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-I", "/home/kuba/.xmake/packages/b/benchmark/v1.9.5/3342284b744d4dd2972a41ed57880659/include", "-I", "/home/kuba/.xmake/packages/t/taskflow/v4.0.0/659212b31374427584fe8768f48ad7d4/include", "-I", "/home/kuba/.xmake/packages/a/abseil/20260107.1/3b239966ba254cc086fb193ee6058a02/include", "-I", "/home/kuba/.xmake/packages/m/meshoptimizer/v1.0.1/96695a6607714380936dbd9ac00ad328/include", "-I", "/home/kuba/.xmake/packages/b/bvh/2025.06.16/0461f82e04ea4816b6470b7be6679709/include", "-march=x86-64-v3", "-DNDEBUG", "-o", "build/.objs/bench/linux/x86_64/release/benches/simple_iter.cpp.o", "benches/simple_iter.cpp"],
-  "file": "benches/simple_iter.cpp"
-},
-{
-  "directory": "/home/kuba/Documents/studia/PAG/cpp",
   "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/gcc", "-c", "-m64", "-fvisibility=hidden", "-O3", "-std=c11", "-Ilib", "-Ilib/external/raylib/src", "-Ilib/external/raylib/src/external/glfw/include", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-D_GLFW_X11", "-march=x86-64-v3", "-w", "-DNDEBUG", "-o", "build/.objs/raylib/linux/x86_64/release/lib/external/raylib/src/rcore.c.o", "lib/external/raylib/src/rcore.c"],
   "file": "lib/external/raylib/src/rcore.c"
 },
@@ -123,4 +98,29 @@
   "directory": "/home/kuba/Documents/studia/PAG/cpp",
   "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/gcc", "-c", "-m64", "-fvisibility=hidden", "-O3", "-std=c11", "-Ilib", "-Ilib/external/raylib/src", "-Ilib/external/raylib/src/external/glfw/include", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-D_GLFW_X11", "-march=x86-64-v3", "-w", "-DNDEBUG", "-o", "build/.objs/raylib/linux/x86_64/release/lib/external/raylib/src/rglfw.c.o", "lib/external/raylib/src/rglfw.c"],
   "file": "lib/external/raylib/src/rglfw.c"
+},
+{
+  "directory": "/home/kuba/Documents/studia/PAG/cpp",
+  "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/g++", "-c", "-m64", "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-O3", "-std=c++23", "-I", "build/.objs/main/linux/x86_64/release/lib/cxx", "-include", "pch.hpp", "-Ilib", "-Ilib/external/raylib/src", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-I", "/home/kuba/.xmake/packages/t/taskflow/v4.0.0/659212b31374427584fe8768f48ad7d4/include", "-I", "/home/kuba/.xmake/packages/a/abseil/20260107.1/3b239966ba254cc086fb193ee6058a02/include", "-I", "/home/kuba/.xmake/packages/m/meshoptimizer/v1.0.1/96695a6607714380936dbd9ac00ad328/include", "-I", "/home/kuba/.xmake/packages/b/bvh/2025.06.16/0461f82e04ea4816b6470b7be6679709/include", "-march=x86-64-v3", "-DNDEBUG", "-o", "build/.objs/main/linux/x86_64/release/src/main.cpp.o", "src/main.cpp"],
+  "file": "src/main.cpp"
+},
+{
+  "directory": "/home/kuba/Documents/studia/PAG/cpp",
+  "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/g++", "-c", "-m64", "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-O3", "-std=c++23", "-Ilib", "-Ilib/external/raylib/src", "-DBENCHMARK_STATIC_DEFINE", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-I", "/home/kuba/.xmake/packages/b/benchmark/v1.9.5/3342284b744d4dd2972a41ed57880659/include", "-I", "/home/kuba/.xmake/packages/t/taskflow/v4.0.0/659212b31374427584fe8768f48ad7d4/include", "-I", "/home/kuba/.xmake/packages/a/abseil/20260107.1/3b239966ba254cc086fb193ee6058a02/include", "-I", "/home/kuba/.xmake/packages/m/meshoptimizer/v1.0.1/96695a6607714380936dbd9ac00ad328/include", "-I", "/home/kuba/.xmake/packages/b/bvh/2025.06.16/0461f82e04ea4816b6470b7be6679709/include", "-march=x86-64-v3", "-DNDEBUG", "-o", "build/.objs/bench/linux/x86_64/release/benches/main.cpp.o", "benches/main.cpp"],
+  "file": "benches/main.cpp"
+},
+{
+  "directory": "/home/kuba/Documents/studia/PAG/cpp",
+  "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/g++", "-c", "-m64", "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-O3", "-std=c++23", "-Ilib", "-Ilib/external/raylib/src", "-DBENCHMARK_STATIC_DEFINE", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-I", "/home/kuba/.xmake/packages/b/benchmark/v1.9.5/3342284b744d4dd2972a41ed57880659/include", "-I", "/home/kuba/.xmake/packages/t/taskflow/v4.0.0/659212b31374427584fe8768f48ad7d4/include", "-I", "/home/kuba/.xmake/packages/a/abseil/20260107.1/3b239966ba254cc086fb193ee6058a02/include", "-I", "/home/kuba/.xmake/packages/m/meshoptimizer/v1.0.1/96695a6607714380936dbd9ac00ad328/include", "-I", "/home/kuba/.xmake/packages/b/bvh/2025.06.16/0461f82e04ea4816b6470b7be6679709/include", "-march=x86-64-v3", "-DNDEBUG", "-o", "build/.objs/bench/linux/x86_64/release/benches/sparse_bench.cpp.o", "benches/sparse_bench.cpp"],
+  "file": "benches/sparse_bench.cpp"
+},
+{
+  "directory": "/home/kuba/Documents/studia/PAG/cpp",
+  "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/g++", "-c", "-m64", "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-O3", "-std=c++23", "-Ilib", "-Ilib/external/raylib/src", "-DBENCHMARK_STATIC_DEFINE", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-I", "/home/kuba/.xmake/packages/b/benchmark/v1.9.5/3342284b744d4dd2972a41ed57880659/include", "-I", "/home/kuba/.xmake/packages/t/taskflow/v4.0.0/659212b31374427584fe8768f48ad7d4/include", "-I", "/home/kuba/.xmake/packages/a/abseil/20260107.1/3b239966ba254cc086fb193ee6058a02/include", "-I", "/home/kuba/.xmake/packages/m/meshoptimizer/v1.0.1/96695a6607714380936dbd9ac00ad328/include", "-I", "/home/kuba/.xmake/packages/b/bvh/2025.06.16/0461f82e04ea4816b6470b7be6679709/include", "-march=x86-64-v3", "-DNDEBUG", "-o", "build/.objs/bench/linux/x86_64/release/benches/ecs_bench.cpp.o", "benches/ecs_bench.cpp"],
+  "file": "benches/ecs_bench.cpp"
+},
+{
+  "directory": "/home/kuba/Documents/studia/PAG/cpp",
+  "arguments": ["/nix/store/a245z3cvf9x9sn0xlk6k8j9xhxbhda1z-gcc-wrapper-15.2.0/bin/g++", "-c", "-m64", "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-O3", "-std=c++23", "-Ilib", "-Ilib/external/raylib/src", "-DBENCHMARK_STATIC_DEFINE", "-DPLATFORM_DESKTOP", "-DGRAPHICS_API_OPENGL_33", "-I", "/home/kuba/.xmake/packages/b/benchmark/v1.9.5/3342284b744d4dd2972a41ed57880659/include", "-I", "/home/kuba/.xmake/packages/t/taskflow/v4.0.0/659212b31374427584fe8768f48ad7d4/include", "-I", "/home/kuba/.xmake/packages/a/abseil/20260107.1/3b239966ba254cc086fb193ee6058a02/include", "-I", "/home/kuba/.xmake/packages/m/meshoptimizer/v1.0.1/96695a6607714380936dbd9ac00ad328/include", "-I", "/home/kuba/.xmake/packages/b/bvh/2025.06.16/0461f82e04ea4816b6470b7be6679709/include", "-march=x86-64-v3", "-DNDEBUG", "-o", "build/.objs/bench/linux/x86_64/release/benches/simple_iter.cpp.o", "benches/simple_iter.cpp"],
+  "file": "benches/simple_iter.cpp"
 }]

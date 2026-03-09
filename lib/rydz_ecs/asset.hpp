@@ -154,8 +154,6 @@ public:
     auto full_path = root_path_ + "/" + strip_fragment(path);
 
     if (!loader->is_async()) {
-      // Synchronous loading — queued for main thread processing
-      // The loader's insert_into_world will handle actual loading
       std::lock_guard<std::mutex> lock(completed_mutex_);
       completed_.push_back(
           {id, std::any(std::string(full_path + get_fragment(path))), loader});

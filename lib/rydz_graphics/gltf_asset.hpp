@@ -1,4 +1,5 @@
 #pragma once
+#include "raymath.h"
 #include "rydz_ecs/asset.hpp"
 #include <cstring>
 #include <raylib.h>

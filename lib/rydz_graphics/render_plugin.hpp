@@ -64,14 +64,10 @@ inline void build_render_batches_system(
                      const ViewVisibility *vv, const MeshLodGroup *lod_group) {
     if (!mesh3d || !mesh3d->model.is_valid())
       return;
-    // Use ViewVisibility (frustum cull result) if available
     if (vv && !vv->visible)
       return;
-    // LOD selection: pick the right model handle
     Handle<Model> model_handle = mesh3d->model;
     if (lod_group && lod_group->level_count > 1) {
-      // For now use LOD 0 — screen-space selection will be added
-      // when camera matrix access is cleaner
       model_handle = lod_group->levels[0];
     }
 

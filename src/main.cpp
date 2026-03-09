@@ -1,4 +1,4 @@
-#define RLGL_ENABLE_OPENGL_DEBUG_CONTEXT
+#define RLGL_ENABLE_OPENGL_DEBUG_CONTEXT 0
 #include "raylib.h"
 #include "scene.hpp"
 int main() {

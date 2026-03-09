@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ranges>
 #include <type_traits>
 
 using namespace std;
@@ -10,7 +11,7 @@ using copy_const_t =
                        To>;
 
 namespace ecs {
-namespace views = std::ranges::views;
+namespace views = ranges::views;
 
-inline constexpr auto range = std::ranges::views::iota;
+inline constexpr auto range = ranges::views::iota;
 } // namespace ecs

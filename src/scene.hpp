@@ -1,5 +1,6 @@
 #pragma once
 #include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
 
 using namespace ecs;
@@ -76,20 +77,20 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
   });
 }
 
-inline void toggle_camera_system(Query<Mut<CameraController>> query,
-                                 NonSendMarker) {
-  if (!IsKeyPressed(KEY_ESCAPE))
-    return;
-
-  query.for_each([&](CameraController *ctrl) {
-    ctrl->enabled = !ctrl->enabled;
-
-    if (ctrl->enabled)
-      DisableCursor();
-    else
-      EnableCursor();
-  });
-}
+// inline void toggle_camera_system(Query<Mut<CameraController>> query,
+//                                  NonSendMarker) {
+//   if (!IsKeyPressed(KEY_ESCAPE))
+//     return;
+//
+//   query.for_each([&](CameraController *ctrl) {
+//     ctrl->enabled = !ctrl->enabled;
+//
+//     if (ctrl->enabled)
+//       DisableCursor();
+//     else
+//       EnableCursor();
+//   });
+// }
 
 inline void spawn_map(Cmd cmd, ResMut<Assets<Model>> model_assets,
                       NonSendMarker) {
@@ -167,6 +168,7 @@ struct LightsSpawned {
 };
 
 inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<Model>> models,
+                                  ResMut<Assets<Texture2D>> textures,
                                   ResMut<LightsSpawned> lights, NonSendMarker) {
   if (lights->done || !IsKeyPressed(KEY_L))
     return;
@@ -177,16 +179,22 @@ inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<Model>> models,
       .intensity = 0.5f,
   });
 
+  auto stone_tex = textures->add(LoadTexture("res/textures/stone.jpg"));
+
   cmd.spawn(Mesh3d{models->add(mesh::cube())},
-            PointLight{.color = {255, 75, 75, 255},
-                       .intensity = 3800.0f,
-                       .range = 20000.0f},
+            PointLight{.color = {255, 0, 0, 255},
+                       .intensity = 8800.0f,
+                       .range = 2000.0f},
             Transform3D::from_xyz(-50.0f, 50.0f, 0.0f));
+
+  cmd.spawn(Mesh3d{models->add(mesh::cube())},
+            Material3d{StandardMaterial::from_texture(stone_tex)},
+            Transform3D::from_xyz(50.0f, 50.0f, 0.0f));
 
   cmd.spawn(PointLight{.color = {75, 75, 255, 255},
                        .intensity = 800.0f,
                        .range = 200.0f},
-            Transform3D::from_xyz(50.0f, 50.0f, 0.0f));
+            Transform3D::from_xyz(100.0f, 100.0f, 0.0f));
 
   lights->done = true;
 }
@@ -196,6 +204,10 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
             Transform3D::from_xyz(8, 6, 8).look_at({0, 0, 0}),
             CameraController{});
   DisableCursor();
+}
+
+inline void change_clear_color(ResMut<ClearColor> color) {
+  color->color = {50, 50, 250, 255};
 }
 
 inline void spawn_cubes(Cmd cmd, ResMut<Assets<Model>> model_assets,
@@ -221,14 +233,15 @@ inline void scene_plugin(App &app) {
   app.insert_resource(LightsSpawned{});
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
-  app.add_systems(ScheduleLabel::Startup,
+  app.add_systems(ScheduleLabel::Update,
                   into_system(spawn_map).run_if(run_once()));
 
   app.add_systems(ScheduleLabel::Update, camera_controller_system);
   app.add_systems(ScheduleLabel::Update, camera_mouse_system);
-  app.add_systems(ScheduleLabel::Update, toggle_camera_system);
+  // app.add_systems(ScheduleLabel::Update, toggle_camera_system);
 
   app.add_systems(ScheduleLabel::Update, spawn_houses_on_input);
   app.add_systems(ScheduleLabel::Update, spawn_car_on_input);
   app.add_systems(ScheduleLabel::Update, spawn_lights_on_input);
+  app.add_systems(ScheduleLabel::Startup, change_clear_color);
 }
