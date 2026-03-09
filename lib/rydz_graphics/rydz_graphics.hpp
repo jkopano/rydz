@@ -10,3 +10,4 @@
 #include "rydz_graphics/render_batches.hpp"
 #include "rydz_graphics/render_config.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/skybox.hpp"

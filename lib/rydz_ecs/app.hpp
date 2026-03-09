@@ -39,10 +39,29 @@ public:
     return *this;
   }
 
-  template <typename F, typename Cond>
-  App &add_systems_if(ScheduleLabel label, F &&func, Cond &&cond) {
-    schedules_.entry(label).add_system_fn_if(std::forward<F>(func),
-                                             std::forward<Cond>(cond));
+  template <typename Label, typename F>
+    requires(is_on_enter<std::decay_t<Label>>::value)
+  App &add_systems(Label &&label, F &&func) {
+    using S = decltype(label.value);
+    auto *schedules = world_.get_resource<StateSchedules<std::decay_t<S>>>();
+    if (!schedules) {
+      world_.insert_resource(StateSchedules<std::decay_t<S>>{});
+      schedules = world_.get_resource<StateSchedules<std::decay_t<S>>>();
+    }
+    schedules->on_enter[label.value].add_system_fn(std::forward<F>(func));
+    return *this;
+  }
+
+  template <typename Label, typename F>
+    requires(is_on_exit<std::decay_t<Label>>::value)
+  App &add_systems(Label &&label, F &&func) {
+    using S = decltype(label.value);
+    auto *schedules = world_.get_resource<StateSchedules<std::decay_t<S>>>();
+    if (!schedules) {
+      world_.insert_resource(StateSchedules<std::decay_t<S>>{});
+      schedules = world_.get_resource<StateSchedules<std::decay_t<S>>>();
+    }
+    schedules->on_exit[label.value].add_system_fn(std::forward<F>(func));
     return *this;
   }
 
@@ -64,9 +83,23 @@ public:
   template <typename S> App &init_state(S initial) {
     world_.insert_resource(State<S>(std::move(initial)));
     world_.insert_resource(NextState<S>{});
+    world_.insert_resource(StateTransitionEvent<S>{});
+    world_.insert_resource(StateSchedules<S>{});
     schedules_.entry(ScheduleLabel::PreUpdate)
         .add_system(make_system(
             [](World &world_ref) { check_state_transitions<S>(world_ref); }));
+
+    // Run OnEnter for the initial state during startup
+    S initial_copy = initial;
+    schedules_.entry(ScheduleLabel::Startup)
+        .add_system(make_system([initial_copy](World &world_ref) {
+          auto *schedules = world_ref.get_resource<StateSchedules<S>>();
+          if (schedules) {
+            auto it = schedules->on_enter.find(initial_copy);
+            if (it != schedules->on_enter.end())
+              it->second.run(world_ref);
+          }
+        }));
     return *this;
   }
 

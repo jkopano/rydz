@@ -202,29 +202,8 @@ inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<Model>> models,
 inline void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
             Transform3D::from_xyz(8, 6, 8).look_at({0, 0, 0}),
-            CameraController{});
+            CameraController{}, Skybox::from("res/hdri/skybox"));
   DisableCursor();
-}
-
-inline void change_clear_color(ResMut<ClearColor> color) {
-  color->color = {50, 50, 250, 255};
-}
-
-inline void spawn_cubes(Cmd cmd, ResMut<Assets<Model>> model_assets,
-                        ResMut<CarHandles> car_handles, NonSendMarker) {
-  if (!car_handles->loaded) {
-    Model car_model = LoadModel("res/models/first-car.glb");
-    car_handles->car = model_assets->add(std::move(car_model));
-    car_handles->loaded = true;
-  }
-
-  cmd.spawn(CarTag{}, Mesh3d{car_handles->car},
-            Transform3D{
-                .translation = {10.0f, 1.7f, 10.0f},
-                .scale = {3.0f, 3.0f, 3.0f},
-            });
-
-  car_handles->spawned = true;
 }
 
 inline void scene_plugin(App &app) {
@@ -243,5 +222,4 @@ inline void scene_plugin(App &app) {
   app.add_systems(ScheduleLabel::Update, spawn_houses_on_input);
   app.add_systems(ScheduleLabel::Update, spawn_car_on_input);
   app.add_systems(ScheduleLabel::Update, spawn_lights_on_input);
-  app.add_systems(ScheduleLabel::Startup, change_clear_color);
 }

@@ -7,6 +7,7 @@
 #include "mesh3d.hpp"
 #include "render_batches.hpp"
 #include "render_config.hpp"
+#include "skybox.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/transform.hpp"
@@ -132,7 +133,8 @@ inline void build_render_batches_system(
 inline void render_system(
     Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
     Res<Assets<Texture2D>> tex_assets, Res<RenderBatches> batches,
-    Query<const Camera3DComponent, const ActiveCamera, const Transform3D>
+    Query<const Camera3DComponent, const ActiveCamera, const Transform3D,
+          Opt<const Skybox>>
         cam_query,
     Query<const DirectionalLight> dir_query,
     Query<const PointLight, const GlobalTransform> point_query, NonSendMarker) {
@@ -145,11 +147,15 @@ inline void render_system(
   cam.fovy = 45.0f;
   cam.projection = CAMERA_PERSPECTIVE;
 
+  const Skybox *active_skybox = nullptr;
+
   cam_query.for_each([&](const Camera3DComponent *cam_comp,
-                         const ActiveCamera *, const Transform3D *cam_tx) {
+                         const ActiveCamera *, const Transform3D *cam_tx,
+                         const Skybox *sky) {
     if (cam_comp && cam_tx) {
       cam = build_camera(cam_tx->translation, cam_tx->forward(), cam_tx->up(),
                          *cam_comp);
+      active_skybox = sky;
     }
   });
 
@@ -214,6 +220,10 @@ inline void render_system(
   BeginDrawing();
   ClearBackground(bg);
   BeginMode3D(cam);
+
+  if (active_skybox && active_skybox->loaded) {
+    active_skybox->draw(cam);
+  }
 
   for (const auto &batch : batches->batches) {
     const auto &key = batch.key;
@@ -467,7 +477,6 @@ inline void render_plugin(App &app) {
   if (!app.world().contains_resource<LodHistory>()) {
     app.insert_resource(LodHistory{});
   }
-
   app.add_systems(ScheduleLabel::First, auto_insert_global_transform);
   app.add_systems(ScheduleLabel::First, auto_insert_visibility);
   app.add_systems(ScheduleLabel::First, auto_insert_material);
