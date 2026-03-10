@@ -48,6 +48,8 @@ template <typename T> struct Mut {
   }
   operator const T *() const { return ptr; }
 
+  T &bypass_change_detection() { return *ptr; }
+
 private:
   void mark() {
     if (!marked && storage && ptr) {
@@ -152,6 +154,20 @@ template <typename T> struct WorldQueryTraits<Opt<Mut<T>>> {
       return Item{storage ? storage->get(entity) : nullptr, storage, entity,
                   tick};
     }
+    bool matches(Entity) const { return true; }
+    size_t capacity() const { return SIZE_MAX; }
+    bool is_required() const { return false; }
+  };
+};
+
+template <> struct WorldQueryTraits<Entity> {
+  using Item = Entity;
+
+  static void access(SystemAccess &) {}
+
+  struct Fetcher {
+    void init(const World &) {}
+    Item fetch(Entity entity) const { return entity; }
     bool matches(Entity) const { return true; }
     size_t capacity() const { return SIZE_MAX; }
     bool is_required() const { return false; }
@@ -396,15 +412,14 @@ private:
   };
 
   template <typename... Items> auto make_iter(std::tuple<Items...>) const {
-    QueryRange<Items...> range;
-    range.fetchers = std::make_tuple(make_fetcher<Items>()...);
-    range.world = world_;
-    range.count =
-        static_cast<uint32_t>(compute_min_cap<Items...>(range.fetchers));
-    return range;
+    QueryRange<Items...> result;
+    result.fetchers = std::make_tuple(make_fetcher<Items>()...);
+    result.world = world_;
+    result.count =
+        static_cast<uint32_t>(compute_min_cap<Items...>(result.fetchers));
+    return result;
   }
 
-  // --- each() implementation ---
   template <typename Func, typename... Items>
   void for_each_impl(Func &&func, std::tuple<Items...>) const {
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);

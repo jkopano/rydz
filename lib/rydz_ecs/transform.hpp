@@ -1,7 +1,6 @@
 #pragma once
-#include "entity.hpp"
 #include "hierarchy.hpp"
-#include "world.hpp"
+#include "query.hpp"
 #include <functional>
 #include <raylib.h>
 #include <raymath.h>
@@ -88,25 +87,15 @@ struct GlobalTransform {
   }
 };
 
-inline void propagate_transforms(World &world) {
+inline void propagate_transforms(
+    Query<Entity, Transform3D, Opt<Parent>, Mut<GlobalTransform>> query) {
   std::unordered_map<Entity, Matrix> local_matrices;
-  auto *transform_storage = world.get_storage<Transform3D>();
-  if (transform_storage) {
-    for (auto e : transform_storage->entity_indices()) {
-      auto *t = transform_storage->get(e);
-      if (t)
-        local_matrices[e] = t->compute_matrix();
-    }
-  }
-
   std::unordered_map<Entity, Entity> parents;
-  auto *parent_storage = world.get_storage<Parent>();
-  if (parent_storage) {
-    for (auto e : parent_storage->entity_indices()) {
-      auto *p = parent_storage->get(e);
-      if (p)
-        parents[e] = p->entity;
-    }
+
+  for (auto [entity, transform, parent, global] : query.iter()) {
+    local_matrices[entity] = transform->compute_matrix();
+    if (parent)
+      parents[entity] = parent->entity;
   }
 
   std::unordered_map<Entity, GlobalTransform> cache;
@@ -121,25 +110,26 @@ inline void propagate_transforms(World &world) {
     if (lit != local_matrices.end())
       local_mat = lit->second;
 
-    GlobalTransform global;
+    GlobalTransform result;
     auto pit = parents.find(entity);
     if (pit != parents.end()) {
       GlobalTransform parent_global = compute(pit->second);
-      global.matrix = MatrixMultiply(local_mat, parent_global.matrix);
+      result.matrix = MatrixMultiply(local_mat, parent_global.matrix);
     } else {
-      global.matrix = local_mat;
+      result.matrix = local_mat;
     }
 
-    cache[entity] = global;
-    return global;
+    cache[entity] = result;
+    return result;
   };
 
-  for (auto &[entity, _] : local_matrices) {
+  for (auto &[entity, _] : local_matrices)
     compute(entity);
-  }
 
-  for (auto &[entity, global] : cache) {
-    world.insert_component(entity, global);
+  for (auto [entity, transform, parent, global] : query.iter()) {
+    auto it = cache.find(entity);
+    if (it != cache.end())
+      global.bypass_change_detection() = it->second;
   }
 }
 
