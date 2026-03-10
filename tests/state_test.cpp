@@ -8,13 +8,13 @@
 using namespace ecs;
 
 // ============================================================
-// State enum
+// State enums
 // ============================================================
 
-enum class GameState { Menu, Playing };
+enum class GameState { Menu, Playing, Paused };
 
 // ============================================================
-// State tests (mirrors state_test.rs)
+// Basic state tests
 // ============================================================
 
 TEST(StateTest, InStateCondition) {
@@ -22,7 +22,6 @@ TEST(StateTest, InStateCondition) {
   world.insert_resource(State<GameState>(GameState::Menu));
   world.insert_resource(NextState<GameState>{});
 
-  // in_state should return true for current state
   auto cond_menu = make_condition(in_state(GameState::Menu));
   EXPECT_TRUE(cond_menu->is_true(world));
 
@@ -35,15 +34,12 @@ TEST(StateTest, StateTransition) {
   world.insert_resource(State<GameState>(GameState::Menu));
   world.insert_resource(NextState<GameState>{});
 
-  // Request transition
   auto *next = world.get_resource<NextState<GameState>>();
   ASSERT_NE(next, nullptr);
   next->set(GameState::Playing);
 
-  // Apply transition
   check_state_transitions<GameState>(world);
 
-  // Verify state changed
   auto *state = world.get_resource<State<GameState>>();
   ASSERT_NE(state, nullptr);
   EXPECT_EQ(state->get(), GameState::Playing);
@@ -54,10 +50,8 @@ TEST(StateTest, StateTransitionNoOp) {
   world.insert_resource(State<GameState>(GameState::Menu));
   world.insert_resource(NextState<GameState>{});
 
-  // No pending transition
   check_state_transitions<GameState>(world);
 
-  // State should remain unchanged
   auto *state = world.get_resource<State<GameState>>();
   ASSERT_NE(state, nullptr);
   EXPECT_EQ(state->get(), GameState::Menu);
@@ -82,12 +76,228 @@ TEST(StateTest, ConditionedSystemWithState) {
   EXPECT_EQ(menu_runs, 1);
   EXPECT_EQ(playing_runs, 0);
 
-  // Transition to Playing
   world.get_resource<NextState<GameState>>()->set(GameState::Playing);
   check_state_transitions<GameState>(world);
 
   menu_sys->run(world);
   playing_sys->run(world);
-  EXPECT_EQ(menu_runs, 1);    // didn't run again
-  EXPECT_EQ(playing_runs, 1); // now runs
+  EXPECT_EQ(menu_runs, 1);
+  EXPECT_EQ(playing_runs, 1);
+}
+
+// ============================================================
+// Edge cases
+// ============================================================
+
+TEST(StateTest, TransitionToSameStateIsNoOp) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+  world.insert_resource(StateTransitionEvent<GameState>{});
+
+  auto *next = world.get_resource<NextState<GameState>>();
+  next->set(GameState::Menu); // same state
+
+  check_state_transitions<GameState>(world);
+
+  auto *event = world.get_resource<StateTransitionEvent<GameState>>();
+  EXPECT_FALSE(event->changed)
+      << "Transition to the same state should not fire changed event";
+}
+
+TEST(StateTest, MultipleTransitionsOnlyLastApplies) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+
+  auto *next = world.get_resource<NextState<GameState>>();
+  next->set(GameState::Playing);
+  next->set(GameState::Paused); // overwrite
+
+  check_state_transitions<GameState>(world);
+
+  EXPECT_EQ(world.get_resource<State<GameState>>()->get(), GameState::Paused);
+}
+
+TEST(StateTest, TransitionClearsNextState) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+
+  auto *next = world.get_resource<NextState<GameState>>();
+  next->set(GameState::Playing);
+
+  check_state_transitions<GameState>(world);
+
+  EXPECT_FALSE(next->pending.has_value())
+      << "NextState should be cleared after transition";
+}
+
+TEST(StateTest, DoubleCheckTransitionsIsIdempotent) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+  world.insert_resource(StateTransitionEvent<GameState>{});
+
+  auto *next = world.get_resource<NextState<GameState>>();
+  next->set(GameState::Playing);
+
+  check_state_transitions<GameState>(world);
+  EXPECT_EQ(world.get_resource<State<GameState>>()->get(), GameState::Playing);
+
+  // Second check with no new pending — should not change anything
+  check_state_transitions<GameState>(world);
+  EXPECT_EQ(world.get_resource<State<GameState>>()->get(), GameState::Playing);
+
+  // changed should be reset to false on second call
+  auto *event = world.get_resource<StateTransitionEvent<GameState>>();
+  EXPECT_FALSE(event->changed);
+}
+
+TEST(StateTest, StateChangedCondition) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+  world.insert_resource(StateTransitionEvent<GameState>{});
+
+  auto cond = make_condition(state_changed<GameState>());
+
+  // No transition yet
+  EXPECT_FALSE(cond->is_true(world));
+
+  // Trigger transition
+  world.get_resource<NextState<GameState>>()->set(GameState::Playing);
+  check_state_transitions<GameState>(world);
+
+  EXPECT_TRUE(cond->is_true(world));
+
+  // After another check (no new transition), changed resets
+  check_state_transitions<GameState>(world);
+  EXPECT_FALSE(cond->is_true(world));
+}
+
+TEST(StateTest, OnEnterScheduleRuns) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+  world.insert_resource(StateTransitionEvent<GameState>{});
+  world.insert_resource(StateSchedules<GameState>{});
+
+  int enter_playing_count = 0;
+
+  auto *schedules = world.get_resource<StateSchedules<GameState>>();
+  schedules->on_enter[GameState::Playing].add_system_fn(
+      [&enter_playing_count]() { enter_playing_count++; });
+
+  world.get_resource<NextState<GameState>>()->set(GameState::Playing);
+  check_state_transitions<GameState>(world);
+
+  EXPECT_EQ(enter_playing_count, 1);
+}
+
+TEST(StateTest, OnExitScheduleRuns) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+  world.insert_resource(StateTransitionEvent<GameState>{});
+  world.insert_resource(StateSchedules<GameState>{});
+
+  int exit_menu_count = 0;
+
+  auto *schedules = world.get_resource<StateSchedules<GameState>>();
+  schedules->on_exit[GameState::Menu].add_system_fn(
+      [&exit_menu_count]() { exit_menu_count++; });
+
+  world.get_resource<NextState<GameState>>()->set(GameState::Playing);
+  check_state_transitions<GameState>(world);
+
+  EXPECT_EQ(exit_menu_count, 1);
+}
+
+TEST(StateTest, OnExitRunsBeforeOnEnter) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+  world.insert_resource(StateTransitionEvent<GameState>{});
+  world.insert_resource(StateSchedules<GameState>{});
+
+  int order_counter = 0;
+  int exit_order = -1;
+  int enter_order = -1;
+
+  auto *schedules = world.get_resource<StateSchedules<GameState>>();
+  schedules->on_exit[GameState::Menu].add_system_fn(
+      [&]() { exit_order = order_counter++; });
+  schedules->on_enter[GameState::Playing].add_system_fn(
+      [&]() { enter_order = order_counter++; });
+
+  world.get_resource<NextState<GameState>>()->set(GameState::Playing);
+  check_state_transitions<GameState>(world);
+
+  EXPECT_LT(exit_order, enter_order)
+      << "OnExit should run before OnEnter during transition";
+}
+
+TEST(StateTest, OnEnterNotCalledForSameState) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+  world.insert_resource(StateTransitionEvent<GameState>{});
+  world.insert_resource(StateSchedules<GameState>{});
+
+  int enter_count = 0;
+
+  auto *schedules = world.get_resource<StateSchedules<GameState>>();
+  schedules->on_enter[GameState::Menu].add_system_fn(
+      [&enter_count]() { enter_count++; });
+
+  // Transition to same state
+  world.get_resource<NextState<GameState>>()->set(GameState::Menu);
+  check_state_transitions<GameState>(world);
+
+  EXPECT_EQ(enter_count, 0)
+      << "OnEnter should not fire when transitioning to same state";
+}
+
+TEST(StateTest, ChainedTransitions) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+  world.insert_resource(StateTransitionEvent<GameState>{});
+
+  // Menu -> Playing
+  world.get_resource<NextState<GameState>>()->set(GameState::Playing);
+  check_state_transitions<GameState>(world);
+  EXPECT_EQ(world.get_resource<State<GameState>>()->get(), GameState::Playing);
+
+  // Playing -> Paused
+  world.get_resource<NextState<GameState>>()->set(GameState::Paused);
+  check_state_transitions<GameState>(world);
+  EXPECT_EQ(world.get_resource<State<GameState>>()->get(), GameState::Paused);
+
+  // Paused -> Menu
+  world.get_resource<NextState<GameState>>()->set(GameState::Menu);
+  check_state_transitions<GameState>(world);
+  EXPECT_EQ(world.get_resource<State<GameState>>()->get(), GameState::Menu);
+}
+
+TEST(StateTest, MissingStateResourceHandledGracefully) {
+  World world;
+  // No State<GameState> inserted — only NextState
+  world.insert_resource(NextState<GameState>{});
+
+  world.get_resource<NextState<GameState>>()->set(GameState::Playing);
+
+  // Should not crash
+  check_state_transitions<GameState>(world);
+}
+
+TEST(StateTest, MissingNextStateResourceHandledGracefully) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  // No NextState<GameState> inserted
+
+  // Should not crash
+  check_state_transitions<GameState>(world);
+  EXPECT_EQ(world.get_resource<State<GameState>>()->get(), GameState::Menu);
 }

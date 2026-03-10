@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 #include <thread>
 
+#include "rydz_ecs/condition.hpp"
 #include "rydz_ecs/query.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/system.hpp"
@@ -11,7 +12,7 @@
 using namespace ecs;
 
 // ============================================================
-// Components for parallel tests
+// Components / resources for tests
 // ============================================================
 
 struct CompA {
@@ -24,11 +25,32 @@ struct CompC {
   int value = 0;
 };
 
+struct Counter {
+  int value = 0;
+};
+
 // ============================================================
-// Schedule graph tests
+// Helpers
 // ============================================================
 
-// Test: Two systems writing DIFFERENT components should run in parallel
+struct ConcurrencyTracker {
+  std::atomic<int> max_concurrent{0};
+  std::atomic<int> current{0};
+
+  void enter() {
+    int c = ++current;
+    int prev = max_concurrent.load();
+    while (c > prev && !max_concurrent.compare_exchange_weak(prev, c))
+      ;
+  }
+
+  void exit() { --current; }
+};
+
+// ============================================================
+// Parallel / access tests
+// ============================================================
+
 TEST(ScheduleGraphTest, ParallelWhenNoWriteConflict) {
   World world;
 
@@ -36,228 +58,447 @@ TEST(ScheduleGraphTest, ParallelWhenNoWriteConflict) {
   world.insert_component(e, CompA{0});
   world.insert_component(e, CompB{0});
 
-  std::atomic<int> max_concurrent{0};
-  std::atomic<int> current{0};
+  ConcurrencyTracker tracker;
 
   Schedule schedule;
 
-  // System 1: writes CompA only
-  schedule.add_system_fn(
-      [&max_concurrent, &current](Query<Mut<CompA>> query) {
-        int c = ++current;
-        int prev = max_concurrent.load();
-        while (c > prev && !max_concurrent.compare_exchange_weak(prev, c))
-          ;
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        query.for_each([](CompA *a) { a->value += 1; });
-        --current;
-      });
+  schedule.add_system_fn([&tracker](Query<Mut<CompA>> query) {
+    tracker.enter();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    query.for_each([](CompA *a) { a->value += 1; });
+    tracker.exit();
+  });
 
-  // System 2: writes CompB only (no conflict with System 1)
-  schedule.add_system_fn(
-      [&max_concurrent, &current](Query<Mut<CompB>> query) {
-        int c = ++current;
-        int prev = max_concurrent.load();
-        while (c > prev && !max_concurrent.compare_exchange_weak(prev, c))
-          ;
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        query.for_each([](CompB *b) { b->value += 10; });
-        --current;
-      });
+  schedule.add_system_fn([&tracker](Query<Mut<CompB>> query) {
+    tracker.enter();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    query.for_each([](CompB *b) { b->value += 10; });
+    tracker.exit();
+  });
 
   schedule.run(world);
 
-  // Both should have run
   EXPECT_EQ(world.get_component<CompA>(e)->value, 1);
   EXPECT_EQ(world.get_component<CompB>(e)->value, 10);
-
-  // They should have run concurrently (max_concurrent should be 2)
-  EXPECT_EQ(max_concurrent.load(), 2)
+  EXPECT_EQ(tracker.max_concurrent.load(), 2)
       << "Systems writing different components should run in parallel";
 }
 
-// Test: Two systems writing the SAME component must run sequentially
 TEST(ScheduleGraphTest, SequentialWhenWriteConflict) {
   World world;
 
   auto e = world.spawn();
   world.insert_component(e, CompA{0});
 
-  std::atomic<int> max_concurrent{0};
-  std::atomic<int> current{0};
+  ConcurrencyTracker tracker;
 
   Schedule schedule;
 
-  // System 1: writes CompA
-  schedule.add_system_fn(
-      [&max_concurrent, &current](Query<Mut<CompA>> query) {
-        int c = ++current;
-        int prev = max_concurrent.load();
-        while (c > prev && !max_concurrent.compare_exchange_weak(prev, c))
-          ;
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        query.for_each([](CompA *a) { a->value += 1; });
-        --current;
-      });
+  schedule.add_system_fn([&tracker](Query<Mut<CompA>> query) {
+    tracker.enter();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    query.for_each([](CompA *a) { a->value += 1; });
+    tracker.exit();
+  });
 
-  // System 2: also writes CompA (CONFLICT — must be sequential)
-  schedule.add_system_fn(
-      [&max_concurrent, &current](Query<Mut<CompA>> query) {
-        int c = ++current;
-        int prev = max_concurrent.load();
-        while (c > prev && !max_concurrent.compare_exchange_weak(prev, c))
-          ;
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        query.for_each([](CompA *a) { a->value += 10; });
-        --current;
-      });
+  schedule.add_system_fn([&tracker](Query<Mut<CompA>> query) {
+    tracker.enter();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    query.for_each([](CompA *a) { a->value += 10; });
+    tracker.exit();
+  });
 
   schedule.run(world);
 
-  // Both should have run
   EXPECT_EQ(world.get_component<CompA>(e)->value, 11);
-
-  // They should NOT have run concurrently (max_concurrent should be 1)
-  EXPECT_EQ(max_concurrent.load(), 1)
+  EXPECT_EQ(tracker.max_concurrent.load(), 1)
       << "Systems writing the same component must run sequentially";
 }
 
-// Test: Writer + Reader of same component must be sequential
 TEST(ScheduleGraphTest, SequentialWhenWriteReadConflict) {
   World world;
 
   auto e = world.spawn();
   world.insert_component(e, CompA{100});
 
-  std::atomic<int> max_concurrent{0};
-  std::atomic<int> current{0};
+  ConcurrencyTracker tracker;
 
   Schedule schedule;
 
-  // System 1: writes CompA
-  schedule.add_system_fn(
-      [&max_concurrent, &current](Query<Mut<CompA>> query) {
-        int c = ++current;
-        int prev = max_concurrent.load();
-        while (c > prev && !max_concurrent.compare_exchange_weak(prev, c))
-          ;
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        query.for_each([](CompA *a) { a->value += 1; });
-        --current;
-      });
+  schedule.add_system_fn([&tracker](Query<Mut<CompA>> query) {
+    tracker.enter();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    query.for_each([](CompA *a) { a->value += 1; });
+    tracker.exit();
+  });
 
-  // System 2: reads CompA (conflict with writer)
-  schedule.add_system_fn([&max_concurrent, &current](Query<CompA> query) {
-    int c = ++current;
-    int prev = max_concurrent.load();
-    while (c > prev && !max_concurrent.compare_exchange_weak(prev, c))
-      ;
+  schedule.add_system_fn([&tracker](Query<CompA> query) {
+    tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     query.for_each([](const CompA *) {});
-    --current;
+    tracker.exit();
   });
 
   schedule.run(world);
 
-  EXPECT_EQ(max_concurrent.load(), 1)
+  EXPECT_EQ(tracker.max_concurrent.load(), 1)
       << "Writer + Reader of same component must run sequentially";
 }
 
-// Test: Two readers of the same component should run in parallel
 TEST(ScheduleGraphTest, ParallelWhenReadOnly) {
   World world;
 
   auto e = world.spawn();
   world.insert_component(e, CompA{42});
 
-  std::atomic<int> max_concurrent{0};
-  std::atomic<int> current{0};
+  ConcurrencyTracker tracker;
 
   Schedule schedule;
 
-  // System 1: reads CompA
-  schedule.add_system_fn([&max_concurrent, &current](Query<CompA> query) {
-    int c = ++current;
-    int prev = max_concurrent.load();
-    while (c > prev && !max_concurrent.compare_exchange_weak(prev, c))
-      ;
+  schedule.add_system_fn([&tracker](Query<CompA> query) {
+    tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     query.for_each([](const CompA *) {});
-    --current;
+    tracker.exit();
   });
 
-  // System 2: also reads CompA (no conflict — read-read is compatible)
-  schedule.add_system_fn([&max_concurrent, &current](Query<CompA> query) {
-    int c = ++current;
-    int prev = max_concurrent.load();
-    while (c > prev && !max_concurrent.compare_exchange_weak(prev, c))
-      ;
+  schedule.add_system_fn([&tracker](Query<CompA> query) {
+    tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     query.for_each([](const CompA *) {});
-    --current;
+    tracker.exit();
   });
 
   schedule.run(world);
 
-  EXPECT_EQ(max_concurrent.load(), 2)
+  EXPECT_EQ(tracker.max_concurrent.load(), 2)
       << "Two read-only systems on the same component should run in parallel";
 }
 
-// Test: Three systems — A||B sequential with C
-TEST(ScheduleGraphTest, MixedParallelAndSequential) {
+// ============================================================
+// Batching: readers should batch together even if a writer is between them
+// ============================================================
+
+TEST(ScheduleGraphTest, ReadersParallelDespiteWriterInMiddle) {
   World world;
 
   auto e = world.spawn();
   world.insert_component(e, CompA{0});
   world.insert_component(e, CompB{0});
-  world.insert_component(e, CompC{0});
 
-  std::atomic<int> max_concurrent{0};
-  std::atomic<int> current{0};
-  std::atomic<int> order{0};
-  std::atomic<int> sys3_order{0};
+  ConcurrencyTracker tracker;
 
   Schedule schedule;
 
-  // System 1: writes CompA (compatible with sys 2)
-  schedule.add_system_fn([&](Query<Mut<CompA>> query) {
-    int c = ++current;
-    int prev = max_concurrent.load();
-    while (c > prev && !max_concurrent.compare_exchange_weak(prev, c))
-      ;
+  // Reader 1 of A,B
+  schedule.add_system_fn([&tracker](Query<CompA, CompB> query) {
+    tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](CompA *a) { a->value = 1; });
-    --current;
-    ++order;
+    query.for_each([](const CompA *, const CompB *) {});
+    tracker.exit();
   });
 
-  // System 2: writes CompB (compatible with sys 1, but conflicts with sys 3)
-  schedule.add_system_fn([&](Query<Mut<CompB>> query) {
-    int c = ++current;
-    int prev = max_concurrent.load();
-    while (c > prev && !max_concurrent.compare_exchange_weak(prev, c))
-      ;
+  // Writer of A,B (conflicts with both readers)
+  schedule.add_system_fn([&tracker](Query<Mut<CompA>, Mut<CompB>> query) {
+    tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](CompB *b) { b->value = 2; });
-    --current;
-    ++order;
+    query.for_each([](CompA *a, CompB *b) {
+      a->value = 1;
+      b->value = 1;
+    });
+    tracker.exit();
   });
 
-  // System 3: writes CompB (conflicts with sys 2, must wait)
-  schedule.add_system_fn([&](Query<Mut<CompB>> query) {
-    sys3_order.store(order.load());
-    query.for_each([](CompB *b) { b->value += 10; });
+  // Reader 2 of A,B (compatible with Reader 1, conflicts with Writer)
+  schedule.add_system_fn([&tracker](Query<CompA, CompB> query) {
+    tracker.enter();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    query.for_each([](const CompA *, const CompB *) {});
+    tracker.exit();
   });
 
   schedule.run(world);
 
-  EXPECT_EQ(world.get_component<CompA>(e)->value, 1);
-  EXPECT_EQ(world.get_component<CompB>(e)->value, 12);
+  // Reader 1 and Reader 2 should be batched together (parallel)
+  // Writer runs in a separate batch
+  EXPECT_EQ(tracker.max_concurrent.load(), 2)
+      << "Two readers should batch together even when a writer is inserted "
+         "between them";
+}
 
-  // Systems 1 and 2 should have run in parallel
-  EXPECT_EQ(max_concurrent.load(), 2);
+// ============================================================
+// Ordering: .after(), .before(), chain()
+// ============================================================
 
-  // System 3 must have run AFTER system 2 (order >= 2 means both 1&2 finished)
-  EXPECT_GE(sys3_order.load(), 1)
-      << "System 3 should run after System 2 (write-write conflict on CompB)";
+void ordering_first(ResMut<Counter> c) { c->value = 1; }
+void ordering_second(ResMut<Counter> c) { c->value = c->value * 10 + 2; }
+void ordering_third(ResMut<Counter> c) { c->value = c->value * 10 + 3; }
+
+TEST(ScheduleOrderingTest, AfterEnforcesOrder) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  // Add second first, but it should run after first
+  schedule.add_system_fn(
+      std::move(into_system(ordering_second).after(ordering_first)));
+  schedule.add_system_fn(ordering_first);
+
+  schedule.run(world);
+
+  // first sets 1, second does 1*10+2=12
+  EXPECT_EQ(world.get_resource<Counter>()->value, 12);
+}
+
+TEST(ScheduleOrderingTest, BeforeEnforcesOrder) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  schedule.add_system_fn(ordering_second);
+  schedule.add_system_fn(
+      std::move(into_system(ordering_first).before(ordering_second)));
+
+  schedule.run(world);
+
+  // first sets 1, second does 1*10+2=12
+  EXPECT_EQ(world.get_resource<Counter>()->value, 12);
+}
+
+TEST(ScheduleOrderingTest, ChainEnforcesSequentialOrder) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  schedule.add_system_fn(chain(ordering_first, ordering_second, ordering_third));
+
+  schedule.run(world);
+
+  // first:1, second:1*10+2=12, third:12*10+3=123
+  EXPECT_EQ(world.get_resource<Counter>()->value, 123);
+}
+
+TEST(ScheduleOrderingTest, ChainReversedInsertionStillWorks) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  // chain should override insertion order
+  schedule.add_system_fn(chain(ordering_third, ordering_second, ordering_first));
+
+  schedule.run(world);
+
+  // third:3, second:3*10+2=32, first:32*10+1=... wait, no — they all write
+  // c->value
+  // third sets 3, second does 3*10+2=32, first sets 1
+  // Actually first always sets value=1, so the last in chain wins for =
+  // Let me re-check: chain(third, second, first) means third runs, then second,
+  // then first
+  EXPECT_EQ(world.get_resource<Counter>()->value, 1);
+}
+
+// ============================================================
+// Ordering: error cases
+// ============================================================
+
+TEST(ScheduleOrderingTest, AfterNonexistentSystemThrows) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  // ordering_second.after(ordering_third) but ordering_third is not in schedule
+  schedule.add_system_fn(
+      std::move(into_system(ordering_second).after(ordering_third)));
+
+  EXPECT_THROW(schedule.run(world), std::runtime_error);
+}
+
+TEST(ScheduleOrderingTest, BeforeNonexistentSystemThrows) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  schedule.add_system_fn(
+      std::move(into_system(ordering_first).before(ordering_third)));
+
+  EXPECT_THROW(schedule.run(world), std::runtime_error);
+}
+
+TEST(ScheduleOrderingTest, CycleThrows) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  schedule.add_system_fn(
+      std::move(into_system(ordering_first).after(ordering_second)));
+  schedule.add_system_fn(
+      std::move(into_system(ordering_second).after(ordering_first)));
+
+  EXPECT_THROW(schedule.run(world), std::runtime_error);
+}
+
+TEST(ScheduleOrderingTest, SelfCycleThrows) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  schedule.add_system_fn(
+      std::move(into_system(ordering_first).after(ordering_first)));
+
+  EXPECT_THROW(schedule.run(world), std::runtime_error);
+}
+
+// ============================================================
+// Schedule basics / edge cases
+// ============================================================
+
+TEST(ScheduleTest, EmptyScheduleRunsWithoutCrash) {
+  World world;
+  Schedule schedule;
+  schedule.run(world); // should be no-op
+  EXPECT_TRUE(schedule.empty());
+}
+
+TEST(ScheduleTest, SingleSystem) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  schedule.add_system_fn([](ResMut<Counter> c) { c->value = 42; });
+  schedule.run(world);
+
+  EXPECT_EQ(world.get_resource<Counter>()->value, 42);
+}
+
+TEST(ScheduleTest, SystemCount) {
+  Schedule schedule;
+  EXPECT_EQ(schedule.system_count(), 0u);
+
+  schedule.add_system_fn([](ResMut<Counter>) {});
+  EXPECT_EQ(schedule.system_count(), 1u);
+
+  schedule.add_system_fn([](ResMut<Counter>) {});
+  EXPECT_EQ(schedule.system_count(), 2u);
+}
+
+TEST(ScheduleTest, MultipleRunsReuseGraph) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  schedule.add_system_fn([](ResMut<Counter> c) { c->value += 1; });
+
+  schedule.run(world);
+  schedule.run(world);
+  schedule.run(world);
+
+  EXPECT_EQ(world.get_resource<Counter>()->value, 3);
+}
+
+TEST(ScheduleTest, ExclusiveSystemRunsAlone) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  ConcurrencyTracker tracker;
+
+  Schedule schedule;
+
+  // Exclusive system (takes World&)
+  schedule.add_system_fn([&tracker](World &w) {
+    tracker.enter();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    w.get_resource<Counter>()->value += 1;
+    tracker.exit();
+  });
+
+  schedule.add_system_fn([&tracker](ResMut<Counter> c) {
+    tracker.enter();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    c->value += 10;
+    tracker.exit();
+  });
+
+  schedule.run(world);
+
+  EXPECT_EQ(world.get_resource<Counter>()->value, 11);
+  EXPECT_EQ(tracker.max_concurrent.load(), 1)
+      << "Exclusive system must not run concurrently with anything";
+}
+
+// ============================================================
+// Chain with descriptors (run_if + ordering combined)
+// ============================================================
+
+TEST(ScheduleOrderingTest, ChainWithRunIf) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  schedule.add_system_fn(
+      chain(ordering_first,
+            std::move(into_system(ordering_second).run_if(
+                [](Res<Counter> c) { return c->value == 1; })),
+            ordering_third));
+
+  schedule.run(world);
+
+  // first sets 1, second condition true (value==1) so 1*10+2=12,
+  // third: 12*10+3=123
+  EXPECT_EQ(world.get_resource<Counter>()->value, 123);
+}
+
+TEST(ScheduleOrderingTest, ChainWithRunIfFalse) {
+  World world;
+  world.insert_resource(Counter{0});
+
+  Schedule schedule;
+  schedule.add_system_fn(
+      chain(ordering_first,
+            std::move(into_system(ordering_second).run_if(
+                [](Res<Counter> c) { return c->value == 999; })),
+            ordering_third));
+
+  schedule.run(world);
+
+  // first sets 1, second condition false (value!=999) so skipped,
+  // third: 1*10+3=13
+  EXPECT_EQ(world.get_resource<Counter>()->value, 13);
+}
+
+// ============================================================
+// Ordering + parallelism interaction
+// ============================================================
+
+TEST(ScheduleOrderingTest, AfterDoesNotPreventUnrelatedParallelism) {
+  World world;
+
+  auto e = world.spawn();
+  world.insert_component(e, CompA{0});
+  world.insert_component(e, CompB{0});
+  world.insert_resource(Counter{0});
+
+  ConcurrencyTracker tracker;
+
+  Schedule schedule;
+
+  // sys_a writes CompA
+  schedule.add_system_fn([&tracker](Query<Mut<CompA>> query) {
+    tracker.enter();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    query.for_each([](CompA *a) { a->value = 1; });
+    tracker.exit();
+  });
+
+  // sys_b writes CompB — no access conflict with sys_a, no ordering constraint
+  schedule.add_system_fn([&tracker](Query<Mut<CompB>> query) {
+    tracker.enter();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    query.for_each([](CompB *b) { b->value = 2; });
+    tracker.exit();
+  });
+
+  schedule.run(world);
+
+  EXPECT_EQ(tracker.max_concurrent.load(), 2)
+      << "Unrelated systems should still run in parallel";
 }

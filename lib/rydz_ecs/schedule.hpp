@@ -2,6 +2,7 @@
 #include "condition.hpp"
 #include "system.hpp"
 #include <absl/container/flat_hash_map.h>
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <string>
@@ -39,10 +40,62 @@ inline tf::Executor &global_executor() {
   return executor;
 }
 
+struct ChainedSystems {
+  struct Entry {
+    std::unique_ptr<ISystem> system;
+    SystemOrdering ordering;
+  };
+  std::vector<Entry> systems;
+};
+
+template <typename T> struct is_chained_systems : std::false_type {};
+template <> struct is_chained_systems<ChainedSystems> : std::true_type {};
+template <typename T>
+inline constexpr bool is_chained_systems_v = is_chained_systems<T>::value;
+
+namespace detail {
+
+template <typename Func>
+ChainedSystems::Entry make_chain_entry(Func &&func, const std::string &prev) {
+  SystemOrdering ordering;
+  std::unique_ptr<ISystem> sys;
+
+  if constexpr (is_system_descriptor_v<std::decay_t<Func>>) {
+    ordering = func.take_ordering();
+    sys = func.build();
+  } else {
+    sys = make_system(std::forward<Func>(func));
+  }
+
+  if (!prev.empty()) {
+    ordering.after.push_back(prev);
+  }
+
+  return {std::move(sys), std::move(ordering)};
+}
+
+} // namespace detail
+
+template <typename... Fs> ChainedSystems chain(Fs &&...funcs) {
+  ChainedSystems result;
+  std::string prev_name;
+
+  auto process = [&](auto &&func) {
+    auto entry =
+        detail::make_chain_entry(std::forward<decltype(func)>(func), prev_name);
+    prev_name = entry.system->name();
+    result.systems.push_back(std::move(entry));
+  };
+
+  (process(std::forward<Fs>(funcs)), ...);
+  return result;
+}
+
 class Schedule {
   struct SystemEntry {
     std::unique_ptr<ISystem> system;
     SystemAccess access;
+    SystemOrdering ordering;
   };
 
   enum class SegmentKind {
@@ -67,24 +120,25 @@ public:
   Schedule(Schedule &&) = default;
   Schedule &operator=(Schedule &&) = default;
 
-  void add_system(std::unique_ptr<ISystem> system) {
-    SystemEntry entry{std::move(system), {}};
+  void add_system(std::unique_ptr<ISystem> system,
+                  SystemOrdering ordering = {}) {
+    SystemEntry entry{std::move(system), {}, std::move(ordering)};
     entry.access = entry.system->access();
     entries_.push_back(std::move(entry));
     needs_rebuild_ = true;
   }
 
   template <typename F> void add_system_fn(F &&func) {
-    if constexpr (is_system_descriptor_v<std::decay_t<F>>) {
-      add_system(func.build());
+    if constexpr (is_chained_systems_v<std::decay_t<F>>) {
+      for (auto &e : func.systems) {
+        add_system(std::move(e.system), std::move(e.ordering));
+      }
+    } else if constexpr (is_system_descriptor_v<std::decay_t<F>>) {
+      auto ordering = func.take_ordering();
+      add_system(func.build(), std::move(ordering));
     } else {
       add_system(make_system(std::forward<F>(func)));
     }
-  }
-
-  template <typename F, typename Cond>
-  void add_system_fn_if(F &&func, Cond &&cond) {
-    add_system(make_system_run_if(std::forward(func), std::forward(cond)));
   }
 
   void run(World &world) {
@@ -114,6 +168,81 @@ private:
   void rebuild_graph() {
     segments_.clear();
 
+    const size_t n = entries_.size();
+    if (n == 0)
+      return;
+
+    absl::flat_hash_map<std::string, size_t> name_to_index;
+    for (size_t i = 0; i < n; ++i) {
+      name_to_index[entries_[i].system->name()] = i;
+    }
+
+    std::vector<std::vector<size_t>> adj(n);
+    std::vector<size_t> in_degree(n, 0);
+
+    for (size_t i = 0; i < n; ++i) {
+      for (const auto &dep : entries_[i].ordering.after) {
+        auto it = name_to_index.find(dep);
+        if (it == name_to_index.end()) {
+          throw std::runtime_error("System '" + entries_[i].system->name() +
+                                   "' has .after() on '" + dep +
+                                   "' which does not exist in this schedule");
+        }
+        adj[it->second].push_back(i);
+        in_degree[i]++;
+      }
+      for (const auto &dep : entries_[i].ordering.before) {
+        auto it = name_to_index.find(dep);
+        if (it == name_to_index.end()) {
+          throw std::runtime_error("System '" + entries_[i].system->name() +
+                                   "' has .before() on '" + dep +
+                                   "' which does not exist in this schedule");
+        }
+        adj[i].push_back(it->second);
+        in_degree[it->second]++;
+      }
+    }
+
+    // Kahn's algorithm, stable by insertion order
+    std::vector<size_t> ready;
+    for (size_t i = 0; i < n; ++i) {
+      if (in_degree[i] == 0)
+        ready.push_back(i);
+    }
+
+    std::vector<size_t> order;
+    order.reserve(n);
+    while (!ready.empty()) {
+      auto min_it = std::min_element(ready.begin(), ready.end());
+      size_t curr = *min_it;
+      ready.erase(min_it);
+      order.push_back(curr);
+
+      for (size_t next : adj[curr]) {
+        if (--in_degree[next] == 0) {
+          ready.push_back(next);
+        }
+      }
+    }
+
+    if (order.size() != n) {
+      std::string msg = "Cycle detected in system ordering. Systems in cycle:";
+      for (size_t i = 0; i < n; ++i) {
+        if (in_degree[i] != 0)
+          msg += " " + entries_[i].system->name();
+      }
+      throw std::runtime_error(msg);
+    }
+
+    // Reorder entries per topo sort
+    std::vector<SystemEntry> sorted;
+    sorted.reserve(n);
+    for (size_t idx : order) {
+      sorted.push_back(std::move(entries_[idx]));
+    }
+    entries_ = std::move(sorted);
+
+    // Chunk by main_thread_only, then batch within each chunk
     auto chunked_view =
         entries_ |
         std::views::chunk_by([](const SystemEntry &a, const SystemEntry &b) {
@@ -131,31 +260,92 @@ private:
       if (is_main || (chunk.size() == 1)) {
         segments_.push_back({start, end, SegmentKind::Inline, {}});
       } else {
-        Segment segment{start, end, SegmentKind::Parallel, {}};
-        build_parallel_segment(segment);
-        segments_.push_back(std::move(segment));
+        build_batched_segments(start, end);
       }
     }
   }
 
-  void build_parallel_segment(Segment &segment) {
-    segment.taskflow.clear();
-    const size_t count = segment.end - segment.start;
-    std::vector<tf::Task> tasks{};
-    tasks.reserve(count);
+  bool systems_conflict(size_t i, size_t j) const {
+    const auto &a = entries_[i];
+    const auto &b = entries_[j];
 
-    for (size_t i : range(segment.start, segment.end)) {
-      tasks.push_back(segment.taskflow.emplace(
-          [this, i] { entries_[i].system->run(*current_world_); }));
+    if (a.access.exclusive || b.access.exclusive ||
+        !a.access.is_compatible(b.access))
+      return true;
+
+    const auto &name_a = a.system->name();
+    const auto &name_b = b.system->name();
+    for (const auto &dep : a.ordering.after)
+      if (dep == name_b)
+        return true;
+    for (const auto &dep : a.ordering.before)
+      if (dep == name_b)
+        return true;
+    for (const auto &dep : b.ordering.after)
+      if (dep == name_a)
+        return true;
+    for (const auto &dep : b.ordering.before)
+      if (dep == name_a)
+        return true;
+
+    return false;
+  }
+
+  void build_batched_segments(size_t start, size_t end) {
+    const size_t count = end - start;
+
+    // Greedy batch assignment: each batch holds mutually compatible systems
+    std::vector<std::vector<size_t>> batches;
+
+    for (size_t i = 0; i < count; ++i) {
+      bool placed = false;
+      for (auto &batch : batches) {
+        bool compatible = true;
+        for (size_t j : batch) {
+          if (systems_conflict(start + i, start + j)) {
+            compatible = false;
+            break;
+          }
+        }
+        if (compatible) {
+          batch.push_back(i);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        batches.push_back({i});
+      }
     }
 
-    for (size_t j : range(1u, count)) {
-      for (size_t i : range(0u, j)) {
-        const auto &a = entries_[segment.start + i].access;
-        const auto &b = entries_[segment.start + j].access;
-        if (a.exclusive || b.exclusive || !a.is_compatible(b))
-          tasks[i].precede(tasks[j]);
+    // Reorder entries within [start, end) by batch
+    std::vector<SystemEntry> reordered;
+    reordered.reserve(count);
+    for (const auto &batch : batches) {
+      for (size_t idx : batch) {
+        reordered.push_back(std::move(entries_[start + idx]));
       }
+    }
+    for (size_t i = 0; i < count; ++i) {
+      entries_[start + i] = std::move(reordered[i]);
+    }
+
+    // Push a segment per batch
+    size_t batch_start = start;
+    for (const auto &batch : batches) {
+      size_t batch_end = batch_start + batch.size();
+      if (batch.size() == 1) {
+        segments_.push_back({batch_start, batch_end, SegmentKind::Inline, {}});
+      } else {
+        // All systems in this batch are compatible — full parallel, no edges
+        Segment seg{batch_start, batch_end, SegmentKind::Parallel, {}};
+        for (size_t i = batch_start; i < batch_end; ++i) {
+          seg.taskflow.emplace(
+              [this, i] { entries_[i].system->run(*current_world_); });
+        }
+        segments_.push_back(std::move(seg));
+      }
+      batch_start = batch_end;
     }
   }
 };
@@ -183,11 +373,7 @@ namespace detail {
 
 template <typename F>
 void add_system_to_schedule(Schedule &schedule, F &&func) {
-  if constexpr (is_system_descriptor_v<std::decay_t<F>>) {
-    schedule.add_system(func.build());
-  } else {
-    schedule.add_system_fn(std::forward<F>(func));
-  }
+  schedule.add_system_fn(std::forward<F>(func));
 }
 
 } // namespace detail

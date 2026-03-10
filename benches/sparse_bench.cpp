@@ -56,7 +56,7 @@ static void BM_HashMapStorageIteration10Pct(benchmark::State &state) {
   const int total = 10000;
   const int sparsity = 10;
 
-  auto &map_storage = world.ensure_hashmap_storage<MapData>();
+  auto &map_storage = world.ensure_storage<MapData>();
 
   for (int i = 0; i < total; i++) {
     auto e = world.spawn();

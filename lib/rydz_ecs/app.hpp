@@ -31,11 +31,7 @@ public:
   }
 
   template <typename F> App &add_systems(ScheduleLabel label, F &&func) {
-    if constexpr (is_system_descriptor_v<std::decay_t<F>>) {
-      schedules_.entry(label).add_system(func.build());
-    } else {
-      schedules_.entry(label).add_system_fn(std::forward<F>(func));
-    }
+    schedules_.entry(label).add_system_fn(std::forward<F>(func));
     return *this;
   }
 

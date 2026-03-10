@@ -105,12 +105,12 @@ TEST(ComponentTest, HasComponent) {
 
 TEST(ComponentTest, HashMapStorage) {
   World world;
-  world.ensure_hashmap_storage<CompTag>();
+  world.ensure_storage<CompTag>();
 
   auto e1 = world.spawn();
   auto e2 = world.spawn();
 
-  auto &storage = world.ensure_hashmap_storage<CompTag>();
+  auto &storage = world.ensure_storage<CompTag>();
   storage.insert(e1, CompTag{"player"}, world.read_change_tick());
   storage.insert(e2, CompTag{"enemy"}, world.read_change_tick());
 
@@ -131,11 +131,11 @@ TEST(ComponentTest, HashMapStorage) {
 
 TEST(ComponentTest, HashMapStorageWithDespawn) {
   World world;
-  world.ensure_hashmap_storage<CompTag>();
+  world.ensure_storage<CompTag>();
 
   auto e1 = world.spawn();
 
-  auto &storage = world.ensure_hashmap_storage<CompTag>();
+  auto &storage = world.ensure_storage<CompTag>();
   storage.insert(e1, CompTag{"temp"}, world.read_change_tick());
   world.insert_component(e1, Position{1, 2});
 

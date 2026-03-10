@@ -1,8 +1,25 @@
 #pragma once
 #include "system.hpp"
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace ecs {
+
+struct SystemOrdering {
+  std::vector<std::string> after;
+  std::vector<std::string> before;
+};
+
+template <typename Fn> std::string system_name_of(Fn &&fn) {
+  using D = std::decay_t<Fn>;
+  if constexpr (std::is_pointer_v<D> &&
+                std::is_function_v<std::remove_pointer_t<D>>) {
+    return std::to_string(reinterpret_cast<uintptr_t>(fn));
+  } else {
+    return typeid(D).name();
+  }
+}
 
 class ICondition {
 public:
@@ -83,6 +100,7 @@ std::unique_ptr<ISystem> make_system_run_if(F &&func,
 template <typename F> class SystemDescriptor {
   F func_;
   std::unique_ptr<ICondition> condition_;
+  SystemOrdering ordering_;
 
 public:
   explicit SystemDescriptor(F func) : func_(std::move(func)) {}
@@ -96,6 +114,18 @@ public:
     condition_ = std::move(cond);
     return std::move(*this);
   }
+
+  template <typename Fn> SystemDescriptor &&after(Fn &&fn) && {
+    ordering_.after.push_back(system_name_of(std::forward<Fn>(fn)));
+    return std::move(*this);
+  }
+
+  template <typename Fn> SystemDescriptor &&before(Fn &&fn) && {
+    ordering_.before.push_back(system_name_of(std::forward<Fn>(fn)));
+    return std::move(*this);
+  }
+
+  SystemOrdering take_ordering() { return std::move(ordering_); }
 
   std::unique_ptr<ISystem> build() {
     auto sys = make_system(std::move(func_));

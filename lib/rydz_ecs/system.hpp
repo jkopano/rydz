@@ -168,8 +168,16 @@ template <typename F> class FunctionSystem : public ISystem {
 
 public:
   explicit FunctionSystem(F func, std::string name = "")
-      : func_(std::move(func)),
-        name_(name.empty() ? typeid(F).name() : std::move(name)) {}
+      : func_(std::move(func)) {
+    if (!name.empty()) {
+      name_ = std::move(name);
+    } else if constexpr (std::is_pointer_v<F> &&
+                         std::is_function_v<std::remove_pointer_t<F>>) {
+      name_ = std::to_string(reinterpret_cast<uintptr_t>(func_));
+    } else {
+      name_ = typeid(F).name();
+    }
+  }
 
   void run(World &world) override {
     function_traits<F>::apply(
