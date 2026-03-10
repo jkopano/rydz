@@ -98,7 +98,7 @@ TEST(ChangeDetectionTest, QueryWithAddedFilter) {
   // Query with Added<Health> should only return e3
   std::vector<int> results;
   Query<Health, Filters<Added<Health>>> query(world);
-  query.for_each([&](const Health *h) { results.push_back(h->value); });
+  query.each([&](const Health *h) { results.push_back(h->value); });
 
   ASSERT_EQ(results.size(), 1u);
   EXPECT_EQ(results[0], 300);
@@ -123,7 +123,7 @@ TEST(ChangeDetectionTest, QueryWithChangedFilter) {
   // Query with Changed<Health> should only return e2
   std::vector<int> results;
   Query<Health, Filters<Changed<Health>>> query(world);
-  query.for_each([&](const Health *h) { results.push_back(h->value); });
+  query.each([&](const Health *h) { results.push_back(h->value); });
 
   ASSERT_EQ(results.size(), 1u);
   EXPECT_EQ(results[0], 200);

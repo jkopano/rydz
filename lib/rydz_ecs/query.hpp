@@ -16,26 +16,26 @@ template <typename T> struct Mut {
   VecStorage<T> *storage = nullptr;
   Entity entity{};
   Tick tick{};
-  bool dirty = false;
+  bool marked = false;
 
   Mut() = default;
   Mut(T *p, VecStorage<T> *s, Entity e, Tick t)
       : ptr(p), storage(s), entity(e), tick(t) {}
 
   T &get() {
-    dirty = true;
+    mark();
     return *ptr;
   }
   const T &get() const { return *ptr; }
 
   T *operator->() {
-    dirty = true;
+    mark();
     return ptr;
   }
   const T *operator->() const { return ptr; }
 
   T &operator*() {
-    dirty = true;
+    mark();
     return *ptr;
   }
   const T &operator*() const { return *ptr; }
@@ -43,14 +43,17 @@ template <typename T> struct Mut {
   explicit operator bool() const { return ptr != nullptr; }
 
   operator T *() {
-    dirty = true;
+    mark();
     return ptr;
   }
   operator const T *() const { return ptr; }
 
-  ~Mut() {
-    if (dirty && storage && ptr)
+private:
+  void mark() {
+    if (!marked && storage && ptr) {
       storage->mark_changed(entity, tick);
+      marked = true;
+    }
   }
 };
 template <typename Inner> struct Opt {};
@@ -235,15 +238,15 @@ template <typename T> struct is_filter<With<T>> : std::true_type {};
 template <typename T> struct is_filter<Without<T>> : std::true_type {};
 template <typename T> struct is_filter<Added<T>> : std::true_type {};
 template <typename T> struct is_filter<Changed<T>> : std::true_type {};
-template <typename F1, typename F2> struct is_filter<Or<F1, F2>> : std::true_type {};
+template <typename F1, typename F2>
+struct is_filter<Or<F1, F2>> : std::true_type {};
 template <typename... Fs> struct is_filter<Filters<Fs...>> : std::true_type {};
 
 namespace detail {
 
 template <typename F, typename FiltersT> struct MergeFilters;
 
-template <typename F, typename... Fs>
-struct MergeFilters<F, Filters<Fs...>> {
+template <typename F, typename... Fs> struct MergeFilters<F, Filters<Fs...>> {
   using type = Filters<F, Fs...>;
 };
 
@@ -269,16 +272,16 @@ struct SplitTrailingFilters<T, Rest...> {
   static_assert(!(tail_has_items && is_filter_v),
                 "Query filters must be trailing parameters");
 
-  using Items = std::conditional_t<
-      is_filter_v && !tail_has_items,
-      typename Tail::Items,
-      decltype(std::tuple_cat(std::declval<std::tuple<T>>(),
-                              std::declval<typename Tail::Items>()))>;
+  using Items =
+      std::conditional_t<is_filter_v && !tail_has_items, typename Tail::Items,
+                         decltype(std::tuple_cat(
+                             std::declval<std::tuple<T>>(),
+                             std::declval<typename Tail::Items>()))>;
 
-  using Filters = std::conditional_t<
-      is_filter_v && !tail_has_items,
-      typename MergeFilters<T, typename Tail::Filters>::type,
-      typename Tail::Filters>;
+  using Filters =
+      std::conditional_t<is_filter_v && !tail_has_items,
+                         typename MergeFilters<T, typename Tail::Filters>::type,
+                         typename Tail::Filters>;
 };
 
 } // namespace detail
@@ -293,9 +296,11 @@ template <typename... Qs> class Query {
 public:
   explicit Query(const World &world) : world_(&world) {}
 
-  template <typename Func> void for_each(Func &&func) const {
-    for_each_cached(std::forward<Func>(func), ItemTuple{});
+  template <typename Func> void each(Func &&func) const {
+    for_each_impl(std::forward<Func>(func), ItemTuple{});
   }
+
+  auto iter() const { return make_iter(ItemTuple{}); }
 
   static void access(SystemAccess &acc) {
     access_items(acc, ItemTuple{});
@@ -309,11 +314,10 @@ private:
     return f;
   }
 
-  template <typename Func, typename... Items>
-  void for_each_cached(Func &&func, std::tuple<Items...>) const {
-
-    auto fetchers = std::make_tuple(make_fetcher<Items>()...);
-
+  template <typename... Items>
+  static size_t
+  compute_min_cap(const std::tuple<typename WorldQueryTraits<Items>::Fetcher...>
+                      &fetchers) {
     size_t min_cap = SIZE_MAX;
     std::apply(
         [&](const auto &...f) {
@@ -324,17 +328,92 @@ private:
           (check(f), ...);
         },
         fetchers);
+    return (min_cap == SIZE_MAX) ? 0 : min_cap;
+  }
 
-    if (min_cap == 0 || min_cap == SIZE_MAX)
-      return;
+  template <typename... Items>
+  static bool matches_all(
+      const std::tuple<typename WorldQueryTraits<Items>::Fetcher...> &fetchers,
+      Entity entity) {
+    return std::apply(
+        [&](const auto &...f) { return (f.matches(entity) && ...); }, fetchers);
+  }
+
+  template <typename... Items> struct QueryRange {
+    using FetcherTuple =
+        std::tuple<typename WorldQueryTraits<Items>::Fetcher...>;
+    using ValueTuple = std::tuple<typename WorldQueryTraits<Items>::Item...>;
+
+    struct Sentinel {};
+
+    struct Iterator {
+      const FetcherTuple *fetchers;
+      const World *world;
+      uint32_t index;
+      uint32_t max_index;
+
+      Iterator &operator++() {
+        ++index;
+        advance();
+        return *this;
+      }
+
+      ValueTuple operator*() const {
+        Entity entity = Entity::from_raw(index, 0);
+        return std::apply(
+            [&](const auto &...f) -> ValueTuple {
+              return {f.fetch(entity)...};
+            },
+            *fetchers);
+      }
+
+      bool operator!=(Sentinel) const { return index < max_index; }
+
+      void advance() {
+        while (index < max_index) {
+          Entity entity = Entity::from_raw(index, 0);
+          bool all_match = std::apply(
+              [&](const auto &...f) { return (f.matches(entity) && ...); },
+              *fetchers);
+          if (all_match && QueryFilterTraits<FilterT>::matches(*world, entity))
+            break;
+          ++index;
+        }
+      }
+    };
+
+    FetcherTuple fetchers;
+    const World *world;
+    uint32_t count;
+
+    Iterator begin() const {
+      Iterator it{&fetchers, world, 0, count};
+      it.advance();
+      return it;
+    }
+
+    Sentinel end() const { return {}; }
+  };
+
+  template <typename... Items> auto make_iter(std::tuple<Items...>) const {
+    QueryRange<Items...> range;
+    range.fetchers = std::make_tuple(make_fetcher<Items>()...);
+    range.world = world_;
+    range.count =
+        static_cast<uint32_t>(compute_min_cap<Items...>(range.fetchers));
+    return range;
+  }
+
+  // --- each() implementation ---
+  template <typename Func, typename... Items>
+  void for_each_impl(Func &&func, std::tuple<Items...>) const {
+    auto fetchers = std::make_tuple(make_fetcher<Items>()...);
+    size_t min_cap = compute_min_cap<Items...>(fetchers);
 
     for (uint32_t i = 0; i < static_cast<uint32_t>(min_cap); i++) {
       Entity entity = Entity::from_raw(i, 0);
 
-      bool all_match = std::apply(
-          [&](const auto &...f) { return (f.matches(entity) && ...); },
-          fetchers);
-      if (!all_match)
+      if (!matches_all<Items...>(fetchers, entity))
         continue;
 
       if (!QueryFilterTraits<FilterT>::matches(*world_, entity))

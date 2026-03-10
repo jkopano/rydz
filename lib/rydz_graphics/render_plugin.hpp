@@ -7,12 +7,12 @@
 #include "mesh3d.hpp"
 #include "render_batches.hpp"
 #include "render_config.hpp"
-#include "skybox.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/transform.hpp"
 #include "rydz_ecs/types.hpp"
 #include "rydz_ecs/visibility.hpp"
+#include "skybox.hpp"
 #include <absl/container/flat_hash_map.h>
 #include <array>
 #include <cstring>
@@ -60,9 +60,9 @@ inline void build_render_batches_system(
   batches->clear();
   absl::flat_hash_map<RenderBatchKey, size_t> batch_index;
 
-  query.for_each([&](const Mesh3d *mesh3d, const GlobalTransform *global,
-                     const Material3d *mat, const RenderConfig *rc,
-                     const ViewVisibility *vv, const MeshLodGroup *lod_group) {
+  query.each([&](const Mesh3d *mesh3d, const GlobalTransform *global,
+                 const Material3d *mat, const RenderConfig *rc,
+                 const ViewVisibility *vv, const MeshLodGroup *lod_group) {
     if (!mesh3d || !mesh3d->model.is_valid())
       return;
     if (vv && !vv->visible)
@@ -130,14 +130,15 @@ inline void build_render_batches_system(
   });
 }
 
-inline void render_system(
-    Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
-    Res<Assets<Texture2D>> tex_assets, Res<RenderBatches> batches,
-    Query<const Camera3DComponent, const ActiveCamera, const Transform3D,
-          Opt<const Skybox>>
-        cam_query,
-    Query<const DirectionalLight> dir_query,
-    Query<const PointLight, const GlobalTransform> point_query, NonSendMarker) {
+inline void
+render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
+              Res<Assets<Texture2D>> tex_assets, Res<RenderBatches> batches,
+              Query<const Camera3DComponent, const ActiveCamera,
+                    const Transform3D, Opt<const Skybox>>
+                  cam_query,
+              Query<const DirectionalLight> dir_query,
+              Query<const PointLight, const GlobalTransform> point_query,
+              NonSendMarker) {
   Color bg = clear_color->color;
 
   Camera3D cam = {};
@@ -149,9 +150,8 @@ inline void render_system(
 
   const Skybox *active_skybox = nullptr;
 
-  cam_query.for_each([&](const Camera3DComponent *cam_comp,
-                         const ActiveCamera *, const Transform3D *cam_tx,
-                         const Skybox *sky) {
+  cam_query.each([&](const Camera3DComponent *cam_comp, const ActiveCamera *,
+                     const Transform3D *cam_tx, const Skybox *sky) {
     if (cam_comp && cam_tx) {
       cam = build_camera(cam_tx->translation, cam_tx->forward(), cam_tx->up(),
                          *cam_comp);
@@ -193,7 +193,7 @@ inline void render_system(
 
   DirectionalLight dir_light{};
   bool has_dir = false;
-  dir_query.for_each([&](const DirectionalLight *dir) {
+  dir_query.each([&](const DirectionalLight *dir) {
     if (!dir || has_dir)
       return;
     dir_light = *dir;
@@ -207,7 +207,7 @@ inline void render_system(
   std::array<float, kMaxPointLights> point_ranges{};
   usize point_count = 0;
 
-  point_query.for_each([&](const PointLight *pl, const GlobalTransform *gt) {
+  point_query.each([&](const PointLight *pl, const GlobalTransform *gt) {
     if (!pl || !gt || point_count >= kMaxPointLights)
       return;
     point_positions[point_count] = gt->translation();

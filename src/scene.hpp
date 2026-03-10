@@ -22,7 +22,8 @@ struct CameraController {
 inline void
 camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
                          Res<Time> time, NonSendMarker) {
-  query.for_each([&](Transform3D *t, CameraController const *ctrl) {
+
+  for (auto [t, ctrl] : query.iter()) {
     if (!ctrl->enabled)
       return;
 
@@ -53,14 +54,14 @@ camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
       t->translation =
           Vector3Add(t->translation, Vector3Scale(move, speed * dt));
     }
-  });
+  }
 }
 
 inline void
 camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
                     NonSendMarker) {
   Vector2 mouse_delta = GetMouseDelta();
-  query.for_each([&](CameraController *ctrl, Transform3D *t) {
+  query.each([&](auto ctrl, auto t) {
     if (!ctrl->enabled || (mouse_delta.x == 0 && mouse_delta.y == 0))
       return;
 

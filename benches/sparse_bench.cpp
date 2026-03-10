@@ -44,7 +44,7 @@ static void BM_VecStorageIteration10Pct(benchmark::State &state) {
 
   for (auto _ : state) {
     Query<Position, DenseData> query(world);
-    query.for_each([](const Position *, const DenseData *val) {
+    query.each([](const Position *, const DenseData *val) {
       benchmark::DoNotOptimize(val->value);
     });
   }

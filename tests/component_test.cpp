@@ -86,7 +86,7 @@ TEST(ComponentTest, Query) {
 
   int count = 0;
   Query<Position> query(world);
-  query.for_each([&](const Position *pos) {
+  query.each([&](const Position *pos) {
     count++;
     EXPECT_NE(pos, nullptr);
   });
@@ -163,7 +163,7 @@ TEST(ComponentTest, Query2) {
 
   int count = 0;
   Query<Position, Velocity> query(world);
-  query.for_each([&](const Position *pos, const Velocity *vel) {
+  query.each([&](const Position *pos, const Velocity *vel) {
     count++;
     EXPECT_EQ(*pos, (Position{1, 2}));
     EXPECT_EQ(*vel, (Velocity{10, 20}));

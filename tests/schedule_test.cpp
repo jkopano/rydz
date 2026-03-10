@@ -65,14 +65,14 @@ TEST(ScheduleGraphTest, ParallelWhenNoWriteConflict) {
   schedule.add_system_fn([&tracker](Query<Mut<CompA>> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](CompA *a) { a->value += 1; });
+    query.each([](CompA *a) { a->value += 1; });
     tracker.exit();
   });
 
   schedule.add_system_fn([&tracker](Query<Mut<CompB>> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](CompB *b) { b->value += 10; });
+    query.each([](CompB *b) { b->value += 10; });
     tracker.exit();
   });
 
@@ -97,14 +97,14 @@ TEST(ScheduleGraphTest, SequentialWhenWriteConflict) {
   schedule.add_system_fn([&tracker](Query<Mut<CompA>> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](CompA *a) { a->value += 1; });
+    query.each([](CompA *a) { a->value += 1; });
     tracker.exit();
   });
 
   schedule.add_system_fn([&tracker](Query<Mut<CompA>> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](CompA *a) { a->value += 10; });
+    query.each([](CompA *a) { a->value += 10; });
     tracker.exit();
   });
 
@@ -128,14 +128,14 @@ TEST(ScheduleGraphTest, SequentialWhenWriteReadConflict) {
   schedule.add_system_fn([&tracker](Query<Mut<CompA>> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](CompA *a) { a->value += 1; });
+    query.each([](CompA *a) { a->value += 1; });
     tracker.exit();
   });
 
   schedule.add_system_fn([&tracker](Query<CompA> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](const CompA *) {});
+    query.each([](const CompA *) {});
     tracker.exit();
   });
 
@@ -158,14 +158,14 @@ TEST(ScheduleGraphTest, ParallelWhenReadOnly) {
   schedule.add_system_fn([&tracker](Query<CompA> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](const CompA *) {});
+    query.each([](const CompA *) {});
     tracker.exit();
   });
 
   schedule.add_system_fn([&tracker](Query<CompA> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](const CompA *) {});
+    query.each([](const CompA *) {});
     tracker.exit();
   });
 
@@ -194,7 +194,7 @@ TEST(ScheduleGraphTest, ReadersParallelDespiteWriterInMiddle) {
   schedule.add_system_fn([&tracker](Query<CompA, CompB> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](const CompA *, const CompB *) {});
+    query.each([](const CompA *, const CompB *) {});
     tracker.exit();
   });
 
@@ -202,7 +202,7 @@ TEST(ScheduleGraphTest, ReadersParallelDespiteWriterInMiddle) {
   schedule.add_system_fn([&tracker](Query<Mut<CompA>, Mut<CompB>> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](CompA *a, CompB *b) {
+    query.each([](CompA *a, CompB *b) {
       a->value = 1;
       b->value = 1;
     });
@@ -213,7 +213,7 @@ TEST(ScheduleGraphTest, ReadersParallelDespiteWriterInMiddle) {
   schedule.add_system_fn([&tracker](Query<CompA, CompB> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](const CompA *, const CompB *) {});
+    query.each([](const CompA *, const CompB *) {});
     tracker.exit();
   });
 
@@ -270,7 +270,8 @@ TEST(ScheduleOrderingTest, ChainEnforcesSequentialOrder) {
   world.insert_resource(Counter{0});
 
   Schedule schedule;
-  schedule.add_system_fn(chain(ordering_first, ordering_second, ordering_third));
+  schedule.add_system_fn(
+      chain(ordering_first, ordering_second, ordering_third));
 
   schedule.run(world);
 
@@ -284,7 +285,8 @@ TEST(ScheduleOrderingTest, ChainReversedInsertionStillWorks) {
 
   Schedule schedule;
   // chain should override insertion order
-  schedule.add_system_fn(chain(ordering_third, ordering_second, ordering_first));
+  schedule.add_system_fn(
+      chain(ordering_third, ordering_second, ordering_first));
 
   schedule.run(world);
 
@@ -436,8 +438,9 @@ TEST(ScheduleOrderingTest, ChainWithRunIf) {
   Schedule schedule;
   schedule.add_system_fn(
       chain(ordering_first,
-            std::move(into_system(ordering_second).run_if(
-                [](Res<Counter> c) { return c->value == 1; })),
+            std::move(into_system(ordering_second).run_if([](Res<Counter> c) {
+              return c->value == 1;
+            })),
             ordering_third));
 
   schedule.run(world);
@@ -454,8 +457,9 @@ TEST(ScheduleOrderingTest, ChainWithRunIfFalse) {
   Schedule schedule;
   schedule.add_system_fn(
       chain(ordering_first,
-            std::move(into_system(ordering_second).run_if(
-                [](Res<Counter> c) { return c->value == 999; })),
+            std::move(into_system(ordering_second).run_if([](Res<Counter> c) {
+              return c->value == 999;
+            })),
             ordering_third));
 
   schedule.run(world);
@@ -485,7 +489,7 @@ TEST(ScheduleOrderingTest, AfterDoesNotPreventUnrelatedParallelism) {
   schedule.add_system_fn([&tracker](Query<Mut<CompA>> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](CompA *a) { a->value = 1; });
+    query.each([](CompA *a) { a->value = 1; });
     tracker.exit();
   });
 
@@ -493,7 +497,7 @@ TEST(ScheduleOrderingTest, AfterDoesNotPreventUnrelatedParallelism) {
   schedule.add_system_fn([&tracker](Query<Mut<CompB>> query) {
     tracker.enter();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    query.for_each([](CompB *b) { b->value = 2; });
+    query.each([](CompB *b) { b->value = 2; });
     tracker.exit();
   });
 
