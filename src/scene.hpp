@@ -30,29 +30,29 @@ camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
     float dt = time->delta_seconds;
     float speed = ctrl->move_speed;
 
-    Vector3 move = {0, 0, 0};
-    Vector3 forward = t->forward();
-    Vector3 right = t->right();
+    rl::Vector3 move = {0, 0, 0};
+    rl::Vector3 forward = t->forward();
+    rl::Vector3 right = t->right();
 
-    if (IsKeyDown(KEY_LEFT_CONTROL))
+    if (rl::IsKeyDown(KEY_LEFT_CONTROL))
       speed *= 3.0f;
-    if (IsKeyDown(KEY_W))
-      move = Vector3Add(move, forward);
-    if (IsKeyDown(KEY_S))
-      move = Vector3Subtract(move, forward);
-    if (IsKeyDown(KEY_D))
-      move = Vector3Add(move, right);
-    if (IsKeyDown(KEY_A))
-      move = Vector3Subtract(move, right);
-    if (IsKeyDown(KEY_SPACE))
-      move = Vector3Add(move, {0, 1, 0});
-    if (IsKeyDown(KEY_LEFT_SHIFT))
-      move = Vector3Subtract(move, {0, 1, 0});
+    if (rl::IsKeyDown(KEY_W))
+      move = rl::Vector3Add(move, forward);
+    if (rl::IsKeyDown(KEY_S))
+      move = rl::Vector3Subtract(move, forward);
+    if (rl::IsKeyDown(KEY_D))
+      move = rl::Vector3Add(move, right);
+    if (rl::IsKeyDown(KEY_A))
+      move = rl::Vector3Subtract(move, right);
+    if (rl::IsKeyDown(KEY_SPACE))
+      move = rl::Vector3Add(move, {0, 1, 0});
+    if (rl::IsKeyDown(KEY_LEFT_SHIFT))
+      move = rl::Vector3Subtract(move, {0, 1, 0});
 
-    if (Vector3LengthSqr(move) > 0.0f) {
-      move = Vector3Normalize(move);
+    if (rl::Vector3LengthSqr(move) > 0.0f) {
+      move = rl::Vector3Normalize(move);
       t->translation =
-          Vector3Add(t->translation, Vector3Scale(move, speed * dt));
+          rl::Vector3Add(t->translation, rl::Vector3Scale(move, speed * dt));
     }
   }
 }
@@ -60,8 +60,9 @@ camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
 inline void
 camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
                     NonSendMarker) {
-  Vector2 mouse_delta = GetMouseDelta();
-  query.each([&](auto ctrl, auto t) {
+  rl::Vector2 mouse_delta = rl::GetMouseDelta();
+
+  for (auto [ctrl, t] : query.iter()) {
     if (!ctrl->enabled || (mouse_delta.x == 0 && mouse_delta.y == 0))
       return;
 
@@ -74,28 +75,28 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
       ctrl->pitch = -89.0f;
 
     t->rotation =
-        QuaternionFromEuler(ctrl->pitch * DEG2RAD, ctrl->yaw * DEG2RAD, 0.0f);
-  });
+        rl::QuaternionFromEuler(ctrl->pitch * DEG2RAD, ctrl->yaw * DEG2RAD, 0.0f);
+  }
 }
 
 // inline void toggle_camera_system(Query<Mut<CameraController>> query,
 //                                  NonSendMarker) {
-//   if (!IsKeyPressed(KEY_ESCAPE))
+//   if (!rl::IsKeyPressed(KEY_ESCAPE))
 //     return;
 //
 //   query.for_each([&](CameraController *ctrl) {
 //     ctrl->enabled = !ctrl->enabled;
 //
 //     if (ctrl->enabled)
-//       DisableCursor();
+//       rl::DisableCursor();
 //     else
-//       EnableCursor();
+//       rl::EnableCursor();
 //   });
 // }
 
-inline void spawn_map(Cmd cmd, ResMut<Assets<Model>> model_assets,
+inline void spawn_map(Cmd cmd, ResMut<Assets<rl::Model>> model_assets,
                       NonSendMarker) {
-  Model map_model = LoadModel("res/models/race_map.glb");
+  rl::Model map_model = rl::LoadModel("res/models/race_map.glb");
   auto map_h = model_assets->add(std::move(map_model));
 
   cmd.spawn(MapTag{}, Mesh3d{map_h},
@@ -106,17 +107,17 @@ inline void spawn_map(Cmd cmd, ResMut<Assets<Model>> model_assets,
 }
 
 struct HouseHandles {
-  Handle<Model> house;
+  Handle<rl::Model> house;
   bool loaded = false;
 };
 
-inline void spawn_houses_on_input(Cmd cmd, ResMut<Assets<Model>> model_assets,
+inline void spawn_houses_on_input(Cmd cmd, ResMut<Assets<rl::Model>> model_assets,
                                   ResMut<HouseHandles> handles, NonSendMarker) {
-  if (!IsKeyPressed(KEY_H))
+  if (!rl::IsKeyPressed(KEY_H))
     return;
 
   if (!handles->loaded) {
-    Model house_model = LoadModel("res/models/old_house.glb");
+    rl::Model house_model = rl::LoadModel("res/models/old_house.glb");
     handles->house = model_assets->add(std::move(house_model));
     handles->loaded = true;
   }
@@ -137,20 +138,20 @@ inline void spawn_houses_on_input(Cmd cmd, ResMut<Assets<Model>> model_assets,
 }
 
 struct CarHandles {
-  Handle<Model> car;
+  Handle<rl::Model> car;
   bool loaded = false;
   bool spawned = false;
 };
 
-inline void spawn_car_on_input(Cmd cmd, ResMut<Assets<Model>> model_assets,
+inline void spawn_car_on_input(Cmd cmd, ResMut<Assets<rl::Model>> model_assets,
                                ResMut<CarHandles> car_handles, NonSendMarker) {
   if (car_handles->spawned)
     return;
-  if (!IsKeyPressed(KEY_G))
+  if (!rl::IsKeyPressed(KEY_G))
     return;
 
   if (!car_handles->loaded) {
-    Model car_model = LoadModel("res/models/first-car.glb");
+    rl::Model car_model = rl::LoadModel("res/models/first-car.glb");
     car_handles->car = model_assets->add(std::move(car_model));
     car_handles->loaded = true;
   }
@@ -168,10 +169,10 @@ struct LightsSpawned {
   bool done = false;
 };
 
-inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<Model>> models,
-                                  ResMut<Assets<Texture2D>> textures,
+inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Model>> models,
+                                  ResMut<Assets<rl::Texture2D>> textures,
                                   ResMut<LightsSpawned> lights, NonSendMarker) {
-  if (lights->done || !IsKeyPressed(KEY_L))
+  if (lights->done || !rl::IsKeyPressed(KEY_L))
     return;
 
   cmd.spawn(DirectionalLight{
@@ -180,7 +181,7 @@ inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<Model>> models,
       .intensity = 0.5f,
   });
 
-  auto stone_tex = textures->add(LoadTexture("res/textures/stone.jpg"));
+  auto stone_tex = textures->add(rl::LoadTexture("res/textures/stone.jpg"));
 
   cmd.spawn(Mesh3d{models->add(mesh::cube())},
             PointLight{.color = {255, 0, 0, 255},
@@ -204,7 +205,7 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
             Transform3D::from_xyz(8, 6, 8).look_at({0, 0, 0}),
             CameraController{}, Skybox::from("res/hdri/skybox"));
-  DisableCursor();
+  rl::DisableCursor();
 }
 
 inline void scene_plugin(App &app) {
@@ -213,8 +214,7 @@ inline void scene_plugin(App &app) {
   app.insert_resource(LightsSpawned{});
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
-  app.add_systems(ScheduleLabel::Update,
-                  into_system(spawn_map).run_if(run_once()));
+  app.add_systems(ScheduleLabel::Update, group(spawn_map).run_if(run_once()));
 
   app.add_systems(ScheduleLabel::Update, camera_controller_system);
   app.add_systems(ScheduleLabel::Update, camera_mouse_system);

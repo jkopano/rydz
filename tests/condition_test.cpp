@@ -112,9 +112,8 @@ TEST(ConditionTest, IntoSystemRunIfLambda) {
   World world;
   int run_count = 0;
 
-  auto desc = into_system([&]() { run_count++; }).run_if([]() -> bool {
-    return false;
-  });
+  auto desc =
+      group([&]() { run_count++; }).run_if([]() -> bool { return false; });
 
   auto system = desc.build();
 
@@ -126,7 +125,7 @@ TEST(ConditionTest, IntoSystemRunIfTrue) {
   World world;
   int run_count = 0;
 
-  auto system = into_system([&]() {
+  auto system = group([&]() {
                   run_count++;
                 }).run_if([]() -> bool {
                     return true;
@@ -143,7 +142,7 @@ TEST(ConditionTest, IntoSystemRunOnce) {
   World world;
   int run_count = 0;
 
-  auto system = into_system([&]() { run_count++; }).run_if(run_once()).build();
+  auto system = group([&]() { run_count++; }).run_if(run_once()).build();
 
   system->run(world);
   EXPECT_EQ(run_count, 1);
@@ -156,7 +155,7 @@ TEST(ConditionTest, IntoSystemNoCondition) {
   World world;
   int run_count = 0;
 
-  auto system = into_system([&]() { run_count++; }).build();
+  auto system = group([&]() { run_count++; }).build();
 
   system->run(world);
   EXPECT_EQ(run_count, 1);

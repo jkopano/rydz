@@ -1,7 +1,5 @@
 #pragma once
-#include <raylib.h>
-#include <raymath.h>
-#include <rlgl.h>
+#include "rl.hpp"
 
 namespace ecs {
 
@@ -51,43 +49,43 @@ struct RenderConfig {
   void apply() const {
 
     if (depth.test) {
-      rlEnableDepthTest();
+      rl::rlEnableDepthTest();
     } else {
-      rlDisableDepthTest();
+      rl::rlDisableDepthTest();
     }
     if (depth.write) {
-      rlEnableDepthMask();
+      rl::rlEnableDepthMask();
     } else {
-      rlDisableDepthMask();
+      rl::rlDisableDepthMask();
     }
 
     switch (cull) {
     case CullMode::Back:
-      rlEnableBackfaceCulling();
-      rlSetCullFace(RL_CULL_FACE_BACK);
+      rl::rlEnableBackfaceCulling();
+      rl::rlSetCullFace(RL_CULL_FACE_BACK);
       break;
     case CullMode::Front:
-      rlEnableBackfaceCulling();
-      rlSetCullFace(RL_CULL_FACE_FRONT);
+      rl::rlEnableBackfaceCulling();
+      rl::rlSetCullFace(RL_CULL_FACE_FRONT);
       break;
     case CullMode::None:
-      rlDisableBackfaceCulling();
+      rl::rlDisableBackfaceCulling();
       break;
     }
 
     if (wireframe || polygon_mode == PolygonMode::Line) {
-      rlEnableWireMode();
+      rl::rlEnableWireMode();
     }
 
     switch (blend) {
     case BlendMode::Alpha:
-      rlSetBlendMode(RL_BLEND_ALPHA);
+      rl::rlSetBlendMode(RL_BLEND_ALPHA);
       break;
     case BlendMode::Additive:
-      rlSetBlendMode(RL_BLEND_ADDITIVE);
+      rl::rlSetBlendMode(RL_BLEND_ADDITIVE);
       break;
     case BlendMode::Multiplied:
-      rlSetBlendMode(RL_BLEND_MULTIPLIED);
+      rl::rlSetBlendMode(RL_BLEND_MULTIPLIED);
       break;
     case BlendMode::Custom:
       break;
@@ -95,12 +93,12 @@ struct RenderConfig {
   }
 
   static void restore_defaults() {
-    rlEnableDepthTest();
-    rlEnableDepthMask();
-    rlEnableBackfaceCulling();
-    rlSetCullFace(RL_CULL_FACE_BACK);
-    rlDisableWireMode();
-    rlSetBlendMode(RL_BLEND_ALPHA);
+    rl::rlEnableDepthTest();
+    rl::rlEnableDepthMask();
+    rl::rlEnableBackfaceCulling();
+    rl::rlSetCullFace(RL_CULL_FACE_BACK);
+    rl::rlDisableWireMode();
+    rl::rlSetBlendMode(RL_BLEND_ALPHA);
   }
 };
 

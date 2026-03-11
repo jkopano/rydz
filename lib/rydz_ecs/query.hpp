@@ -1,6 +1,7 @@
 #pragma once
 #include "access.hpp"
 #include "entity.hpp"
+#include "helpers.hpp"
 #include "storage.hpp"
 #include "ticks.hpp"
 #include "world.hpp"
@@ -425,7 +426,7 @@ private:
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);
     size_t min_cap = compute_min_cap<Items...>(fetchers);
 
-    for (uint32_t i = 0; i < static_cast<uint32_t>(min_cap); i++) {
+    for (auto i : range(0u, min_cap)) {
       Entity entity = Entity::from_raw(i, 0);
 
       if (!matches_all<Items...>(fetchers, entity))

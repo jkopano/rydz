@@ -3,19 +3,19 @@
 #include "render_config.hpp"
 #include <absl/hash/hash.h>
 #include <cstdint>
-#include <raylib.h>
+#include "rl.hpp"
 #include <utility>
 #include <vector>
 
 namespace ecs {
 
 struct MaterialKey {
-  Color base_color = WHITE;
+  rl::Color base_color = WHITE;
   uint32_t texture_id = UINT32_MAX;
   uint32_t normal_id = UINT32_MAX;
   float metallic = 0.0f;
   float roughness = 0.5f;
-  const Shader *shader = nullptr;
+  const rl::Shader *shader = nullptr;
 
   bool operator==(const MaterialKey &o) const {
     return base_color.r == o.base_color.r && base_color.g == o.base_color.g &&
@@ -27,7 +27,7 @@ struct MaterialKey {
 };
 
 struct RenderBatchKey {
-  Handle<Model> model{};
+  Handle<rl::Model> model{};
   int mesh_index = 0;
   int material_index = 0;
   MaterialKey material;
@@ -48,7 +48,7 @@ struct RenderBatchKey {
 
 struct RenderBatch {
   RenderBatchKey key;
-  std::vector<Matrix> transforms;
+  std::vector<rl::Matrix> transforms;
 };
 
 struct RenderBatches {

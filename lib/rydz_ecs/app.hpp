@@ -6,8 +6,7 @@
 #include "state.hpp"
 #include "time.hpp"
 #include "world.hpp"
-#include <raylib.h>
-#include <raymath.h>
+#include "rl.hpp"
 #include <string>
 
 namespace ecs {
@@ -126,7 +125,7 @@ public:
   void update() {
     auto *time = world_.get_resource<Time>();
     if (time) {
-      time->delta_seconds = GetFrameTime();
+      time->delta_seconds = rl::GetFrameTime();
       time->elapsed_seconds += time->delta_seconds;
       time->frame_count++;
     }
@@ -148,20 +147,20 @@ public:
   void run() {
     auto *config = world_.get_resource<WindowConfig>();
     if (config) {
-      InitWindow(config->width, config->height, config->title.c_str());
-      SetTargetFPS(config->target_fps);
+      rl::InitWindow(config->width, config->height, config->title.c_str());
+      rl::SetTargetFPS(config->target_fps);
     } else {
-      InitWindow(800, 600, "ECS App");
-      SetTargetFPS(60);
+      rl::InitWindow(800, 600, "ECS App");
+      rl::SetTargetFPS(60);
     }
 
     startup();
 
-    while (!WindowShouldClose()) {
+    while (!rl::WindowShouldClose()) {
       update();
     }
 
-    CloseWindow();
+    rl::CloseWindow();
   }
 
 private:

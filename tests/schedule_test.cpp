@@ -241,7 +241,7 @@ TEST(ScheduleOrderingTest, AfterEnforcesOrder) {
   Schedule schedule;
   // Add second first, but it should run after first
   schedule.add_system_fn(
-      std::move(into_system(ordering_second).after(ordering_first)));
+      std::move(group(ordering_second).after(ordering_first)));
   schedule.add_system_fn(ordering_first);
 
   schedule.run(world);
@@ -257,7 +257,7 @@ TEST(ScheduleOrderingTest, BeforeEnforcesOrder) {
   Schedule schedule;
   schedule.add_system_fn(ordering_second);
   schedule.add_system_fn(
-      std::move(into_system(ordering_first).before(ordering_second)));
+      std::move(group(ordering_first).before(ordering_second)));
 
   schedule.run(world);
 
@@ -310,7 +310,7 @@ TEST(ScheduleOrderingTest, AfterNonexistentSystemThrows) {
   Schedule schedule;
   // ordering_second.after(ordering_third) but ordering_third is not in schedule
   schedule.add_system_fn(
-      std::move(into_system(ordering_second).after(ordering_third)));
+      std::move(group(ordering_second).after(ordering_third)));
 
   EXPECT_THROW(schedule.run(world), std::runtime_error);
 }
@@ -321,7 +321,7 @@ TEST(ScheduleOrderingTest, BeforeNonexistentSystemThrows) {
 
   Schedule schedule;
   schedule.add_system_fn(
-      std::move(into_system(ordering_first).before(ordering_third)));
+      std::move(group(ordering_first).before(ordering_third)));
 
   EXPECT_THROW(schedule.run(world), std::runtime_error);
 }
@@ -332,9 +332,9 @@ TEST(ScheduleOrderingTest, CycleThrows) {
 
   Schedule schedule;
   schedule.add_system_fn(
-      std::move(into_system(ordering_first).after(ordering_second)));
+      std::move(group(ordering_first).after(ordering_second)));
   schedule.add_system_fn(
-      std::move(into_system(ordering_second).after(ordering_first)));
+      std::move(group(ordering_second).after(ordering_first)));
 
   EXPECT_THROW(schedule.run(world), std::runtime_error);
 }
@@ -345,7 +345,7 @@ TEST(ScheduleOrderingTest, SelfCycleThrows) {
 
   Schedule schedule;
   schedule.add_system_fn(
-      std::move(into_system(ordering_first).after(ordering_first)));
+      std::move(group(ordering_first).after(ordering_first)));
 
   EXPECT_THROW(schedule.run(world), std::runtime_error);
 }
@@ -438,7 +438,7 @@ TEST(ScheduleOrderingTest, ChainWithRunIf) {
   Schedule schedule;
   schedule.add_system_fn(
       chain(ordering_first,
-            std::move(into_system(ordering_second).run_if([](Res<Counter> c) {
+            std::move(group(ordering_second).run_if([](Res<Counter> c) {
               return c->value == 1;
             })),
             ordering_third));
@@ -457,7 +457,7 @@ TEST(ScheduleOrderingTest, ChainWithRunIfFalse) {
   Schedule schedule;
   schedule.add_system_fn(
       chain(ordering_first,
-            std::move(into_system(ordering_second).run_if([](Res<Counter> c) {
+            std::move(group(ordering_second).run_if([](Res<Counter> c) {
               return c->value == 999;
             })),
             ordering_third));

@@ -28,7 +28,7 @@ public:
   void insert(Entity entity, T component, Tick current_tick) {
     uint32_t idx = entity.index;
     if (idx >= data_.size()) {
-      data_.resize(idx + 1, std::nullopt);
+      data_.resize(std::bit_ceil(idx + 1), std::nullopt);
     }
     ComponentTicks ticks;
     ticks.added = current_tick;

@@ -1,8 +1,7 @@
 #pragma once
-#include "raymath.h"
+#include "rl.hpp"
 #include "rydz_ecs/asset.hpp"
 #include <cstring>
-#include <raylib.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -96,7 +95,7 @@ inline std::vector<std::string> split_fragments(const std::string &fragment) {
   return result;
 }
 
-inline int find_mesh_in_scene(const GltfScene &scene,
+inline int find_mesh_in_scene(const rl::GltfScene &scene,
                               const GltfFragment &frag) {
   switch (frag.type) {
   case GltfFragment::Type::MeshByIndex:
@@ -117,7 +116,7 @@ inline int find_mesh_in_scene(const GltfScene &scene,
   }
 }
 
-inline int find_material_in_scene(const GltfScene &scene,
+inline int find_material_in_scene(const rl::GltfScene &scene,
                                   const GltfFragment &frag) {
   if (frag.type == GltfFragment::Type::MaterialByName) {
     std::string num_part = frag.name.substr(8); // skip "Material"
@@ -131,8 +130,8 @@ inline int find_material_in_scene(const GltfScene &scene,
 }
 
 struct SceneRoot {
-  std::vector<Handle<Mesh>> meshes;
-  std::vector<Handle<Material>> materials;
+  std::vector<Handle<rl::Mesh>> meshes;
+  std::vector<Handle<rl::Material>> materials;
 };
 
 class GltfLoader : public IAssetLoader {
@@ -163,28 +162,28 @@ public:
     }
 
     // Load scene (cache by file path)
-    GltfScene *scene = get_or_load_scene(file_path);
+    rl::GltfScene *scene = get_or_load_scene(file_path);
     if (!scene || scene->meshCount == 0)
       return;
 
     if (fragment.empty()) {
       // No fragment: load as full Model (wrap scene into a Model)
-      auto *model_assets = world.get_resource<Assets<Model>>();
+      auto *model_assets = world.get_resource<Assets<rl::Model>>();
       if (model_assets) {
-        Model model = {0};
-        model.transform = MatrixIdentity();
+        rl::Model model = {0};
+        model.transform = rl::MatrixIdentity();
         model.meshCount = scene->meshCount;
         model.materialCount = scene->materialCount;
 
         // Deep copy meshes and upload to GPU
-        model.meshes = (Mesh *)RL_CALLOC(model.meshCount, sizeof(Mesh));
+        model.meshes = (rl::Mesh *)RL_CALLOC(model.meshCount, sizeof(rl::Mesh));
         for (int i = 0; i < model.meshCount; i++) {
           model.meshes[i] = scene->meshes[i];
-          UploadMesh(&model.meshes[i], false);
+          rl::UploadMesh(&model.meshes[i], false);
         }
 
         model.materials =
-            (Material *)RL_CALLOC(model.materialCount, sizeof(Material));
+            (rl::Material *)RL_CALLOC(model.materialCount, sizeof(rl::Material));
         for (int i = 0; i < model.materialCount; i++)
           model.materials[i] = scene->materials[i];
 
@@ -192,7 +191,7 @@ public:
         for (int i = 0; i < model.meshCount; i++)
           model.meshMaterial[i] = scene->meshMaterial[i];
 
-        model_assets->set(Handle<Model>{handle_id}, model);
+        model_assets->set(Handle<rl::Model>{handle_id}, model);
       }
     } else {
       // Parse fragments and resolve sub-assets
@@ -203,9 +202,9 @@ public:
         if (parsed.type == GltfFragment::Type::MaterialByName) {
           int mat_idx = find_material_in_scene(*scene, parsed);
           if (mat_idx >= 0) {
-            auto *mat_assets = world.get_resource<Assets<Material>>();
+            auto *mat_assets = world.get_resource<Assets<rl::Material>>();
             if (mat_assets) {
-              mat_assets->set(Handle<Material>{handle_id},
+              mat_assets->set(Handle<rl::Material>{handle_id},
                               scene->materials[mat_idx]);
             }
           }
@@ -213,11 +212,11 @@ public:
           // Try to find mesh
           int mesh_idx = find_mesh_in_scene(*scene, parsed);
           if (mesh_idx >= 0) {
-            auto *mesh_assets = world.get_resource<Assets<Mesh>>();
+            auto *mesh_assets = world.get_resource<Assets<rl::Mesh>>();
             if (mesh_assets) {
-              Mesh m = scene->meshes[mesh_idx];
-              UploadMesh(&m, false);
-              mesh_assets->set(Handle<Mesh>{handle_id}, m);
+              rl::Mesh m = scene->meshes[mesh_idx];
+              rl::UploadMesh(&m, false);
+              mesh_assets->set(Handle<rl::Mesh>{handle_id}, m);
             }
           }
         }
@@ -226,14 +225,14 @@ public:
   }
 
 private:
-  std::unordered_map<std::string, GltfScene> scene_cache_;
+  std::unordered_map<std::string, rl::GltfScene> scene_cache_;
 
-  GltfScene *get_or_load_scene(const std::string &path) {
+  rl::GltfScene *get_or_load_scene(const std::string &path) {
     auto it = scene_cache_.find(path);
     if (it != scene_cache_.end())
       return &it->second;
 
-    GltfScene scene = LoadGltfScene(path.c_str());
+    rl::GltfScene scene = rl::LoadGltfScene(path.c_str());
     if (scene.meshCount == 0)
       return nullptr;
 

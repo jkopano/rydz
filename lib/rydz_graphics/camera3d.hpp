@@ -1,6 +1,5 @@
 #pragma once
-#include <raylib.h>
-#include <raymath.h>
+#include "rl.hpp"
 
 namespace ecs {
 
@@ -13,11 +12,11 @@ struct Camera3DComponent {
 
 struct ActiveCamera {};
 
-inline Camera3D build_camera(Vector3 position, Vector3 forward, Vector3 up,
+inline rl::Camera3D build_camera(rl::Vector3 position, rl::Vector3 forward, rl::Vector3 up,
                              const Camera3DComponent &comp) {
-  Camera3D cam = {};
+  rl::Camera3D cam = {};
   cam.position = position;
-  cam.target = Vector3Add(position, forward);
+  cam.target = rl::Vector3Add(position, forward);
   cam.up = up;
   cam.fovy = static_cast<float>(comp.fov);
   cam.projection = comp.projection;

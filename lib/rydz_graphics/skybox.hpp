@@ -1,8 +1,6 @@
 #pragma once
+#include "rl.hpp"
 #include <cstring>
-#include <raylib.h>
-#include <rcamera.h>
-#include <rlgl.h>
 #include <string>
 
 namespace ecs {
@@ -29,7 +27,7 @@ public:
   };
 
   unsigned int cubemap_id = 0;
-  Shader shader = {};
+  rl::Shader shader = {};
   unsigned int vao = 0;
   unsigned int vbo = 0;
   bool loaded = false;
@@ -54,59 +52,59 @@ public:
     return Skybox::from(Config::from_directory(directory_path));
   }
 
-  void draw(Camera3D cam) const {
+  void draw(rl::Camera3D cam) const {
     if (!loaded)
       return;
 
-    rlDisableBackfaceCulling();
-    rlDisableDepthMask();
+    rl::rlDisableBackfaceCulling();
+    rl::rlDisableDepthMask();
 
-    rlEnableShader(shader.id);
+    rl::rlEnableShader(shader.id);
 
-    Matrix view_mat = GetCameraViewMatrix(&cam);
-    float aspect = static_cast<float>(GetScreenWidth()) /
-                   static_cast<float>(GetScreenHeight());
-    Matrix proj_mat = GetCameraProjectionMatrix(&cam, aspect);
+    rl::Matrix view_mat = rl::GetCameraViewMatrix(&cam);
+    float aspect = static_cast<float>(rl::GetScreenWidth()) /
+                   static_cast<float>(rl::GetScreenHeight());
+    rl::Matrix proj_mat = rl::GetCameraProjectionMatrix(&cam, aspect);
 
-    int view_loc = GetShaderLocation(shader, "u_view");
-    int proj_loc = GetShaderLocation(shader, "u_projection");
+    int view_loc = rl::GetShaderLocation(shader, "u_view");
+    int proj_loc = rl::GetShaderLocation(shader, "u_projection");
 
-    SetShaderValueMatrix(shader, view_loc, view_mat);
-    SetShaderValueMatrix(shader, proj_loc, proj_mat);
+    rl::SetShaderValueMatrix(shader, view_loc, view_mat);
+    rl::SetShaderValueMatrix(shader, proj_loc, proj_mat);
 
-    rlActiveTextureSlot(0);
-    rlEnableTextureCubemap(cubemap_id);
+    rl::rlActiveTextureSlot(0);
+    rl::rlEnableTextureCubemap(cubemap_id);
 
-    rlEnableVertexArray(vao);
-    rlDrawVertexArray(0, 36);
-    rlDisableVertexArray();
+    rl::rlEnableVertexArray(vao);
+    rl::rlDrawVertexArray(0, 36);
+    rl::rlDisableVertexArray();
 
-    rlDisableTextureCubemap();
-    rlDisableShader();
+    rl::rlDisableTextureCubemap();
+    rl::rlDisableShader();
 
-    rlEnableDepthMask();
-    rlEnableBackfaceCulling();
+    rl::rlEnableDepthMask();
+    rl::rlEnableBackfaceCulling();
   }
 
   void unload() {
     if (cubemap_id != 0)
-      rlUnloadTexture(cubemap_id);
+      rl::rlUnloadTexture(cubemap_id);
     if (vao != 0)
-      rlUnloadVertexArray(vao);
+      rl::rlUnloadVertexArray(vao);
     if (vbo != 0)
-      rlUnloadVertexBuffer(vbo);
+      rl::rlUnloadVertexBuffer(vbo);
     loaded = false;
   }
 
 private:
-  static Shader get_skybox_shader() {
-    static Shader s = {};
+  static rl::Shader get_skybox_shader() {
+    static rl::Shader s = {};
     static bool init = false;
     if (!init) {
-      s = LoadShader("res/shaders/skybox.vert", "res/shaders/skybox.frag");
-      int skybox_loc = GetShaderLocation(s, "u_skybox");
+      s = rl::LoadShader("res/shaders/skybox.vert", "res/shaders/skybox.frag");
+      int skybox_loc = rl::GetShaderLocation(s, "u_skybox");
       int val = 0;
-      SetShaderValue(s, skybox_loc, &val, SHADER_UNIFORM_INT);
+      rl::SetShaderValue(s, skybox_loc, &val, SHADER_UNIFORM_INT);
       init = true;
     }
     return s;
@@ -126,25 +124,25 @@ private:
         -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
         -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f};
 
-    vao = rlLoadVertexArray();
-    rlEnableVertexArray(vao);
-    vbo = rlLoadVertexBuffer(vertices, sizeof(vertices), false);
-    rlSetVertexAttribute(0, 3, RL_FLOAT, false, 0, 0);
-    rlEnableVertexAttribute(0);
-    rlDisableVertexArray();
+    vao = rl::rlLoadVertexArray();
+    rl::rlEnableVertexArray(vao);
+    vbo = rl::rlLoadVertexBuffer(vertices, sizeof(vertices), false);
+    rl::rlSetVertexAttribute(0, 3, RL_FLOAT, false, 0, 0);
+    rl::rlEnableVertexAttribute(0);
+    rl::rlDisableVertexArray();
   }
 
   static unsigned int load_cubemap_from_paths(const std::string paths[6]) {
-    Image images[6];
+    rl::Image images[6];
     for (int i = 0; i < 6; i++) {
-      images[i] = LoadImage(paths[i].c_str());
+      images[i] = rl::LoadImage(paths[i].c_str());
       if (images[i].data == nullptr) {
         for (int j = 0; j < i; j++)
-          UnloadImage(images[j]);
+          rl::UnloadImage(images[j]);
         return 0;
       }
       if (images[i].format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
-        ImageFormat(&images[i], PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        rl::ImageFormat(&images[i], PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
       }
     }
 
@@ -158,11 +156,11 @@ private:
     for (int i = 0; i < 6; i++) {
       std::memcpy(data + i * w * h * pixel_size, images[i].data,
                   w * h * pixel_size);
-      UnloadImage(images[i]);
+      rl::UnloadImage(images[i]);
     }
 
     unsigned int id =
-        rlLoadTextureCubemap(data, w, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
+        rl::rlLoadTextureCubemap(data, w, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
     RL_FREE(data);
     return id;
   }

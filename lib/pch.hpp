@@ -33,6 +33,4 @@
 #include <bvh/v2/bbox.h>
 #include <bvh/v2/vec.h>
 #include <meshoptimizer.h>
-#include <raylib.h>
-#include <raymath.h>
-#include <rlgl.h>
+#include "rl.hpp"

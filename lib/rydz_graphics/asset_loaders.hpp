@@ -1,11 +1,11 @@
 #pragma once
 #include "gltf_asset.hpp"
 #include "rydz_ecs/asset.hpp"
-#include <raylib.h>
+#include "rl.hpp"
 
 namespace ecs {
 
-class TextureLoader : public AssetLoader<TextureLoader, Texture2D> {
+class TextureLoader : public AssetLoader<TextureLoader, rl::Texture2D> {
 public:
   std::vector<std::string> extensions() const override {
     return {"png", "jpg", "jpeg", "bmp", "tga", "gif"};
@@ -13,9 +13,9 @@ public:
 
   bool is_async() const override { return false; }
 
-  Texture2D load_asset(const std::vector<uint8_t> & /*data*/,
+  rl::Texture2D load_asset(const std::vector<uint8_t> & /*data*/,
                        const std::string &path) {
-    Texture2D tex{};
+    rl::Texture2D tex{};
     tex.id = 0;
     path_ = path;
     return tex;
@@ -24,10 +24,10 @@ public:
   void insert_into_world(World &world, uint32_t handle_id,
                          std::any asset) override {
     auto path = std::any_cast<std::string>(std::move(asset));
-    auto *assets = world.get_resource<Assets<Texture2D>>();
+    auto *assets = world.get_resource<Assets<rl::Texture2D>>();
     if (assets) {
-      Texture2D tex = LoadTexture(path.c_str());
-      assets->set(Handle<Texture2D>{handle_id}, tex);
+      rl::Texture2D tex = rl::LoadTexture(path.c_str());
+      assets->set(Handle<rl::Texture2D>{handle_id}, tex);
     }
   }
 
@@ -35,7 +35,7 @@ private:
   std::string path_;
 };
 
-class ModelLoader : public AssetLoader<ModelLoader, Model> {
+class ModelLoader : public AssetLoader<ModelLoader, rl::Model> {
 public:
   std::vector<std::string> extensions() const override {
     return {"obj", "iqm"};
@@ -43,9 +43,9 @@ public:
 
   bool is_async() const override { return false; }
 
-  Model load_asset(const std::vector<uint8_t> & /*data*/,
+  rl::Model load_asset(const std::vector<uint8_t> & /*data*/,
                    const std::string &path) {
-    Model m{};
+    rl::Model m{};
     path_ = path;
     return m;
   }
@@ -53,10 +53,10 @@ public:
   void insert_into_world(World &world, uint32_t handle_id,
                          std::any asset) override {
     auto path = std::any_cast<std::string>(std::move(asset));
-    auto *assets = world.get_resource<Assets<Model>>();
+    auto *assets = world.get_resource<Assets<rl::Model>>();
     if (assets) {
-      Model model = LoadModel(path.c_str());
-      assets->set(Handle<Model>{handle_id}, model);
+      rl::Model model = rl::LoadModel(path.c_str());
+      assets->set(Handle<rl::Model>{handle_id}, model);
     }
   }
 
@@ -64,7 +64,7 @@ private:
   std::string path_;
 };
 
-class SoundLoader : public AssetLoader<SoundLoader, Sound> {
+class SoundLoader : public AssetLoader<SoundLoader, rl::Sound> {
 public:
   std::vector<std::string> extensions() const override {
     return {"wav", "ogg", "mp3"};
@@ -72,19 +72,19 @@ public:
 
   bool is_async() const override { return true; }
 
-  Sound load_asset(const std::vector<uint8_t> & /*data*/,
+  rl::Sound load_asset(const std::vector<uint8_t> & /*data*/,
                    const std::string &path) {
-    Sound s{};
+    rl::Sound s{};
     path_ = path;
     return s;
   }
 
   void insert_into_world(World &world, uint32_t handle_id,
                          std::any /*asset*/) override {
-    auto *assets = world.get_resource<Assets<Sound>>();
+    auto *assets = world.get_resource<Assets<rl::Sound>>();
     if (assets) {
-      Sound snd = LoadSound(path_.c_str());
-      assets->set(Handle<Sound>{handle_id}, snd);
+      rl::Sound snd = rl::LoadSound(path_.c_str());
+      assets->set(Handle<rl::Sound>{handle_id}, snd);
     }
   }
 

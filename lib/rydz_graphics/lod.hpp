@@ -3,13 +3,12 @@
 #include "camera3d.hpp"
 #include "mesh3d.hpp"
 #include "rydz_ecs/transform.hpp"
+#include "rl.hpp"
 #include <absl/container/flat_hash_map.h>
 #include <algorithm>
 #include <array>
 #include <cstring>
 #include <meshoptimizer.h>
-#include <raylib.h>
-#include <raymath.h>
 #include <vector>
 
 namespace ecs {
@@ -34,7 +33,7 @@ struct LodConfig {
 
 /// Component: stores a Model handle per LOD level.
 struct MeshLodGroup {
-  std::array<Handle<Model>, LOD_LEVELS> levels{};
+  std::array<Handle<rl::Model>, LOD_LEVELS> levels{};
   int level_count = 0;
 };
 
@@ -47,7 +46,7 @@ struct LodHistory {
 
 /// Simplify a raylib Mesh to a target ratio. Returns a new Mesh.
 /// The original mesh must have indices. If it doesn't, returns a copy.
-inline Mesh simplify_mesh(const Mesh &src, float target_ratio) {
+inline rl::Mesh simplify_mesh(const rl::Mesh &src, float target_ratio) {
   if (!src.vertices || src.vertexCount <= 0)
     return src;
 
@@ -88,7 +87,7 @@ inline Mesh simplify_mesh(const Mesh &src, float target_ratio) {
   }
 
   // Build new mesh
-  Mesh out = {};
+  rl::Mesh out = {};
   out.vertexCount = static_cast<int>(new_vertex_count);
   out.triangleCount = static_cast<int>(simplified.size() / 3);
 
@@ -132,7 +131,7 @@ inline Mesh simplify_mesh(const Mesh &src, float target_ratio) {
   }
 
   // Upload to GPU
-  UploadMesh(&out, false);
+  rl::UploadMesh(&out, false);
   return out;
 }
 
@@ -201,7 +200,7 @@ inline int apply_lod_hysteresis(Entity entity, int desired_level,
 inline void auto_generate_lods_system(World &world) {
   auto *mesh_storage = world.get_storage<Mesh3d>();
   auto *lod_storage = world.get_storage<MeshLodGroup>();
-  auto *model_assets = world.get_resource<Assets<Model>>();
+  auto *model_assets = world.get_resource<Assets<rl::Model>>();
   auto *config = world.get_resource<LodConfig>();
   if (!mesh_storage || !model_assets || !config)
     return;
@@ -225,7 +224,7 @@ inline void auto_generate_lods_system(World &world) {
       continue;
     }
 
-    Model *model = model_assets->get(mesh3d->model);
+    rl::Model *model = model_assets->get(mesh3d->model);
     if (!model || model->meshCount <= 0 || !model->meshes)
       continue;
 
@@ -242,10 +241,10 @@ inline void auto_generate_lods_system(World &world) {
     group.level_count = 1;
 
     for (int lod = 1; lod < LOD_LEVELS; ++lod) {
-      Model lod_model = {};
+      rl::Model lod_model = {};
       lod_model.meshCount = model->meshCount;
       lod_model.meshes =
-          static_cast<Mesh *>(RL_CALLOC(model->meshCount, sizeof(Mesh)));
+          static_cast<rl::Mesh *>(RL_CALLOC(model->meshCount, sizeof(rl::Mesh)));
 
       bool any_valid = false;
       for (int mi = 0; mi < model->meshCount; ++mi) {
@@ -273,10 +272,10 @@ inline void auto_generate_lods_system(World &world) {
 }
 
 /// Compute the screen-space pixel radius for a bounding sphere.
-inline float compute_screen_radius(Vector3 center, float radius,
-                                   const Matrix &view, const Matrix &proj,
+inline float compute_screen_radius(rl::Vector3 center, float radius,
+                                   const rl::Matrix &view, const rl::Matrix &proj,
                                    float half_screen_height) {
-  Vector3 view_pos = Vector3Transform(center, view);
+  rl::Vector3 view_pos = rl::Vector3Transform(center, view);
   float depth = -view_pos.z;
   float effective_depth = std::max(depth, 0.1f);
 

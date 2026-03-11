@@ -13,25 +13,23 @@
 #include "rydz_ecs/types.hpp"
 #include "rydz_ecs/visibility.hpp"
 #include "skybox.hpp"
+#include "rl.hpp"
 #include <absl/container/flat_hash_map.h>
 #include <array>
 #include <cstring>
-#include <raylib.h>
-#include <raymath.h>
-#include <rlgl.h>
 #include <vector>
 
 namespace ecs {
 
 struct ClearColor {
-  Color color = {30, 30, 40, 255};
+  rl::Color color = {30, 30, 40, 255};
 };
 
 inline void apply_materials_system(World &world) {
   auto *mesh_storage = world.get_storage<Mesh3d>();
   auto *mat_storage = world.get_storage<Material3d>();
-  auto *model_assets = world.get_resource<Assets<Model>>();
-  auto *tex_assets = world.get_resource<Assets<Texture2D>>();
+  auto *model_assets = world.get_resource<Assets<rl::Model>>();
+  auto *tex_assets = world.get_resource<Assets<rl::Texture2D>>();
   if (!mesh_storage || !mat_storage || !model_assets)
     return;
 
@@ -42,7 +40,7 @@ inline void apply_materials_system(World &world) {
     if (!mesh_comp || !mat_comp)
       continue;
 
-    Model *model = model_assets->get(mesh_comp->model);
+    rl::Model *model = model_assets->get(mesh_comp->model);
     if (!model)
       continue;
 
@@ -55,7 +53,7 @@ inline void build_render_batches_system(
           Opt<const RenderConfig>, Opt<const ViewVisibility>,
           Opt<const MeshLodGroup>>
         query,
-    ResMut<Assets<Model>> model_assets, ResMut<RenderBatches> batches,
+    ResMut<Assets<rl::Model>> model_assets, ResMut<RenderBatches> batches,
     Res<LodConfig> lod_config, ResMut<LodHistory> lod_history, NonSendMarker) {
   batches->clear();
   absl::flat_hash_map<RenderBatchKey, size_t> batch_index;
@@ -67,18 +65,18 @@ inline void build_render_batches_system(
       return;
     if (vv && !vv->visible)
       return;
-    Handle<Model> model_handle = mesh3d->model;
+    Handle<rl::Model> model_handle = mesh3d->model;
     if (lod_group && lod_group->level_count > 1) {
       model_handle = lod_group->levels[0];
     }
 
-    Model *model = model_assets->get(model_handle);
+    rl::Model *model = model_assets->get(model_handle);
     if (!model || model->meshCount <= 0 || model->meshes == nullptr)
       return;
 
     if (model->meshes[0].vaoId == 0) {
       for (int i = 0; i < model->meshCount; ++i) {
-        UploadMesh(&model->meshes[i], false);
+        rl::UploadMesh(&model->meshes[i], false);
       }
     }
 
@@ -131,17 +129,17 @@ inline void build_render_batches_system(
 }
 
 inline void
-render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
-              Res<Assets<Texture2D>> tex_assets, Res<RenderBatches> batches,
+render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
+              Res<Assets<rl::Texture2D>> tex_assets, Res<RenderBatches> batches,
               Query<const Camera3DComponent, const ActiveCamera,
                     const Transform3D, Opt<const Skybox>>
                   cam_query,
               Query<const DirectionalLight> dir_query,
               Query<const PointLight, const GlobalTransform> point_query,
               NonSendMarker) {
-  Color bg = clear_color->color;
+  rl::Color bg = clear_color->color;
 
-  Camera3D cam = {};
+  rl::Camera3D cam = {};
   cam.position = {10, 10, 10};
   cam.target = {0, 0, 0};
   cam.up = {0, 1, 0};
@@ -159,14 +157,14 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
     }
   });
 
-  auto fallback_material = []() -> Material & {
-    static Material fallback = {};
+  auto fallback_material = []() -> rl::Material & {
+    static rl::Material fallback = {};
     static bool init = false;
     if (!init) {
-      fallback.shader.id = rlGetShaderIdDefault();
-      fallback.shader.locs = rlGetShaderLocsDefault();
-      fallback.maps = (MaterialMap *)RL_CALLOC(12, sizeof(MaterialMap));
-      fallback.maps[MATERIAL_MAP_DIFFUSE].texture.id = rlGetTextureIdDefault();
+      fallback.shader.id = rl::rlGetShaderIdDefault();
+      fallback.shader.locs = rl::rlGetShaderLocsDefault();
+      fallback.maps = (rl::MaterialMap *)RL_CALLOC(12, sizeof(rl::MaterialMap));
+      fallback.maps[MATERIAL_MAP_DIFFUSE].texture.id = rl::rlGetTextureIdDefault();
       fallback.maps[MATERIAL_MAP_DIFFUSE].texture.width = 1;
       fallback.maps[MATERIAL_MAP_DIFFUSE].texture.height = 1;
       fallback.maps[MATERIAL_MAP_DIFFUSE].texture.mipmaps = 1;
@@ -178,8 +176,8 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
     return fallback;
   };
 
-  auto mul_color = [](Color a, Color b) -> Color {
-    return Color{
+  auto mul_color = [](rl::Color a, rl::Color b) -> rl::Color {
+    return rl::Color{
         (unsigned char)((a.r * b.r) / 255),
         (unsigned char)((a.g * b.g) / 255),
         (unsigned char)((a.b * b.b) / 255),
@@ -187,7 +185,7 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
     };
   };
 
-  auto color_to_vec3 = [](Color c) -> Vector3 {
+  auto color_to_vec3 = [](rl::Color c) -> rl::Vector3 {
     return {c.r / 255.0f, c.g / 255.0f, c.b / 255.0f};
   };
 
@@ -201,8 +199,8 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
   });
 
   constexpr int kMaxPointLights = 16;
-  std::array<Vector3, kMaxPointLights> point_positions{};
-  std::array<Vector3, kMaxPointLights> point_colors{};
+  std::array<rl::Vector3, kMaxPointLights> point_positions{};
+  std::array<rl::Vector3, kMaxPointLights> point_colors{};
   std::array<float, kMaxPointLights> point_intensities{};
   std::array<float, kMaxPointLights> point_ranges{};
   usize point_count = 0;
@@ -217,9 +215,9 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
     ++point_count;
   });
 
-  BeginDrawing();
-  ClearBackground(bg);
-  BeginMode3D(cam);
+  rl::BeginDrawing();
+  rl::ClearBackground(bg);
+  rl::BeginMode3D(cam);
 
   if (active_skybox && active_skybox->loaded) {
     active_skybox->draw(cam);
@@ -227,12 +225,12 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
 
   for (const auto &batch : batches->batches) {
     const auto &key = batch.key;
-    const Model *model = model_assets->get(key.model);
+    const rl::Model *model = model_assets->get(key.model);
     if (!model || key.mesh_index < 0 || key.mesh_index >= model->meshCount)
       continue;
 
-    const Mesh &mesh = model->meshes[key.mesh_index];
-    const Material *src_mat = nullptr;
+    const rl::Mesh &mesh = model->meshes[key.mesh_index];
+    const rl::Material *src_mat = nullptr;
     if (model->materials && model->materialCount > 0 &&
         key.material_index >= 0 && key.material_index < model->materialCount) {
       src_mat = &model->materials[key.material_index];
@@ -241,16 +239,16 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
       src_mat = &fallback_material();
     }
 
-    std::array<MaterialMap, 12> local_maps;
-    Material draw_mat = *src_mat;
+    std::array<rl::MaterialMap, 12> local_maps;
+    rl::Material draw_mat = *src_mat;
     memcpy(local_maps.data(), src_mat->maps, sizeof(local_maps));
     draw_mat.maps = local_maps.data();
 
     if (key.material.shader) {
       draw_mat.shader = *key.material.shader;
     } else if (draw_mat.shader.id == 0 || draw_mat.shader.locs == nullptr) {
-      draw_mat.shader.id = rlGetShaderIdDefault();
-      draw_mat.shader.locs = rlGetShaderLocsDefault();
+      draw_mat.shader.id = rl::rlGetShaderIdDefault();
+      draw_mat.shader.locs = rl::rlGetShaderLocsDefault();
     }
 
     draw_mat.maps[MATERIAL_MAP_DIFFUSE].color = mul_color(
@@ -258,13 +256,13 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
 
     if (key.material.texture_id != UINT32_MAX) {
       if (auto *tex =
-              tex_assets->get(Handle<Texture2D>{key.material.texture_id})) {
+              tex_assets->get(Handle<rl::Texture2D>{key.material.texture_id})) {
         draw_mat.maps[MATERIAL_MAP_DIFFUSE].texture = *tex;
       }
     }
     if (key.material.normal_id != UINT32_MAX) {
       if (auto *tex =
-              tex_assets->get(Handle<Texture2D>{key.material.normal_id})) {
+              tex_assets->get(Handle<rl::Texture2D>{key.material.normal_id})) {
         draw_mat.maps[MATERIAL_MAP_NORMAL].texture = *tex;
       }
     }
@@ -273,34 +271,34 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
       key.rc.apply();
     }
 
-    auto set_shader_value = [](Shader &shader, const char *name,
+    auto set_shader_value = [](rl::Shader &shader, const char *name,
                                const void *value, int type) {
-      int loc = GetShaderLocation(shader, name);
+      int loc = rl::GetShaderLocation(shader, name);
       if (loc >= 0) {
-        SetShaderValue(shader, loc, value, type);
+        rl::SetShaderValue(shader, loc, value, type);
       }
     };
 
-    auto set_shader_value_v = [](Shader &shader, const char *name,
+    auto set_shader_value_v = [](rl::Shader &shader, const char *name,
                                  const void *value, int type, int count) {
-      int loc = GetShaderLocation(shader, name);
+      int loc = rl::GetShaderLocation(shader, name);
       if (loc >= 0) {
-        SetShaderValueV(shader, loc, value, type, count);
+        rl::SetShaderValueV(shader, loc, value, type, count);
       }
     };
 
-    Shader &shader = draw_mat.shader;
+    rl::Shader &shader = draw_mat.shader;
     float metallic = key.material.metallic;
     float roughness = key.material.roughness;
     float normal_factor = 1.0f;
     float occlusion_factor = 1.0f;
-    Vector3 emissive = {0.0f, 0.0f, 0.0f};
-    Vector4 tint = {1.0f, 1.0f, 1.0f, 0.0f};
-    Vector3 camera_pos = cam.position;
+    rl::Vector3 emissive = {0.0f, 0.0f, 0.0f};
+    rl::Vector4 tint = {1.0f, 1.0f, 1.0f, 0.0f};
+    rl::Vector3 camera_pos = cam.position;
 
     int has_normal = 0;
     if (key.material.normal_id != UINT32_MAX) {
-      if (tex_assets->get(Handle<Texture2D>{key.material.normal_id})) {
+      if (tex_assets->get(Handle<rl::Texture2D>{key.material.normal_id})) {
         has_normal = 1;
       }
     }
@@ -310,8 +308,8 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
     int has_emissive = 0;
 
     int has_directional = has_dir ? 1 : 0;
-    Vector3 dir_color = color_to_vec3(dir_light.color);
-    Vector3 dir_dir = Vector3Normalize(dir_light.direction);
+    rl::Vector3 dir_color = color_to_vec3(dir_light.color);
+    rl::Vector3 dir_dir = rl::Vector3Normalize(dir_light.direction);
     float dir_intensity = dir_light.intensity;
 
     usize point_count_i = point_count;
@@ -370,17 +368,17 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
     if (draw_mat.shader.locs && mesh.vaoId != 0) {
       if (draw_mat.shader.locs[SHADER_LOC_MATRIX_MODEL] < 0) {
         draw_mat.shader.locs[SHADER_LOC_MATRIX_MODEL] =
-            GetShaderLocationAttrib(draw_mat.shader, "instanceTransform");
+            rl::GetShaderLocationAttrib(draw_mat.shader, "instanceTransform");
       }
       can_instance = draw_mat.shader.locs[SHADER_LOC_MATRIX_MODEL] >= 0;
     }
 
     if (can_instance) {
-      ::DrawMeshInstanced(mesh, draw_mat, batch.transforms.data(),
+      rl::DrawMeshInstanced(mesh, draw_mat, batch.transforms.data(),
                           static_cast<int>(batch.transforms.size()));
     } else {
       for (const auto &tx : batch.transforms) {
-        ::DrawMesh(mesh, draw_mat, tx);
+        rl::DrawMesh(mesh, draw_mat, tx);
       }
     }
 
@@ -389,9 +387,9 @@ render_system(Res<ClearColor> clear_color, Res<Assets<Model>> model_assets,
     }
   }
 
-  EndMode3D();
-  DrawFPS(10, 10);
-  EndDrawing();
+  rl::EndMode3D();
+  rl::DrawFPS(10, 10);
+  rl::EndDrawing();
 }
 
 inline void auto_insert_global_transform(World &world) {
@@ -456,11 +454,11 @@ inline void auto_insert_render_config(World &world) {
 }
 
 inline void render_plugin(App &app) {
-  if (!app.world().contains_resource<Assets<Model>>()) {
-    app.insert_resource(Assets<Model>{});
+  if (!app.world().contains_resource<Assets<rl::Model>>()) {
+    app.insert_resource(Assets<rl::Model>{});
   }
-  if (!app.world().contains_resource<Assets<Texture2D>>()) {
-    app.insert_resource(Assets<Texture2D>{});
+  if (!app.world().contains_resource<Assets<rl::Texture2D>>()) {
+    app.insert_resource(Assets<rl::Texture2D>{});
   }
   if (!app.world().contains_resource<ClearColor>()) {
     app.insert_resource(ClearColor{});

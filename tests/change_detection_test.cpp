@@ -46,7 +46,7 @@ TEST(ChangeDetectionTest, ChangedDetectsMutation) {
   EXPECT_FALSE((QueryFilterTraits<Changed<Health>>::matches(world, entity)));
 
   // Mutate the component (must mark changed)
-  auto &storage = world.ensure_storage<Health>();
+  auto &storage = world.ensure_storage_exist<Health>();
   storage.mark_changed(entity, world.read_change_tick());
 
   // Changed should now match
@@ -117,7 +117,7 @@ TEST(ChangeDetectionTest, QueryWithChangedFilter) {
   world.increment_change_tick();
 
   // Mutate only e2
-  auto &storage = world.ensure_storage<Health>();
+  auto &storage = world.ensure_storage_exist<Health>();
   storage.mark_changed(e2, world.read_change_tick());
 
   // Query with Changed<Health> should only return e2

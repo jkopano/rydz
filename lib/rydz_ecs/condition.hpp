@@ -143,7 +143,7 @@ struct is_system_descriptor<SystemDescriptor<F>> : std::true_type {};
 template <typename T>
 inline constexpr bool is_system_descriptor_v = is_system_descriptor<T>::value;
 
-template <typename F> SystemDescriptor<std::decay_t<F>> into_system(F &&func) {
+template <typename F> SystemDescriptor<std::decay_t<F>> group(F &&func) {
   return SystemDescriptor<std::decay_t<F>>(std::forward<F>(func));
 }
 

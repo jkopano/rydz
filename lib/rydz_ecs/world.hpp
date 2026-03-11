@@ -60,22 +60,23 @@ public:
     entities.destroy(entity);
   }
 
-  template <typename T> auto &ensure_storage() {
+  template <typename T> auto &ensure_storage_exist() {
     using TargetStorage = storage_t<T>;
-    auto key = std::type_index(typeid(T));
 
+    auto key = std::type_index(typeid(T));
     auto it = storages_.find(key);
-    if (it == storages_.end()) {
-      auto storage = std::make_unique<TargetStorage>();
-      auto *ptr = storage.get();
-      storages_.emplace(key, std::move(storage));
-      return *ptr;
+    if (it != storages_.end()) {
+      return *static_cast<TargetStorage *>(it->second.get());
     }
-    return *static_cast<TargetStorage *>(it->second.get());
+
+    auto storage = std::make_unique<TargetStorage>();
+    auto *ptr = storage.get();
+    storages_.emplace(key, std::move(storage));
+    return *ptr;
   }
 
   template <typename T> void insert_component(Entity entity, T component) {
-    auto &storage = ensure_storage<T>();
+    auto &storage = ensure_storage_exist<T>();
     storage.insert(entity, std::move(component), change_tick_);
   }
 
@@ -88,9 +89,11 @@ public:
   template <typename T> void remove_component(Entity entity) {
     auto key = std::type_index(typeid(T));
     auto it = storages_.find(key);
-    if (it != storages_.end()) {
-      it->second->remove(entity);
+    if (it == storages_.end()) {
+      return;
     }
+
+    it->second->remove(entity);
   }
 
   template <typename T> bool has_component(Entity entity) const {
@@ -105,8 +108,9 @@ public:
   std::optional<ComponentTicks> get_component_ticks(Entity entity) const {
     auto key = std::type_index(typeid(T));
     auto it = storages_.find(key);
-    if (it == storages_.end())
+    if (it == storages_.end()) {
       return std::nullopt;
+    }
     return it->second->get_ticks(entity);
   }
 
