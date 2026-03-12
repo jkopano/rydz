@@ -161,7 +161,7 @@ template <> struct SystemParamTraits<Cmd> {
   }
 
   static bool available(const World &world) {
-    return world.contains_resource<CommandQueue>();
+    return world.has_resource<CommandQueue>();
   }
 
   static void access(SystemAccess &acc) {

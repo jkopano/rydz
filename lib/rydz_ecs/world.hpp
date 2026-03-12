@@ -41,9 +41,7 @@ public:
     return resources.get<T>();
   }
 
-  template <typename T> bool contains_resource() const {
-    return resources.contains<T>();
-  }
+  template <typename T> bool has_resource() const { return resources.has<T>(); }
 
   template <typename T> std::optional<T> remove_resource() {
     return resources.remove<T>();

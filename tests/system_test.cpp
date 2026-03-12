@@ -25,11 +25,11 @@ struct Counter {
 TEST(SystemTest, ResourceManagement) {
   World world;
 
-  EXPECT_FALSE(world.contains_resource<Flag>());
+  EXPECT_FALSE(world.has_resource<Flag>());
   world.insert_resource(Flag{false});
-  EXPECT_TRUE(world.contains_resource<Flag>());
+  EXPECT_TRUE(world.has_resource<Flag>());
   world.remove_resource<Flag>();
-  EXPECT_FALSE(world.contains_resource<Flag>());
+  EXPECT_FALSE(world.has_resource<Flag>());
 }
 
 TEST(SystemTest, MakeSystemExecution) {

@@ -137,7 +137,7 @@ inline void compute_mesh_bounds_system(World &world) {
   if (!mesh_storage || !model_assets)
     return;
 
-  for (auto e : mesh_storage->entity_indices()) {
+  for (auto e : mesh_storage->entities()) {
     if (bounds_storage && bounds_storage->get(e))
       continue;
 
@@ -168,7 +168,7 @@ inline void frustum_cull_system(World &world) {
 
   const Camera3DComponent *cam_comp = nullptr;
   const Transform3D *cam_tx = nullptr;
-  for (auto e : active_storage->entity_indices()) {
+  for (auto e : active_storage->entities()) {
     cam_comp = cam_storage->get(e);
     cam_tx = cam_tx_storage->get(e);
     if (cam_comp && cam_tx)
@@ -195,7 +195,7 @@ inline void frustum_cull_system(World &world) {
   if (!bounds_storage || !gt_storage)
     return;
 
-  auto entities = bounds_storage->entity_indices();
+  auto entities = bounds_storage->entities();
   if (entities.empty())
     return;
 

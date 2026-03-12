@@ -50,9 +50,7 @@ template <typename T> struct SystemParamTraits<Res<T>> {
     return Res<T>{ptr};
   }
 
-  static bool available(const World &world) {
-    return world.contains_resource<T>();
-  }
+  static bool available(const World &world) { return world.has_resource<T>(); }
 
   static void access(SystemAccess &acc) { acc.add_resource_read<T>(); }
 };
@@ -69,9 +67,7 @@ template <typename T> struct SystemParamTraits<ResMut<T>> {
     return ResMut<T>{ptr};
   }
 
-  static bool available(const World &world) {
-    return world.contains_resource<T>();
-  }
+  static bool available(const World &world) { return world.has_resource<T>(); }
 
   static void access(SystemAccess &acc) { acc.add_resource_write<T>(); }
 };
@@ -115,8 +111,8 @@ template <typename R, typename... Args> struct function_traits_impl {
 
   template <size_t N> using arg = std::tuple_element_t<N, args_tuple>;
 
-  template <typename Fn> static void apply(Fn &&fn) {
-    std::forward<Fn>(fn).template operator()<Args...>();
+  template <typename Fn> static decltype(auto) apply(Fn &&fn) {
+    return std::forward<Fn>(fn).template operator()<Args...>();
   }
 };
 
@@ -171,11 +167,8 @@ public:
       : func_(std::move(func)) {
     if (!name.empty()) {
       name_ = std::move(name);
-    } else if constexpr (std::is_pointer_v<F> &&
-                         std::is_function_v<std::remove_pointer_t<F>>) {
-      name_ = std::to_string(reinterpret_cast<uintptr_t>(func_));
     } else {
-      name_ = typeid(F).name();
+      name_ = system_name_of(func_);
     }
   }
 

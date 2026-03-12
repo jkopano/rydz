@@ -7,13 +7,13 @@
 #include "mesh3d.hpp"
 #include "render_batches.hpp"
 #include "render_config.hpp"
+#include "rl.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/transform.hpp"
 #include "rydz_ecs/types.hpp"
 #include "rydz_ecs/visibility.hpp"
 #include "skybox.hpp"
-#include "rl.hpp"
 #include <absl/container/flat_hash_map.h>
 #include <array>
 #include <cstring>
@@ -33,7 +33,7 @@ inline void apply_materials_system(World &world) {
   if (!mesh_storage || !mat_storage || !model_assets)
     return;
 
-  auto entities = mat_storage->entity_indices();
+  auto entities = mat_storage->entities();
   for (auto e : entities) {
     auto *mesh_comp = mesh_storage->get(e);
     auto *mat_comp = mat_storage->get(e);
@@ -164,7 +164,8 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
       fallback.shader.id = rl::rlGetShaderIdDefault();
       fallback.shader.locs = rl::rlGetShaderLocsDefault();
       fallback.maps = (rl::MaterialMap *)RL_CALLOC(12, sizeof(rl::MaterialMap));
-      fallback.maps[MATERIAL_MAP_DIFFUSE].texture.id = rl::rlGetTextureIdDefault();
+      fallback.maps[MATERIAL_MAP_DIFFUSE].texture.id =
+          rl::rlGetTextureIdDefault();
       fallback.maps[MATERIAL_MAP_DIFFUSE].texture.width = 1;
       fallback.maps[MATERIAL_MAP_DIFFUSE].texture.height = 1;
       fallback.maps[MATERIAL_MAP_DIFFUSE].texture.mipmaps = 1;
@@ -375,7 +376,7 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
 
     if (can_instance) {
       rl::DrawMeshInstanced(mesh, draw_mat, batch.transforms.data(),
-                          static_cast<int>(batch.transforms.size()));
+                            static_cast<int>(batch.transforms.size()));
     } else {
       for (const auto &tx : batch.transforms) {
         rl::DrawMesh(mesh, draw_mat, tx);
@@ -398,7 +399,7 @@ inline void auto_insert_global_transform(World &world) {
   if (!transform_storage)
     return;
 
-  auto entities = transform_storage->entity_indices();
+  auto entities = transform_storage->entities();
   for (auto e : entities) {
     if (!global_storage || !global_storage->get(e)) {
       world.insert_component(e, GlobalTransform{});
@@ -413,7 +414,7 @@ inline void auto_insert_visibility(World &world) {
   if (!mesh_storage)
     return;
 
-  auto entities = mesh_storage->entity_indices();
+  auto entities = mesh_storage->entities();
   for (auto e : entities) {
     if (!vis_storage || !vis_storage->get(e)) {
       world.insert_component(e, Visibility::Visible);
@@ -428,7 +429,7 @@ inline void auto_insert_material(World &world) {
   if (!mesh_storage)
     return;
 
-  auto entities = mesh_storage->entity_indices();
+  auto entities = mesh_storage->entities();
   for (auto e : entities) {
     if (!mat_storage || !mat_storage->get(e)) {
       world.insert_component(e,
@@ -444,7 +445,7 @@ inline void auto_insert_render_config(World &world) {
   if (!mesh_storage)
     return;
 
-  auto entities = mesh_storage->entity_indices();
+  auto entities = mesh_storage->entities();
   for (auto e : entities) {
     if (!rc_storage || !rc_storage->get(e)) {
       world.insert_component(e, RenderConfig{});
@@ -454,25 +455,25 @@ inline void auto_insert_render_config(World &world) {
 }
 
 inline void render_plugin(App &app) {
-  if (!app.world().contains_resource<Assets<rl::Model>>()) {
+  if (!app.world().has_resource<Assets<rl::Model>>()) {
     app.insert_resource(Assets<rl::Model>{});
   }
-  if (!app.world().contains_resource<Assets<rl::Texture2D>>()) {
+  if (!app.world().has_resource<Assets<rl::Texture2D>>()) {
     app.insert_resource(Assets<rl::Texture2D>{});
   }
-  if (!app.world().contains_resource<ClearColor>()) {
+  if (!app.world().has_resource<ClearColor>()) {
     app.insert_resource(ClearColor{});
   }
-  if (!app.world().contains_resource<RenderBatches>()) {
+  if (!app.world().has_resource<RenderBatches>()) {
     app.insert_resource(RenderBatches{});
   }
-  if (!app.world().contains_resource<AssetServer>()) {
+  if (!app.world().has_resource<AssetServer>()) {
     app.insert_resource(AssetServer{});
   }
-  if (!app.world().contains_resource<LodConfig>()) {
+  if (!app.world().has_resource<LodConfig>()) {
     app.insert_resource(LodConfig{});
   }
-  if (!app.world().contains_resource<LodHistory>()) {
+  if (!app.world().has_resource<LodHistory>()) {
     app.insert_resource(LodHistory{});
   }
   app.add_systems(ScheduleLabel::First, auto_insert_global_transform);

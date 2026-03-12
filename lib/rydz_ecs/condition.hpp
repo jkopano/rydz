@@ -11,16 +11,6 @@ struct SystemOrdering {
   std::vector<std::string> before;
 };
 
-template <typename Fn> std::string system_name_of(Fn &&fn) {
-  using D = std::decay_t<Fn>;
-  if constexpr (std::is_pointer_v<D> &&
-                std::is_function_v<std::remove_pointer_t<D>>) {
-    return std::to_string(reinterpret_cast<uintptr_t>(fn));
-  } else {
-    return typeid(D).name();
-  }
-}
-
 class ICondition {
 public:
   virtual ~ICondition() = default;
@@ -34,13 +24,9 @@ public:
   explicit FunctionCondition(F func) : func_(std::move(func)) {}
 
   bool is_true(World &world) override {
-    return evaluate(world, (typename function_traits<F>::args_tuple *)nullptr);
-  }
-
-private:
-  template <typename... Args>
-  bool evaluate(World &world, std::tuple<Args...> *) {
-    return func_(SystemParamTraits<bare_param_t<Args>>::retrieve(world)...);
+    return function_traits<F>::apply([&]<SystemParameter... Args>() {
+      return func_(SystemParamTraits<bare_param_t<Args>>::retrieve(world)...);
+    });
   }
 };
 

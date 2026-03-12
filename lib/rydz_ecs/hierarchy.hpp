@@ -26,7 +26,7 @@ inline Children children_of(const World &world, Entity parent) {
   if (!storage)
     return result;
 
-  auto indices = storage->entity_indices();
+  auto indices = storage->entities();
   for (auto entity : indices) {
     auto *p = storage->get(entity);
     if (p && p->entity == parent) {

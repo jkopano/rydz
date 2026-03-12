@@ -16,15 +16,15 @@ struct MyResource {
 TEST(WorldTest, ResourceInsertGetRemove) {
   World world;
 
-  EXPECT_FALSE(world.contains_resource<MyResource>());
+  EXPECT_FALSE(world.has_resource<MyResource>());
 
   world.insert_resource(MyResource{42});
-  EXPECT_TRUE(world.contains_resource<MyResource>());
+  EXPECT_TRUE(world.has_resource<MyResource>());
 
   auto *res = world.get_resource<MyResource>();
   ASSERT_NE(res, nullptr);
   EXPECT_EQ(res->value, 42);
 
   world.remove_resource<MyResource>();
-  EXPECT_FALSE(world.contains_resource<MyResource>());
+  EXPECT_FALSE(world.has_resource<MyResource>());
 }

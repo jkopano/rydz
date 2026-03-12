@@ -1,14 +1,13 @@
 #pragma once
 #include "access.hpp"
 #include "entity.hpp"
+#include "filter.hpp"
 #include "helpers.hpp"
 #include "storage.hpp"
 #include "ticks.hpp"
 #include "world.hpp"
-#include <optional>
 #include <tuple>
 #include <type_traits>
-#include <utility>
 
 namespace ecs {
 
@@ -61,14 +60,6 @@ private:
 };
 template <typename Inner> struct Opt {};
 
-template <typename T> struct With {};
-template <typename T> struct Without {};
-template <typename T> struct Added {};
-template <typename T> struct Changed {};
-template <typename F1, typename F2> struct Or {};
-template <typename... Fs> struct Filters {};
-
-// Primary template: bare T = read-only access (const T*)
 template <typename T> struct WorldQueryTraits {
   using Item = const T *;
 
@@ -77,7 +68,7 @@ template <typename T> struct WorldQueryTraits {
   struct Fetcher {
     const VecStorage<T> *storage = nullptr;
 
-    void init(const World &world) { storage = world.get_storage<T>(); }
+    void init(World &world) { storage = world.get_storage<T>(); }
 
     Item fetch(Entity entity) const {
       return storage ? storage->get(entity) : nullptr;
@@ -92,7 +83,6 @@ template <typename T> struct WorldQueryTraits {
   };
 };
 
-// Mut<T> = mutable access (T*)
 template <typename T> struct WorldQueryTraits<Mut<T>> {
   using Item = Mut<T>;
 
@@ -102,8 +92,8 @@ template <typename T> struct WorldQueryTraits<Mut<T>> {
     VecStorage<T> *storage = nullptr;
     Tick tick{};
 
-    void init(const World &world) {
-      storage = const_cast<World &>(world).get_storage<T>();
+    void init(World &world) {
+      storage = world.get_storage<T>();
       tick = world.read_change_tick();
     }
     Item fetch(Entity entity) const {
@@ -118,7 +108,6 @@ template <typename T> struct WorldQueryTraits<Mut<T>> {
   };
 };
 
-// Opt<T> = optional read (const T*, nullable)
 template <typename T> struct WorldQueryTraits<Opt<T>> {
   using Item = const T *;
 
@@ -127,7 +116,7 @@ template <typename T> struct WorldQueryTraits<Opt<T>> {
   struct Fetcher {
     const VecStorage<T> *storage = nullptr;
 
-    void init(const World &world) { storage = world.get_storage<T>(); }
+    void init(World &world) { storage = world.get_storage<T>(); }
     Item fetch(Entity entity) const {
       return storage ? storage->get(entity) : nullptr;
     }
@@ -137,7 +126,6 @@ template <typename T> struct WorldQueryTraits<Opt<T>> {
   };
 };
 
-// Opt<Mut<T>> = optional mutable (T*, nullable)
 template <typename T> struct WorldQueryTraits<Opt<Mut<T>>> {
   using Item = Mut<T>;
 
@@ -147,8 +135,8 @@ template <typename T> struct WorldQueryTraits<Opt<Mut<T>>> {
     VecStorage<T> *storage = nullptr;
     Tick tick{};
 
-    void init(const World &world) {
-      storage = const_cast<World &>(world).get_storage<T>();
+    void init(World &world) {
+      storage = world.get_storage<T>();
       tick = world.read_change_tick();
     }
     Item fetch(Entity entity) const {
@@ -167,7 +155,7 @@ template <> struct WorldQueryTraits<Entity> {
   static void access(SystemAccess &) {}
 
   struct Fetcher {
-    void init(const World &) {}
+    void init(World &) {}
     Item fetch(Entity entity) const { return entity; }
     bool matches(Entity) const { return true; }
     size_t capacity() const { return SIZE_MAX; }
@@ -175,143 +163,15 @@ template <> struct WorldQueryTraits<Entity> {
   };
 };
 
-template <typename F> struct QueryFilterTraits;
-
-template <> struct QueryFilterTraits<Filters<>> {
-  static bool matches(const World &, Entity) { return true; }
-  static void access(SystemAccess &) {}
-};
-
-template <typename F> struct QueryFilterTraits<Filters<F>> {
-  static bool matches(const World &world, Entity entity) {
-    return QueryFilterTraits<F>::matches(world, entity);
-  }
-  static void access(SystemAccess &acc) { QueryFilterTraits<F>::access(acc); }
-};
-
-template <typename F, typename... Fs>
-struct QueryFilterTraits<Filters<F, Fs...>> {
-  static bool matches(const World &world, Entity entity) {
-    return QueryFilterTraits<F>::matches(world, entity) &&
-           QueryFilterTraits<Filters<Fs...>>::matches(world, entity);
-  }
-  static void access(SystemAccess &acc) {
-    QueryFilterTraits<F>::access(acc);
-    QueryFilterTraits<Filters<Fs...>>::access(acc);
-  }
-};
-
-template <typename T> struct QueryFilterTraits<With<T>> {
-  static bool matches(const World &world, Entity entity) {
-    return world.has_component<T>(entity);
-  }
-  static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
-};
-
-template <typename T> struct QueryFilterTraits<Without<T>> {
-  static bool matches(const World &world, Entity entity) {
-    return !world.has_component<T>(entity);
-  }
-  static void access(SystemAccess &) {}
-};
-
-template <typename T> struct QueryFilterTraits<Added<T>> {
-  static bool matches(const World &world, Entity entity) {
-    auto ticks = world.get_component_ticks<T>(entity);
-    if (!ticks)
-      return false;
-    Tick this_run = world.read_change_tick();
-    Tick last_run = Tick{this_run.value - 1};
-    return ticks->added.is_newer_than(last_run, this_run);
-  }
-  static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
-};
-
-template <typename T> struct QueryFilterTraits<Changed<T>> {
-  static bool matches(const World &world, Entity entity) {
-    auto ticks = world.get_component_ticks<T>(entity);
-    if (!ticks)
-      return false;
-    Tick this_run = world.read_change_tick();
-    Tick last_run = Tick{this_run.value - 1};
-    return ticks->changed.is_newer_than(last_run, this_run);
-  }
-  static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
-};
-
-template <typename F1, typename F2> struct QueryFilterTraits<Or<F1, F2>> {
-  static bool matches(const World &world, Entity entity) {
-    return QueryFilterTraits<F1>::matches(world, entity) ||
-           QueryFilterTraits<F2>::matches(world, entity);
-  }
-  static void access(SystemAccess &acc) {
-    QueryFilterTraits<F1>::access(acc);
-    QueryFilterTraits<F2>::access(acc);
-  }
-};
-
-template <typename T> struct is_filter : std::false_type {};
-template <typename T> struct is_filter<With<T>> : std::true_type {};
-template <typename T> struct is_filter<Without<T>> : std::true_type {};
-template <typename T> struct is_filter<Added<T>> : std::true_type {};
-template <typename T> struct is_filter<Changed<T>> : std::true_type {};
-template <typename F1, typename F2>
-struct is_filter<Or<F1, F2>> : std::true_type {};
-template <typename... Fs> struct is_filter<Filters<Fs...>> : std::true_type {};
-
-namespace detail {
-
-template <typename F, typename FiltersT> struct MergeFilters;
-
-template <typename F, typename... Fs> struct MergeFilters<F, Filters<Fs...>> {
-  using type = Filters<F, Fs...>;
-};
-
-template <typename... Fs1, typename... Fs2>
-struct MergeFilters<Filters<Fs1...>, Filters<Fs2...>> {
-  using type = Filters<Fs1..., Fs2...>;
-};
-
-template <typename... Qs> struct SplitTrailingFilters;
-
-template <> struct SplitTrailingFilters<> {
-  using Items = std::tuple<>;
-  using Filters = Filters<>;
-};
-
-template <typename T, typename... Rest>
-struct SplitTrailingFilters<T, Rest...> {
-  using Tail = SplitTrailingFilters<Rest...>;
-  static constexpr bool tail_has_items =
-      !std::is_same_v<typename Tail::Items, std::tuple<>>;
-  static constexpr bool is_filter_v = is_filter<T>::value;
-
-  static_assert(!(tail_has_items && is_filter_v),
-                "Query filters must be trailing parameters");
-
-  using Items =
-      std::conditional_t<is_filter_v && !tail_has_items, typename Tail::Items,
-                         decltype(std::tuple_cat(
-                             std::declval<std::tuple<T>>(),
-                             std::declval<typename Tail::Items>()))>;
-
-  using Filters =
-      std::conditional_t<is_filter_v && !tail_has_items,
-                         typename MergeFilters<T, typename Tail::Filters>::type,
-                         typename Tail::Filters>;
-};
-
-} // namespace detail
-
 template <typename... Qs> class Query {
   using Decomposed = detail::SplitTrailingFilters<Qs...>;
   using ItemTuple = typename Decomposed::Items;
-  using FilterT = typename Decomposed::Filters;
+  using FilterT = typename Decomposed::FilterList;
 
-  const World *world_;
+  World *world_;
 
 public:
-  explicit Query(const World &world) : world_(&world) {}
+  explicit Query(World &world) : world_(&world) {}
 
   template <typename Func> void each(Func &&func) const {
     for_each_impl(std::forward<Func>(func), ItemTuple{});

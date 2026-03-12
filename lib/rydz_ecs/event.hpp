@@ -112,7 +112,7 @@ template <typename E> struct SystemParamTraits<EventWriter<E>> {
   }
 
   static bool available(const World &world) {
-    return world.contains_resource<Events<E>>();
+    return world.has_resource<Events<E>>();
   }
 
   static void access(SystemAccess &acc) { acc.add_resource_write<Events<E>>(); }
@@ -129,7 +129,7 @@ template <typename E> struct SystemParamTraits<EventReader<E>> {
   }
 
   static bool available(const World &world) {
-    return world.contains_resource<Events<E>>();
+    return world.has_resource<Events<E>>();
   }
 
   static void access(SystemAccess &acc) { acc.add_resource_read<Events<E>>(); }

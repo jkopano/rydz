@@ -23,7 +23,7 @@ inline void compute_visibility(World &world) {
   if (!vis_storage)
     return;
 
-  auto entities = vis_storage->entity_indices();
+  auto entities = vis_storage->entities();
   for (auto e : entities) {
     auto *v = vis_storage->get(e);
     if (v)
@@ -33,7 +33,7 @@ inline void compute_visibility(World &world) {
   std::unordered_map<Entity, Entity> parents;
   auto *parent_storage = world.get_storage<Parent>();
   if (parent_storage) {
-    auto p_entities = parent_storage->entity_indices();
+    auto p_entities = parent_storage->entities();
     for (auto e : p_entities) {
       auto *p = parent_storage->get(e);
       if (p)

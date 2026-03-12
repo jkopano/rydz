@@ -8,6 +8,7 @@
 #include "rydz_ecs/world.hpp"
 
 #include "rydz_ecs/bundle.hpp"
+#include "rydz_ecs/filter.hpp"
 #include "rydz_ecs/query.hpp"
 #include "rydz_ecs/system.hpp"
 

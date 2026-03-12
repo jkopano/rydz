@@ -15,7 +15,7 @@ public:
   virtual ~IStorage() = default;
   virtual void remove(Entity entity) = 0;
   virtual bool has(Entity entity) const = 0;
-  virtual std::vector<Entity> entity_indices() const = 0;
+  virtual std::vector<Entity> entities() const = 0;
   virtual size_t size() const = 0;
   virtual bool empty() const = 0;
   virtual std::optional<ComponentTicks> get_ticks(Entity entity) const = 0;
@@ -98,7 +98,7 @@ public:
     return idx < data_.size() && data_[idx].has_value();
   }
 
-  std::vector<Entity> entity_indices() const override {
+  std::vector<Entity> entities() const override {
     std::vector<Entity> result;
     for (uint32_t i = 0; i < data_.size(); ++i) {
       if (data_[i].has_value()) {
@@ -181,7 +181,7 @@ public:
   void remove(Entity entity) override { data_.erase(entity); }
   bool has(Entity entity) const override { return data_.count(entity) > 0; }
 
-  std::vector<Entity> entity_indices() const override {
+  std::vector<Entity> entities() const override {
     std::vector<Entity> result;
     result.reserve(data_.size());
     for (auto &[e, _] : data_)

@@ -40,7 +40,7 @@ public:
     return &impl->data;
   }
 
-  template <typename T> bool contains() const {
+  template <typename T> bool has() const {
     return data_.count(std::type_index(typeid(T))) > 0;
   }
 

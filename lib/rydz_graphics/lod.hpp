@@ -208,7 +208,7 @@ inline void auto_generate_lods_system(World &world) {
   // Cache: model handle id → already-computed MeshLodGroup
   absl::flat_hash_map<uint64_t, MeshLodGroup> lod_cache;
 
-  for (auto e : mesh_storage->entity_indices()) {
+  for (auto e : mesh_storage->entities()) {
     if (lod_storage && lod_storage->get(e))
       continue;
 

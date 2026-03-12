@@ -1,17 +1,29 @@
 #pragma once
 
+#include <cstdint>
 #include <ranges>
+#include <string>
 #include <type_traits>
+#include <typeinfo>
 
-using namespace std;
+namespace ecs {
 
 template <typename From, typename To>
 using copy_const_t =
     std::conditional_t<std::is_const_v<std::remove_reference_t<From>>, const To,
                        To>;
 
-namespace ecs {
-namespace views = ranges::views;
+template <typename Fn> std::string system_name_of(Fn &&fn) {
+  using D = std::decay_t<Fn>;
+  if constexpr (std::is_pointer_v<D> &&
+                std::is_function_v<std::remove_pointer_t<D>>) {
+    return std::to_string(reinterpret_cast<uintptr_t>(fn));
+  } else {
+    return typeid(D).name();
+  }
+}
 
-inline constexpr auto range = ranges::views::iota;
+namespace views = std::ranges::views;
+
+inline constexpr auto range = std::ranges::views::iota;
 } // namespace ecs

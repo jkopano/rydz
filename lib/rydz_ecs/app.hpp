@@ -2,11 +2,11 @@
 #include "command.hpp"
 #include "event.hpp"
 #include "plugin.hpp"
+#include "rl.hpp"
 #include "schedule.hpp"
 #include "state.hpp"
 #include "time.hpp"
 #include "world.hpp"
-#include "rl.hpp"
 #include <string>
 
 namespace ecs {
@@ -178,7 +178,7 @@ inline auto window_plugin(WindowConfig config = {}) {
 }
 
 inline void time_plugin(App &app) {
-  if (!app.world().contains_resource<Time>()) {
+  if (!app.world().has_resource<Time>()) {
     app.insert_resource(Time{});
   }
 }

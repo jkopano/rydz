@@ -175,9 +175,9 @@ TEST(ComponentTest, Query2) {
 TEST(ComponentTest, ResourceContains) {
   World world;
 
-  EXPECT_FALSE(world.contains_resource<TestResource>());
+  EXPECT_FALSE(world.has_resource<TestResource>());
   world.insert_resource(TestResource{42});
-  EXPECT_TRUE(world.contains_resource<TestResource>());
+  EXPECT_TRUE(world.has_resource<TestResource>());
   world.remove_resource<TestResource>();
-  EXPECT_FALSE(world.contains_resource<TestResource>());
+  EXPECT_FALSE(world.has_resource<TestResource>());
 }

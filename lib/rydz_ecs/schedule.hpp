@@ -9,8 +9,6 @@
 #include <taskflow/taskflow.hpp>
 #include <vector>
 
-using namespace std;
-
 namespace ecs {
 
 enum class ScheduleLabel {
