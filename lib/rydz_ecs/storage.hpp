@@ -20,7 +20,6 @@ public:
   virtual size_t size() const = 0;
   virtual bool empty() const = 0;
   virtual std::optional<ComponentTicks> get_ticks(Entity entity) const = 0;
-  virtual std::vector<Entity> entities() const = 0; // Legacy API
 };
 
 template <typename T> class SparseSetStorage : public IStorage {
@@ -31,14 +30,14 @@ template <typename T> class SparseSetStorage : public IStorage {
 
   std::vector<uint32_t> sparse_;
   std::vector<Entry> dense_;
-  static constexpr uint32_t null_idx = std::numeric_limits<uint32_t>::max();
 
 public:
   void insert(Entity entity, T component, Tick current_tick) {
     uint32_t idx = entity.index();
-    if (idx >= sparse_.size()) sparse_.resize(idx + 1, null_idx);
+    if (idx >= sparse_.size())
+      sparse_.resize(idx + 1, UINT32_MAX);
 
-    if (sparse_[idx] != null_idx) {
+    if (sparse_[idx] != UINT32_MAX) {
       auto &entry = dense_[sparse_[idx]];
       entry.data.component = std::move(component);
       entry.data.ticks.changed = current_tick;
@@ -46,15 +45,13 @@ public:
     }
 
     sparse_[idx] = static_cast<uint32_t>(dense_.size());
-    dense_.push_back({
-        {std::move(component), {current_tick, current_tick}},
-        entity
-    });
+    dense_.push_back(
+        {{std::move(component), {current_tick, current_tick}}, entity});
   }
 
   T *get(Entity entity) {
     uint32_t idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != null_idx) {
+    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX) {
       return &dense_[sparse_[idx]].data.component;
     }
     return nullptr;
@@ -62,7 +59,7 @@ public:
 
   const T *get(Entity entity) const {
     uint32_t idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != null_idx) {
+    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX) {
       return &dense_[sparse_[idx]].data.component;
     }
     return nullptr;
@@ -70,7 +67,7 @@ public:
 
   ComponentData<T> *get_data(Entity entity) {
     uint32_t idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != null_idx) {
+    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX) {
       return &dense_[sparse_[idx]].data;
     }
     return nullptr;
@@ -78,7 +75,7 @@ public:
 
   const ComponentData<T> *get_data(Entity entity) const {
     uint32_t idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != null_idx) {
+    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX) {
       return &dense_[sparse_[idx]].data;
     }
     return nullptr;
@@ -86,7 +83,8 @@ public:
 
   void remove(Entity entity) override {
     uint32_t idx = entity.index();
-    if (idx >= sparse_.size() || sparse_[idx] == null_idx) return;
+    if (idx >= sparse_.size() || sparse_[idx] == UINT32_MAX)
+      return;
 
     uint32_t dense_idx = sparse_[idx];
     if (dense_idx != dense_.size() - 1) {
@@ -95,19 +93,12 @@ public:
     }
 
     dense_.pop_back();
-    sparse_[idx] = null_idx;
+    sparse_[idx] = UINT32_MAX;
   }
 
   bool has(Entity entity) const override {
     uint32_t idx = entity.index();
-    return idx < sparse_.size() && sparse_[idx] != null_idx;
-  }
-
-  std::vector<Entity> entities() const override {
-    std::vector<Entity> result;
-    result.reserve(dense_.size());
-    for (const auto &entry : dense_) result.push_back(entry.entity);
-    return result;
+    return idx < sparse_.size() && sparse_[idx] != UINT32_MAX;
   }
 
   size_t size() const override { return dense_.size(); }
@@ -120,7 +111,8 @@ public:
 
   void mark_changed(Entity entity, Tick tick) {
     auto *d = get_data(entity);
-    if (d) d->ticks.changed = tick;
+    if (d)
+      d->ticks.changed = tick;
   }
 
   template <typename F> void for_each(F &&func) const {
@@ -144,7 +136,8 @@ template <typename T> class HashMapStorage : public IStorage {
 public:
   void insert(Entity entity, T component, Tick current_tick) {
     ComponentTicks ticks{current_tick, current_tick};
-    data_.insert_or_assign(entity, ComponentData<T>{std::move(component), ticks});
+    data_.insert_or_assign(entity,
+                           ComponentData<T>{std::move(component), ticks});
   }
 
   T *get(Entity entity) {
@@ -169,20 +162,15 @@ public:
 
   void remove(Entity entity) override { data_.erase(entity); }
   bool has(Entity entity) const override { return data_.count(entity) > 0; }
-  
-  std::vector<Entity> entities() const override {
-    std::vector<Entity> result;
-    result.reserve(data_.size());
-    for (auto &[e, _] : data_) result.push_back(e);
-    return result;
-  }
 
   template <typename F> void for_each(F &&func) const {
-    for (auto &[e, cd] : data_) func(e, cd.component);
+    for (auto &[e, cd] : data_)
+      func(e, cd.component);
   }
 
   template <typename F> void for_each_mut(F &&func) {
-    for (auto &[e, cd] : data_) func(e, cd.component);
+    for (auto &[e, cd] : data_)
+      func(e, cd.component);
   }
 
   size_t size() const override { return data_.size(); }
@@ -195,7 +183,8 @@ public:
 
   void mark_changed(Entity entity, Tick tick) {
     auto *d = get_data(entity);
-    if (d) d->ticks.changed = tick;
+    if (d)
+      d->ticks.changed = tick;
   }
 };
 

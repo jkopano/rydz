@@ -26,13 +26,11 @@ inline Children children_of(const World &world, Entity parent) {
   if (!storage)
     return result;
 
-  auto indices = storage->entities();
-  for (auto entity : indices) {
-    auto *p = storage->get(entity);
-    if (p && p->entity == parent) {
+  storage->for_each([&](Entity entity, const Parent &p) {
+    if (p.entity == parent) {
       result.entities.push_back(entity);
     }
-  }
+  });
   return result;
 }
 

@@ -74,8 +74,8 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
     if (ctrl->pitch < -89.0f)
       ctrl->pitch = -89.0f;
 
-    t->rotation =
-        rl::QuaternionFromEuler(ctrl->pitch * DEG2RAD, ctrl->yaw * DEG2RAD, 0.0f);
+    t->rotation = rl::QuaternionFromEuler(ctrl->pitch * DEG2RAD,
+                                          ctrl->yaw * DEG2RAD, 0.0f);
   }
 }
 
@@ -111,7 +111,8 @@ struct HouseHandles {
   bool loaded = false;
 };
 
-inline void spawn_houses_on_input(Cmd cmd, ResMut<Assets<rl::Model>> model_assets,
+inline void spawn_houses_on_input(Cmd cmd,
+                                  ResMut<Assets<rl::Model>> model_assets,
                                   ResMut<HouseHandles> handles, NonSendMarker) {
   if (!rl::IsKeyPressed(KEY_H))
     return;

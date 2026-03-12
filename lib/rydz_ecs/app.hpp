@@ -5,7 +5,7 @@
 #include "rl.hpp"
 #include "schedule.hpp"
 #include "state.hpp"
-#include "time.hpp"
+#include "core/time.hpp"
 #include "world.hpp"
 #include <string>
 

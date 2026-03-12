@@ -10,9 +10,9 @@
 #include "rl.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
-#include "rydz_ecs/transform.hpp"
-#include "rydz_ecs/types.hpp"
-#include "rydz_ecs/visibility.hpp"
+#include "rydz_graphics/transform.hpp"
+#include "rydz_graphics/visibility.hpp"
+#include "types.hpp"
 #include "skybox.hpp"
 #include <absl/container/flat_hash_map.h>
 #include <array>
@@ -33,19 +33,17 @@ inline void apply_materials_system(World &world) {
   if (!mesh_storage || !mat_storage || !model_assets)
     return;
 
-  auto entities = mat_storage->entities();
-  for (auto e : entities) {
+  mat_storage->for_each([&](Entity e, const Material3d &mat_comp) {
     auto *mesh_comp = mesh_storage->get(e);
-    auto *mat_comp = mat_storage->get(e);
-    if (!mesh_comp || !mat_comp)
-      continue;
+    if (!mesh_comp)
+      return;
 
     rl::Model *model = model_assets->get(mesh_comp->model);
     if (!model)
-      continue;
+      return;
 
-    mat_comp->material.apply(*model, tex_assets);
-  }
+    mat_comp.material.apply(*model, tex_assets);
+  });
 }
 
 inline void build_render_batches_system(
@@ -399,13 +397,12 @@ inline void auto_insert_global_transform(World &world) {
   if (!transform_storage)
     return;
 
-  auto entities = transform_storage->entities();
-  for (auto e : entities) {
+  transform_storage->for_each([&](Entity e, const Transform3D &) {
     if (!global_storage || !global_storage->get(e)) {
       world.insert_component(e, GlobalTransform{});
       global_storage = world.get_storage<GlobalTransform>();
     }
-  }
+  });
 }
 
 inline void auto_insert_visibility(World &world) {
@@ -414,13 +411,12 @@ inline void auto_insert_visibility(World &world) {
   if (!mesh_storage)
     return;
 
-  auto entities = mesh_storage->entities();
-  for (auto e : entities) {
+  mesh_storage->for_each([&](Entity e, const Mesh3d &) {
     if (!vis_storage || !vis_storage->get(e)) {
       world.insert_component(e, Visibility::Visible);
       vis_storage = world.get_storage<Visibility>();
     }
-  }
+  });
 }
 
 inline void auto_insert_material(World &world) {
@@ -429,14 +425,13 @@ inline void auto_insert_material(World &world) {
   if (!mesh_storage)
     return;
 
-  auto entities = mesh_storage->entities();
-  for (auto e : entities) {
+  mesh_storage->for_each([&](Entity e, const Mesh3d &) {
     if (!mat_storage || !mat_storage->get(e)) {
       world.insert_component(e,
                              Material3d{StandardMaterial::from_color(WHITE)});
       mat_storage = world.get_storage<Material3d>();
     }
-  }
+  });
 }
 
 inline void auto_insert_render_config(World &world) {
@@ -445,13 +440,12 @@ inline void auto_insert_render_config(World &world) {
   if (!mesh_storage)
     return;
 
-  auto entities = mesh_storage->entities();
-  for (auto e : entities) {
+  mesh_storage->for_each([&](Entity e, const Mesh3d &) {
     if (!rc_storage || !rc_storage->get(e)) {
       world.insert_component(e, RenderConfig{});
       rc_storage = world.get_storage<RenderConfig>();
     }
-  }
+  });
 }
 
 inline void render_plugin(App &app) {

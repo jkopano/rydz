@@ -2,8 +2,8 @@
 #include "camera3d.hpp"
 #include "mesh3d.hpp"
 #include "rydz_ecs/asset.hpp"
-#include "rydz_ecs/transform.hpp"
-#include "rydz_ecs/visibility.hpp"
+#include "rydz_graphics/transform.hpp"
+#include "rydz_graphics/visibility.hpp"
 #include "rl.hpp"
 #include <array>
 #include <bvh/v2/bbox.h>
@@ -137,17 +137,13 @@ inline void compute_mesh_bounds_system(World &world) {
   if (!mesh_storage || !model_assets)
     return;
 
-  for (auto e : mesh_storage->entities()) {
+  mesh_storage->for_each([&](Entity e, const Mesh3d &mesh3d) {
     if (bounds_storage && bounds_storage->get(e))
-      continue;
+      return;
 
-    auto *mesh3d = mesh_storage->get(e);
-    if (!mesh3d)
-      continue;
-
-    rl::Model *model = model_assets->get(mesh3d->model);
+    rl::Model *model = model_assets->get(mesh3d.model);
     if (!model || model->meshCount <= 0 || !model->meshes)
-      continue;
+      return;
 
     auto combined = BBox3::make_empty();
     for (int i = 0; i < model->meshCount; ++i) {
@@ -156,7 +152,7 @@ inline void compute_mesh_bounds_system(World &world) {
 
     world.insert_component(e, MeshBounds{combined});
     bounds_storage = world.get_storage<MeshBounds>();
-  }
+  });
 }
 
 inline void frustum_cull_system(World &world) {
@@ -168,12 +164,15 @@ inline void frustum_cull_system(World &world) {
 
   const Camera3DComponent *cam_comp = nullptr;
   const Transform3D *cam_tx = nullptr;
-  for (auto e : active_storage->entities()) {
+  bool found_cam = false;
+  active_storage->for_each([&](Entity e, const ActiveCamera &) {
+    if (found_cam)
+      return;
     cam_comp = cam_storage->get(e);
     cam_tx = cam_tx_storage->get(e);
     if (cam_comp && cam_tx)
-      break;
-  }
+      found_cam = true;
+  });
   if (!cam_comp || !cam_tx)
     return;
 
@@ -195,7 +194,10 @@ inline void frustum_cull_system(World &world) {
   if (!bounds_storage || !gt_storage)
     return;
 
-  auto entities = bounds_storage->entities();
+  std::vector<Entity> entities;
+  bounds_storage->for_each([&](Entity e, const MeshBounds &) {
+    entities.push_back(e);
+  });
   if (entities.empty())
     return;
 

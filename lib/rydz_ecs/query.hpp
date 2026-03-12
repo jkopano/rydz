@@ -8,6 +8,7 @@
 #include "world.hpp"
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 namespace ecs {
 
@@ -216,69 +217,27 @@ private:
         [&](const auto &...f) { return (f.matches(entity) && ...); }, fetchers);
   }
 
-  template <typename... Items> struct QueryRange {
-    using FetcherTuple =
-        std::tuple<typename WorldQueryTraits<Items>::Fetcher...>;
-    using ValueTuple = std::tuple<typename WorldQueryTraits<Items>::Item...>;
+  template <typename... Items> auto make_iter(std::tuple<Items...>) const {
+    auto fetchers = std::make_tuple(make_fetcher<Items>()...);
+    uint32_t count =
+        static_cast<uint32_t>(compute_min_cap<Items...>(fetchers));
 
-    struct Sentinel {};
-
-    struct Iterator {
-      const FetcherTuple *fetchers;
-      const World *world;
-      uint32_t index;
-      uint32_t max_index;
-
-      Iterator &operator++() {
-        ++index;
-        advance();
-        return *this;
-      }
-
-      ValueTuple operator*() const {
-        Entity entity = Entity::from_raw(index, 0);
-        return std::apply(
-            [&](const auto &...f) -> ValueTuple {
-              return {f.fetch(entity)...};
-            },
-            *fetchers);
-      }
-
-      bool operator!=(Sentinel) const { return index < max_index; }
-
-      void advance() {
-        while (index < max_index) {
-          Entity entity = Entity::from_raw(index, 0);
-          bool all_match = std::apply(
-              [&](const auto &...f) { return (f.matches(entity) && ...); },
-              *fetchers);
-          if (all_match && QueryFilterTraits<FilterT>::matches(*world, entity))
-            break;
-          ++index;
-        }
-      }
+    auto matches = [fetchers, world = world_](uint32_t index) {
+      Entity entity = Entity::from_raw(index, 0);
+      if (!matches_all<Items...>(fetchers, entity))
+        return false;
+      return QueryFilterTraits<FilterT>::matches(*world, entity);
     };
 
-    FetcherTuple fetchers;
-    const World *world;
-    uint32_t count;
+    auto fetch = [fetchers](uint32_t index) {
+      Entity entity = Entity::from_raw(index, 0);
+      return std::apply(
+          [&](const auto &...f) { return std::tuple{f.fetch(entity)...}; },
+          fetchers);
+    };
 
-    Iterator begin() const {
-      Iterator it{&fetchers, world, 0, count};
-      it.advance();
-      return it;
-    }
-
-    Sentinel end() const { return {}; }
-  };
-
-  template <typename... Items> auto make_iter(std::tuple<Items...>) const {
-    QueryRange<Items...> result;
-    result.fetchers = std::make_tuple(make_fetcher<Items>()...);
-    result.world = world_;
-    result.count =
-        static_cast<uint32_t>(compute_min_cap<Items...>(result.fetchers));
-    return result;
+    return views::iota(uint32_t{0}, count) | views::filter(matches) |
+           views::transform(fetch);
   }
 
   template <typename Func, typename... Items>

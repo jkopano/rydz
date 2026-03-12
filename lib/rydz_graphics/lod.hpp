@@ -1,9 +1,9 @@
 #pragma once
-#include "rydz_ecs/asset.hpp"
 #include "camera3d.hpp"
 #include "mesh3d.hpp"
-#include "rydz_ecs/transform.hpp"
 #include "rl.hpp"
+#include "rydz_ecs/asset.hpp"
+#include "rydz_graphics/transform.hpp"
 #include <absl/container/flat_hash_map.h>
 #include <algorithm>
 #include <array>
@@ -208,25 +208,21 @@ inline void auto_generate_lods_system(World &world) {
   // Cache: model handle id → already-computed MeshLodGroup
   absl::flat_hash_map<uint64_t, MeshLodGroup> lod_cache;
 
-  for (auto e : mesh_storage->entities()) {
+  mesh_storage->for_each([&](Entity e, const Mesh3d &mesh3d) {
     if (lod_storage && lod_storage->get(e))
-      continue;
-
-    auto *mesh3d = mesh_storage->get(e);
-    if (!mesh3d)
-      continue;
+      return;
 
     // Check cache first
-    auto cache_it = lod_cache.find(mesh3d->model.id);
+    auto cache_it = lod_cache.find(mesh3d.model.id);
     if (cache_it != lod_cache.end()) {
       world.insert_component(e, cache_it->second);
       lod_storage = world.get_storage<MeshLodGroup>();
-      continue;
+      return;
     }
 
-    rl::Model *model = model_assets->get(mesh3d->model);
+    rl::Model *model = model_assets->get(mesh3d.model);
     if (!model || model->meshCount <= 0 || !model->meshes)
-      continue;
+      return;
 
     // Count total vertices
     int total_verts = 0;
@@ -234,17 +230,17 @@ inline void auto_generate_lods_system(World &world) {
       total_verts += model->meshes[i].vertexCount;
 
     if (total_verts < config->vertex_threshold)
-      continue;
+      return;
 
     MeshLodGroup group{};
-    group.levels[0] = mesh3d->model; // LOD 0 = original
+    group.levels[0] = mesh3d.model; // LOD 0 = original
     group.level_count = 1;
 
     for (int lod = 1; lod < LOD_LEVELS; ++lod) {
       rl::Model lod_model = {};
       lod_model.meshCount = model->meshCount;
-      lod_model.meshes =
-          static_cast<rl::Mesh *>(RL_CALLOC(model->meshCount, sizeof(rl::Mesh)));
+      lod_model.meshes = static_cast<rl::Mesh *>(
+          RL_CALLOC(model->meshCount, sizeof(rl::Mesh)));
 
       bool any_valid = false;
       for (int mi = 0; mi < model->meshCount; ++mi) {
@@ -265,15 +261,16 @@ inline void auto_generate_lods_system(World &world) {
       }
     }
 
-    lod_cache[mesh3d->model.id] = group;
+    lod_cache[mesh3d.model.id] = group;
     world.insert_component(e, group);
     lod_storage = world.get_storage<MeshLodGroup>();
-  }
+  });
 }
 
 /// Compute the screen-space pixel radius for a bounding sphere.
 inline float compute_screen_radius(rl::Vector3 center, float radius,
-                                   const rl::Matrix &view, const rl::Matrix &proj,
+                                   const rl::Matrix &view,
+                                   const rl::Matrix &proj,
                                    float half_screen_height) {
   rl::Vector3 view_pos = rl::Vector3Transform(center, view);
   float depth = -view_pos.z;

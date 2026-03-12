@@ -23,9 +23,7 @@
 #include "rydz_ecs/state.hpp"
 
 #include "rydz_ecs/app.hpp"
-#include "rydz_ecs/time.hpp"
+#include "rydz_ecs/core/time.hpp"
 
 #include "rydz_ecs/asset.hpp"
-#include "rydz_ecs/name.hpp"
-#include "rydz_ecs/transform.hpp"
-#include "rydz_ecs/visibility.hpp"
+#include "rydz_ecs/core/name.hpp"
