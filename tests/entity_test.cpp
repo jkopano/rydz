@@ -14,8 +14,8 @@ TEST(EntityTest, EntityCreation) {
   auto e1 = manager.create();
   auto e2 = manager.create();
 
-  EXPECT_EQ(e1.index, 0u);
-  EXPECT_EQ(e2.index, 1u);
+  EXPECT_EQ(e1.index(), 0u);
+  EXPECT_EQ(e2.index(), 1u);
   EXPECT_NE(e1, e2);
 }
 
@@ -37,22 +37,22 @@ TEST(EntityTest, EntityRecycling) {
 
   auto e1 = manager.create();
   auto e2 = manager.create();
-  EXPECT_EQ(e1.index, 0u);
-  EXPECT_EQ(e1.generation, 0u);
-  EXPECT_EQ(e2.index, 1u);
+  EXPECT_EQ(e1.index(), 0u);
+  EXPECT_EQ(e1.generation(), 0u);
+  EXPECT_EQ(e2.index(), 1u);
 
   manager.destroy(e1);
   manager.destroy(e2);
 
   // LIFO: e2 (id 1) was freed last, so it comes out first
   auto e3 = manager.create();
-  EXPECT_EQ(e3.index, 1u);
-  EXPECT_EQ(e3.generation, 1u);
+  EXPECT_EQ(e3.index(), 1u);
+  EXPECT_EQ(e3.generation(), 1u);
   EXPECT_NE(e1, e3);
 
   auto e4 = manager.create();
-  EXPECT_EQ(e4.index, 0u);
-  EXPECT_EQ(e4.generation, 1u);
+  EXPECT_EQ(e4.index(), 0u);
+  EXPECT_EQ(e4.generation(), 1u);
 }
 
 // ============================================================
@@ -77,8 +77,8 @@ TEST(EntityTest, GenerationPreventsStaleAccess) {
   EXPECT_EQ(world.get_component<TestComponent>(e1), nullptr);
 
   auto e2 = world.spawn();
-  EXPECT_EQ(e2.index, e1.index);
-  EXPECT_NE(e2.generation, e1.generation);
+  EXPECT_EQ(e2.index(), e1.index());
+  EXPECT_NE(e2.generation(), e1.generation());
 
   // New entity should not have the component
   EXPECT_EQ(world.get_component<TestComponent>(e2), nullptr);
@@ -86,10 +86,4 @@ TEST(EntityTest, GenerationPreventsStaleAccess) {
   world.insert_component(e2, TestComponent{99});
   EXPECT_NE(world.get_component<TestComponent>(e2), nullptr);
   EXPECT_EQ(world.get_component<TestComponent>(e2)->value, 99u);
-
-  // Stale entity should still not access
-  // Note: in the C++ impl, VecStorage is index-based (ignores generation),
-  // so get_component on stale entity with same index MAY return a value.
-  // This is a known difference vs Rust — the C++ storage doesn't check
-  // generations.
 }

@@ -11,7 +11,7 @@ struct CarTag {};
 struct RotateMarker {};
 
 struct CameraController {
-  using Storage = VecStorage<CameraController>;
+  using Storage = SparseSetStorage<CameraController>;
   float move_speed = 20.0f;
   float mouse_sensitivity = 0.003f;
   float yaw = -90.0f;

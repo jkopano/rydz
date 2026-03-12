@@ -113,7 +113,7 @@ public:
   }
 
   template <typename T, typename Self> auto *get_storage(this Self &&self) {
-    using ReturnType = copy_const_t<Self, VecStorage<T>>;
+    using ReturnType = copy_const_t<Self, SparseSetStorage<T>>;
 
     auto it = self.storages_.find(std::type_index(typeid(T)));
     return (it == self.storages_.end())

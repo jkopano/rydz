@@ -16,7 +16,7 @@ template <typename T> struct ComponentData;
 struct SystemAccess;
 
 class IStorage;
-template <typename T> class VecStorage;
+template <typename T> class SparseSetStorage;
 template <typename T> class HashMapStorage;
 
 class Resources;

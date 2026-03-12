@@ -13,13 +13,13 @@ namespace ecs {
 
 template <typename T> struct Mut {
   T *ptr = nullptr;
-  VecStorage<T> *storage = nullptr;
+  SparseSetStorage<T> *storage = nullptr;
   Entity entity{};
   Tick tick{};
   bool marked = false;
 
   Mut() = default;
-  Mut(T *p, VecStorage<T> *s, Entity e, Tick t)
+  Mut(T *p, SparseSetStorage<T> *s, Entity e, Tick t)
       : ptr(p), storage(s), entity(e), tick(t) {}
 
   T &get() {
@@ -66,7 +66,7 @@ template <typename T> struct WorldQueryTraits {
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
 
   struct Fetcher {
-    const VecStorage<T> *storage = nullptr;
+    const SparseSetStorage<T> *storage = nullptr;
 
     void init(World &world) { storage = world.get_storage<T>(); }
 
@@ -89,7 +89,7 @@ template <typename T> struct WorldQueryTraits<Mut<T>> {
   static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
 
   struct Fetcher {
-    VecStorage<T> *storage = nullptr;
+    SparseSetStorage<T> *storage = nullptr;
     Tick tick{};
 
     void init(World &world) {
@@ -114,7 +114,7 @@ template <typename T> struct WorldQueryTraits<Opt<T>> {
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
 
   struct Fetcher {
-    const VecStorage<T> *storage = nullptr;
+    const SparseSetStorage<T> *storage = nullptr;
 
     void init(World &world) { storage = world.get_storage<T>(); }
     Item fetch(Entity entity) const {
@@ -132,7 +132,7 @@ template <typename T> struct WorldQueryTraits<Opt<Mut<T>>> {
   static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
 
   struct Fetcher {
-    VecStorage<T> *storage = nullptr;
+    SparseSetStorage<T> *storage = nullptr;
     Tick tick{};
 
     void init(World &world) {
