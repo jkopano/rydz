@@ -16,6 +16,9 @@ public:
 };
 
 class CommandQueue {
+public:
+  using Type = ResourceType;
+private:
   std::vector<std::shared_ptr<ICommand>> queue_;
 
 public:
@@ -37,22 +40,13 @@ public:
 
 namespace detail {
 
-template <typename T> struct SpawnComponentCommand : ICommand {
+// Unified insert command — works for plain components, bundles, and tuples
+template <typename T> struct InsertCommand : ICommand {
   Entity entity;
-  T component;
-  SpawnComponentCommand(Entity e, T c) : entity(e), component(std::move(c)) {}
+  T item;
+  InsertCommand(Entity e, T i) : entity(e), item(std::move(i)) {}
   void apply(World &world) override {
-    world.insert_component(entity, std::move(component));
-  }
-};
-
-template <typename... Ts> struct SpawnBundleCommand : ICommand {
-  Entity entity;
-  std::tuple<Ts...> bundle;
-  SpawnBundleCommand(Entity e, std::tuple<Ts...> b)
-      : entity(e), bundle(std::move(b)) {}
-  void apply(World &world) override {
-    insert_bundle(world, entity, std::move(bundle));
+    insert_bundle(world, entity, std::move(item));
   }
 };
 
@@ -87,15 +81,8 @@ public:
   EntityCommands(Entity entity, CommandQueue *queue, EntityManager *entities)
       : entity_(entity), queue_(queue), entities_(entities) {}
 
-  template <typename T> EntityCommands &insert(T component) {
-    queue_->push(
-        detail::SpawnComponentCommand<T>(entity_, std::move(component)));
-    return *this;
-  }
-
-  template <typename... Ts>
-  EntityCommands &insert_bundle(std::tuple<Ts...> bundle) {
-    queue_->push(detail::SpawnBundleCommand<Ts...>(entity_, std::move(bundle)));
+  template <Spawnable T> EntityCommands &insert(T item) {
+    queue_->push(detail::InsertCommand<T>(entity_, std::move(item)));
     return *this;
   }
 
@@ -117,19 +104,9 @@ public:
   Cmd(CommandQueue *queue, EntityManager *entities)
       : queue_(queue), entities_(entities) {}
 
-  template <typename T> EntityCommands spawn(T component) {
+  template <Spawnable... Ts> EntityCommands spawn(Ts... items) {
     Entity entity = entities_->create();
-    queue_->push(
-        detail::SpawnComponentCommand<T>(entity, std::move(component)));
-    return EntityCommands(entity, queue_, entities_);
-  }
-
-  template <typename... Ts> EntityCommands spawn(Ts... components) {
-    Entity entity = entities_->create();
-
-    (queue_->push(
-         detail::SpawnComponentCommand<Ts>(entity, std::move(components))),
-     ...);
+    (queue_->push(detail::InsertCommand<Ts>(entity, std::move(items))), ...);
     return EntityCommands(entity, queue_, entities_);
   }
 
@@ -141,6 +118,13 @@ public:
   void despawn(Entity entity) { queue_->push(detail::DespawnCommand(entity)); }
 
   template <typename T> void insert_resource(T resource) {
+    static_assert(
+        !Bundle<T>,
+        "Bundles cannot be inserted as resources.");
+    static_assert(
+        Resource<T>,
+        "Only Resources can be inserted via insert_resource(). "
+        "Add 'using Type = ResourceType;' to your struct.");
     queue_->push(detail::InsertResourceCommand<T>(std::move(resource)));
   }
 

@@ -16,6 +16,7 @@ namespace ecs {
 constexpr int LOD_LEVELS = 4;
 
 struct LodConfig {
+  using Type = ResourceType;
   /// Minimum vertex count before LOD levels are generated.
   int vertex_threshold = 500;
   /// Simplification ratios per level (fraction of original).
@@ -39,6 +40,7 @@ struct MeshLodGroup {
 
 /// Resource: per-entity LOD history for hysteresis.
 struct LodHistory {
+  using Type = ResourceType;
   absl::flat_hash_map<Entity, int, std::hash<Entity>> map;
 };
 
@@ -77,7 +79,6 @@ inline rl::Mesh simplify_mesh(const rl::Mesh &src, float target_ratio) {
   if (new_count == 0)
     return src;
 
-  // Remap vertices to compact buffer
   std::vector<unsigned int> remap(src.vertexCount, UINT32_MAX);
   unsigned int new_vertex_count = 0;
   for (auto idx : simplified) {
@@ -86,7 +87,6 @@ inline rl::Mesh simplify_mesh(const rl::Mesh &src, float target_ratio) {
     }
   }
 
-  // Build new mesh
   rl::Mesh out = {};
   out.vertexCount = static_cast<int>(new_vertex_count);
   out.triangleCount = static_cast<int>(simplified.size() / 3);
@@ -102,7 +102,6 @@ inline rl::Mesh simplify_mesh(const rl::Mesh &src, float target_ratio) {
     out.texcoords =
         static_cast<float *>(RL_CALLOC(new_vertex_count * 2, sizeof(float)));
 
-  // Copy remapped vertex data
   for (int i = 0; i < src.vertexCount; ++i) {
     if (remap[i] == UINT32_MAX)
       continue;
@@ -123,19 +122,15 @@ inline rl::Mesh simplify_mesh(const rl::Mesh &src, float target_ratio) {
     }
   }
 
-  // Write remapped indices
   out.indices = static_cast<unsigned short *>(
       RL_CALLOC(simplified.size(), sizeof(unsigned short)));
   for (size_t i = 0; i < simplified.size(); ++i) {
     out.indices[i] = static_cast<unsigned short>(remap[simplified[i]]);
   }
 
-  // Upload to GPU
   rl::UploadMesh(&out, false);
   return out;
 }
-
-// ====== LOD selection ======
 
 inline float apply_complexity_bias(float screen_radius_px, float triangle_count,
                                    const LodConfig &config) {
@@ -146,13 +141,12 @@ inline float apply_complexity_bias(float screen_radius_px, float triangle_count,
   return screen_radius_px * scale;
 }
 
-/// Returns LOD level index, or -1 if the object is too small to render.
 inline int select_lod_level(float screen_radius_px, const LodConfig &config) {
   for (int level = 0; level < LOD_LEVELS; ++level) {
     if (screen_radius_px >= config.screen_radius_px[level])
       return level;
   }
-  return -1; // Too small — cull
+  return -1;
 }
 
 inline int apply_lod_hysteresis(Entity entity, int desired_level,
@@ -192,11 +186,6 @@ inline int apply_lod_hysteresis(Entity entity, int desired_level,
   return resolved;
 }
 
-// ====== LOD Systems ======
-
-/// Auto-generates LOD meshes for entities with large meshes.
-/// Runs on main thread (needs GL for UploadMesh).
-/// Deduplicates by model handle ID — LODs generated once per unique model.
 inline void auto_generate_lods_system(World &world) {
   auto *mesh_storage = world.get_storage<Mesh3d>();
   auto *lod_storage = world.get_storage<MeshLodGroup>();
@@ -205,14 +194,12 @@ inline void auto_generate_lods_system(World &world) {
   if (!mesh_storage || !model_assets || !config)
     return;
 
-  // Cache: model handle id → already-computed MeshLodGroup
   absl::flat_hash_map<uint64_t, MeshLodGroup> lod_cache;
 
   mesh_storage->for_each([&](Entity e, const Mesh3d &mesh3d) {
     if (lod_storage && lod_storage->get(e))
       return;
 
-    // Check cache first
     auto cache_it = lod_cache.find(mesh3d.model.id);
     if (cache_it != lod_cache.end()) {
       world.insert_component(e, cache_it->second);
@@ -224,7 +211,6 @@ inline void auto_generate_lods_system(World &world) {
     if (!model || model->meshCount <= 0 || !model->meshes)
       return;
 
-    // Count total vertices
     int total_verts = 0;
     for (int i = 0; i < model->meshCount; ++i)
       total_verts += model->meshes[i].vertexCount;
@@ -233,7 +219,7 @@ inline void auto_generate_lods_system(World &world) {
       return;
 
     MeshLodGroup group{};
-    group.levels[0] = mesh3d.model; // LOD 0 = original
+    group.levels[0] = mesh3d.model;
     group.level_count = 1;
 
     for (int lod = 1; lod < LOD_LEVELS; ++lod) {
@@ -267,7 +253,6 @@ inline void auto_generate_lods_system(World &world) {
   });
 }
 
-/// Compute the screen-space pixel radius for a bounding sphere.
 inline float compute_screen_radius(rl::Vector3 center, float radius,
                                    const rl::Matrix &view,
                                    const rl::Matrix &proj,
@@ -276,7 +261,7 @@ inline float compute_screen_radius(rl::Vector3 center, float radius,
   float depth = -view_pos.z;
   float effective_depth = std::max(depth, 0.1f);
 
-  float proj_scale_y = proj.m5; // projection[1][1]
+  float proj_scale_y = proj.m5;
   float radius_ndc = (radius / effective_depth) * proj_scale_y;
   float radius_px = std::abs(radius_ndc) * half_screen_height;
 

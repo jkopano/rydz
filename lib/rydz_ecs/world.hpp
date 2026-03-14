@@ -1,4 +1,5 @@
 #pragma once
+#include "fwd.hpp"
 #include "entity.hpp"
 #include "helpers.hpp"
 #include "resource.hpp"
@@ -32,6 +33,8 @@ public:
   // <RESOURCY>
 
   template <typename T> void insert_resource(T resource) {
+    // Bundle check deferred — bundle.hpp may not be included yet.
+    // Static assert enforced at Cmd / App level.
     resources.insert<T>(std::move(resource));
   }
 

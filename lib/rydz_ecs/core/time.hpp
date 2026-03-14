@@ -1,9 +1,10 @@
 #pragma once
-#include "rydz_ecs/system.hpp"
+#include "rydz_ecs/fwd.hpp"
 
 namespace ecs {
 
 struct Time {
+  using Type = ResourceType;
   float delta_seconds = 0.0f;
   float elapsed_seconds = 0.0f;
   uint64_t frame_count = 0;

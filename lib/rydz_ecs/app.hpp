@@ -12,6 +12,7 @@
 namespace ecs {
 
 struct WindowConfig {
+  using Type = ResourceType;
   int width = 800;
   int height = 600;
   std::string title = "ECS App";

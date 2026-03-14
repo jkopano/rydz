@@ -1,4 +1,5 @@
 #pragma once
+#include "fwd.hpp"
 #include "schedule.hpp"
 #include "system.hpp"
 #include <absl/container/flat_hash_map.h>
@@ -7,6 +8,7 @@
 namespace ecs {
 
 template <typename S> struct State {
+  using Type = ResourceType;
   S value;
 
   explicit State(S v) : value(std::move(v)) {}
@@ -15,6 +17,7 @@ template <typename S> struct State {
 };
 
 template <typename S> struct NextState {
+  using Type = ResourceType;
   std::optional<S> pending;
 
   NextState() = default;
@@ -34,10 +37,12 @@ template <typename S> struct OnExit {
 };
 
 template <typename S> struct StateTransitionEvent {
+  using Type = ResourceType;
   bool changed = false;
 };
 
 template <typename S> struct StateSchedules {
+  using Type = ResourceType;
   absl::flat_hash_map<S, Schedule> on_enter;
   absl::flat_hash_map<S, Schedule> on_exit;
 };

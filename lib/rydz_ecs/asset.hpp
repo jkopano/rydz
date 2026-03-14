@@ -1,4 +1,5 @@
 #pragma once
+#include "fwd.hpp"
 #include "system.hpp"
 #include <any>
 #include <atomic>
@@ -23,6 +24,9 @@ template <typename T> struct Handle {
 };
 
 template <typename T> class Assets {
+public:
+  using Type = ResourceType;
+private:
   std::deque<std::optional<T>> items_;
 
 public:
@@ -100,6 +104,9 @@ public:
 };
 
 class AssetServer {
+public:
+  using Type = ResourceType;
+private:
   struct LoadedAsset {
     uint32_t handle_id;
     std::any asset;

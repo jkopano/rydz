@@ -22,6 +22,7 @@
 namespace ecs {
 
 struct ClearColor {
+  using Type = ResourceType;
   rl::Color color = {30, 30, 40, 255};
 };
 

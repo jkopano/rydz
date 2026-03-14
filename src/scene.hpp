@@ -1,4 +1,5 @@
 #pragma once
+#include "rl.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
@@ -21,7 +22,7 @@ struct CameraController {
 
 inline void
 camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
-                         Res<Time> time, NonSendMarker) {
+                         Res<Time> time, Res<Input> input) {
 
   for (auto [t, ctrl] : query.iter()) {
     if (!ctrl->enabled)
@@ -34,19 +35,19 @@ camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
     rl::Vector3 forward = t->forward();
     rl::Vector3 right = t->right();
 
-    if (rl::IsKeyDown(KEY_LEFT_CONTROL))
+    if (input->key_down(KEY_LEFT_CONTROL))
       speed *= 3.0f;
-    if (rl::IsKeyDown(KEY_W))
+    if (input->key_down(KEY_W))
       move = rl::Vector3Add(move, forward);
-    if (rl::IsKeyDown(KEY_S))
+    if (input->key_down(KEY_S))
       move = rl::Vector3Subtract(move, forward);
-    if (rl::IsKeyDown(KEY_D))
+    if (input->key_down(KEY_D))
       move = rl::Vector3Add(move, right);
-    if (rl::IsKeyDown(KEY_A))
+    if (input->key_down(KEY_A))
       move = rl::Vector3Subtract(move, right);
-    if (rl::IsKeyDown(KEY_SPACE))
+    if (input->key_down(KEY_SPACE))
       move = rl::Vector3Add(move, {0, 1, 0});
-    if (rl::IsKeyDown(KEY_LEFT_SHIFT))
+    if (input->key_down(KEY_LEFT_SHIFT))
       move = rl::Vector3Subtract(move, {0, 1, 0});
 
     if (rl::Vector3LengthSqr(move) > 0.0f) {
@@ -59,15 +60,15 @@ camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
 
 inline void
 camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
-                    NonSendMarker) {
-  rl::Vector2 mouse_delta = rl::GetMouseDelta();
+                    Res<Input> input) {
+  Vector2 m = input->mouse_delta();
 
   for (auto [ctrl, t] : query.iter()) {
-    if (!ctrl->enabled || (mouse_delta.x == 0 && mouse_delta.y == 0))
+    if (!ctrl->enabled || (m.x == 0 && m.y == 0))
       return;
 
-    ctrl->yaw -= mouse_delta.x * ctrl->mouse_sensitivity * 57.f;
-    ctrl->pitch -= mouse_delta.y * ctrl->mouse_sensitivity * 57.f;
+    ctrl->yaw -= m.x * ctrl->mouse_sensitivity * 57.f;
+    ctrl->pitch -= m.y * ctrl->mouse_sensitivity * 57.f;
 
     if (ctrl->pitch > 89.0f)
       ctrl->pitch = 89.0f;
@@ -107,14 +108,16 @@ inline void spawn_map(Cmd cmd, ResMut<Assets<rl::Model>> model_assets,
 }
 
 struct HouseHandles {
+  using Type = ResourceType;
   Handle<rl::Model> house;
   bool loaded = false;
 };
 
 inline void spawn_houses_on_input(Cmd cmd,
                                   ResMut<Assets<rl::Model>> model_assets,
-                                  ResMut<HouseHandles> handles, NonSendMarker) {
-  if (!rl::IsKeyPressed(KEY_H))
+                                  ResMut<HouseHandles> handles,
+                                  Res<Input> input, NonSendMarker) {
+  if (!input->key_pressed(KEY_H))
     return;
 
   if (!handles->loaded) {
@@ -139,16 +142,18 @@ inline void spawn_houses_on_input(Cmd cmd,
 }
 
 struct CarHandles {
+  using Type = ResourceType;
   Handle<rl::Model> car;
   bool loaded = false;
   bool spawned = false;
 };
 
 inline void spawn_car_on_input(Cmd cmd, ResMut<Assets<rl::Model>> model_assets,
-                               ResMut<CarHandles> car_handles, NonSendMarker) {
+                               ResMut<CarHandles> car_handles, Res<Input> input,
+                               NonSendMarker) {
   if (car_handles->spawned)
     return;
-  if (!rl::IsKeyPressed(KEY_G))
+  if (!input->key_pressed(KEY_G))
     return;
 
   if (!car_handles->loaded) {
@@ -167,13 +172,15 @@ inline void spawn_car_on_input(Cmd cmd, ResMut<Assets<rl::Model>> model_assets,
 }
 
 struct LightsSpawned {
+  using Type = ResourceType;
   bool done = false;
 };
 
 inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Model>> models,
                                   ResMut<Assets<rl::Texture2D>> textures,
-                                  ResMut<LightsSpawned> lights, NonSendMarker) {
-  if (lights->done || !rl::IsKeyPressed(KEY_L))
+                                  ResMut<LightsSpawned> lights,
+                                  Res<Input> input, NonSendMarker) {
+  if (lights->done || !input->key_pressed(KEY_L))
     return;
 
   cmd.spawn(DirectionalLight{
@@ -210,6 +217,7 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
 }
 
 inline void scene_plugin(App &app) {
+  app.add_plugin(input_plugin);
   app.insert_resource(HouseHandles{});
   app.insert_resource(CarHandles{});
   app.insert_resource(LightsSpawned{});

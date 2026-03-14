@@ -11,10 +11,12 @@ using namespace ecs;
 // ============================================================
 
 struct Flag {
+  using Type = ResourceType;
   bool value = false;
 };
 
 struct Counter {
+  using Type = ResourceType;
   int value = 0;
 };
 

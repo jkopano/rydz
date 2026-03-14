@@ -27,3 +27,4 @@
 
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/core/name.hpp"
+#include "rydz_ecs/input.hpp"

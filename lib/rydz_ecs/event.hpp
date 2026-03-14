@@ -1,4 +1,5 @@
 #pragma once
+#include "fwd.hpp"
 #include "system.hpp"
 #include <cstddef>
 #include <unordered_map>
@@ -11,6 +12,9 @@ struct EventId {
 };
 
 template <typename E> class Events {
+public:
+  using Type = ResourceType;
+private:
   std::vector<std::pair<E, EventId>> buffers_[2];
   size_t current_buffer_ = 0;
   size_t event_count_ = 0;

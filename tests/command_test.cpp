@@ -21,7 +21,13 @@ struct Name {
   }
 };
 
+struct Score {
+  int v;
+  bool operator==(const Score &o) const { return v == o.v; }
+};
+
 struct Value {
+  using Type = ResourceType;
   int v;
   bool operator==(const Value &o) const { return v == o.v; }
 };
@@ -76,7 +82,7 @@ TEST(CommandTest, SpawnMany) {
     Cmd cmd(queue, &world.entities);
 
     for (int i = 0; i < 5; i++) {
-      cmd.spawn(Value{i});
+      cmd.spawn(Score{i});
     }
   }
 
@@ -84,9 +90,9 @@ TEST(CommandTest, SpawnMany) {
   queue->apply(world);
 
   int count = 0;
-  auto *storage = world.get_storage<Value>();
+  auto *storage = world.get_storage<Score>();
   if (storage) {
-    storage->for_each([&](Entity, const Value &) { count++; });
+    storage->for_each([&](Entity, const Score &) { count++; });
   }
   EXPECT_EQ(count, 5);
 }
