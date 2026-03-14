@@ -5,10 +5,17 @@
 namespace ecs {
 
 struct Mesh3d {
-  Handle<rl::Model> model;
+  Handle<rl::Mesh> mesh;
 
   Mesh3d() = default;
-  explicit Mesh3d(Handle<rl::Model> h) : model(h) {}
+  explicit Mesh3d(Handle<rl::Mesh> h) : mesh(h) {}
+};
+
+struct Model3d {
+  Handle<rl::Model> model;
+
+  Model3d() = default;
+  explicit Model3d(Handle<rl::Model> h) : model(h) {}
 };
 
 namespace mesh {
@@ -21,49 +28,49 @@ inline void ensure_uploaded(rl::Mesh &m) {
   }
 }
 
-inline rl::Model cube(float width = 1, float height = 1, float length = 1) {
+inline rl::Mesh cube(float width = 1, float height = 1, float length = 1) {
   rl::Mesh m = rl::GenMeshCube(width, height, length);
   ensure_uploaded(m);
-  return rl::LoadModelFromMesh(m);
+  return m;
 }
 
-inline rl::Model sphere(float radius = 0.5f, int rings = 16, int slices = 16) {
+inline rl::Mesh sphere(float radius = 0.5f, int rings = 16, int slices = 16) {
   rl::Mesh m = rl::GenMeshSphere(radius, rings, slices);
   ensure_uploaded(m);
-  return rl::LoadModelFromMesh(m);
+  return m;
 }
 
-inline rl::Model plane(float width = 10, float length = 10, int res_x = 1,
+inline rl::Mesh plane(float width = 10, float length = 10, int res_x = 1,
                    int res_z = 1) {
   rl::Mesh m = rl::GenMeshPlane(width, length, res_x, res_z);
   ensure_uploaded(m);
-  return rl::LoadModelFromMesh(m);
+  return m;
 }
 
-inline rl::Model cylinder(float radius = 0.5f, float height = 1, int slices = 16) {
+inline rl::Mesh cylinder(float radius = 0.5f, float height = 1, int slices = 16) {
   rl::Mesh m = rl::GenMeshCylinder(radius, height, slices);
   ensure_uploaded(m);
-  return rl::LoadModelFromMesh(m);
+  return m;
 }
 
-inline rl::Model torus(float radius = 0.5f, float size = 0.2f, int rad_seg = 16,
+inline rl::Mesh torus(float radius = 0.5f, float size = 0.2f, int rad_seg = 16,
                    int sides = 16) {
   rl::Mesh m = rl::GenMeshTorus(radius, size, rad_seg, sides);
   ensure_uploaded(m);
-  return rl::LoadModelFromMesh(m);
+  return m;
 }
 
-inline rl::Model hemisphere(float radius = 0.5f, int rings = 16, int slices = 16) {
+inline rl::Mesh hemisphere(float radius = 0.5f, int rings = 16, int slices = 16) {
   rl::Mesh m = rl::GenMeshHemiSphere(radius, rings, slices);
   ensure_uploaded(m);
-  return rl::LoadModelFromMesh(m);
+  return m;
 }
 
-inline rl::Model knot(float radius = 0.5f, float size = 0.2f, int rad_seg = 16,
+inline rl::Mesh knot(float radius = 0.5f, float size = 0.2f, int rad_seg = 16,
                   int sides = 16) {
   rl::Mesh m = rl::GenMeshKnot(radius, size, rad_seg, sides);
   ensure_uploaded(m);
-  return rl::LoadModelFromMesh(m);
+  return m;
 }
 
 } // namespace mesh

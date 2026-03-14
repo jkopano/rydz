@@ -131,17 +131,17 @@ struct MeshBounds {
   BBox3 bbox = BBox3::make_empty();
 };
 inline void compute_mesh_bounds_system(World &world) {
-  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *model_storage = world.get_storage<Model3d>();
   auto *bounds_storage = world.get_storage<MeshBounds>();
   auto *model_assets = world.get_resource<Assets<rl::Model>>();
-  if (!mesh_storage || !model_assets)
+  if (!model_storage || !model_assets)
     return;
 
-  mesh_storage->for_each([&](Entity e, const Mesh3d &mesh3d) {
+  model_storage->for_each([&](Entity e, const Model3d &model3d) {
     if (bounds_storage && bounds_storage->get(e))
       return;
 
-    rl::Model *model = model_assets->get(mesh3d.model);
+    rl::Model *model = model_assets->get(model3d.model);
     if (!model || model->meshCount <= 0 || !model->meshes)
       return;
 

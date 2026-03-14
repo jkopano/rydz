@@ -10,6 +10,7 @@
 #include "rl.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
+#include "rydz_graphics/asset_loaders.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"
 #include "types.hpp"
@@ -27,19 +28,19 @@ struct ClearColor {
 };
 
 inline void apply_materials_system(World &world) {
-  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *model_storage = world.get_storage<Model3d>();
   auto *mat_storage = world.get_storage<Material3d>();
   auto *model_assets = world.get_resource<Assets<rl::Model>>();
   auto *tex_assets = world.get_resource<Assets<rl::Texture2D>>();
-  if (!mesh_storage || !mat_storage || !model_assets)
+  if (!model_storage || !mat_storage || !model_assets)
     return;
 
   mat_storage->for_each([&](Entity e, const Material3d &mat_comp) {
-    auto *mesh_comp = mesh_storage->get(e);
-    if (!mesh_comp)
+    auto *model_comp = model_storage->get(e);
+    if (!model_comp)
       return;
 
-    rl::Model *model = model_assets->get(mesh_comp->model);
+    rl::Model *model = model_assets->get(model_comp->model);
     if (!model)
       return;
 
@@ -48,7 +49,7 @@ inline void apply_materials_system(World &world) {
 }
 
 inline void build_render_batches_system(
-    Query<const Mesh3d, const GlobalTransform, Opt<const Material3d>,
+    Query<const Model3d, const GlobalTransform, Opt<const Material3d>,
           Opt<const RenderConfig>, Opt<const ViewVisibility>,
           Opt<const MeshLodGroup>>
         query,
@@ -57,14 +58,14 @@ inline void build_render_batches_system(
   batches->clear();
   absl::flat_hash_map<RenderBatchKey, size_t> batch_index;
 
-  query.each([&](const Mesh3d *mesh3d, const GlobalTransform *global,
+  query.each([&](const Model3d *model3d, const GlobalTransform *global,
                  const Material3d *mat, const RenderConfig *rc,
                  const ViewVisibility *vv, const MeshLodGroup *lod_group) {
-    if (!mesh3d || !mesh3d->model.is_valid())
+    if (!model3d || !model3d->model.is_valid())
       return;
     if (vv && !vv->visible)
       return;
-    Handle<rl::Model> model_handle = mesh3d->model;
+    Handle<rl::Model> model_handle = model3d->model;
     if (lod_group && lod_group->level_count > 1) {
       model_handle = lod_group->levels[0];
     }
@@ -407,12 +408,12 @@ inline void auto_insert_global_transform(World &world) {
 }
 
 inline void auto_insert_visibility(World &world) {
-  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *model_storage = world.get_storage<Model3d>();
   auto *vis_storage = world.get_storage<Visibility>();
-  if (!mesh_storage)
+  if (!model_storage)
     return;
 
-  mesh_storage->for_each([&](Entity e, const Mesh3d &) {
+  model_storage->for_each([&](Entity e, const Model3d &) {
     if (!vis_storage || !vis_storage->get(e)) {
       world.insert_component(e, Visibility::Visible);
       vis_storage = world.get_storage<Visibility>();
@@ -421,12 +422,12 @@ inline void auto_insert_visibility(World &world) {
 }
 
 inline void auto_insert_material(World &world) {
-  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *model_storage = world.get_storage<Model3d>();
   auto *mat_storage = world.get_storage<Material3d>();
-  if (!mesh_storage)
+  if (!model_storage)
     return;
 
-  mesh_storage->for_each([&](Entity e, const Mesh3d &) {
+  model_storage->for_each([&](Entity e, const Model3d &) {
     if (!mat_storage || !mat_storage->get(e)) {
       world.insert_component(e,
                              Material3d{StandardMaterial::from_color(WHITE)});
@@ -436,12 +437,12 @@ inline void auto_insert_material(World &world) {
 }
 
 inline void auto_insert_render_config(World &world) {
-  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *model_storage = world.get_storage<Model3d>();
   auto *rc_storage = world.get_storage<RenderConfig>();
-  if (!mesh_storage)
+  if (!model_storage)
     return;
 
-  mesh_storage->for_each([&](Entity e, const Mesh3d &) {
+  model_storage->for_each([&](Entity e, const Model3d &) {
     if (!rc_storage || !rc_storage->get(e)) {
       world.insert_component(e, RenderConfig{});
       rc_storage = world.get_storage<RenderConfig>();
@@ -452,6 +453,9 @@ inline void auto_insert_render_config(World &world) {
 inline void render_plugin(App &app) {
   if (!app.world().has_resource<Assets<rl::Model>>()) {
     app.insert_resource(Assets<rl::Model>{});
+  }
+  if (!app.world().has_resource<Assets<rl::Mesh>>()) {
+    app.insert_resource(Assets<rl::Mesh>{});
   }
   if (!app.world().has_resource<Assets<rl::Texture2D>>()) {
     app.insert_resource(Assets<rl::Texture2D>{});
@@ -465,12 +469,28 @@ inline void render_plugin(App &app) {
   if (!app.world().has_resource<AssetServer>()) {
     app.insert_resource(AssetServer{});
   }
+  {
+    auto *server = app.world().get_resource<AssetServer>();
+    if (server) {
+      register_default_loaders(*server);
+    }
+  }
   if (!app.world().has_resource<LodConfig>()) {
     app.insert_resource(LodConfig{});
   }
   if (!app.world().has_resource<LodHistory>()) {
     app.insert_resource(LodHistory{});
   }
+
+  if (!app.world().has_resource<PendingModelLoads>()) {
+    app.insert_resource(PendingModelLoads{});
+  }
+  app.add_systems(ScheduleLabel::First,
+                  [](ResMut<AssetServer> server, World &world) {
+                    server->update(world);
+                  });
+  app.add_systems(ScheduleLabel::First, process_pending_model_loads);
+
   app.add_systems(ScheduleLabel::First, auto_insert_global_transform);
   app.add_systems(ScheduleLabel::First, auto_insert_visibility);
   app.add_systems(ScheduleLabel::First, auto_insert_material);

@@ -80,27 +80,10 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
   }
 }
 
-// inline void toggle_camera_system(Query<Mut<CameraController>> query,
-//                                  NonSendMarker) {
-//   if (!rl::IsKeyPressed(KEY_ESCAPE))
-//     return;
-//
-//   query.for_each([&](CameraController *ctrl) {
-//     ctrl->enabled = !ctrl->enabled;
-//
-//     if (ctrl->enabled)
-//       rl::DisableCursor();
-//     else
-//       rl::EnableCursor();
-//   });
-// }
+inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
+  auto map_h = asset_server->load<rl::Model>("res/models/race_map.glb");
 
-inline void spawn_map(Cmd cmd, ResMut<Assets<rl::Model>> model_assets,
-                      NonSendMarker) {
-  rl::Model map_model = rl::LoadModel("res/models/race_map.glb");
-  auto map_h = model_assets->add(std::move(map_model));
-
-  cmd.spawn(MapTag{}, Mesh3d{map_h},
+  cmd.spawn(MapTag{}, Model3d{map_h},
             Transform3D{
                 .translation = {700.0f, 1.0f, 700.0f},
                 .scale = {0.03f, 0.03f, 0.03f},
@@ -113,16 +96,15 @@ struct HouseHandles {
   bool loaded = false;
 };
 
-inline void spawn_houses_on_input(Cmd cmd,
-                                  ResMut<Assets<rl::Model>> model_assets,
+inline void spawn_houses_on_input(Cmd cmd, Res<AssetServer> asset_server,
                                   ResMut<HouseHandles> handles,
-                                  Res<Input> input, NonSendMarker) {
+                                  Res<Input> input) {
   if (!input->key_pressed(KEY_H))
     return;
 
   if (!handles->loaded) {
-    rl::Model house_model = rl::LoadModel("res/models/old_house.glb");
-    handles->house = model_assets->add(std::move(house_model));
+    // handles->house =
+    // asset_server->load<rl::Model>("res/models/old_house.glb");
     handles->loaded = true;
   }
 
@@ -132,11 +114,13 @@ inline void spawn_houses_on_input(Cmd cmd,
 
   for (int x = -grid; x < grid; ++x) {
     for (int z = -grid; z < grid; ++z) {
-      cmd.spawn(HouseTag{}, Mesh3d{handles->house},
-                Transform3D{
-                    .translation = {x * spacing, 0.0f, z * spacing},
-                    .scale = {scale, scale, scale},
-                });
+      cmd.spawn(
+          HouseTag{},
+          Model3d{asset_server->load<rl::Model>("res/models/old_house.glb")},
+          Transform3D{
+              .translation = {x * spacing, 0.0f, z * spacing},
+              .scale = {scale, scale, scale},
+          });
     }
   }
 }
@@ -148,21 +132,21 @@ struct CarHandles {
   bool spawned = false;
 };
 
-inline void spawn_car_on_input(Cmd cmd, ResMut<Assets<rl::Model>> model_assets,
-                               ResMut<CarHandles> car_handles, Res<Input> input,
-                               NonSendMarker) {
+inline void spawn_car_on_input(Cmd cmd, Res<AssetServer> asset_server,
+                               ResMut<CarHandles> car_handles,
+                               Res<Input> input) {
   if (car_handles->spawned)
     return;
   if (!input->key_pressed(KEY_G))
     return;
 
   if (!car_handles->loaded) {
-    rl::Model car_model = rl::LoadModel("res/models/first-car.glb");
-    car_handles->car = model_assets->add(std::move(car_model));
+    car_handles->car =
+        asset_server->load<rl::Model>("res/models/first-car.glb");
     car_handles->loaded = true;
   }
 
-  cmd.spawn(CarTag{}, Mesh3d{car_handles->car},
+  cmd.spawn(CarTag{}, Model3d{car_handles->car},
             Transform3D{
                 .translation = {10.0f, 1.7f, 10.0f},
                 .scale = {3.0f, 3.0f, 3.0f},
@@ -178,6 +162,7 @@ struct LightsSpawned {
 
 inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Model>> models,
                                   ResMut<Assets<rl::Texture2D>> textures,
+                                  ResMut<Assets<rl::Mesh>> meshes,
                                   ResMut<LightsSpawned> lights,
                                   Res<Input> input, NonSendMarker) {
   if (lights->done || !input->key_pressed(KEY_L))
@@ -191,13 +176,20 @@ inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Model>> models,
 
   auto stone_tex = textures->add(rl::LoadTexture("res/textures/stone.jpg"));
 
-  cmd.spawn(Mesh3d{models->add(mesh::cube())},
+  rl::Mesh cube_mesh = mesh::cube();
+  rl::Model cube_model = rl::LoadModelFromMesh(cube_mesh);
+  auto cube_h = models->add(std::move(cube_model));
+
+  cmd.spawn(Model3d{cube_h},
             PointLight{.color = {255, 0, 0, 255},
                        .intensity = 8800.0f,
                        .range = 2000.0f},
             Transform3D::from_xyz(-50.0f, 50.0f, 0.0f));
 
-  cmd.spawn(Mesh3d{models->add(mesh::cube())},
+  rl::Model cube_model2 = rl::LoadModelFromMesh(mesh::cube());
+  auto cube_h2 = models->add(std::move(cube_model2));
+
+  cmd.spawn(Model3d{cube_h2},
             Material3d{StandardMaterial::from_texture(stone_tex)},
             Transform3D::from_xyz(50.0f, 50.0f, 0.0f));
 
@@ -227,7 +219,6 @@ inline void scene_plugin(App &app) {
 
   app.add_systems(ScheduleLabel::Update, camera_controller_system);
   app.add_systems(ScheduleLabel::Update, camera_mouse_system);
-  // app.add_systems(ScheduleLabel::Update, toggle_camera_system);
 
   app.add_systems(ScheduleLabel::Update, spawn_houses_on_input);
   app.add_systems(ScheduleLabel::Update, spawn_car_on_input);

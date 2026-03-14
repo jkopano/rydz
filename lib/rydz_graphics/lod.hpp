@@ -187,27 +187,27 @@ inline int apply_lod_hysteresis(Entity entity, int desired_level,
 }
 
 inline void auto_generate_lods_system(World &world) {
-  auto *mesh_storage = world.get_storage<Mesh3d>();
+  auto *model_storage = world.get_storage<Model3d>();
   auto *lod_storage = world.get_storage<MeshLodGroup>();
   auto *model_assets = world.get_resource<Assets<rl::Model>>();
   auto *config = world.get_resource<LodConfig>();
-  if (!mesh_storage || !model_assets || !config)
+  if (!model_storage || !model_assets || !config)
     return;
 
   absl::flat_hash_map<uint64_t, MeshLodGroup> lod_cache;
 
-  mesh_storage->for_each([&](Entity e, const Mesh3d &mesh3d) {
+  model_storage->for_each([&](Entity e, const Model3d &model3d) {
     if (lod_storage && lod_storage->get(e))
       return;
 
-    auto cache_it = lod_cache.find(mesh3d.model.id);
+    auto cache_it = lod_cache.find(model3d.model.id);
     if (cache_it != lod_cache.end()) {
       world.insert_component(e, cache_it->second);
       lod_storage = world.get_storage<MeshLodGroup>();
       return;
     }
 
-    rl::Model *model = model_assets->get(mesh3d.model);
+    rl::Model *model = model_assets->get(model3d.model);
     if (!model || model->meshCount <= 0 || !model->meshes)
       return;
 
@@ -219,7 +219,7 @@ inline void auto_generate_lods_system(World &world) {
       return;
 
     MeshLodGroup group{};
-    group.levels[0] = mesh3d.model;
+    group.levels[0] = model3d.model;
     group.level_count = 1;
 
     for (int lod = 1; lod < LOD_LEVELS; ++lod) {
@@ -247,7 +247,7 @@ inline void auto_generate_lods_system(World &world) {
       }
     }
 
-    lod_cache[mesh3d.model.id] = group;
+    lod_cache[model3d.model.id] = group;
     world.insert_component(e, group);
     lod_storage = world.get_storage<MeshLodGroup>();
   });

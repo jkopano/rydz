@@ -114,9 +114,10 @@ private:
   };
 
   std::unordered_map<std::string, std::shared_ptr<IAssetLoader>> loaders_;
-  std::mutex completed_mutex_;
-  std::vector<LoadedAsset> completed_;
-  std::atomic<uint32_t> next_id_{0};
+  mutable std::mutex completed_mutex_;
+  mutable std::vector<LoadedAsset> completed_;
+  mutable std::atomic<uint32_t> next_id_{0};
+  mutable std::unordered_map<std::string, uint32_t> path_cache_;
   std::string root_path_;
 
 public:
@@ -127,12 +128,14 @@ public:
       : loaders_(std::move(other.loaders_)),
         completed_(std::move(other.completed_)),
         next_id_(other.next_id_.load()),
+        path_cache_(std::move(other.path_cache_)),
         root_path_(std::move(other.root_path_)) {}
 
   AssetServer &operator=(AssetServer &&other) noexcept {
     loaders_ = std::move(other.loaders_);
     completed_ = std::move(other.completed_);
     next_id_.store(other.next_id_.load());
+    path_cache_ = std::move(other.path_cache_);
     root_path_ = std::move(other.root_path_);
     return *this;
   }
@@ -147,9 +150,22 @@ public:
     register_loader(std::make_shared<L>(std::forward<Args>(args)...));
   }
 
-  template <typename T> Handle<T> load(const std::string &path) {
+  template <typename T> Handle<T> load(const std::string &path) const {
+    {
+      std::lock_guard<std::mutex> lock(completed_mutex_);
+      auto cached = path_cache_.find(path);
+      if (cached != path_cache_.end()) {
+        return Handle<T>{cached->second};
+      }
+    }
+
     uint32_t id = next_id_.fetch_add(1);
     Handle<T> handle{id};
+
+    {
+      std::lock_guard<std::mutex> lock(completed_mutex_);
+      path_cache_[path] = id;
+    }
 
     auto ext = get_extension(path);
     auto it = loaders_.find(ext);

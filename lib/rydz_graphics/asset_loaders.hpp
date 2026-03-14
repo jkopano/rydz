@@ -35,34 +35,48 @@ private:
   std::string path_;
 };
 
-class ModelLoader : public AssetLoader<ModelLoader, rl::Model> {
+struct PendingModelLoad {
+  std::string path;
+  uint32_t handle_id;
+};
+
+struct PendingModelLoads {
+  using Type = ResourceType;
+  std::vector<PendingModelLoad> pending;
+};
+
+class ModelLoader : public IAssetLoader {
 public:
   std::vector<std::string> extensions() const override {
-    return {"obj", "iqm"};
+    return {"obj", "iqm", "glb", "gltf"};
   }
 
   bool is_async() const override { return false; }
 
-  rl::Model load_asset(const std::vector<uint8_t> & /*data*/,
-                   const std::string &path) {
-    rl::Model m{};
-    path_ = path;
-    return m;
+  std::any load(const std::vector<uint8_t> & /*data*/,
+                const std::string &path) override {
+    return std::any(std::string(path));
   }
 
   void insert_into_world(World &world, uint32_t handle_id,
                          std::any asset) override {
     auto path = std::any_cast<std::string>(std::move(asset));
-    auto *assets = world.get_resource<Assets<rl::Model>>();
-    if (assets) {
-      rl::Model model = rl::LoadModel(path.c_str());
-      assets->set(Handle<rl::Model>{handle_id}, model);
+    auto *pending = world.get_resource<PendingModelLoads>();
+    if (pending) {
+      pending->pending.push_back(PendingModelLoad{std::move(path), handle_id});
     }
   }
-
-private:
-  std::string path_;
 };
+
+inline void process_pending_model_loads(ResMut<PendingModelLoads> pending,
+                                        ResMut<Assets<rl::Model>> model_assets,
+                                        NonSendMarker) {
+  for (auto &load : pending->pending) {
+    rl::Model model = rl::LoadModel(load.path.c_str());
+    model_assets->set(Handle<rl::Model>{load.handle_id}, model);
+  }
+  pending->pending.clear();
+}
 
 class SoundLoader : public AssetLoader<SoundLoader, rl::Sound> {
 public:
@@ -95,7 +109,6 @@ private:
 inline void register_default_loaders(AssetServer &server) {
   server.register_loader<TextureLoader>();
   server.register_loader<ModelLoader>();
-  server.register_loader<GltfLoader>();
   server.register_loader<SoundLoader>();
 }
 
