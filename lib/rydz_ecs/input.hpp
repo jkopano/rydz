@@ -1,6 +1,7 @@
 #pragma once
 #include "app.hpp"
 #include <unordered_set>
+#include <vector>
 
 namespace ecs {
 
@@ -49,6 +50,8 @@ struct Input {
     mouse_.delta_y = dy;
   }
 
+  std::unordered_set<KeyCode> &keys_down() { return keys_down_; }
+
 private:
   std::unordered_set<KeyCode> keys_down_;
   std::unordered_set<KeyCode> keys_pressed_;
@@ -56,86 +59,25 @@ private:
   MouseState mouse_;
 };
 
-inline constexpr KeyCode POLLED_KEYS[] = {
-    // Letters A-Z (65-90)
-    65,
-    66,
-    67,
-    68,
-    69,
-    70,
-    71,
-    72,
-    73,
-    74,
-    75,
-    76,
-    77,
-    78,
-    79,
-    80,
-    81,
-    82,
-    83,
-    84,
-    85,
-    86,
-    87,
-    88,
-    89,
-    90,
-    // Digits 0-9 (48-57)
-    48,
-    49,
-    50,
-    51,
-    52,
-    53,
-    54,
-    55,
-    56,
-    57,
-    // Function keys F1-F12 (290-301)
-    290,
-    291,
-    292,
-    293,
-    294,
-    295,
-    296,
-    297,
-    298,
-    299,
-    300,
-    301,
-    // Special keys
-    32,  // SPACE
-    256, // ESCAPE
-    257, // ENTER
-    258, // TAB
-    259, // BACKSPACE
-    261, // DELETE
-    262, // RIGHT
-    263, // LEFT
-    264, // DOWN
-    265, // UP
-    340, // LEFT_SHIFT
-    341, // LEFT_CONTROL
-    342, // LEFT_ALT
-    344, // RIGHT_SHIFT
-    345, // RIGHT_CONTROL
-    346, // RIGHT_ALT
-};
-
 inline void input_polling_system(ResMut<Input> input, NonSendMarker) {
   input->clear_frame();
 
-  for (KeyCode key : POLLED_KEYS) {
-    if (rl::IsKeyDown(key)) {
-      input->set_key_down(key);
-    } else {
-      input->set_key_up(key);
+  // Drain raylib's key pressed queue
+  int key;
+  while ((key = rl::GetKeyPressed()) != 0) {
+    input->set_key_down(key);
+  }
+
+  // Check releases for currently tracked keys
+  auto &down = input->keys_down();
+  std::vector<KeyCode> released;
+  for (KeyCode k : down) {
+    if (rl::IsKeyUp(k)) {
+      released.push_back(k);
     }
+  }
+  for (KeyCode k : released) {
+    input->set_key_up(k);
   }
 
   rl::Vector2 md = rl::GetMouseDelta();

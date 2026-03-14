@@ -44,7 +44,9 @@ using ::GetFrameTime;
 
 // ---- Input ----
 using ::IsKeyDown;
+using ::IsKeyUp;
 using ::IsKeyPressed;
+using ::GetKeyPressed;
 using ::GetMouseDelta;
 using ::DisableCursor;
 using ::EnableCursor;
