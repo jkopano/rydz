@@ -66,8 +66,8 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
     if (!ctrl->enabled || (mouse_delta.x == 0 && mouse_delta.y == 0))
       return;
 
-    ctrl->yaw -= mouse_delta.x * ctrl->mouse_sensitivity * 57.2958f;
-    ctrl->pitch -= mouse_delta.y * ctrl->mouse_sensitivity * 57.2958f;
+    ctrl->yaw -= mouse_delta.x * ctrl->mouse_sensitivity * 57.f;
+    ctrl->pitch -= mouse_delta.y * ctrl->mouse_sensitivity * 57.f;
 
     if (ctrl->pitch > 89.0f)
       ctrl->pitch = 89.0f;

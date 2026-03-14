@@ -15,7 +15,9 @@ struct Entity {
   }
 
   [[nodiscard]] constexpr uint32_t index() const noexcept { return index_val; }
-  [[nodiscard]] constexpr uint32_t generation() const noexcept { return generation_val; }
+  [[nodiscard]] constexpr uint32_t generation() const noexcept {
+    return generation_val;
+  }
 
   auto operator<=>(const Entity &) const = default;
 };
@@ -39,12 +41,12 @@ class EntityManager {
 public:
   Entity create() {
     Entity e;
-    if (!free_list_.empty()) {
+    if (free_list_.empty()) {
+      e = Entity::from_raw(next_id_++, 0);
+    } else {
       auto [idx, gen] = free_list_.back();
       free_list_.pop_back();
       e = Entity::from_raw(idx, gen);
-    } else {
-      e = Entity::from_raw(next_id_++, 0);
     }
     active_.insert(e);
     return e;
