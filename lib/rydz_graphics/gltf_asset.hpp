@@ -1,4 +1,5 @@
 #pragma once
+#include "math.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/asset.hpp"
 #include <cstring>
@@ -171,7 +172,7 @@ public:
       auto *model_assets = world.get_resource<Assets<rl::Model>>();
       if (model_assets) {
         rl::Model model = {0};
-        model.transform = rl::MatrixIdentity();
+        model.transform = math::to_rl(math::Mat4::sIdentity());
         model.meshCount = scene->meshCount;
         model.materialCount = scene->materialCount;
 

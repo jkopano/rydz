@@ -1,4 +1,5 @@
 #pragma once
+#include "math.hpp"
 #include "rl.hpp"
 #include <cstring>
 #include <string>
@@ -52,7 +53,7 @@ public:
     return Skybox::from(Config::from_directory(directory_path));
   }
 
-  void draw(rl::Camera3D cam) const {
+  void draw(math::Mat4 view, math::Mat4 proj) const {
     if (!loaded)
       return;
 
@@ -61,16 +62,11 @@ public:
 
     rl::rlEnableShader(shader.id);
 
-    rl::Matrix view_mat = rl::GetCameraViewMatrix(&cam);
-    float aspect = static_cast<float>(rl::GetScreenWidth()) /
-                   static_cast<float>(rl::GetScreenHeight());
-    rl::Matrix proj_mat = rl::GetCameraProjectionMatrix(&cam, aspect);
-
     int view_loc = rl::GetShaderLocation(shader, "u_view");
     int proj_loc = rl::GetShaderLocation(shader, "u_projection");
 
-    rl::SetShaderValueMatrix(shader, view_loc, view_mat);
-    rl::SetShaderValueMatrix(shader, proj_loc, proj_mat);
+    rl::SetShaderValueMatrix(shader, view_loc, math::to_rl(view));
+    rl::SetShaderValueMatrix(shader, proj_loc, math::to_rl(proj));
 
     rl::rlActiveTextureSlot(0);
     rl::rlEnableTextureCubemap(cubemap_id);

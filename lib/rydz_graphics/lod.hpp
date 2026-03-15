@@ -41,7 +41,7 @@ struct MeshLodGroup {
 /// Resource: per-entity LOD history for hysteresis.
 struct LodHistory {
   using Type = ResourceType;
-  absl::flat_hash_map<Entity, int, std::hash<Entity>> map;
+  absl::flat_hash_map<Entity, int> map;
 };
 
 // ====== LOD mesh generation via meshoptimizer ======
@@ -253,15 +253,14 @@ inline void auto_generate_lods_system(World &world) {
   });
 }
 
-inline float compute_screen_radius(rl::Vector3 center, float radius,
-                                   const rl::Matrix &view,
-                                   const rl::Matrix &proj,
+inline float compute_screen_radius(math::Vec3 center, float radius,
+                                   math::Mat4 view, math::Mat4 proj,
                                    float half_screen_height) {
-  rl::Vector3 view_pos = rl::Vector3Transform(center, view);
-  float depth = -view_pos.z;
+  math::Vec3 view_pos = view * center;
+  float depth = -view_pos.GetZ();
   float effective_depth = std::max(depth, 0.1f);
 
-  float proj_scale_y = proj.m5;
+  float proj_scale_y = proj(1, 1);
   float radius_ndc = (radius / effective_depth) * proj_scale_y;
   float radius_px = std::abs(radius_ndc) * half_screen_height;
 

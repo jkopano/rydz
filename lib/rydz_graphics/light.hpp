@@ -1,7 +1,10 @@
 #pragma once
+#include "math.hpp"
 #include "rl.hpp"
 
 namespace ecs {
+
+using namespace math;
 
 struct PointLight {
   rl::Color color = WHITE;
@@ -11,7 +14,7 @@ struct PointLight {
 
 struct DirectionalLight {
   rl::Color color = WHITE;
-  rl::Vector3 direction = {-1, -1, -1};
+  Vec3 direction = Vec3(-1, -1, -1);
   float intensity = 1.0f;
 };
 

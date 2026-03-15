@@ -23,6 +23,11 @@ enum class ScheduleLabel {
   FixedUpdate,
 };
 
+template <typename H>
+H AbslHashValue(H h, ScheduleLabel l) {
+  return H::combine(std::move(h), static_cast<int>(l));
+}
+
 } // namespace ecs
 
 template <> struct std::hash<ecs::ScheduleLabel> {
@@ -349,8 +354,7 @@ private:
 };
 
 class Schedules {
-  absl::flat_hash_map<ScheduleLabel, Schedule, std::hash<ScheduleLabel>>
-      schedules_;
+  absl::flat_hash_map<ScheduleLabel, Schedule> schedules_;
 
 public:
   Schedule &entry(ScheduleLabel label) { return schedules_[label]; }

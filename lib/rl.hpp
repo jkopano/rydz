@@ -1,8 +1,6 @@
 #pragma once
 
 #include <raylib.h>
-#include <raymath.h>
-#include <rcamera.h>
 #include <rlgl.h>
 
 namespace rl {
@@ -29,12 +27,10 @@ using ::Vector4;
 
 // ---- Core: Window / Drawing ----
 using ::BeginDrawing;
-using ::BeginMode3D;
 using ::ClearBackground;
 using ::CloseWindow;
 using ::DrawFPS;
 using ::EndDrawing;
-using ::EndMode3D;
 using ::GetFrameTime;
 using ::InitWindow;
 using ::SetTargetFPS;
@@ -54,10 +50,6 @@ using ::IsKeyUp;
 // ---- Screen ----
 using ::GetScreenHeight;
 using ::GetScreenWidth;
-
-// ---- Camera ----
-using ::GetCameraProjectionMatrix;
-using ::GetCameraViewMatrix;
 
 // ---- Models / Meshes ----
 using ::DrawMesh;
@@ -94,33 +86,6 @@ using ::SetShaderValue;
 using ::SetShaderValueMatrix;
 using ::SetShaderValueV;
 
-// ---- Math: Matrix ----
-using ::MatrixIdentity;
-using ::MatrixInvert;
-using ::MatrixLookAt;
-using ::MatrixMultiply;
-using ::MatrixPerspective;
-using ::MatrixScale;
-using ::MatrixTranslate;
-
-// ---- Math: Vector3 ----
-using ::Vector3Add;
-using ::Vector3DotProduct;
-using ::Vector3Length;
-using ::Vector3LengthSqr;
-using ::Vector3Normalize;
-using ::Vector3RotateByQuaternion;
-using ::Vector3Scale;
-using ::Vector3Subtract;
-using ::Vector3Transform;
-
-// ---- Math: Quaternion ----
-using ::QuaternionFromEuler;
-using ::QuaternionFromMatrix;
-using ::QuaternionIdentity;
-using ::QuaternionNormalize;
-using ::QuaternionToMatrix;
-
 // ---- rlgl functions ----
 using ::rlActiveTextureSlot;
 using ::rlDisableBackfaceCulling;
@@ -151,5 +116,15 @@ using ::rlSetVertexAttribute;
 using ::rlUnloadTexture;
 using ::rlUnloadVertexArray;
 using ::rlUnloadVertexBuffer;
+
+// ---- rlgl: Matrix / Batch ----
+using ::rlDrawRenderBatchActive;
+using ::rlLoadIdentity;
+using ::rlMatrixMode;
+using ::rlMultMatrixf;
+using ::rlPopMatrix;
+using ::rlPushMatrix;
+using ::rlSetMatrixModelview;
+using ::rlSetMatrixProjection;
 
 } // namespace rl

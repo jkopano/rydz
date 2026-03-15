@@ -1,6 +1,6 @@
 add_rules("mode.debug", "mode.release")
 
-add_requires("abseil", "taskflow", "gtest", "benchmark", "meshoptimizer", "bvh")
+add_requires("abseil", "taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
 
 set_languages("c++23")
 add_includedirs("lib")
@@ -12,6 +12,7 @@ if is_mode("debug") then
 	add_cxflags("-fno-sanitize-recover=undefined")
 
 	add_cxflags("-Wall", "-Wextra", "-Wpedantic", "-Wshadow")
+
 end
 
 if is_mode("release") then
@@ -55,7 +56,7 @@ target("main")
 	set_rundir("$(projectdir)")
 	add_files("src/*.cpp")
 	add_deps("raylib")
-	add_packages("taskflow", "abseil", "meshoptimizer", "bvh")
+	add_packages("taskflow", "abseil", "meshoptimizer", "joltphysics")
 	set_pcxxheader("lib/pch.hpp")
 
 target("tests")
@@ -63,11 +64,11 @@ target("tests")
 	set_default(false)
 	add_files("tests/*.cpp")
 	add_deps("raylib")
-	add_packages("gtest", "taskflow", "abseil", "meshoptimizer", "bvh")
+	add_packages("gtest", "taskflow", "abseil", "meshoptimizer", "joltphysics")
 
 target("bench")
 	set_kind("binary")
 	set_default(false)
 	add_files("benches/*.cpp")
 	add_deps("raylib")
-	add_packages("benchmark", "taskflow", "abseil", "meshoptimizer", "bvh")
+	add_packages("benchmark", "taskflow", "abseil", "meshoptimizer", "joltphysics")

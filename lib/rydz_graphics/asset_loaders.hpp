@@ -124,7 +124,7 @@ inline void center_model_meshes(rl::Model &model) {
     }
   }
 
-  model.transform = rl::MatrixIdentity();
+  model.transform = math::to_rl(math::Mat4::sIdentity());
 }
 
 inline void process_pending_model_loads(ResMut<PendingModelLoads> pending,

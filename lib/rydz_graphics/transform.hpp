@@ -1,5 +1,5 @@
 #pragma once
-#include "rl.hpp"
+#include "math.hpp"
 #include "rydz_ecs/hierarchy.hpp"
 #include "rydz_ecs/query.hpp"
 #include <functional>
@@ -7,94 +7,73 @@
 
 namespace ecs {
 
+using namespace math;
+
 struct Transform3D {
-  rl::Vector3 translation = {0, 0, 0};
-  rl::Quaternion rotation = rl::QuaternionIdentity();
-  rl::Vector3 scale = {1, 1, 1};
+  Vec3 translation = Vec3::sZero();
+  Quat rotation = Quat::sIdentity();
+  Vec3 scale = Vec3::sReplicate(1.0f);
 
   static Transform3D from_xyz(float x, float y, float z) {
-    return {{x, y, z}, rl::QuaternionIdentity(), {1, 1, 1}};
+    return {{Vec3(x, y, z)}, Quat::sIdentity(), Vec3::sReplicate(1.0f)};
   }
 
-  static Transform3D from_translation(rl::Vector3 pos) {
-    return {pos, rl::QuaternionIdentity(), {1, 1, 1}};
+  static Transform3D from_translation(Vec3 pos) {
+    return {pos, Quat::sIdentity(), Vec3::sReplicate(1.0f)};
   }
 
-  static Transform3D from_rotation(rl::Quaternion q) {
-    return {{0, 0, 0}, q, {1, 1, 1}};
+  static Transform3D from_rotation(Quat q) {
+    return {Vec3::sZero(), q, Vec3::sReplicate(1.0f)};
   }
 
-  static Transform3D from_scale(rl::Vector3 s) {
-    return {{0, 0, 0}, rl::QuaternionIdentity(), s};
+  static Transform3D from_scale(Vec3 s) {
+    return {Vec3::sZero(), Quat::sIdentity(), s};
   }
 
   static Transform3D from_scale_uniform(float s) {
-    return from_scale({s, s, s});
+    return from_scale(Vec3::sReplicate(s));
   }
 
-  rl::Matrix compute_matrix() const {
-    rl::Matrix s = rl::MatrixScale(scale.x, scale.y, scale.z);
-    rl::Matrix r = rl::QuaternionToMatrix(rotation);
-    rl::Matrix t =
-        rl::MatrixTranslate(translation.x, translation.y, translation.z);
-    return rl::MatrixMultiply(rl::MatrixMultiply(s, r), t);
+  Mat4 compute_matrix() const {
+    return Mat4::sRotationTranslation(rotation, translation).PreScaled(scale);
   }
 
-  rl::Vector3 forward() const {
-    return rl::Vector3Normalize(
-        rl::Vector3RotateByQuaternion({0, 0, -1}, rotation));
-  }
+  Vec3 forward() const { return rotation * Vec3(0, 0, -1); }
 
-  rl::Vector3 right() const {
-    return rl::Vector3Normalize(
-        rl::Vector3RotateByQuaternion({1, 0, 0}, rotation));
-  }
+  Vec3 right() const { return rotation * Vec3(1, 0, 0); }
 
-  rl::Vector3 up() const {
-    return rl::Vector3Normalize(
-        rl::Vector3RotateByQuaternion({0, 1, 0}, rotation));
-  }
+  Vec3 up() const { return rotation * Vec3(0, 1, 0); }
 
-  Transform3D &look_at(rl::Vector3 target, rl::Vector3 world_up = {0, 1, 0}) {
-    rl::Vector3 dir = rl::Vector3Subtract(target, translation);
-    if (rl::Vector3LengthSqr(dir) < 1e-10f)
+  Transform3D &look_at(Vec3 target, Vec3 world_up = Vec3(0, 1, 0)) {
+    Vec3 dir = target - translation;
+    if (dir.LengthSq() < 1e-10f)
       return *this;
 
-    rl::Matrix look = rl::MatrixLookAt(translation, target, world_up);
-    rl::Matrix inv = rl::MatrixInvert(look);
-    inv.m12 = 0;
-    inv.m13 = 0;
-    inv.m14 = 0;
-    rotation = rl::QuaternionNormalize(rl::QuaternionFromMatrix(inv));
+    Mat4 look = Mat4::sLookAt(translation, target, world_up);
+    Mat4 inv = look.Inversed();
+    inv.SetTranslation(Vec3::sZero());
+    rotation = inv.GetQuaternion().Normalized();
     return *this;
   }
 };
 
 struct GlobalTransform {
-  rl::Matrix matrix = rl::MatrixIdentity();
+  Mat4 matrix = Mat4::sIdentity();
 
-  static GlobalTransform from_matrix(rl::Matrix m) { return {m}; }
+  static GlobalTransform from_matrix(Mat4 m) { return {m}; }
 
-  rl::Vector3 translation() const {
-    return {matrix.m12, matrix.m13, matrix.m14};
-  }
+  Vec3 translation() const { return matrix.GetTranslation(); }
 
-  rl::Vector3 forward() const {
-    return rl::Vector3Normalize({-matrix.m8, -matrix.m9, -matrix.m10});
-  }
+  Vec3 forward() const { return (-matrix.GetAxisZ()).Normalized(); }
 
-  rl::Vector3 right() const {
-    return rl::Vector3Normalize({matrix.m0, matrix.m1, matrix.m2});
-  }
+  Vec3 right() const { return matrix.GetAxisX().Normalized(); }
 
-  rl::Vector3 up() const {
-    return rl::Vector3Normalize({matrix.m4, matrix.m5, matrix.m6});
-  }
+  Vec3 up() const { return matrix.GetAxisY().Normalized(); }
 };
 
 inline void propagate_transforms(
     Query<Entity, Transform3D, Opt<Parent>, Mut<GlobalTransform>> query) {
-  std::unordered_map<Entity, rl::Matrix> local_matrices;
+  std::unordered_map<Entity, Mat4> local_matrices;
   std::unordered_map<Entity, Entity> parents;
 
   for (auto [entity, transform, parent, global] : query.iter()) {
@@ -110,7 +89,7 @@ inline void propagate_transforms(
     if (it != cache.end())
       return it->second;
 
-    rl::Matrix local_mat = rl::MatrixIdentity();
+    Mat4 local_mat = Mat4::sIdentity();
     auto lit = local_matrices.find(entity);
     if (lit != local_matrices.end())
       local_mat = lit->second;
@@ -119,7 +98,7 @@ inline void propagate_transforms(
     auto pit = parents.find(entity);
     if (pit != parents.end()) {
       GlobalTransform parent_global = compute(pit->second);
-      result.matrix = rl::MatrixMultiply(local_mat, parent_global.matrix);
+      result.matrix = parent_global.matrix * local_mat;
     } else {
       result.matrix = local_mat;
     }

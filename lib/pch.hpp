@@ -30,7 +30,6 @@
 #include <utility>
 #include <vector>
 
-#include <bvh/v2/bbox.h>
-#include <bvh/v2/vec.h>
 #include <meshoptimizer.h>
+#include "math.hpp"
 #include "rl.hpp"

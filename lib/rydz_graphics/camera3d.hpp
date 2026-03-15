@@ -1,8 +1,11 @@
 #pragma once
+#include "math.hpp"
 #include "rl.hpp"
 #include "rydz_graphics/transform.hpp"
 
 namespace ecs {
+
+using namespace math;
 
 struct Camera3DComponent {
   double fov = 45.0;
@@ -13,27 +16,23 @@ struct Camera3DComponent {
 
 struct ActiveCamera {};
 
-inline rl::Camera3D build_camera(rl::Vector3 position, rl::Vector3 forward,
-                                 rl::Vector3 up,
-                                 const Camera3DComponent &comp) {
-  rl::Camera3D cam = {};
-  cam.position = position;
-  cam.target = rl::Vector3Add(position, forward);
-  cam.up = up;
-  cam.fovy = static_cast<float>(comp.fov);
-  cam.projection = comp.projection;
-  return cam;
-}
+struct CameraView {
+  Mat4 view;
+  Mat4 proj;
+  Vec3 position;
+};
 
-inline rl::Camera3D build_camera(const Transform3D &t,
-                                 const Camera3DComponent &comp) {
-  rl::Camera3D cam = {};
-  cam.position = t.translation;
-  cam.target = rl::Vector3Add(t.translation, t.forward());
-  cam.up = t.up();
-  cam.fovy = static_cast<float>(comp.fov);
-  cam.projection = comp.projection;
-  return cam;
+inline CameraView compute_camera_view(const Transform3D &t,
+                                      const Camera3DComponent &comp) {
+  float aspect = static_cast<float>(rl::GetScreenWidth()) /
+                 static_cast<float>(std::max(rl::GetScreenHeight(), 1));
+  float fov_rad = static_cast<float>(comp.fov) * DEG2RAD;
+
+  Mat4 view = Mat4::sLookAt(t.translation, t.translation + t.forward(), t.up());
+  Mat4 proj = Mat4::sPerspective(fov_rad, aspect,
+                                 static_cast<float>(comp.near_plane),
+                                 static_cast<float>(comp.far_plane));
+  return {view, proj, t.translation};
 }
 
 } // namespace ecs

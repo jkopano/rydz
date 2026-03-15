@@ -4,6 +4,7 @@
 #include "light.hpp"
 #include "lod.hpp"
 #include "material3d.hpp"
+#include "math.hpp"
 #include "mesh3d.hpp"
 #include "render_batches.hpp"
 #include "render_config.hpp"
@@ -21,6 +22,8 @@
 #include <vector>
 
 namespace ecs {
+
+using namespace math;
 
 struct ClearColor {
   using Type = ResourceType;
@@ -118,11 +121,11 @@ inline void build_render_batches_system(
         size_t idx = batches->batches.size();
         RenderBatch batch{};
         batch.key = key;
-        batch.transforms.push_back(global->matrix);
+        batch.transforms.push_back(to_rl(global->matrix));
         batches->batches.push_back(std::move(batch));
         batch_index.emplace(batches->batches.back().key, idx);
       } else {
-        batches->batches[it->second].transforms.push_back(global->matrix);
+        batches->batches[it->second].transforms.push_back(to_rl(global->matrix));
       }
     }
   });
@@ -139,20 +142,17 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
               NonSendMarker) {
   rl::Color bg = clear_color->color;
 
-  rl::Camera3D cam = {};
-  cam.position = {10, 10, 10};
-  cam.target = {0, 0, 0};
-  cam.up = {0, 1, 0};
-  cam.fovy = 45.0f;
-  cam.projection = CAMERA_PERSPECTIVE;
-
+  CameraView cam_view{
+      .view = Mat4::sIdentity(),
+      .proj = Mat4::sIdentity(),
+      .position = Vec3(10, 10, 10),
+  };
   const Skybox *active_skybox = nullptr;
 
   cam_query.each([&](const Camera3DComponent *cam_comp, const ActiveCamera *,
                      const Transform3D *cam_tx, const Skybox *sky) {
     if (cam_comp && cam_tx) {
-      cam = build_camera(cam_tx->translation, cam_tx->forward(), cam_tx->up(),
-                         *cam_comp);
+      cam_view = compute_camera_view(*cam_tx, *cam_comp);
       active_skybox = sky;
     }
   });
@@ -209,7 +209,7 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
   point_query.each([&](const PointLight *pl, const GlobalTransform *gt) {
     if (!pl || !gt || point_count >= kMaxPointLights)
       return;
-    point_positions[point_count] = gt->translation();
+    point_positions[point_count] = to_rl(gt->translation());
     point_colors[point_count] = color_to_vec3(pl->color);
     point_intensities[point_count] = pl->intensity;
     point_ranges[point_count] = pl->range;
@@ -218,10 +218,20 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
 
   rl::BeginDrawing();
   rl::ClearBackground(bg);
-  rl::BeginMode3D(cam);
+
+  // Begin 3D mode manually (replaces BeginMode3D)
+  rl::rlDrawRenderBatchActive();
+  rl::rlMatrixMode(RL_PROJECTION);
+  rl::rlPushMatrix();
+  rl::rlLoadIdentity();
+  rl::rlSetMatrixProjection(to_rl(cam_view.proj));
+  rl::rlMatrixMode(RL_MODELVIEW);
+  rl::rlLoadIdentity();
+  rl::rlSetMatrixModelview(to_rl(cam_view.view));
+  rl::rlEnableDepthTest();
 
   if (active_skybox && active_skybox->loaded) {
-    active_skybox->draw(cam);
+    active_skybox->draw(cam_view.view, cam_view.proj);
   }
 
   for (const auto &batch : batches->batches) {
@@ -295,7 +305,7 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
     float occlusion_factor = 1.0f;
     rl::Vector3 emissive = {0.0f, 0.0f, 0.0f};
     rl::Vector4 tint = {1.0f, 1.0f, 1.0f, 0.0f};
-    rl::Vector3 camera_pos = cam.position;
+    rl::Vector3 camera_pos = to_rl(cam_view.position);
 
     int has_normal = 0;
     if (key.material.normal_id != UINT32_MAX) {
@@ -310,7 +320,7 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
 
     int has_directional = has_dir ? 1 : 0;
     rl::Vector3 dir_color = color_to_vec3(dir_light.color);
-    rl::Vector3 dir_dir = rl::Vector3Normalize(dir_light.direction);
+    rl::Vector3 dir_dir = to_rl(dir_light.direction.Normalized());
     float dir_intensity = dir_light.intensity;
 
     usize point_count_i = point_count;
@@ -395,7 +405,13 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
     }
   }
 
-  rl::EndMode3D();
+  // End 3D mode manually (replaces EndMode3D)
+  rl::rlDrawRenderBatchActive();
+  rl::rlMatrixMode(RL_PROJECTION);
+  rl::rlPopMatrix();
+  rl::rlMatrixMode(RL_MODELVIEW);
+  rl::rlLoadIdentity();
+
   rl::DrawFPS(10, 10);
   rl::EndDrawing();
 }
@@ -414,7 +430,7 @@ inline void apply_model_transform(World &world) {
     auto *model = model_assets->get(m3d.model);
     if (!model)
       return;
-    gt->matrix = rl::MatrixMultiply(model->transform, gt->matrix);
+    gt->matrix = gt->matrix * from_rl(model->transform);
   });
 }
 
