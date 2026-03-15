@@ -208,7 +208,7 @@ void main() {
   // Base color
   vec4 baseColor = colDiffuse;
   vec4 diff_tex = texture(texture0, TexCoord);
-  if (diff_tex.a < 0.1) {
+  if (diff_tex.a < 0.1 && colDiffuse.a > 0.5) {
     discard;
   }
   baseColor *= diff_tex;

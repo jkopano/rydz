@@ -81,13 +81,10 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
 }
 
 inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
-  auto map_h = asset_server->load<rl::Model>("res/models/race_map.glb");
-
-  cmd.spawn(MapTag{}, Model3d{map_h},
-            Transform3D{
-                .translation = {700.0f, 1.0f, 700.0f},
-                .scale = {0.03f, 0.03f, 0.03f},
-            });
+  cmd.spawn(
+      MapTag{},
+      Model3d{asset_server->load<rl::Model>("res/models/sponza_atrium_3.glb")},
+      Transform3D{});
 }
 
 struct HouseHandles {
@@ -99,18 +96,15 @@ struct HouseHandles {
 inline void spawn_houses_on_input(Cmd cmd, Res<AssetServer> asset_server,
                                   ResMut<HouseHandles> handles,
                                   Res<Input> input) {
+  if (handles->loaded)
+    return;
   if (!input->key_pressed(KEY_H))
     return;
-
-  if (!handles->loaded) {
-    // handles->house =
-    // asset_server->load<rl::Model>("res/models/old_house.glb");
-    handles->loaded = true;
-  }
+  handles->loaded = true;
 
   float spacing = 20.0f;
   float scale = 0.015f;
-  int grid = 100;
+  int grid = 50;
 
   for (int x = -grid; x < grid; ++x) {
     for (int z = -grid; z < grid; ++z) {

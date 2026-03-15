@@ -1,5 +1,6 @@
 #pragma once
 #include "rl.hpp"
+#include "rydz_graphics/transform.hpp"
 
 namespace ecs {
 
@@ -12,12 +13,24 @@ struct Camera3DComponent {
 
 struct ActiveCamera {};
 
-inline rl::Camera3D build_camera(rl::Vector3 position, rl::Vector3 forward, rl::Vector3 up,
-                             const Camera3DComponent &comp) {
+inline rl::Camera3D build_camera(rl::Vector3 position, rl::Vector3 forward,
+                                 rl::Vector3 up,
+                                 const Camera3DComponent &comp) {
   rl::Camera3D cam = {};
   cam.position = position;
   cam.target = rl::Vector3Add(position, forward);
   cam.up = up;
+  cam.fovy = static_cast<float>(comp.fov);
+  cam.projection = comp.projection;
+  return cam;
+}
+
+inline rl::Camera3D build_camera(const Transform3D &t,
+                                 const Camera3DComponent &comp) {
+  rl::Camera3D cam = {};
+  cam.position = t.translation;
+  cam.target = rl::Vector3Add(t.translation, t.forward());
+  cam.up = t.up();
   cam.fovy = static_cast<float>(comp.fov);
   cam.projection = comp.projection;
   return cam;

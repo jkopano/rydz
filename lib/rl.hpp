@@ -8,76 +8,77 @@
 namespace rl {
 
 // ---- Types ----
+using ::Camera2D;
+using ::Camera3D;
+using ::Color;
+using ::GltfScene;
+using ::Image;
+using ::Material;
+using ::MaterialMap;
+using ::Matrix;
+using ::Mesh;
+using ::Model;
+using ::Quaternion;
+using ::Rectangle;
+using ::Shader;
+using ::Sound;
+using ::Texture2D;
 using ::Vector2;
 using ::Vector3;
 using ::Vector4;
-using ::Matrix;
-using ::Quaternion;
-using ::Color;
-using ::Rectangle;
-using ::Image;
-using ::Texture2D;
-using ::Shader;
-using ::Camera3D;
-using ::Camera2D;
-using ::Mesh;
-using ::Model;
-using ::Material;
-using ::MaterialMap;
-using ::Sound;
-using ::GltfScene;
 
 // ---- Core: Window / Drawing ----
-using ::InitWindow;
-using ::CloseWindow;
-using ::WindowShouldClose;
-using ::SetTargetFPS;
 using ::BeginDrawing;
-using ::EndDrawing;
 using ::BeginMode3D;
-using ::EndMode3D;
 using ::ClearBackground;
+using ::CloseWindow;
 using ::DrawFPS;
+using ::EndDrawing;
+using ::EndMode3D;
+using ::GetFrameTime;
+using ::InitWindow;
+using ::SetTargetFPS;
 using ::SetTraceLogLevel;
 using ::TraceLog;
-using ::GetFrameTime;
+using ::WindowShouldClose;
 
 // ---- Input ----
-using ::IsKeyDown;
-using ::IsKeyUp;
-using ::IsKeyPressed;
-using ::GetKeyPressed;
-using ::GetMouseDelta;
 using ::DisableCursor;
 using ::EnableCursor;
+using ::GetKeyPressed;
+using ::GetMouseDelta;
+using ::IsKeyDown;
+using ::IsKeyPressed;
+using ::IsKeyUp;
 
 // ---- Screen ----
-using ::GetScreenWidth;
 using ::GetScreenHeight;
+using ::GetScreenWidth;
 
 // ---- Camera ----
-using ::GetCameraViewMatrix;
 using ::GetCameraProjectionMatrix;
+using ::GetCameraViewMatrix;
 
 // ---- Models / Meshes ----
-using ::LoadModel;
-using ::LoadModelFromMesh;
 using ::DrawMesh;
 using ::DrawMeshInstanced;
-using ::UploadMesh;
 using ::GenMeshCube;
-using ::GenMeshSphere;
-using ::GenMeshPlane;
 using ::GenMeshCylinder;
-using ::GenMeshTorus;
 using ::GenMeshHemiSphere;
 using ::GenMeshKnot;
+using ::GenMeshPlane;
+using ::GenMeshSphere;
+using ::GenMeshTorus;
+using ::LoadModel;
+using ::LoadModelFromMesh;
+using ::UpdateMeshBuffer;
+using ::UploadMesh;
 
 // ---- Textures / Images ----
-using ::LoadTexture;
-using ::LoadImage;
-using ::UnloadImage;
 using ::ImageFormat;
+using ::LoadImage;
+using ::LoadTexture;
+using ::UnloadImage;
 
 // ---- Audio ----
 using ::LoadSound;
@@ -86,68 +87,69 @@ using ::LoadSound;
 using ::LoadGltfScene;
 
 // ---- Shaders ----
-using ::LoadShader;
 using ::GetShaderLocation;
 using ::GetShaderLocationAttrib;
+using ::LoadShader;
 using ::SetShaderValue;
-using ::SetShaderValueV;
 using ::SetShaderValueMatrix;
+using ::SetShaderValueV;
 
 // ---- Math: Matrix ----
 using ::MatrixIdentity;
-using ::MatrixScale;
-using ::MatrixTranslate;
-using ::MatrixMultiply;
 using ::MatrixInvert;
 using ::MatrixLookAt;
+using ::MatrixMultiply;
 using ::MatrixPerspective;
+using ::MatrixScale;
+using ::MatrixTranslate;
 
 // ---- Math: Vector3 ----
 using ::Vector3Add;
-using ::Vector3Subtract;
-using ::Vector3Scale;
-using ::Vector3Normalize;
+using ::Vector3DotProduct;
 using ::Vector3Length;
 using ::Vector3LengthSqr;
-using ::Vector3Transform;
+using ::Vector3Normalize;
 using ::Vector3RotateByQuaternion;
+using ::Vector3Scale;
+using ::Vector3Subtract;
+using ::Vector3Transform;
 
 // ---- Math: Quaternion ----
-using ::QuaternionIdentity;
 using ::QuaternionFromEuler;
 using ::QuaternionFromMatrix;
+using ::QuaternionIdentity;
 using ::QuaternionNormalize;
 using ::QuaternionToMatrix;
 
 // ---- rlgl functions ----
+using ::rlActiveTextureSlot;
+using ::rlDisableBackfaceCulling;
+using ::rlDisableDepthMask;
+using ::rlDisableDepthTest;
+using ::rlDisableShader;
+using ::rlDisableTextureCubemap;
+using ::rlDisableVertexArray;
+using ::rlDisableWireMode;
+using ::rlDrawVertexArray;
+using ::rlEnableBackfaceCulling;
+using ::rlEnableDepthMask;
+using ::rlEnableDepthTest;
+using ::rlEnableShader;
+using ::rlEnableTextureCubemap;
+using ::rlEnableVertexArray;
+using ::rlEnableVertexAttribute;
+using ::rlEnableWireMode;
 using ::rlGetShaderIdDefault;
 using ::rlGetShaderLocsDefault;
 using ::rlGetTextureIdDefault;
-using ::rlEnableDepthTest;
-using ::rlDisableDepthTest;
-using ::rlEnableDepthMask;
-using ::rlDisableDepthMask;
-using ::rlEnableBackfaceCulling;
-using ::rlDisableBackfaceCulling;
-using ::rlSetCullFace;
-using ::rlEnableWireMode;
-using ::rlDisableWireMode;
-using ::rlSetBlendMode;
-using ::rlEnableShader;
-using ::rlDisableShader;
-using ::rlEnableTextureCubemap;
-using ::rlDisableTextureCubemap;
-using ::rlEnableVertexArray;
-using ::rlDisableVertexArray;
+using ::rlLoadTextureCubemap;
 using ::rlLoadVertexArray;
 using ::rlLoadVertexBuffer;
+using ::rlSetBlendMode;
+using ::rlSetCullFace;
+using ::rlSetVertexAttribute;
+using ::rlUnloadTexture;
 using ::rlUnloadVertexArray;
 using ::rlUnloadVertexBuffer;
-using ::rlSetVertexAttribute;
-using ::rlEnableVertexAttribute;
-using ::rlLoadTextureCubemap;
-using ::rlUnloadTexture;
-using ::rlActiveTextureSlot;
-using ::rlDrawVertexArray;
 
 } // namespace rl

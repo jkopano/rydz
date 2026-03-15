@@ -13,8 +13,8 @@
 #include "rydz_graphics/asset_loaders.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"
-#include "types.hpp"
 #include "skybox.hpp"
+#include "types.hpp"
 #include <absl/container/flat_hash_map.h>
 #include <array>
 #include <cstring>
@@ -367,11 +367,18 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
 
     bool can_instance = false;
     if (draw_mat.shader.locs && mesh.vaoId != 0) {
-      if (draw_mat.shader.locs[SHADER_LOC_MATRIX_MODEL] < 0) {
-        draw_mat.shader.locs[SHADER_LOC_MATRIX_MODEL] =
+      // Set up instance transform ATTRIBUTE location (for DrawMeshInstanced)
+      if (draw_mat.shader.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] < 0) {
+        draw_mat.shader.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] =
             rl::GetShaderLocationAttrib(draw_mat.shader, "instanceTransform");
       }
-      can_instance = draw_mat.shader.locs[SHADER_LOC_MATRIX_MODEL] >= 0;
+      // Set up matModel UNIFORM location (for DrawMesh non-instanced fallback)
+      if (draw_mat.shader.locs[SHADER_LOC_MATRIX_MODEL] < 0) {
+        draw_mat.shader.locs[SHADER_LOC_MATRIX_MODEL] =
+            rl::GetShaderLocation(draw_mat.shader, "matModel");
+      }
+      can_instance =
+          draw_mat.shader.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] >= 0;
     }
 
     if (can_instance) {
@@ -391,6 +398,24 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
   rl::EndMode3D();
   rl::DrawFPS(10, 10);
   rl::EndDrawing();
+}
+
+inline void apply_model_transform(World &world) {
+  auto *model_storage = world.get_storage<Model3d>();
+  auto *gt_storage = world.get_storage<GlobalTransform>();
+  auto *model_assets = world.get_resource<Assets<rl::Model>>();
+  if (!model_storage || !gt_storage || !model_assets)
+    return;
+
+  model_storage->for_each([&](Entity e, const Model3d &m3d) {
+    auto *gt = gt_storage->get(e);
+    if (!gt)
+      return;
+    auto *model = model_assets->get(m3d.model);
+    if (!model)
+      return;
+    gt->matrix = rl::MatrixMultiply(model->transform, gt->matrix);
+  });
 }
 
 inline void auto_insert_global_transform(World &world) {
@@ -485,10 +510,9 @@ inline void render_plugin(App &app) {
   if (!app.world().has_resource<PendingModelLoads>()) {
     app.insert_resource(PendingModelLoads{});
   }
-  app.add_systems(ScheduleLabel::First,
-                  [](ResMut<AssetServer> server, World &world) {
-                    server->update(world);
-                  });
+  app.add_systems(
+      ScheduleLabel::First,
+      [](ResMut<AssetServer> server, World &world) { server->update(world); });
   app.add_systems(ScheduleLabel::First, process_pending_model_loads);
 
   app.add_systems(ScheduleLabel::First, auto_insert_global_transform);
@@ -496,6 +520,7 @@ inline void render_plugin(App &app) {
   app.add_systems(ScheduleLabel::First, auto_insert_material);
 
   app.add_systems(ScheduleLabel::PostUpdate, propagate_transforms);
+  app.add_systems(ScheduleLabel::PostUpdate, apply_model_transform);
   app.add_systems(ScheduleLabel::PostUpdate, compute_visibility);
 
   app.add_systems(ScheduleLabel::PostUpdate, compute_mesh_bounds_system);

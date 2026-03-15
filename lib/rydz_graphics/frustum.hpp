@@ -1,10 +1,10 @@
 #pragma once
 #include "camera3d.hpp"
 #include "mesh3d.hpp"
-#include "rydz_ecs/asset.hpp"
+#include "rl.hpp"
+#include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"
-#include "rl.hpp"
 #include <array>
 #include <bvh/v2/bbox.h>
 #include <bvh/v2/vec.h>
@@ -61,11 +61,9 @@ inline BBox3 transform_bbox(const BBox3 &local, const rl::Matrix &m) {
   return result;
 }
 
-inline bool aabb_in_frustum(const BBox3 &bbox,
-                            const std::array<FrustumPlane, 6> &planes) {
+inline bool is_aabb_in_frustum(const BBox3 &bbox,
+                               const std::array<FrustumPlane, 6> &planes) {
   for (const auto &plane : planes) {
-    // p-vertex: the corner of the AABB most in the direction of the plane
-    // normal
     rl::Vector3 p_vertex = {
         plane.normal.x >= 0 ? bbox.max[0] : bbox.min[0],
         plane.normal.y >= 0 ? bbox.max[1] : bbox.min[1],
@@ -74,12 +72,13 @@ inline bool aabb_in_frustum(const BBox3 &bbox,
     float dist = plane.normal.x * p_vertex.x + plane.normal.y * p_vertex.y +
                  plane.normal.z * p_vertex.z + plane.distance;
     if (dist < 0)
-      return false; // entire box is behind this plane
+      return false;
   }
   return true;
 }
 
-inline std::array<FrustumPlane, 6> extract_frustum_planes(const rl::Matrix &vp) {
+inline std::array<FrustumPlane, 6>
+extract_frustum_planes(const rl::Matrix &vp) {
   auto row = [&](int i) -> rl::Vector4 {
     const float *base = &vp.m0;
     int off = i * 4;
@@ -116,133 +115,79 @@ inline std::array<FrustumPlane, 6> extract_frustum_planes(const rl::Matrix &vp) 
   };
 }
 
-inline bool sphere_in_frustum(rl::Vector3 center, float radius,
-                              const std::array<FrustumPlane, 6> &planes) {
-  for (const auto &plane : planes) {
-    float dist = plane.normal.x * center.x + plane.normal.y * center.y +
-                 plane.normal.z * center.z + plane.distance;
-    if (dist < -radius)
-      return false;
-  }
-  return true;
-}
-
 struct MeshBounds {
   BBox3 bbox = BBox3::make_empty();
 };
-inline void compute_mesh_bounds_system(World &world) {
-  auto *model_storage = world.get_storage<Model3d>();
-  auto *bounds_storage = world.get_storage<MeshBounds>();
-  auto *model_assets = world.get_resource<Assets<rl::Model>>();
-  if (!model_storage || !model_assets)
-    return;
 
-  model_storage->for_each([&](Entity e, const Model3d &model3d) {
-    if (bounds_storage && bounds_storage->get(e))
-      return;
-
-    rl::Model *model = model_assets->get(model3d.model);
+inline void
+compute_mesh_bounds_system(Query<Entity, Model3d, Without<MeshBounds>> query,
+                           Res<Assets<rl::Model>> model_assets, Cmd cmd) {
+  for (auto [e, model3d] : query.iter()) {
+    const rl::Model *model = model_assets->get(model3d->model);
     if (!model || model->meshCount <= 0 || !model->meshes)
-      return;
+      continue;
 
     auto combined = BBox3::make_empty();
-    for (int i = 0; i < model->meshCount; ++i) {
+    for (int i = 0; i < model->meshCount; ++i)
       combined.extend(compute_local_bbox(model->meshes[i]));
-    }
 
-    world.insert_component(e, MeshBounds{combined});
-    bounds_storage = world.get_storage<MeshBounds>();
-  });
+    cmd.entity(e).insert(MeshBounds{.bbox = combined});
+  }
 }
 
-inline void frustum_cull_system(World &world) {
-  auto *cam_storage = world.get_storage<Camera3DComponent>();
-  auto *active_storage = world.get_storage<ActiveCamera>();
-  auto *cam_tx_storage = world.get_storage<Transform3D>();
-  if (!cam_storage || !active_storage || !cam_tx_storage)
+inline void frustum_cull_system(
+    Cmd cmd,
+    Query<Camera3DComponent, Transform3D, With<ActiveCamera>> cam_query,
+    Query<Entity, MeshBounds, GlobalTransform, Opt<ComputedVisibility>>
+        mesh_query) {
+  auto cam_result = cam_query.single();
+  if (!cam_result)
     return;
+  auto [cam_comp, cam_tx] = *cam_result;
 
-  const Camera3DComponent *cam_comp = nullptr;
-  const Transform3D *cam_tx = nullptr;
-  bool found_cam = false;
-  active_storage->for_each([&](Entity e, const ActiveCamera &) {
-    if (found_cam)
-      return;
-    cam_comp = cam_storage->get(e);
-    cam_tx = cam_tx_storage->get(e);
-    if (cam_comp && cam_tx)
-      found_cam = true;
-  });
-  if (!cam_comp || !cam_tx)
-    return;
-
-  int sw = rl::GetScreenWidth();
-  int sh = std::max(rl::GetScreenHeight(), 1);
-  double aspect = static_cast<double>(sw) / static_cast<double>(sh);
-  rl::Matrix projection =
-      rl::MatrixPerspective(cam_comp->fov * DEG2RAD, aspect, cam_comp->near_plane,
-                        cam_comp->far_plane);
-  rl::Camera3D cam = build_camera(cam_tx->translation, cam_tx->forward(),
-                              cam_tx->up(), *cam_comp);
-  rl::Matrix view = rl::MatrixLookAt(cam.position, cam.target, cam.up);
+  rl::Camera3D cam = build_camera(*cam_tx, *cam_comp);
+  rl::Matrix view = rl::GetCameraViewMatrix(&cam);
+  rl::Matrix projection = rl::GetCameraProjectionMatrix(
+      &cam, static_cast<float>(rl::GetScreenWidth()) /
+                static_cast<float>(std::max(rl::GetScreenHeight(), 1)));
   rl::Matrix vp = rl::MatrixMultiply(view, projection);
   auto planes = extract_frustum_planes(vp);
 
-  auto *bounds_storage = world.get_storage<MeshBounds>();
-  auto *gt_storage = world.get_storage<GlobalTransform>();
-  auto *cv_storage = world.get_storage<ComputedVisibility>();
-  if (!bounds_storage || !gt_storage)
+  struct CullEntry {
+    Entity entity;
+    const MeshBounds *bounds;
+    const GlobalTransform *gt;
+    const ComputedVisibility *cv;
+  };
+
+  std::vector<CullEntry> entries;
+  for (auto [e, mb, gt, cv] : mesh_query.iter())
+    entries.push_back({e, mb, gt, cv});
+
+  if (entries.empty())
     return;
 
-  std::vector<Entity> entities;
-  bounds_storage->for_each([&](Entity e, const MeshBounds &) {
-    entities.push_back(e);
-  });
-  if (entities.empty())
-    return;
-
-  std::vector<ViewVisibility> results(entities.size());
-  std::vector<uint8_t> has_result(entities.size(), 0);
+  std::vector<ViewVisibility> results(entries.size());
 
   tf::Taskflow taskflow;
   taskflow.for_each_index(
-      size_t{0}, entities.size(), size_t{1}, [&](size_t idx) {
-        Entity e = entities[idx];
-        auto *mb = bounds_storage->get(e);
-        auto *gt = gt_storage->get(e);
-        if (!mb || !gt)
-          return;
+      size_t{0}, entries.size(), size_t{1}, [&](size_t idx) {
+        auto &entry = entries[idx];
 
-        if (cv_storage) {
-          auto *cv = cv_storage->get(e);
-          if (cv && !cv->visible) {
-            results[idx] = ViewVisibility{false};
-            has_result[idx] = 1;
-            return;
-          }
+        if (entry.cv && !entry.cv->visible) {
+          results[idx] = ViewVisibility{false};
+          return;
         }
 
-        BBox3 world_bbox = transform_bbox(mb->bbox, gt->matrix);
-
-        results[idx] = ViewVisibility{aabb_in_frustum(world_bbox, planes)};
-        has_result[idx] = 1;
+        BBox3 world_bbox = transform_bbox(entry.bounds->bbox, entry.gt->matrix);
+        results[idx] = ViewVisibility{is_aabb_in_frustum(world_bbox, planes)};
       });
 
   static tf::Executor executor;
   executor.run(taskflow).wait();
 
-  int dbg_visible = 0, dbg_culled = 0;
-  for (size_t i = 0; i < entities.size(); ++i) {
-    if (has_result[i]) {
-      world.insert_component(entities[i], results[i]);
-      if (results[i].visible)
-        dbg_visible++;
-      else
-        dbg_culled++;
-    }
-  }
-  rl::TraceLog(LOG_DEBUG, "FRUSTUM: %d visible, %d culled, %d total entities",
-           dbg_visible, dbg_culled, (int)entities.size());
+  for (size_t i = 0; i < entries.size(); ++i)
+    cmd.entity(entries[i].entity).insert(results[i]);
 }
 
 } // namespace ecs

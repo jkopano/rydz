@@ -1,11 +1,11 @@
 #pragma once
 #include "command.hpp"
+#include "core/time.hpp"
 #include "event.hpp"
 #include "plugin.hpp"
 #include "rl.hpp"
 #include "schedule.hpp"
 #include "state.hpp"
-#include "core/time.hpp"
 #include "world.hpp"
 #include <string>
 
@@ -85,7 +85,6 @@ public:
         .add_system(make_system(
             [](World &world_ref) { check_state_transitions<S>(world_ref); }));
 
-    // Run OnEnter for the initial state during startup
     S initial_copy = initial;
     schedules_.entry(ScheduleLabel::Startup)
         .add_system(make_system([initial_copy](World &world_ref) {

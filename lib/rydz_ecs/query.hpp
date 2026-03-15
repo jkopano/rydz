@@ -6,6 +6,7 @@
 #include "storage.hpp"
 #include "ticks.hpp"
 #include "world.hpp"
+#include <optional>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -180,12 +181,42 @@ public:
 
   auto iter() const { return make_iter(ItemTuple{}); }
 
+  auto single() const { return single_impl(ItemTuple{}); }
+
   static void access(SystemAccess &acc) {
     access_items(acc, ItemTuple{});
     QueryFilterTraits<FilterT>::access(acc);
   }
 
 private:
+  template <typename... Items> auto single_impl(std::tuple<Items...>) const {
+    using ResultTuple = std::tuple<typename WorldQueryTraits<Items>::Item...>;
+    auto fetchers = std::make_tuple(make_fetcher<Items>()...);
+    size_t min_cap = compute_min_cap<Items...>(fetchers);
+
+    std::optional<ResultTuple> result;
+    for (auto i : range(0u, min_cap)) {
+      Entity entity = Entity::from_raw(i, 0);
+      if (!matches_all<Items...>(fetchers, entity))
+        continue;
+      if (!QueryFilterTraits<FilterT>::matches(*world_, entity))
+        continue;
+
+      if (result.has_value()) {
+        rl::TraceLog(LOG_INFO, "Query::single() found more than one match");
+        return std::optional<ResultTuple>{std::nullopt};
+      }
+      result = std::apply(
+          [&](const auto &...f) { return std::tuple{f.fetch(entity)...}; },
+          fetchers);
+    }
+
+    if (!result.has_value())
+      rl::TraceLog(LOG_INFO, "Query::single() found no matches");
+
+    return result;
+  }
+
   template <typename Q> auto make_fetcher() const {
     typename WorldQueryTraits<Q>::Fetcher f;
     f.init(*world_);
