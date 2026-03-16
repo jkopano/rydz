@@ -137,14 +137,14 @@ inline void spawn_car_on_input(Cmd cmd, Res<AssetServer> asset_server,
 
   if (!car_handles->loaded) {
     car_handles->car =
-        asset_server->load<rl::Model>("res/models/first-car.glb");
+        asset_server->load<rl::Model>("res/models/stylized_planet.glb");
     car_handles->loaded = true;
   }
 
   cmd.spawn(CarTag{}, Model3d{car_handles->car},
             Transform3D{
-                .translation = Vec3(10.0f, 1.7f, 10.0f),
-                .scale = Vec3::sReplicate(3.0f),
+                .translation = Vec3(100.0f, 10.7f, 10.0f),
+                .scale = Vec3::sReplicate(3.f),
             });
 
   car_handles->spawned = true;

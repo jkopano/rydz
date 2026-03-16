@@ -19,6 +19,9 @@ enum class ScheduleLabel {
   PreUpdate,
   Update,
   PostUpdate,
+  ExtractRender,
+  Render,
+  PostRender,
   Last,
   FixedUpdate,
 };

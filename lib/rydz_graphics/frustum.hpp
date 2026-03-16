@@ -78,7 +78,7 @@ inline bool aabb_in_frustum(const AABox &bbox,
 }
 
 inline std::array<FrustumPlane, 6> extract_frustum_planes(Mat4 vp) {
-  auto row = [&](u32 i) -> Vec4 {
+  auto row = [&](int i) -> Vec4 {
     return Vec4(vp(i, 0), vp(i, 1), vp(i, 2), vp(i, 3));
   };
 
@@ -152,6 +152,42 @@ inline void frustum_cull_system(
   Mat4 vp = proj * view;
   auto planes = extract_frustum_planes(vp);
 
+  static int dbg_frame = 0;
+  bool do_debug = (dbg_frame++ % 120 == 0);
+  if (do_debug) {
+    // Compare Jolt VP rows vs round-tripped through raylib Matrix
+    rl::Matrix rl_vp = to_rl(vp);
+    const float *base = &rl_vp.m0;
+    for (int i = 0; i < 4; ++i) {
+      Vec4 jolt_row(vp(i, 0), vp(i, 1), vp(i, 2), vp(i, 3));
+      // Memory layout: base[i*4+0..3] = row i of raylib matrix
+      Vec4 rl_row(base[i * 4], base[i * 4 + 1], base[i * 4 + 2],
+                  base[i * 4 + 3]);
+      Vec4 diff = jolt_row - rl_row;
+      if (diff.Length() > 1e-6f) {
+        rl::TraceLog(LOG_WARNING,
+                     "VP ROW %d MISMATCH! jolt=(%.6f,%.6f,%.6f,%.6f) "
+                     "rl=(%.6f,%.6f,%.6f,%.6f)",
+                     i, jolt_row.GetX(), jolt_row.GetY(), jolt_row.GetZ(),
+                     jolt_row.GetW(), rl_row.GetX(), rl_row.GetY(),
+                     rl_row.GetZ(), rl_row.GetW());
+      }
+    }
+
+    Vec3 fwd = cam_tx->forward();
+    rl::TraceLog(LOG_DEBUG, "CAM pos=(%.2f,%.2f,%.2f) fwd=(%.2f,%.2f,%.2f)",
+                 cam_tx->translation.GetX(), cam_tx->translation.GetY(),
+                 cam_tx->translation.GetZ(), fwd.GetX(), fwd.GetY(),
+                 fwd.GetZ());
+    for (int pi = 0; pi < 6; ++pi) {
+      const char *names[] = {"LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR", "FAR"};
+      rl::TraceLog(LOG_DEBUG, "  plane[%s] n=(%.3f,%.3f,%.3f) d=%.3f",
+                   names[pi], planes[pi].normal.GetX(),
+                   planes[pi].normal.GetY(), planes[pi].normal.GetZ(),
+                   planes[pi].distance);
+    }
+  }
+
   struct CullEntry {
     Entity entity;
     const MeshBounds *bounds;
@@ -184,6 +220,76 @@ inline void frustum_cull_system(
 
   static tf::Executor executor;
   executor.run(taskflow).wait();
+
+  if (do_debug) {
+    int vis = 0, cull = 0, false_cull = 0;
+    for (size_t i = 0; i < entries.size(); ++i) {
+      if (results[i].visible) {
+        vis++;
+      } else {
+        cull++;
+        AABox wb =
+            transform_bbox(entries[i].bounds->bbox, entries[i].gt->matrix);
+        // Check ALL 8 corners of the world AABB against clip space
+        Vec3 corners[8] = {
+            Vec3(wb.mMin.GetX(), wb.mMin.GetY(), wb.mMin.GetZ()),
+            Vec3(wb.mMin.GetX(), wb.mMin.GetY(), wb.mMax.GetZ()),
+            Vec3(wb.mMin.GetX(), wb.mMax.GetY(), wb.mMin.GetZ()),
+            Vec3(wb.mMin.GetX(), wb.mMax.GetY(), wb.mMax.GetZ()),
+            Vec3(wb.mMax.GetX(), wb.mMin.GetY(), wb.mMin.GetZ()),
+            Vec3(wb.mMax.GetX(), wb.mMin.GetY(), wb.mMax.GetZ()),
+            Vec3(wb.mMax.GetX(), wb.mMax.GetY(), wb.mMin.GetZ()),
+            Vec3(wb.mMax.GetX(), wb.mMax.GetY(), wb.mMax.GetZ()),
+        };
+        bool any_corner_onscreen = false;
+        for (auto &c : corners) {
+          Vec4 clip = vp * Vec4(c, 1.0f);
+          float w = clip.GetW();
+          if (w > 0.0f) {
+            float nx = clip.GetX() / w;
+            float ny = clip.GetY() / w;
+            float nz = clip.GetZ() / w;
+            if (nx >= -1.0f && nx <= 1.0f && ny >= -1.0f && ny <= 1.0f &&
+                nz >= -1.0f && nz <= 1.0f) {
+              any_corner_onscreen = true;
+              break;
+            }
+          }
+        }
+        if (any_corner_onscreen && false_cull < 10) {
+          false_cull++;
+          Vec3 center = (wb.mMin + wb.mMax) * 0.5f;
+          Vec3 extent = (wb.mMax - wb.mMin) * 0.5f;
+          // Find failing plane
+          const char *names[] = {"LEFT", "RIGHT", "BOTTOM",
+                                 "TOP",  "NEAR",  "FAR"};
+          float worst = -1e30f;
+          int worst_pi = -1;
+          for (int pi = 0; pi < 6; ++pi) {
+            Vec3 p(
+                planes[pi].normal.GetX() >= 0 ? wb.mMax.GetX() : wb.mMin.GetX(),
+                planes[pi].normal.GetY() >= 0 ? wb.mMax.GetY() : wb.mMin.GetY(),
+                planes[pi].normal.GetZ() >= 0 ? wb.mMax.GetZ()
+                                              : wb.mMin.GetZ());
+            float d = planes[pi].normal.Dot(p) + planes[pi].distance;
+            if (d < 0 && d > worst) {
+              worst = d;
+              worst_pi = pi;
+            }
+          }
+          rl::TraceLog(LOG_WARNING,
+                       "FALSE CULL! center=(%.2f,%.2f,%.2f) "
+                       "extent=(%.2f,%.2f,%.2f) "
+                       "plane=%s dist=%.4f",
+                       center.GetX(), center.GetY(), center.GetZ(),
+                       extent.GetX(), extent.GetY(), extent.GetZ(),
+                       names[worst_pi], worst);
+        }
+      }
+    }
+    rl::TraceLog(LOG_DEBUG, "  visible=%d culled=%d false_cull=%d total=%d",
+                 vis, cull, false_cull, (int)entries.size());
+  }
 
   for (size_t i = 0; i < entries.size(); ++i)
     cmd.entity(entries[i].entity).insert(results[i]);

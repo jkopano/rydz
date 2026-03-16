@@ -140,6 +140,12 @@ public:
     apply_commands();
     schedules_.run(ScheduleLabel::PostUpdate, world_);
     apply_commands();
+    schedules_.run(ScheduleLabel::ExtractRender, world_);
+    apply_commands();
+    schedules_.run(ScheduleLabel::Render, world_);
+    apply_commands();
+    schedules_.run(ScheduleLabel::PostRender, world_);
+    apply_commands();
     schedules_.run(ScheduleLabel::Last, world_);
     apply_commands();
   }

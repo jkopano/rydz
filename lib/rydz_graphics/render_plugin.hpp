@@ -538,15 +538,13 @@ inline void render_plugin(App &app) {
   app.add_systems(ScheduleLabel::PostUpdate, propagate_transforms);
   app.add_systems(ScheduleLabel::PostUpdate, apply_model_transform);
   app.add_systems(ScheduleLabel::PostUpdate, compute_visibility);
-
   app.add_systems(ScheduleLabel::PostUpdate, compute_mesh_bounds_system);
   app.add_systems(ScheduleLabel::PostUpdate, frustum_cull_system);
-
   app.add_systems(ScheduleLabel::PostUpdate, auto_generate_lods_system);
 
-  app.add_systems(ScheduleLabel::PostUpdate, build_render_batches_system);
+  app.add_systems(ScheduleLabel::ExtractRender, build_render_batches_system);
 
-  app.add_systems(ScheduleLabel::Last, render_system);
+  app.add_systems(ScheduleLabel::Render, render_system);
 }
 
 } // namespace ecs
