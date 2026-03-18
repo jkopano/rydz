@@ -199,8 +199,8 @@ TEST(BundleTest, CmdSpawnBundleMixedWithComponents) {
   auto *queue = world.get_resource<CommandQueue>();
   Cmd cmd(queue, &world.entities);
 
-  auto ec = cmd.spawn(
-      MovingBundle{.pos = {1.0f, 1.0f}, .vel = {2.0f, 2.0f}}, Health{42});
+  auto ec = cmd.spawn(MovingBundle{.pos = {1.0f, 1.0f}, .vel = {2.0f, 2.0f}},
+                      Health{42});
   Entity e = ec.id();
 
   queue->apply(world);

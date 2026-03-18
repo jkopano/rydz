@@ -39,19 +39,28 @@ public:
 
     if (sparse_[idx] != UINT32_MAX) {
       auto &entry = dense_[sparse_[idx]];
-      entry.data.component = std::move(component);
-      entry.data.ticks.changed = current_tick;
+      if (entry.entity == entity) {
+        entry.data.component = std::move(component);
+        entry.data.ticks.changed = current_tick;
+        return;
+      }
+
+      entry = Entry{
+          {std::move(component), ComponentTicks{current_tick, current_tick}},
+          entity};
       return;
     }
 
     sparse_[idx] = static_cast<uint32_t>(dense_.size());
-    dense_.push_back(
-        {{std::move(component), {current_tick, current_tick}}, entity});
+    dense_.push_back(Entry{
+        {std::move(component), ComponentTicks{current_tick, current_tick}},
+        entity});
   }
 
   T *get(Entity entity) {
     uint32_t idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX) {
+    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
+        dense_[sparse_[idx]].entity == entity) {
       return &dense_[sparse_[idx]].data.component;
     }
     return nullptr;
@@ -59,7 +68,8 @@ public:
 
   const T *get(Entity entity) const {
     uint32_t idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX) {
+    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
+        dense_[sparse_[idx]].entity == entity) {
       return &dense_[sparse_[idx]].data.component;
     }
     return nullptr;
@@ -67,7 +77,8 @@ public:
 
   ComponentData<T> *get_data(Entity entity) {
     uint32_t idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX) {
+    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
+        dense_[sparse_[idx]].entity == entity) {
       return &dense_[sparse_[idx]].data;
     }
     return nullptr;
@@ -75,7 +86,8 @@ public:
 
   const ComponentData<T> *get_data(Entity entity) const {
     uint32_t idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX) {
+    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
+        dense_[sparse_[idx]].entity == entity) {
       return &dense_[sparse_[idx]].data;
     }
     return nullptr;
@@ -83,7 +95,8 @@ public:
 
   void remove(Entity entity) override {
     uint32_t idx = entity.index();
-    if (idx >= sparse_.size() || sparse_[idx] == UINT32_MAX)
+    if (idx >= sparse_.size() || sparse_[idx] == UINT32_MAX ||
+        dense_[sparse_[idx]].entity != entity)
       return;
 
     uint32_t dense_idx = sparse_[idx];
@@ -98,7 +111,8 @@ public:
 
   bool has(Entity entity) const override {
     uint32_t idx = entity.index();
-    return idx < sparse_.size() && sparse_[idx] != UINT32_MAX;
+    return idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
+           dense_[sparse_[idx]].entity == entity;
   }
 
   size_t size() const override { return dense_.size(); }

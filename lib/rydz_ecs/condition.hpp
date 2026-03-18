@@ -25,7 +25,7 @@ public:
 
   bool is_true(World &world) override {
     return function_traits<F>::apply([&]<SystemParameter... Args>() {
-      return func_(SystemParamTraits<bare_param_t<Args>>::retrieve(world)...);
+      return func_(SystemParamTraits<bare_t<Args>>::retrieve(world)...);
     });
   }
 };

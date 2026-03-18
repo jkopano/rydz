@@ -134,10 +134,10 @@ struct SplitTrailingFilters<T, Rest...> {
                              std::declval<std::tuple<T>>(),
                              std::declval<typename Tail::Items>()))>;
 
-  using FilterList =
-      std::conditional_t<is_filter_v && !tail_has_items,
-                         typename MergeFilters<T, typename Tail::FilterList>::type,
-                         typename Tail::FilterList>;
+  using FilterList = std::conditional_t<
+      is_filter_v && !tail_has_items,
+      typename MergeFilters<T, typename Tail::FilterList>::type,
+      typename Tail::FilterList>;
 };
 
 } // namespace detail

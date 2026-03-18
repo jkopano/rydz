@@ -14,6 +14,7 @@ struct EventId {
 template <typename E> class Events {
 public:
   using Type = ResourceType;
+
 private:
   std::vector<std::pair<E, EventId>> buffers_[2];
   size_t current_buffer_ = 0;

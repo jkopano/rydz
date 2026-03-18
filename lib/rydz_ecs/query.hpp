@@ -3,6 +3,7 @@
 #include "entity.hpp"
 #include "filter.hpp"
 #include "helpers.hpp"
+#include "rl.hpp"
 #include "storage.hpp"
 #include "ticks.hpp"
 #include "world.hpp"
@@ -62,26 +63,26 @@ private:
 };
 template <typename Inner> struct Opt {};
 
+template <typename T, typename StoragePtr = const SparseSetStorage<T> *>
+struct IFetcher {
+  StoragePtr storage = nullptr;
+
+  bool matches(Entity entity) const { return storage && storage->has(entity); }
+  size_t capacity() const { return storage ? storage->data_size() : 0; }
+  bool is_required() const { return true; }
+};
+
 template <typename T> struct WorldQueryTraits {
   using Item = const T *;
 
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
 
-  struct Fetcher {
-    const SparseSetStorage<T> *storage = nullptr;
-
-    void init(World &world) { storage = world.get_storage<T>(); }
+  struct Fetcher : IFetcher<T> {
+    void init(World &world) { this->storage = world.get_storage<T>(); }
 
     Item fetch(Entity entity) const {
-      return storage ? storage->get(entity) : nullptr;
+      return this->storage ? this->storage->get(entity) : nullptr;
     }
-
-    bool matches(Entity entity) const {
-      return storage && storage->has(entity);
-    }
-
-    size_t capacity() const { return storage ? storage->data_size() : 0; }
-    bool is_required() const { return true; }
   };
 };
 
@@ -90,23 +91,17 @@ template <typename T> struct WorldQueryTraits<Mut<T>> {
 
   static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
 
-  struct Fetcher {
-    SparseSetStorage<T> *storage = nullptr;
+  struct Fetcher : IFetcher<T, SparseSetStorage<T> *> {
     Tick tick{};
 
     void init(World &world) {
-      storage = world.get_storage<T>();
+      this->storage = world.get_storage<T>();
       tick = world.read_change_tick();
     }
     Item fetch(Entity entity) const {
-      return Item{storage ? storage->get(entity) : nullptr, storage, entity,
-                  tick};
+      return Item{this->storage ? this->storage->get(entity) : nullptr,
+                  this->storage, entity, tick};
     }
-    bool matches(Entity entity) const {
-      return storage && storage->has(entity);
-    }
-    size_t capacity() const { return storage ? storage->data_size() : 0; }
-    bool is_required() const { return true; }
   };
 };
 
@@ -250,8 +245,7 @@ private:
 
   template <typename... Items> auto make_iter(std::tuple<Items...>) const {
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);
-    uint32_t count =
-        static_cast<uint32_t>(compute_min_cap<Items...>(fetchers));
+    uint32_t count = static_cast<uint32_t>(compute_min_cap<Items...>(fetchers));
 
     auto matches = [fetchers, world = world_](uint32_t index) {
       Entity entity = Entity::from_raw(index, 0);

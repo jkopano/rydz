@@ -150,12 +150,9 @@ template <typename F> struct function_traits<F &> : function_traits<F> {};
 template <typename F> struct function_traits<F &&> : function_traits<F> {};
 
 template <typename T>
-using bare_param_t = std::remove_cv_t<std::remove_reference_t<T>>;
-
-template <typename T>
 concept SystemParameter = requires(World &w, SystemAccess &acc) {
-  SystemParamTraits<bare_param_t<T>>::retrieve(w);
-  SystemParamTraits<bare_param_t<T>>::access(acc);
+  SystemParamTraits<bare_t<T>>::retrieve(w);
+  SystemParamTraits<bare_t<T>>::access(acc);
 };
 
 template <typename F> class FunctionSystem : public ISystem {
@@ -188,12 +185,12 @@ public:
 
 private:
   template <SystemParameter... Args> void run_with_args(World &world) {
-    func_(SystemParamTraits<bare_param_t<Args>>::retrieve(world)...);
+    func_(SystemParamTraits<bare_t<Args>>::retrieve(world)...);
   }
 
   template <SystemParameter... Args>
   static void access_with_args(SystemAccess &acc) {
-    (SystemParamTraits<bare_param_t<Args>>::access(acc), ...);
+    (SystemParamTraits<bare_t<Args>>::access(acc), ...);
   }
 };
 

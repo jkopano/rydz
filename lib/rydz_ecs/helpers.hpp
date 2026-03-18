@@ -25,5 +25,8 @@ template <typename Fn> std::string system_name_of(Fn &&fn) {
 
 namespace views = std::ranges::views;
 
+template <typename T>
+using bare_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
 inline constexpr auto range = std::ranges::views::iota;
 } // namespace ecs

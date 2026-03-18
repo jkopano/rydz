@@ -18,6 +18,7 @@ public:
 class CommandQueue {
 public:
   using Type = ResourceType;
+
 private:
   std::vector<std::shared_ptr<ICommand>> queue_;
 
@@ -40,7 +41,6 @@ public:
 
 namespace detail {
 
-// Unified insert command — works for plain components, bundles, and tuples
 template <typename T> struct InsertCommand : ICommand {
   Entity entity;
   T item;
@@ -118,13 +118,10 @@ public:
   void despawn(Entity entity) { queue_->push(detail::DespawnCommand(entity)); }
 
   template <typename T> void insert_resource(T resource) {
-    static_assert(
-        !Bundle<T>,
-        "Bundles cannot be inserted as resources.");
-    static_assert(
-        Resource<T>,
-        "Only Resources can be inserted via insert_resource(). "
-        "Add 'using Type = ResourceType;' to your struct.");
+    static_assert(!Bundle<T>, "Bundles cannot be inserted as resources.");
+    static_assert(Resource<T>,
+                  "Only Resources can be inserted via insert_resource(). "
+                  "Add 'using Type = ResourceType;' to your struct.");
     queue_->push(detail::InsertResourceCommand<T>(std::move(resource)));
   }
 

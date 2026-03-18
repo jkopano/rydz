@@ -21,8 +21,7 @@ struct Entity {
 
   auto operator<=>(const Entity &) const = default;
 
-  template <typename H>
-  friend H AbslHashValue(H h, Entity e) {
+  template <typename H> friend H AbslHashValue(H h, Entity e) {
     return H::combine(std::move(h), e.index_val, e.generation_val);
   }
 };

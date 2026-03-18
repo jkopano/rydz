@@ -59,9 +59,8 @@ template <typename S> auto in_state(S target) {
 }
 
 template <typename S> auto state_changed() {
-  return [](Res<StateTransitionEvent<S>> event) -> bool {
-    return event->changed;
-  };
+  return
+      [](Res<StateTransitionEvent<S>> event) -> bool { return event->changed; };
 }
 
 template <typename S> void check_state_transitions(World &world) {

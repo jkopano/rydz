@@ -26,8 +26,7 @@ enum class ScheduleLabel {
   FixedUpdate,
 };
 
-template <typename H>
-H AbslHashValue(H h, ScheduleLabel l) {
+template <typename H> H AbslHashValue(H h, ScheduleLabel l) {
   return H::combine(std::move(h), static_cast<int>(l));
 }
 
