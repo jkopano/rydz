@@ -189,6 +189,7 @@ public:
 
   size_t size() const override { return data_.size(); }
   bool empty() const override { return data_.empty(); }
+  size_t data_size() const { return data_.size(); }
 
   std::optional<ComponentTicks> get_ticks(Entity entity) const override {
     auto *d = get_data(entity);

@@ -63,13 +63,21 @@ private:
 };
 template <typename Inner> struct Opt {};
 
-template <typename T, typename StoragePtr = const SparseSetStorage<T> *>
+template <typename T, typename ItemT = const T *,
+          typename StoragePtr = const storage_t<T> *>
 struct IFetcher {
   StoragePtr storage = nullptr;
 
-  bool matches(Entity entity) const { return storage && storage->has(entity); }
-  size_t capacity() const { return storage ? storage->data_size() : 0; }
-  bool is_required() const { return true; }
+  virtual void init(World &world) = 0;
+  virtual ItemT fetch(Entity entity) const = 0;
+
+  virtual bool matches(Entity entity) const {
+    return storage && storage->has(entity);
+  }
+  virtual size_t capacity() const { return storage ? storage->data_size() : 0; }
+  virtual bool is_required() const { return true; }
+
+  virtual ~IFetcher() = default;
 };
 
 template <typename T> struct WorldQueryTraits {
@@ -78,9 +86,9 @@ template <typename T> struct WorldQueryTraits {
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
 
   struct Fetcher : IFetcher<T> {
-    void init(World &world) { this->storage = world.get_storage<T>(); }
+    void init(World &world) override { this->storage = world.get_storage<T>(); }
 
-    Item fetch(Entity entity) const {
+    Item fetch(Entity entity) const override {
       return this->storage ? this->storage->get(entity) : nullptr;
     }
   };
@@ -91,14 +99,14 @@ template <typename T> struct WorldQueryTraits<Mut<T>> {
 
   static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
 
-  struct Fetcher : IFetcher<T, SparseSetStorage<T> *> {
+  struct Fetcher : IFetcher<T, Item, storage_t<T> *> {
     Tick tick{};
 
-    void init(World &world) {
+    void init(World &world) override {
       this->storage = world.get_storage<T>();
       tick = world.read_change_tick();
     }
-    Item fetch(Entity entity) const {
+    Item fetch(Entity entity) const override {
       return Item{this->storage ? this->storage->get(entity) : nullptr,
                   this->storage, entity, tick};
     }
@@ -110,16 +118,15 @@ template <typename T> struct WorldQueryTraits<Opt<T>> {
 
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
 
-  struct Fetcher {
-    const SparseSetStorage<T> *storage = nullptr;
+  struct Fetcher : IFetcher<T> {
+    void init(World &world) override { this->storage = world.get_storage<T>(); }
 
-    void init(World &world) { storage = world.get_storage<T>(); }
-    Item fetch(Entity entity) const {
-      return storage ? storage->get(entity) : nullptr;
+    Item fetch(Entity entity) const override {
+      return this->storage ? this->storage->get(entity) : nullptr;
     }
-    bool matches(Entity) const { return true; }
-    size_t capacity() const { return SIZE_MAX; }
-    bool is_required() const { return false; }
+    bool matches(Entity) const override { return true; }
+    size_t capacity() const override { return SIZE_MAX; }
+    bool is_required() const override { return false; }
   };
 };
 
@@ -128,26 +135,26 @@ template <typename T> struct WorldQueryTraits<Opt<Mut<T>>> {
 
   static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
 
-  struct Fetcher {
-    SparseSetStorage<T> *storage = nullptr;
+  struct Fetcher : IFetcher<T, Item, storage_t<T> *> {
     Tick tick{};
 
-    void init(World &world) {
-      storage = world.get_storage<T>();
+    void init(World &world) override {
+      this->storage = world.get_storage<T>();
       tick = world.read_change_tick();
     }
-    Item fetch(Entity entity) const {
-      return Item{storage ? storage->get(entity) : nullptr, storage, entity,
-                  tick};
+    Item fetch(Entity entity) const override {
+      return Item{this->storage ? this->storage->get(entity) : nullptr,
+                  this->storage, entity, tick};
     }
-    bool matches(Entity) const { return true; }
-    size_t capacity() const { return SIZE_MAX; }
-    bool is_required() const { return false; }
+    bool matches(Entity) const override { return true; }
+    size_t capacity() const override { return SIZE_MAX; }
+    bool is_required() const override { return false; }
   };
 };
 
 template <> struct WorldQueryTraits<Entity> {
   using Item = Entity;
+  void *lol = nullptr;
 
   static void access(SystemAccess &) {}
 
