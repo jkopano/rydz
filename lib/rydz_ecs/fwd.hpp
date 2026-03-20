@@ -15,7 +15,7 @@ class EntityManager;
 
 struct Tick;
 struct ComponentTicks;
-template <typename T> struct ComponentData;
+
 
 struct SystemAccess;
 

@@ -6,6 +6,9 @@
 namespace ecs {
 
 class TextureLoader : public AssetLoader<TextureLoader, rl::Texture2D> {
+private:
+  std::string path_;
+
 public:
   std::vector<std::string> extensions() const override {
     return {"png", "jpg", "jpeg", "bmp", "tga", "gif"};
@@ -30,9 +33,6 @@ public:
       assets->set(Handle<rl::Texture2D>{handle_id}, tex);
     }
   }
-
-private:
-  std::string path_;
 };
 
 struct PendingModelLoad {

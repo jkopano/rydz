@@ -73,6 +73,7 @@ struct GlobalTransform {
 
 inline void propagate_transforms(
     Query<Entity, Transform3D, Opt<Parent>, Mut<GlobalTransform>> query) {
+
   std::unordered_map<Entity, Mat4> local_matrices;
   std::unordered_map<Entity, Entity> parents;
 

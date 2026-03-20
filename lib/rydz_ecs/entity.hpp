@@ -37,7 +37,8 @@ template <> struct std::hash<ecs::Entity> {
 
 namespace ecs {
 
-class EntityManager {
+struct EntityManager {
+private:
   uint32_t next_id_ = 0;
   std::vector<std::pair<uint32_t, uint32_t>> free_list_;
   std::unordered_set<Entity> active_;

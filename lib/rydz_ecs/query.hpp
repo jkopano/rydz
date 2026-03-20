@@ -6,6 +6,7 @@
 #include "rl.hpp"
 #include "storage.hpp"
 #include "ticks.hpp"
+#include "types.hpp"
 #include "world.hpp"
 #include <optional>
 #include <tuple>
@@ -74,8 +75,12 @@ struct IFetcher {
   virtual bool matches(Entity entity) const {
     return storage && storage->has(entity);
   }
-  virtual size_t capacity() const { return storage ? storage->data_size() : 0; }
+  virtual usize size() const { return storage ? storage->size() : 0; }
   virtual bool is_required() const { return true; }
+
+  std::vector<Entity> entities() const {
+    return storage ? storage->entities() : std::vector<Entity>{};
+  }
 
   virtual ~IFetcher() = default;
 };
@@ -125,7 +130,7 @@ template <typename T> struct WorldQueryTraits<Opt<T>> {
       return this->storage ? this->storage->get(entity) : nullptr;
     }
     bool matches(Entity) const override { return true; }
-    size_t capacity() const override { return SIZE_MAX; }
+    usize size() const override { return SIZE_MAX; }
     bool is_required() const override { return false; }
   };
 };
@@ -147,14 +152,13 @@ template <typename T> struct WorldQueryTraits<Opt<Mut<T>>> {
                   this->storage, entity, tick};
     }
     bool matches(Entity) const override { return true; }
-    size_t capacity() const override { return SIZE_MAX; }
+    usize size() const override { return SIZE_MAX; }
     bool is_required() const override { return false; }
   };
 };
 
 template <> struct WorldQueryTraits<Entity> {
   using Item = Entity;
-  void *lol = nullptr;
 
   static void access(SystemAccess &) {}
 
@@ -162,8 +166,9 @@ template <> struct WorldQueryTraits<Entity> {
     void init(World &) {}
     Item fetch(Entity entity) const { return entity; }
     bool matches(Entity) const { return true; }
-    size_t capacity() const { return SIZE_MAX; }
+    usize size() const { return SIZE_MAX; }
     bool is_required() const { return false; }
+    std::vector<Entity> entities() const { return {}; }
   };
 };
 
@@ -194,11 +199,10 @@ private:
   template <typename... Items> auto single_impl(std::tuple<Items...>) const {
     using ResultTuple = std::tuple<typename WorldQueryTraits<Items>::Item...>;
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);
-    size_t min_cap = compute_min_cap<Items...>(fetchers);
+    auto candidate_entities = find_smallest_entities_group<Items...>(fetchers);
 
     std::optional<ResultTuple> result;
-    for (auto i : range(0u, min_cap)) {
-      Entity entity = Entity::from_raw(i, 0);
+    for (Entity entity : candidate_entities) {
       if (!matches_all<Items...>(fetchers, entity))
         continue;
       if (!QueryFilterTraits<FilterT>::matches(*world_, entity))
@@ -226,20 +230,23 @@ private:
   }
 
   template <typename... Items>
-  static size_t
-  compute_min_cap(const std::tuple<typename WorldQueryTraits<Items>::Fetcher...>
-                      &fetchers) {
-    size_t min_cap = SIZE_MAX;
+  static std::vector<Entity> find_smallest_entities_group(
+      const std::tuple<typename WorldQueryTraits<Items>::Fetcher...>
+          &fetchers) {
+    usize min_size = SIZE_MAX;
+    std::vector<Entity> result;
     std::apply(
         [&](const auto &...f) {
           auto check = [&](const auto &fetcher) {
-            if (fetcher.is_required() && fetcher.capacity() < min_cap)
-              min_cap = fetcher.capacity();
+            if (fetcher.is_required() && fetcher.size() < min_size) {
+              min_size = fetcher.size();
+              result = fetcher.entities();
+            }
           };
           (check(f), ...);
         },
         fetchers);
-    return (min_cap == SIZE_MAX) ? 0 : min_cap;
+    return result;
   }
 
   template <typename... Items>
@@ -252,34 +259,30 @@ private:
 
   template <typename... Items> auto make_iter(std::tuple<Items...>) const {
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);
-    uint32_t count = static_cast<uint32_t>(compute_min_cap<Items...>(fetchers));
+    auto candidate_entities = find_smallest_entities_group<Items...>(fetchers);
 
-    auto matches = [fetchers, world = world_](uint32_t index) {
-      Entity entity = Entity::from_raw(index, 0);
+    auto matches = [fetchers, world = world_](Entity entity) {
       if (!matches_all<Items...>(fetchers, entity))
         return false;
       return QueryFilterTraits<FilterT>::matches(*world, entity);
     };
 
-    auto fetch = [fetchers](uint32_t index) {
-      Entity entity = Entity::from_raw(index, 0);
+    auto fetch = [fetchers](Entity entity) {
       return std::apply(
           [&](const auto &...f) { return std::tuple{f.fetch(entity)...}; },
           fetchers);
     };
 
-    return views::iota(uint32_t{0}, count) | views::filter(matches) |
+    return std::move(candidate_entities) | views::filter(matches) |
            views::transform(fetch);
   }
 
   template <typename Func, typename... Items>
   void for_each_impl(Func &&func, std::tuple<Items...>) const {
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);
-    size_t min_cap = compute_min_cap<Items...>(fetchers);
+    auto candidate_entities = find_smallest_entities_group<Items...>(fetchers);
 
-    for (auto i : range(0u, min_cap)) {
-      Entity entity = Entity::from_raw(i, 0);
-
+    for (Entity entity : candidate_entities) {
       if (!matches_all<Items...>(fetchers, entity))
         continue;
 

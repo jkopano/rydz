@@ -10,13 +10,19 @@
 #include <string>
 
 namespace ecs {
+struct Window {
+  using Type = ecs::ResourceType;
 
-struct WindowConfig {
-  using Type = ResourceType;
-  int width = 800;
-  int height = 600;
+  i32 width;
+  i32 height;
   std::string title = "ECS App";
   int target_fps = 60;
+
+public:
+  static void Update(ecs::ResMut<Window> window, ecs::NonSendMarker) {
+    window->height = rl::GetScreenHeight();
+    window->width = rl::GetScreenWidth();
+  }
 };
 
 class App {
@@ -151,7 +157,7 @@ public:
   }
 
   void run() {
-    auto *config = world_.get_resource<WindowConfig>();
+    auto *config = world_.get_resource<Window>();
     if (config) {
       rl::InitWindow(config->width, config->height, config->title.c_str());
       rl::SetTargetFPS(config->target_fps);
@@ -178,15 +184,16 @@ private:
   }
 };
 
-inline auto window_plugin(WindowConfig config = {}) {
-  return
-      [config = std::move(config)](App &app) { app.insert_resource(config); };
-}
-
 inline void time_plugin(App &app) {
   if (!app.world().has_resource<Time>()) {
     app.insert_resource(Time{});
   }
+}
+inline auto window_plugin(Window config = {}) {
+  return [config = std::move(config)](ecs::App &app) {
+    app.add_systems(ScheduleLabel::Update, Window::Update);
+    app.insert_resource(config);
+  };
 }
 
 } // namespace ecs

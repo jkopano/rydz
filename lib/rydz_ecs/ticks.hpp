@@ -23,9 +23,4 @@ struct ComponentTicks {
   Tick last_run{};
 };
 
-template <typename T> struct ComponentData {
-  T component;
-  ComponentTicks ticks;
-};
-
 } // namespace ecs

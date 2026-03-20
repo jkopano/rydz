@@ -114,12 +114,13 @@ public:
   }
 
   template <typename T, typename Self> auto *get_storage(this Self &&self) {
-    using ReturnType = copy_const_t<Self, storage_t<T>>;
+    using StripT = std::remove_cv_t<T>;
+    using ReturnT = copy_const_t<Self, storage_t<StripT>>;
 
-    auto it = self.storages_.find(std::type_index(typeid(T)));
+    auto it = self.storages_.find(std::type_index(typeid(StripT)));
     return (it == self.storages_.end())
                ? nullptr
-               : static_cast<ReturnType *>(it->second.get());
+               : static_cast<ReturnT *>(it->second.get());
   }
 };
 

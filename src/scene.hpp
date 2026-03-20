@@ -85,7 +85,7 @@ inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
   cmd.spawn(
       MapTag{},
       Model3d{asset_server->load<rl::Model>("res/models/sponza_atrium_3.glb")},
-      Transform3D{});
+      Transform3D{.scale = Vec3{10.1f, 10.1f, 10.1f}});
 }
 
 struct HouseHandles {

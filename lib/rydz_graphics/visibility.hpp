@@ -33,9 +33,8 @@ inline void compute_visibility(World &world) {
   std::unordered_map<Entity, Entity> parents;
   auto *parent_storage = world.get_storage<Parent>();
   if (parent_storage) {
-    parent_storage->for_each([&](Entity e, const Parent &p) {
-      parents[e] = p.entity;
-    });
+    parent_storage->for_each(
+        [&](Entity e, const Parent &p) { parents[e] = p.entity; });
   }
 
   std::function<bool(Entity)> is_visible = [&](Entity entity) -> bool {
