@@ -8,8 +8,8 @@ namespace ecs {
 using KeyCode = int;
 
 struct MouseState {
-  float delta_x = 0.0f;
-  float delta_y = 0.0f;
+  f32 delta_x = 0.0f;
+  f32 delta_y = 0.0f;
 };
 
 struct Input {
@@ -21,8 +21,8 @@ struct Input {
   Vector2 mouse_delta() const {
     return Vector2{mouse_.delta_x, mouse_.delta_y};
   }
-  float mouse_delta_x() const { return mouse_.delta_x; }
-  float mouse_delta_y() const { return mouse_.delta_y; }
+  f32 mouse_delta_x() const { return mouse_.delta_x; }
+  f32 mouse_delta_y() const { return mouse_.delta_y; }
 
   void clear_frame() {
     keys_pressed_.clear();
@@ -45,7 +45,7 @@ struct Input {
     keys_down_.erase(key);
   }
 
-  void set_mouse_delta(float dx, float dy) {
+  void set_mouse_delta(f32 dx, f32 dy) {
     mouse_.delta_x = dx;
     mouse_.delta_y = dy;
   }
@@ -63,7 +63,7 @@ inline void input_polling_system(ResMut<Input> input, NonSendMarker) {
   input->clear_frame();
 
   // Drain raylib's key pressed queue
-  int key;
+  i32 key;
   while ((key = rl::GetKeyPressed()) != 0) {
     input->set_key_down(key);
   }

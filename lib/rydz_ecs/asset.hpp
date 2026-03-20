@@ -16,7 +16,7 @@
 namespace ecs {
 
 template <typename T> struct Handle {
-  uint32_t id = UINT32_MAX;
+  u32 id = UINT32_MAX;
 
   bool is_valid() const { return id != UINT32_MAX; }
   bool operator==(const Handle &o) const { return id == o.id; }
@@ -32,7 +32,7 @@ private:
 
 public:
   Handle<T> add(T item) {
-    uint32_t idx = static_cast<uint32_t>(items_.size());
+    u32 idx = static_cast<u32>(items_.size());
     items_.push_back(std::move(item));
     return Handle<T>{idx};
   }
@@ -79,9 +79,9 @@ public:
   virtual ~IAssetLoader() = default;
   virtual std::vector<std::string> extensions() const = 0;
   virtual bool is_async() const = 0;
-  virtual std::any load(const std::vector<uint8_t> &data,
+  virtual std::any load(const std::vector<u8> &data,
                         const std::string &path) = 0;
-  virtual void insert_into_world(World &world, uint32_t handle_id,
+  virtual void insert_into_world(World &world, u32 handle_id,
                                  std::any asset) = 0;
 };
 
@@ -90,13 +90,11 @@ class AssetLoader : public IAssetLoader {
 public:
   bool is_async() const override { return true; }
 
-  std::any load(const std::vector<uint8_t> &data,
-                const std::string &path) override {
+  std::any load(const std::vector<u8> &data, const std::string &path) override {
     return std::any(static_cast<Derived *>(this)->load_asset(data, path));
   }
 
-  void insert_into_world(World &world, uint32_t handle_id,
-                         std::any asset) override {
+  void insert_into_world(World &world, u32 handle_id, std::any asset) override {
     auto *assets = world.get_resource<Assets<T>>();
     if (assets) {
       assets->set(Handle<T>{handle_id}, std::any_cast<T>(std::move(asset)));
@@ -110,7 +108,7 @@ public:
 
 private:
   struct LoadedAsset {
-    uint32_t handle_id;
+    u32 handle_id;
     std::any asset;
     std::shared_ptr<IAssetLoader> loader;
   };
@@ -118,8 +116,8 @@ private:
   std::unordered_map<std::string, std::shared_ptr<IAssetLoader>> loaders_;
   mutable std::mutex completed_mutex_;
   mutable std::vector<LoadedAsset> completed_;
-  mutable std::atomic<uint32_t> next_id_{0};
-  mutable std::unordered_map<std::string, uint32_t> path_cache_;
+  mutable std::atomic<u32> next_id_{0};
+  mutable std::unordered_map<std::string, u32> path_cache_;
   std::string root_path_;
 
 public:
@@ -161,7 +159,7 @@ public:
       }
     }
 
-    uint32_t id = next_id_.fetch_add(1);
+    u32 id = next_id_.fetch_add(1);
     Handle<T> handle{id};
 
     {
@@ -239,13 +237,13 @@ private:
     return clean.substr(pos + 1);
   }
 
-  static std::vector<uint8_t> read_file(const std::string &path) {
+  static std::vector<u8> read_file(const std::string &path) {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file.is_open())
       return {};
     auto size = file.tellg();
     file.seekg(0);
-    std::vector<uint8_t> data(static_cast<size_t>(size));
+    std::vector<u8> data(static_cast<size_t>(size));
     file.read(reinterpret_cast<char *>(data.data()),
               static_cast<std::streamsize>(size));
     return data;

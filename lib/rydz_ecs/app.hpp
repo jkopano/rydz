@@ -13,10 +13,10 @@ namespace ecs {
 struct Window {
   using Type = ecs::ResourceType;
 
-  i32 width;
-  i32 height;
+  u32 width;
+  u32 height;
   std::string title = "ECS App";
-  int target_fps = 60;
+  u32 target_fps = 60;
 
 public:
   static void Update(ecs::ResMut<Window> window, ecs::NonSendMarker) {

@@ -27,14 +27,14 @@ enum class ScheduleLabel {
 };
 
 template <typename H> H AbslHashValue(H h, ScheduleLabel l) {
-  return H::combine(std::move(h), static_cast<int>(l));
+  return H::combine(std::move(h), static_cast<i32>(l));
 }
 
 } // namespace ecs
 
 template <> struct std::hash<ecs::ScheduleLabel> {
   size_t operator()(ecs::ScheduleLabel l) const noexcept {
-    return std::hash<int>{}(static_cast<int>(l));
+    return std::hash<i32>{}(static_cast<i32>(l));
   }
 };
 

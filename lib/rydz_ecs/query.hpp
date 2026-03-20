@@ -9,6 +9,7 @@
 #include "types.hpp"
 #include "world.hpp"
 #include <optional>
+#include <span>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -64,36 +65,28 @@ private:
 };
 template <typename Inner> struct Opt {};
 
-template <typename T, typename ItemT = const T *,
-          typename StoragePtr = const storage_t<T> *>
-struct IFetcher {
+template <typename T, typename StoragePtr = const storage_t<T> *>
+struct FetcherBase {
   StoragePtr storage = nullptr;
 
-  virtual void init(World &world) = 0;
-  virtual ItemT fetch(Entity entity) const = 0;
+  usize size() const { return storage ? storage->size() : 0; }
+  bool is_required() const { return true; }
 
-  virtual bool matches(Entity entity) const {
-    return storage && storage->has(entity);
+  std::span<const Entity> entities() const {
+    return storage ? storage->entities() : std::span<const Entity>{};
   }
-  virtual usize size() const { return storage ? storage->size() : 0; }
-  virtual bool is_required() const { return true; }
-
-  std::vector<Entity> entities() const {
-    return storage ? storage->entities() : std::vector<Entity>{};
-  }
-
-  virtual ~IFetcher() = default;
 };
 
 template <typename T> struct WorldQueryTraits {
   using Item = const T *;
 
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
+  static bool is_valid(Item item) { return item != nullptr; }
 
-  struct Fetcher : IFetcher<T> {
-    void init(World &world) override { this->storage = world.get_storage<T>(); }
+  struct Fetcher : FetcherBase<T> {
+    void init(World &world) { this->storage = world.get_storage<T>(); }
 
-    Item fetch(Entity entity) const override {
+    Item fetch(Entity entity) const {
       return this->storage ? this->storage->get(entity) : nullptr;
     }
   };
@@ -103,15 +96,16 @@ template <typename T> struct WorldQueryTraits<Mut<T>> {
   using Item = Mut<T>;
 
   static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
+  static bool is_valid(const Item &item) { return item.ptr != nullptr; }
 
-  struct Fetcher : IFetcher<T, Item, storage_t<T> *> {
+  struct Fetcher : FetcherBase<T, storage_t<T> *> {
     Tick tick{};
 
-    void init(World &world) override {
+    void init(World &world) {
       this->storage = world.get_storage<T>();
       tick = world.read_change_tick();
     }
-    Item fetch(Entity entity) const override {
+    Item fetch(Entity entity) const {
       return Item{this->storage ? this->storage->get(entity) : nullptr,
                   this->storage, entity, tick};
     }
@@ -122,16 +116,16 @@ template <typename T> struct WorldQueryTraits<Opt<T>> {
   using Item = const T *;
 
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
+  static bool is_valid(Item) { return true; }
 
-  struct Fetcher : IFetcher<T> {
-    void init(World &world) override { this->storage = world.get_storage<T>(); }
+  struct Fetcher : FetcherBase<T> {
+    void init(World &world) { this->storage = world.get_storage<T>(); }
 
-    Item fetch(Entity entity) const override {
+    Item fetch(Entity entity) const {
       return this->storage ? this->storage->get(entity) : nullptr;
     }
-    bool matches(Entity) const override { return true; }
-    usize size() const override { return SIZE_MAX; }
-    bool is_required() const override { return false; }
+    usize size() const { return SIZE_MAX; }
+    bool is_required() const { return false; }
   };
 };
 
@@ -139,21 +133,21 @@ template <typename T> struct WorldQueryTraits<Opt<Mut<T>>> {
   using Item = Mut<T>;
 
   static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
+  static bool is_valid(const Item &) { return true; }
 
-  struct Fetcher : IFetcher<T, Item, storage_t<T> *> {
+  struct Fetcher : FetcherBase<T, storage_t<T> *> {
     Tick tick{};
 
-    void init(World &world) override {
+    void init(World &world) {
       this->storage = world.get_storage<T>();
       tick = world.read_change_tick();
     }
-    Item fetch(Entity entity) const override {
+    Item fetch(Entity entity) const {
       return Item{this->storage ? this->storage->get(entity) : nullptr,
                   this->storage, entity, tick};
     }
-    bool matches(Entity) const override { return true; }
-    usize size() const override { return SIZE_MAX; }
-    bool is_required() const override { return false; }
+    usize size() const { return SIZE_MAX; }
+    bool is_required() const { return false; }
   };
 };
 
@@ -161,14 +155,14 @@ template <> struct WorldQueryTraits<Entity> {
   using Item = Entity;
 
   static void access(SystemAccess &) {}
+  static bool is_valid(Item) { return true; }
 
   struct Fetcher {
     void init(World &) {}
     Item fetch(Entity entity) const { return entity; }
-    bool matches(Entity) const { return true; }
     usize size() const { return SIZE_MAX; }
     bool is_required() const { return false; }
-    std::vector<Entity> entities() const { return {}; }
+    std::span<const Entity> entities() const { return {}; }
   };
 };
 
@@ -196,33 +190,6 @@ public:
   }
 
 private:
-  template <typename... Items> auto single_impl(std::tuple<Items...>) const {
-    using ResultTuple = std::tuple<typename WorldQueryTraits<Items>::Item...>;
-    auto fetchers = std::make_tuple(make_fetcher<Items>()...);
-    auto candidate_entities = find_smallest_entities_group<Items...>(fetchers);
-
-    std::optional<ResultTuple> result;
-    for (Entity entity : candidate_entities) {
-      if (!matches_all<Items...>(fetchers, entity))
-        continue;
-      if (!QueryFilterTraits<FilterT>::matches(*world_, entity))
-        continue;
-
-      if (result.has_value()) {
-        rl::TraceLog(LOG_INFO, "Query::single() found more than one match");
-        return std::optional<ResultTuple>{std::nullopt};
-      }
-      result = std::apply(
-          [&](const auto &...f) { return std::tuple{f.fetch(entity)...}; },
-          fetchers);
-    }
-
-    if (!result.has_value())
-      rl::TraceLog(LOG_INFO, "Query::single() found no matches");
-
-    return result;
-  }
-
   template <typename Q> auto make_fetcher() const {
     typename WorldQueryTraits<Q>::Fetcher f;
     f.init(*world_);
@@ -230,11 +197,11 @@ private:
   }
 
   template <typename... Items>
-  static std::vector<Entity> find_smallest_entities_group(
+  static std::span<const Entity> find_smallest_entities_group(
       const std::tuple<typename WorldQueryTraits<Items>::Fetcher...>
           &fetchers) {
     usize min_size = SIZE_MAX;
-    std::vector<Entity> result;
+    std::span<const Entity> result;
     std::apply(
         [&](const auto &...f) {
           auto check = [&](const auto &fetcher) {
@@ -249,47 +216,76 @@ private:
     return result;
   }
 
-  template <typename... Items>
-  static bool matches_all(
-      const std::tuple<typename WorldQueryTraits<Items>::Fetcher...> &fetchers,
-      Entity entity) {
+  template <typename... Items, typename Fetchers>
+  static auto fetch_all(const Fetchers &fetchers, Entity entity) {
     return std::apply(
-        [&](const auto &...f) { return (f.matches(entity) && ...); }, fetchers);
+        [&](const auto &...f) { return std::tuple{f.fetch(entity)...}; },
+        fetchers);
+  }
+
+  template <typename... Items>
+  static bool all_valid(
+      const std::tuple<typename WorldQueryTraits<Items>::Item...> &items) {
+    return [&]<size_t... I>(std::index_sequence<I...>) {
+      return (WorldQueryTraits<Items>::is_valid(std::get<I>(items)) && ...);
+    }(std::index_sequence_for<Items...>{});
+  }
+
+  template <typename... Items>
+  static std::optional<std::tuple<typename WorldQueryTraits<Items>::Item...>>
+  try_fetch(const auto &fetchers, Entity entity, const World &world) {
+    auto items = fetch_all<Items...>(fetchers, entity);
+    if (!all_valid<Items...>(items) ||
+        !QueryFilterTraits<FilterT>::matches(world, entity))
+      return std::nullopt;
+    return items;
+  }
+
+  template <typename... Items> auto single_impl(std::tuple<Items...>) const {
+    using Result = std::tuple<typename WorldQueryTraits<Items>::Item...>;
+    auto fetchers = std::make_tuple(make_fetcher<Items>()...);
+    auto candidates = find_smallest_entities_group<Items...>(fetchers);
+
+    std::optional<Result> result;
+    for (Entity entity : candidates) {
+      auto fetched = try_fetch<Items...>(fetchers, entity, *world_);
+      if (!fetched)
+        continue;
+      if (result.has_value()) {
+        rl::TraceLog(LOG_INFO, "Query::single() found more than one match");
+        return std::optional<Result>{std::nullopt};
+      }
+      result = *fetched;
+    }
+
+    if (!result.has_value())
+      rl::TraceLog(LOG_INFO, "Query::single() found no matches");
+
+    return result;
   }
 
   template <typename... Items> auto make_iter(std::tuple<Items...>) const {
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);
-    auto candidate_entities = find_smallest_entities_group<Items...>(fetchers);
+    auto candidates = find_smallest_entities_group<Items...>(fetchers);
 
-    auto matches = [fetchers, world = world_](Entity entity) {
-      if (!matches_all<Items...>(fetchers, entity))
-        return false;
-      return QueryFilterTraits<FilterT>::matches(*world, entity);
-    };
-
-    auto fetch = [fetchers](Entity entity) {
-      return std::apply(
-          [&](const auto &...f) { return std::tuple{f.fetch(entity)...}; },
-          fetchers);
-    };
-
-    return std::move(candidate_entities) | views::filter(matches) |
-           views::transform(fetch);
+    return candidates |
+           views::transform([fetchers, world = world_](Entity entity) {
+             return try_fetch<Items...>(fetchers, entity, *world);
+           }) |
+           views::filter([](const auto &opt) { return opt.has_value(); }) |
+           views::transform([](auto &&opt) { return *std::move(opt); });
   }
 
   template <typename Func, typename... Items>
   void for_each_impl(Func &&func, std::tuple<Items...>) const {
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);
-    auto candidate_entities = find_smallest_entities_group<Items...>(fetchers);
+    auto candidates = find_smallest_entities_group<Items...>(fetchers);
 
-    for (Entity entity : candidate_entities) {
-      if (!matches_all<Items...>(fetchers, entity))
+    for (Entity entity : candidates) {
+      auto fetched = try_fetch<Items...>(fetchers, entity, *world_);
+      if (!fetched)
         continue;
-
-      if (!QueryFilterTraits<FilterT>::matches(*world_, entity))
-        continue;
-
-      std::apply([&](const auto &...f) { func(f.fetch(entity)...); }, fetchers);
+      std::apply(func, *fetched);
     }
   }
 

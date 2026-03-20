@@ -1,17 +1,18 @@
 #pragma once
+#include "types.hpp"
 #include <cstdint>
 
 namespace ecs {
 
 struct Tick {
-  uint32_t value = 0;
+  u32 value = 0;
 
   Tick() = default;
-  explicit Tick(uint32_t v) : value(v) {}
+  explicit Tick(u32 v) : value(v) {}
 
   bool is_newer_than(Tick last_run, Tick this_run) const {
-    uint32_t ticks_since_last_run = this_run.value - last_run.value;
-    uint32_t ticks_since_self = this_run.value - value;
+    u32 ticks_since_last_run = this_run.value - last_run.value;
+    u32 ticks_since_self = this_run.value - value;
     return ticks_since_self < ticks_since_last_run;
   }
 };

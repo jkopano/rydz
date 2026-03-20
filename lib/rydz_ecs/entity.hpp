@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "types.hpp"
 #include <functional>
 #include <unordered_set>
 #include <vector>
@@ -7,15 +7,13 @@
 namespace ecs {
 
 struct Entity {
-  uint32_t index_val = 0;
-  uint32_t generation_val = 0;
+  u32 index_val = 0;
+  u32 generation_val = 0;
 
-  static constexpr Entity from_raw(uint32_t idx, uint32_t gen) {
-    return {idx, gen};
-  }
+  static constexpr Entity from_raw(u32 idx, u32 gen) { return {idx, gen}; }
 
-  [[nodiscard]] constexpr uint32_t index() const noexcept { return index_val; }
-  [[nodiscard]] constexpr uint32_t generation() const noexcept {
+  [[nodiscard]] constexpr u32 index() const noexcept { return index_val; }
+  [[nodiscard]] constexpr u32 generation() const noexcept {
     return generation_val;
   }
 
@@ -30,8 +28,8 @@ struct Entity {
 
 template <> struct std::hash<ecs::Entity> {
   size_t operator()(const ecs::Entity &e) const noexcept {
-    return std::hash<uint64_t>{}((static_cast<uint64_t>(e.index_val) << 32) |
-                                 e.generation_val);
+    return std::hash<u64>{}((static_cast<u64>(e.index_val) << 32) |
+                            e.generation_val);
   }
 };
 
@@ -39,8 +37,8 @@ namespace ecs {
 
 struct EntityManager {
 private:
-  uint32_t next_id_ = 0;
-  std::vector<std::pair<uint32_t, uint32_t>> free_list_;
+  u32 next_id_ = 0;
+  std::vector<std::pair<u32, u32>> free_list_;
   std::unordered_set<Entity> active_;
 
 public:

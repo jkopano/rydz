@@ -1,5 +1,6 @@
 #pragma once
 
+#include "types.hpp"
 #include <cstdint>
 #include <ranges>
 #include <string>
@@ -17,7 +18,7 @@ template <typename Fn> std::string system_name_of(Fn &&fn) {
   using D = std::decay_t<Fn>;
   if constexpr (std::is_pointer_v<D> &&
                 std::is_function_v<std::remove_pointer_t<D>>) {
-    return std::to_string(reinterpret_cast<uintptr_t>(fn));
+    return std::to_string(reinterpret_cast<usize>(fn));
   } else {
     return typeid(D).name();
   }

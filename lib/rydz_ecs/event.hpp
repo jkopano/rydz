@@ -8,7 +8,7 @@
 namespace ecs {
 
 struct EventId {
-  size_t id = 0;
+  usize id = 0;
 };
 
 template <typename E> class Events {
@@ -17,11 +17,11 @@ public:
 
 private:
   std::vector<std::pair<E, EventId>> buffers_[2];
-  size_t current_buffer_ = 0;
-  size_t event_count_ = 0;
+  usize current_buffer_ = 0;
+  usize event_count_ = 0;
 
-  std::unordered_map<size_t, EventId> reader_cursors_;
-  size_t next_reader_id_ = 0;
+  std::unordered_map<usize, EventId> reader_cursors_;
+  usize next_reader_id_ = 0;
 
 public:
   void send(const E &event) {
@@ -34,12 +34,12 @@ public:
     buffers_[current_buffer_].push_back({std::move(event), id});
   }
 
-  size_t total_count() const { return buffers_[0].size() + buffers_[1].size(); }
+  usize total_count() const { return buffers_[0].size() + buffers_[1].size(); }
 
   bool is_empty() const { return buffers_[0].empty() && buffers_[1].empty(); }
 
   void update() {
-    size_t oldest = 1 - current_buffer_;
+    usize oldest = 1 - current_buffer_;
     buffers_[oldest].clear();
     current_buffer_ = oldest;
   }
@@ -50,17 +50,17 @@ public:
     event_count_ = 0;
   }
 
-  size_t register_reader() {
-    size_t id = next_reader_id_++;
+  usize register_reader() {
+    usize id = next_reader_id_++;
     reader_cursors_[id] = EventId{event_count_};
     return id;
   }
 
-  template <typename Func> void read(size_t reader_id, Func &&func) {
+  template <typename Func> void read(usize reader_id, Func &&func) {
     auto &cursor = reader_cursors_[reader_id];
-    size_t start_id = cursor.id;
+    usize start_id = cursor.id;
 
-    size_t oldest = 1 - current_buffer_;
+    usize oldest = 1 - current_buffer_;
     for (auto &[evt, eid] : buffers_[oldest]) {
       if (eid.id >= start_id)
         func(evt);
@@ -73,7 +73,7 @@ public:
     cursor.id = event_count_;
   }
 
-  bool has_unread(size_t reader_id) const {
+  bool has_unread(usize reader_id) const {
     auto it = reader_cursors_.find(reader_id);
     if (it == reader_cursors_.end())
       return !is_empty();
@@ -93,7 +93,7 @@ public:
 
 template <typename E> class EventReader {
   Events<E> *events_;
-  size_t reader_id_;
+  usize reader_id_;
 
 public:
   explicit EventReader(Events<E> *events)

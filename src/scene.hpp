@@ -15,10 +15,10 @@ struct RotateMarker {};
 
 struct CameraController {
   using Storage = SparseSetStorage<CameraController>;
-  float move_speed = 20.0f;
-  float mouse_sensitivity = 0.003f;
-  float yaw = -90.0f;
-  float pitch = -20.0f;
+  f32 move_speed = 20.0f;
+  f32 mouse_sensitivity = 0.003f;
+  f32 yaw = -90.0f;
+  f32 pitch = -20.0f;
   bool enabled = true;
 };
 
@@ -30,8 +30,8 @@ camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
     if (!ctrl->enabled)
       return;
 
-    float dt = time->delta_seconds;
-    float speed = ctrl->move_speed;
+    f32 dt = time->delta_seconds;
+    f32 speed = ctrl->move_speed;
 
     Vec3 move = Vec3::sZero();
     Vec3 forward = t->forward();
@@ -103,12 +103,12 @@ inline void spawn_houses_on_input(Cmd cmd, Res<AssetServer> asset_server,
     return;
   handles->loaded = true;
 
-  float spacing = 20.0f;
-  float scale = 0.015f;
-  int grid = 50;
+  f32 spacing = 20.0f;
+  f32 scale = 0.015f;
+  i32 grid = 50;
 
-  for (int x = -grid; x < grid; ++x) {
-    for (int z = -grid; z < grid; ++z) {
+  for (i32 x = -grid; x < grid; ++x) {
+    for (i32 z = -grid; z < grid; ++z) {
       cmd.spawn(
           HouseTag{},
           Model3d{asset_server->load<rl::Model>("res/models/old_house.glb")},
@@ -203,6 +203,38 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
   rl::DisableCursor();
 }
 
+struct Health {
+  u32 value = 100;
+};
+struct Position {
+  i32 x = 10;
+  i32 y = 20;
+};
+struct Damage {
+  u32 value = 100;
+};
+
+inline auto player_bundle(Health health, Position position, Damage damage) {
+  struct PlayerBundle {
+    using Type = BundleType;
+    Position position;
+    Health health;
+    Damage damage;
+  };
+
+  return PlayerBundle{.position = position, .health = health, .damage = damage};
+}
+
+inline auto spawn_player(Cmd cmd) {
+  cmd.spawn(player_bundle({100}, {100, 100}, {100}));
+};
+
+inline auto print_player(Query<Health, Position, Damage> query) {
+  for (auto [h, p, d] : query.iter()) {
+    rl::TraceLog(LOG_INFO, "Player: %d %d %d", h->value, p->x, p->y);
+  }
+}
+
 inline void scene_plugin(App &app) {
   app.add_plugin(input_plugin);
   app.insert_resource(HouseHandles{});
@@ -210,6 +242,7 @@ inline void scene_plugin(App &app) {
   app.insert_resource(LightsSpawned{});
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
+  app.add_systems(ScheduleLabel::Startup, group(spawn_player));
   app.add_systems(ScheduleLabel::Update, group(spawn_map).run_if(run_once()));
 
   app.add_systems(ScheduleLabel::Update, camera_controller_system);

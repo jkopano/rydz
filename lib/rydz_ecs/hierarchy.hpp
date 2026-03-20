@@ -17,6 +17,8 @@ struct Children {
 
   auto begin() const { return entities.begin(); }
   auto end() const { return entities.end(); }
+  auto cbegin() const { return entities.cbegin(); }
+  auto cend() const { return entities.cend(); }
 };
 
 inline Children children_of(const World &world, Entity parent) {
