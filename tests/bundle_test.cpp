@@ -418,3 +418,67 @@ TEST(BundleTest, ChainingInserts) {
   EXPECT_EQ(world.get_component<Health>(e)->hp, 100);
   EXPECT_TRUE(world.has_component<Marker>(e));
 }
+
+// ============================================================
+// spawn_batch
+// ============================================================
+
+TEST(BundleTest, SpawnBatchDirect) {
+  World world;
+
+  std::vector<MovingBundle> bundles;
+  for (int i = 0; i < 50; i++) {
+    bundles.push_back(MovingBundle{
+        .pos = {static_cast<float>(i), 0.0f},
+        .vel = {0.0f, static_cast<float>(i)},
+    });
+  }
+
+  auto entities = spawn_batch(world, std::move(bundles));
+  ASSERT_EQ(entities.size(), 50u);
+
+  for (int i = 0; i < 50; i++) {
+    auto *pos = world.get_component<Position>(entities[i]);
+    ASSERT_NE(pos, nullptr);
+    EXPECT_EQ(pos->x, static_cast<float>(i));
+    auto *vel = world.get_component<Velocity>(entities[i]);
+    ASSERT_NE(vel, nullptr);
+    EXPECT_EQ(vel->dy, static_cast<float>(i));
+  }
+}
+
+TEST(BundleTest, SpawnBatchPlainComponent) {
+  World world;
+
+  std::vector<Health> items = {{10}, {20}, {30}};
+  auto entities = spawn_batch(world, std::move(items));
+  ASSERT_EQ(entities.size(), 3u);
+
+  EXPECT_EQ(world.get_component<Health>(entities[0])->hp, 10);
+  EXPECT_EQ(world.get_component<Health>(entities[1])->hp, 20);
+  EXPECT_EQ(world.get_component<Health>(entities[2])->hp, 30);
+}
+
+TEST(BundleTest, CmdSpawnBatch) {
+  World world;
+  world.insert_resource(CommandQueue{});
+
+  auto *queue = world.get_resource<CommandQueue>();
+  Cmd cmd(queue, &world.entities);
+
+  std::vector<MovingBundle> bundles;
+  for (int i = 0; i < 10; i++) {
+    bundles.push_back(MovingBundle{
+        .pos = {static_cast<float>(i), 0.0f},
+        .vel = {0.0f, static_cast<float>(i)},
+    });
+  }
+
+  cmd.spawn_batch(std::move(bundles));
+  queue->apply(world);
+
+  Query<Position, Velocity> query(world);
+  int count = 0;
+  query.each([&](const Position *, const Velocity *) { count++; });
+  EXPECT_EQ(count, 10);
+}

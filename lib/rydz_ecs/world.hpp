@@ -7,6 +7,7 @@
 #include "ticks.hpp"
 #include <cassert>
 #include <memory>
+#include <ranges>
 #include <typeindex>
 #include <unordered_map>
 

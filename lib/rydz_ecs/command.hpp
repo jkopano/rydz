@@ -5,6 +5,7 @@
 #include "world.hpp"
 #include <functional>
 #include <memory>
+#include <ranges>
 #include <vector>
 
 namespace ecs {
@@ -113,6 +114,14 @@ public:
   EntityCommands spawn_empty() {
     Entity entity = entities_->create();
     return EntityCommands(entity, queue_, entities_);
+  }
+
+  template <std::ranges::input_range R>
+    requires Spawnable<std::ranges::range_value_t<R>>
+  void spawn_batch(R &&_range) {
+    for (auto &&item : std::forward<R>(_range)) {
+      spawn(std::forward<decltype(item)>(item));
+    }
   }
 
   void despawn(Entity entity) { queue_->push(detail::DespawnCommand(entity)); }

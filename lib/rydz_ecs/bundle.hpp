@@ -138,4 +138,19 @@ void insert_bundle(World &world, Entity entity, Ts &&...items) {
   (detail::insert_single(world, entity, std::forward<Ts>(items)), ...);
 }
 
+template <std::ranges::input_range R>
+  requires Spawnable<std::ranges::range_value_t<R>>
+std::vector<Entity> spawn_batch(World &world, R &&range) {
+  std::vector<Entity> spawned;
+  if constexpr (std::ranges::sized_range<R>)
+    spawned.reserve(std::ranges::size(range));
+
+  for (auto &&item : std::forward<R>(range)) {
+    Entity e = world.spawn();
+    insert_bundle(world, e, std::forward<decltype(item)>(item));
+    spawned.push_back(e);
+  }
+  return spawned;
+}
+
 } // namespace ecs

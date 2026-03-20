@@ -4,6 +4,7 @@
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
+#include <algorithm>
 #include <print>
 
 using namespace ecs;
@@ -108,17 +109,38 @@ inline void spawn_houses_on_input(Cmd cmd, Res<AssetServer> asset_server,
   f32 scale = 0.015f;
   i32 grid = 100;
 
-  for (i32 x = -grid; x < grid; ++x) {
-    for (i32 z = -grid; z < grid; ++z) {
-      cmd.spawn(
+  std::vector<std::tuple<HouseTag, Transform3D, Model3d>> houses{};
+  auto model_handle = asset_server->load<rl::Model>("res/models/old_house.glb");
+
+  for (auto x : range(-grid, grid)) {
+    for (auto z : range(-grid, grid)) {
+      houses.emplace_back(
           HouseTag{},
-          Model3d{asset_server->load<rl::Model>("res/models/old_house.glb")},
           Transform3D{
               .translation = Vec3(x * spacing, 0.0f, z * spacing),
               .scale = Vec3::sReplicate(scale),
-          });
+          },
+          Model3d{model_handle});
     }
   }
+
+  // auto houses =
+  //     std::views::cartesian_product(std::views::iota(-grid, grid),
+  //                                   std::views::iota(-grid, grid)) |
+  //     std::views::transform([&](auto &&tuple) {
+  //       auto [x, z] = tuple;
+  //       return std::tuple(
+  //           HouseTag{},
+  //           Transform3D{
+  //               .translation = Vec3(x * spacing, 0.0f, z * spacing),
+  //               .scale = Vec3::sReplicate(scale),
+  //           },
+  //           Model3d{
+  //               asset_server->load<rl::Model>("res/models/old_house.glb"),
+  //           });
+  //     });
+
+  cmd.spawn_batch(houses);
 }
 
 struct CarHandles {
