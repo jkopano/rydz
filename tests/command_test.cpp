@@ -5,6 +5,8 @@
 
 using namespace ecs;
 
+namespace {
+
 // ============================================================
 // Components
 // ============================================================
@@ -31,6 +33,8 @@ struct Value {
   int v;
   bool operator==(const Value &o) const { return v == o.v; }
 };
+
+} // namespace
 
 // ============================================================
 // Command tests (mirrors command_test.rs / commands_test.rs)

@@ -6,6 +6,8 @@
 
 using namespace ecs;
 
+namespace {
+
 // ============================================================
 // Components / Resources
 // ============================================================
@@ -19,6 +21,8 @@ struct Counter {
   using Type = ResourceType;
   int value = 0;
 };
+
+} // namespace
 
 // ============================================================
 // System tests (mirrors system_test.rs)

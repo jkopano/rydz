@@ -11,6 +11,8 @@
 
 using namespace ecs;
 
+namespace {
+
 // ============================================================
 // Components / resources for tests
 // ============================================================
@@ -47,6 +49,8 @@ struct ConcurrencyTracker {
 
   void exit() { --current; }
 };
+
+} // namespace
 
 // ============================================================
 // Parallel / access tests

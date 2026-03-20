@@ -32,11 +32,11 @@ public:
 
 class ConditionedSystem : public ISystem {
   std::unique_ptr<ISystem> system_;
-  std::unique_ptr<ICondition> condition_;
+  std::shared_ptr<ICondition> condition_;
 
 public:
   ConditionedSystem(std::unique_ptr<ISystem> system,
-                    std::unique_ptr<ICondition> condition)
+                    std::shared_ptr<ICondition> condition)
       : system_(std::move(system)), condition_(std::move(condition)) {}
 
   void run(World &world) override {
@@ -129,36 +129,16 @@ struct is_system_descriptor<SystemDescriptor<F>> : std::true_type {};
 template <typename T>
 inline constexpr bool is_system_descriptor_v = is_system_descriptor<T>::value;
 
-class CompositeSystem : public ISystem {
-  std::vector<std::unique_ptr<ISystem>> systems_;
-
-public:
-  explicit CompositeSystem(std::vector<std::unique_ptr<ISystem>> systems)
-      : systems_(std::move(systems)) {}
-
-  void run(World &world) override {
-    for (auto &sys : systems_)
-      sys->run(world);
-  }
-
-  std::string name() const override {
-    return systems_.empty() ? "CompositeSystem" : systems_[0]->name();
-  }
-
-  SystemAccess access() const override {
-    SystemAccess acc;
-    for (auto &sys : systems_) {
-      auto sa = sys->access();
-      acc.merge(sa);
-    }
-    return acc;
-  }
+struct GroupSystemEntry {
+  std::unique_ptr<ISystem> system;
+  SystemOrdering ordering;
 };
 
 class SystemGroupDescriptor {
   std::vector<std::unique_ptr<ISystem>> systems_;
   std::unique_ptr<ICondition> condition_;
   SystemOrdering ordering_;
+  bool chained_ = false;
 
 public:
   template <typename... Fs> explicit SystemGroupDescriptor(Fs &&...funcs) {
@@ -185,20 +165,41 @@ public:
     return std::move(*this);
   }
 
-  SystemOrdering take_ordering() { return std::move(ordering_); }
+  SystemGroupDescriptor &&chain() && {
+    chained_ = true;
+    return std::move(*this);
+  }
 
-  std::unique_ptr<ISystem> build() {
-    auto composite =
-        std::make_unique<CompositeSystem>(std::move(systems_));
-    if (condition_) {
-      return std::make_unique<ConditionedSystem>(std::move(composite),
-                                                  std::move(condition_));
+  std::vector<GroupSystemEntry> build() {
+    std::vector<GroupSystemEntry> result;
+
+    std::shared_ptr<ICondition> shared_cond = std::move(condition_);
+
+    std::string prev_name;
+    for (auto &sys : systems_) {
+      SystemOrdering entry_ordering = ordering_;
+
+      if (chained_ && !prev_name.empty())
+        entry_ordering.after.push_back(prev_name);
+
+      prev_name = sys->name();
+
+      if (shared_cond)
+        sys = std::make_unique<ConditionedSystem>(std::move(sys), shared_cond);
+
+      result.push_back({std::move(sys), std::move(entry_ordering)});
     }
-    return composite;
+
+    return result;
   }
 };
 
-template <> struct is_system_descriptor<SystemGroupDescriptor> : std::true_type {};
+template <typename T> struct is_system_group_descriptor : std::false_type {};
+template <>
+struct is_system_group_descriptor<SystemGroupDescriptor> : std::true_type {};
+template <typename T>
+inline constexpr bool is_system_group_descriptor_v =
+    is_system_group_descriptor<T>::value;
 
 template <typename F> SystemDescriptor<std::decay_t<F>> group(F &&func) {
   return SystemDescriptor<std::decay_t<F>>(std::forward<F>(func));

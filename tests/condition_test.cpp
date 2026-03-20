@@ -6,6 +6,8 @@
 
 using namespace ecs;
 
+namespace {
+
 // ============================================================
 // Condition tests (mirrors condition_test.rs)
 // ============================================================
@@ -19,6 +21,8 @@ struct Counter {
   using Type = ResourceType;
   int value = 0;
 };
+
+} // namespace
 
 TEST(ConditionTest, RunOnce) {
   World world;

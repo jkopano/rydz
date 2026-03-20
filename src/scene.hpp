@@ -4,6 +4,7 @@
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
+#include <print>
 
 using namespace ecs;
 using namespace math;
@@ -105,7 +106,7 @@ inline void spawn_houses_on_input(Cmd cmd, Res<AssetServer> asset_server,
 
   f32 spacing = 20.0f;
   f32 scale = 0.015f;
-  i32 grid = 50;
+  i32 grid = 100;
 
   for (i32 x = -grid; x < grid; ++x) {
     for (i32 z = -grid; z < grid; ++z) {
@@ -231,7 +232,7 @@ inline auto spawn_player(Cmd cmd) {
 
 inline auto print_player(Query<Health, Position, Damage> query) {
   for (auto [h, p, d] : query.iter()) {
-    rl::TraceLog(LOG_INFO, "Player: %d %d %d", h->value, p->x, p->y);
+    std::println("Player: {} {} {}", h->value, p->x, p->y);
   }
 }
 
@@ -242,7 +243,9 @@ inline void scene_plugin(App &app) {
   app.insert_resource(LightsSpawned{});
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
-  app.add_systems(ScheduleLabel::Startup, group(spawn_player));
+  app.add_systems(ScheduleLabel::Startup, spawn_player);
+  app.add_systems(ScheduleLabel::Update,
+                  group(print_player).run_if(run_once()));
   app.add_systems(ScheduleLabel::Update, group(spawn_map).run_if(run_once()));
 
   app.add_systems(ScheduleLabel::Update, camera_controller_system);

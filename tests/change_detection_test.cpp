@@ -5,6 +5,8 @@
 
 using namespace ecs;
 
+namespace {
+
 // ============================================================
 // Components
 // ============================================================
@@ -18,6 +20,8 @@ struct Mana {
   int value;
   bool operator==(const Mana &o) const { return value == o.value; }
 };
+
+} // namespace
 
 // ============================================================
 // Change Detection tests (mirrors change_detection_test.rs)

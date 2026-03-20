@@ -138,6 +138,10 @@ public:
       for (auto &e : func.systems) {
         add_system(std::move(e.system), std::move(e.ordering));
       }
+    } else if constexpr (is_system_group_descriptor_v<std::decay_t<F>>) {
+      for (auto &e : func.build()) {
+        add_system(std::move(e.system), std::move(e.ordering));
+      }
     } else if constexpr (is_system_descriptor_v<std::decay_t<F>>) {
       auto ordering = func.take_ordering();
       add_system(func.build(), std::move(ordering));

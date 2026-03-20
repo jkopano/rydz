@@ -6,6 +6,8 @@
 
 using namespace ecs;
 
+namespace {
+
 // ---- Test components ----
 
 struct Position {
@@ -49,6 +51,8 @@ struct TaggedBundle {
   Marker marker;
   Position pos;
 };
+
+} // namespace
 
 // ============================================================
 // Type tag detection
@@ -273,10 +277,12 @@ TEST(BundleTest, BundleOverwritesExistingComponents) {
 // Empty marker bundles
 // ============================================================
 
+namespace {
 struct EmptyMarkerBundle {
   using Type = BundleType;
   Marker marker;
 };
+} // namespace
 
 TEST(BundleTest, MarkerBundle) {
   World world;
@@ -322,6 +328,7 @@ TEST(BundleTest, QueryMatchesBundleSpawnedEntities) {
 // Deeply nested bundles (3 levels)
 // ============================================================
 
+namespace {
 struct InnerBundle {
   using Type = BundleType;
   Position pos;
@@ -338,6 +345,7 @@ struct OuterBundle {
   MiddleBundle middle;
   Health health;
 };
+} // namespace
 
 TEST(BundleTest, DeeplyNestedBundle) {
   World world;

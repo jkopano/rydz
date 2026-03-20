@@ -5,6 +5,8 @@
 
 using namespace ecs;
 
+namespace {
+
 // ============================================================
 // Components used in tests
 // ============================================================
@@ -31,6 +33,8 @@ struct TestResource {
   int value;
   bool operator==(const TestResource &o) const { return value == o.value; }
 };
+
+} // namespace
 
 // ============================================================
 // Component tests (mirrors component_test.rs)
