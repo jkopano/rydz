@@ -1,6 +1,13 @@
 add_rules("mode.debug", "mode.release")
 
-add_requires("abseil", "taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
+if is_plat("windows") then
+	-- abseil z xmake-repo nie ma pakietu na windows; używamy systemowego (np. vcpkg)
+	add_requires("abseil")
+-- add_requires("abseil", { system = true })
+else
+	add_requires("abseil")
+end
+add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
 
 set_languages("c++23")
 add_includedirs("lib")
@@ -8,10 +15,28 @@ add_includedirs("lib")
 -- Uniwersalne ostrzeżenia (Xmake zamieni je na /W4 dla MSVC lub -Wall dla GCC/Clang)
 set_warnings("all", "extra")
 
+if is_plat("windows") then
+	add_defines("NOMINMAX", "_CRT_SECURE_NO_WARNINGS")
+end
+
+local function is_msvc_like()
+	if not is_plat("windows") then
+		return false
+	end
+	if type(is_toolchain) == "function" then
+		return is_toolchain("msvc") or is_toolchain("clang-cl")
+	end
+	local tc = get_config("toolchain") or ""
+	return tc == "msvc" or tc == "clang-cl"
+end
+
 if is_mode("debug") then
 	if is_plat("windows") then
-		-- Windows MSVC Sanitizer (wymaga zainstalowanego komponentu ASan w VS)
-		add_cxflags("/fsanitize=address")
+		if is_msvc_like() then
+			-- Windows MSVC Sanitizer (wymaga zainstalowanego komponentu ASan w VS)
+			add_cxflags("/fsanitize=address")
+			add_ldflags("/fsanitize=address")
+		end
 	else
 		add_cxflags("-fsanitize=address,undefined", "-fno-omit-frame-pointer")
 		add_ldflags("-fsanitize=address,undefined")
@@ -22,7 +47,11 @@ end
 
 if is_mode("release") then
 	if is_plat("windows") then
-		add_cxflags("/arch:AVX2") -- Odpowiednik x86-64-v3 dla MSVC
+		if is_msvc_like() then
+			add_cxflags("/arch:AVX2") -- Odpowiednik x86-64-v3 dla MSVC
+		else
+			add_cxflags("-mavx2")
+		end
 	else
 		if os.getenv("NIX_ENFORCE_NO_NATIVE") then
 			add_cxflags("-march=x86-64-v3")

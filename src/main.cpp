@@ -1,5 +1,5 @@
 #define RLGL_ENABLE_OPENGL_DEBUG_CONTEXT 0
-#include "rl.hpp"
+// #include "rl.hpp"
 #include "scene.hpp"
 
 int main() {
