@@ -1,0 +1,94 @@
+// 09 - Spawn i Despawn
+#include "math.hpp"
+#include "rl.hpp"
+#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/rydz_graphics.hpp"
+#include <print>
+#include <vector>
+
+using namespace ecs;
+using namespace math;
+
+struct BulletTag {};
+struct Lifetime {
+  f32 remaining = 3.0f;
+};
+
+void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
+  cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
+            Transform3D::from_xyz(0, 15, 20).look_at(Vec3::sZero()));
+
+  cmd.spawn(DirectionalLight{
+      .color = WHITE,
+      .direction = Vec3(-0.3f, -1.0f, -0.5f),
+      .intensity = 0.5f,
+  });
+
+  // podłoga
+  auto floor_h = models->add(rl::LoadModelFromMesh(mesh::plane(30, 30)));
+  cmd.spawn(Model3d{floor_h},
+            Material3d{StandardMaterial::from_color(DARKGRAY)}, Transform3D{});
+}
+
+// spawn_batch
+// korzystasz jak musisz dużo rzeczy wyspawnic, powinno być szybsze(na razie nie
+// jest xd)
+void batch_spawn(Cmd cmd, ResMut<Assets<rl::Model>> models, Res<Input> input,
+                 NonSendMarker) {
+  if (!input->key_pressed(KEY_SPACE))
+    return;
+
+  auto sphere_h = models->add(rl::LoadModelFromMesh(mesh::sphere(0.3f)));
+
+  // budujemy wektor tupli — spawn_batch przyjmuje range
+  std::vector<std::tuple<BulletTag, Lifetime, Model3d, Material3d, Transform3D>>
+      batch;
+
+  for (i32 x = -3; x <= 3; ++x) {
+    for (i32 z = -3; z <= 3; ++z) {
+      batch.emplace_back(BulletTag{}, Lifetime{3.0f}, Model3d{sphere_h},
+                         Material3d{StandardMaterial::from_color(rl::Color{
+                             static_cast<u8>(100 + x * 20),
+                             static_cast<u8>(100 + z * 20), 200, 255})},
+                         Transform3D::from_xyz(x * 1.5f, 5.0f, z * 1.5f));
+    }
+  }
+
+  cmd.spawn_batch(batch);
+  std::println("batch spawned {} entities", batch.size());
+}
+
+// despawnik po czasei
+void lifetime_system(Query<Entity, Mut<Lifetime>> query, Res<Time> time,
+                     Cmd cmd) {
+  for (auto [entity, life] : query.iter()) {
+    life->remaining -= time->delta_seconds;
+    if (life->remaining <= 0.0f) {
+      cmd.despawn(entity);
+    }
+  }
+}
+
+void gravity_system(Query<Mut<Transform3D>, With<BulletTag>> query,
+                    Res<Time> time) {
+  for (auto [t] : query.iter()) {
+    f32 y = t->translation.GetY() - 3.0f * time->delta_seconds;
+    if (y < 0.3f)
+      y = 0.3f;
+    t->translation = Vec3(t->translation.GetX(), y, t->translation.GetZ());
+  }
+}
+
+int main() {
+  App app;
+  app.add_plugin(
+         window_plugin({1024, 768, "09 - Spawn/Despawn (SPACE/F/X)", 60}))
+      .add_plugin(time_plugin)
+      .add_plugin(render_plugin)
+      .add_plugin(input_plugin)
+      .add_systems(ScheduleLabel::Startup, setup)
+      .add_systems(ScheduleLabel::Update,
+                   group(batch_spawn, lifetime_system, gravity_system))
+      .run();
+}

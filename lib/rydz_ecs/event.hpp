@@ -19,6 +19,7 @@ private:
   std::vector<std::pair<E, EventId>> buffers_[2];
   usize current_buffer_ = 0;
   usize event_count_ = 0;
+  usize start_of_current_buffer_ = 0;
 
   std::unordered_map<usize, EventId> reader_cursors_;
   usize next_reader_id_ = 0;
@@ -42,6 +43,7 @@ public:
     usize oldest = 1 - current_buffer_;
     buffers_[oldest].clear();
     current_buffer_ = oldest;
+    start_of_current_buffer_ = event_count_;
   }
 
   void clear() {
@@ -52,7 +54,7 @@ public:
 
   usize register_reader() {
     usize id = next_reader_id_++;
-    reader_cursors_[id] = EventId{event_count_};
+    reader_cursors_[id] = EventId{start_of_current_buffer_};
     return id;
   }
 

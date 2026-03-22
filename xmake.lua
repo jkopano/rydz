@@ -117,3 +117,28 @@ set_default(false)
 add_files("benches/*.cpp")
 add_deps("raylib")
 add_packages("benchmark", "taskflow", "abseil", "meshoptimizer", "joltphysics")
+
+-- Examples
+local examples = {
+	"01_hello_window",
+	"02_ecs_basics",
+	"03_input",
+	"04_events",
+	"05_states",
+	"06_rendering",
+	"07_lighting",
+	"08_hierarchy",
+	"09_spawn_despawn",
+	"10_custom_material",
+}
+
+for _, name in ipairs(examples) do
+	target("example_" .. name)
+	set_kind("binary")
+	set_default(false)
+	set_rundir("$(projectdir)")
+	add_files("examples/" .. name .. "/main.cpp")
+	add_deps("raylib")
+	add_packages("taskflow", "abseil", "meshoptimizer", "joltphysics")
+	set_pcxxheader("lib/pch.hpp")
+end

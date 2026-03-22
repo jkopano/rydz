@@ -259,7 +259,7 @@ private:
     }
 
     if (!result.has_value())
-      rl::TraceLog(LOG_INFO, "Query::single() found no matches");
+      rl::TraceLog(LOG_DEBUG, "Query::single() found no matches");
 
     return result;
   }

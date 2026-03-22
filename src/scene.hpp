@@ -1,7 +1,9 @@
 #pragma once
 #include "math.hpp"
 #include "rl.hpp"
+#include "rydz_ecs/fwd.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
 #include <algorithm>
@@ -14,6 +16,13 @@ struct MapTag {};
 struct HouseTag {};
 struct CarTag {};
 struct RotateMarker {};
+
+struct lol {
+  using Type = BundleType;
+  MapTag map;
+  HouseTag tag;
+  CarTag car;
+};
 
 struct CameraController {
   using Storage = SparseSetStorage<CameraController>;
@@ -143,13 +152,6 @@ inline void spawn_houses_on_input(Cmd cmd, Res<AssetServer> asset_server,
   cmd.spawn_batch(houses);
 }
 
-struct CarHandles {
-  using Type = ResourceType;
-  Handle<rl::Model> car;
-  bool loaded = false;
-  bool spawned = false;
-};
-
 inline void spawn_some_texture(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
                                NonSendMarker) {
   auto stone_tex = textures->add(rl::LoadTexture("res/textures/stone.jpg"));
@@ -158,29 +160,6 @@ inline void spawn_some_texture(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
                 .translation = Vec3(10.0f, 10.0f, 0.0f),
                 .scale = Vec3::sReplicate(1.0f),
             });
-}
-
-inline void spawn_car_on_input(Cmd cmd, Res<AssetServer> asset_server,
-                               ResMut<CarHandles> car_handles,
-                               Res<Input> input) {
-  if (car_handles->spawned)
-    return;
-  if (!input->key_pressed(KEY_G))
-    return;
-
-  if (!car_handles->loaded) {
-    car_handles->car =
-        asset_server->load<rl::Model>("res/models/stylized_planet.glb");
-    car_handles->loaded = true;
-  }
-
-  cmd.spawn(CarTag{}, Model3d{car_handles->car},
-            Transform3D{
-                .translation = Vec3(100.0f, 10.7f, 10.0f),
-                .scale = Vec3::sReplicate(3.f),
-            });
-
-  car_handles->spawned = true;
 }
 
 struct LightsSpawned {
@@ -272,7 +251,6 @@ inline auto print_player(Query<Health, Position, Damage> query) {
 inline void scene_plugin(App &app) {
   app.add_plugin(input_plugin);
   app.insert_resource(HouseHandles{});
-  app.insert_resource(CarHandles{});
   app.insert_resource(LightsSpawned{});
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
@@ -286,6 +264,5 @@ inline void scene_plugin(App &app) {
   app.add_systems(ScheduleLabel::Update, camera_mouse_system);
 
   app.add_systems(ScheduleLabel::Update, spawn_houses_on_input);
-  app.add_systems(ScheduleLabel::Update, spawn_car_on_input);
   app.add_systems(ScheduleLabel::Update, spawn_lights_on_input);
 }

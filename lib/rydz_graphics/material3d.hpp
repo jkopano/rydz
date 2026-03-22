@@ -10,13 +10,13 @@ concept IMaterial =
     requires(const M m, rl::Model &model, Assets<rl::Texture2D> *textures) {
       { m.color() } -> std::convertible_to<rl::Color>;
       { m.apply(model, textures) } -> std::same_as<void>;
-      { m.vertex_source() } -> std::convertible_to<const char *>;
-      { m.fragment_source() } -> std::convertible_to<const char *>;
-      { m.shader() } -> std::convertible_to<const rl::Shader *>;
+      { M::vertex_source() } -> std::convertible_to<const char *>;
+      { M::fragment_source() } -> std::convertible_to<const char *>;
+      { M::shader() } -> std::convertible_to<const rl::Shader *>;
     };
 
 template <IMaterial M> inline void preload_material_shader(NonSendMarker) {
-  M{}.shader();
+  M::shader();
 }
 
 struct StandardMaterial {
@@ -35,11 +35,10 @@ struct StandardMaterial {
   rl::Color color() const { return base_color; }
 
   void apply(rl::Model &model, Assets<rl::Texture2D> *tex_assets) const {
-    rl::Shader &shader = standard_shader();
-    if (model.materials) {
-      for (int i = 0; i < model.materialCount; ++i) {
-        model.materials[i].shader = shader;
-      }
+    const rl::Shader *s = shader();
+    if (model.materials && s) {
+      for (int i = 0; i < model.materialCount; ++i)
+        model.materials[i].shader = *s;
     }
     model.materials[0].maps[MATERIAL_MAP_DIFFUSE].color = base_color;
 
@@ -56,44 +55,38 @@ struct StandardMaterial {
     }
   }
 
-  // Shader paths — nullptr means use raylib's default shader
-  const char *vertex_source() const { return "res/shaders/pbr.vert"; }
-  const char *fragment_source() const { return "res/shaders/pbr.frag"; }
+  static const char *vertex_source() { return "res/shaders/pbr.vert"; }
+  static const char *fragment_source() { return "res/shaders/pbr.frag"; }
 
-  const rl::Shader *shader() const { return &standard_shader(); }
+  static const rl::Shader *shader() {
+    static rl::Shader s = [] {
+      rl::Shader sh =
+          rl::LoadShader("res/shaders/pbr.vert", "res/shaders/pbr.frag");
 
-private:
-  static rl::Shader &standard_shader() {
-    static rl::Shader shader = {};
-    static bool loaded = false;
-    if (!loaded) {
-      shader = rl::LoadShader("res/shaders/pbr.vert", "res/shaders/pbr.frag");
-
-      if (shader.locs == nullptr) {
-        shader.locs = (int *)RL_CALLOC(RL_MAX_SHADER_LOCATIONS, sizeof(int));
+      if (sh.locs == nullptr) {
+        sh.locs = (int *)RL_CALLOC(RL_MAX_SHADER_LOCATIONS, sizeof(int));
         for (int i = 0; i < RL_MAX_SHADER_LOCATIONS; ++i)
-          shader.locs[i] = -1;
+          sh.locs[i] = -1;
       }
 
-      shader.locs[SHADER_LOC_VERTEX_POSITION] =
-          rl::GetShaderLocationAttrib(shader, "vertexPosition");
-      shader.locs[SHADER_LOC_VERTEX_NORMAL] =
-          rl::GetShaderLocationAttrib(shader, "vertexNormal");
-      shader.locs[SHADER_LOC_VERTEX_TEXCOORD01] =
-          rl::GetShaderLocationAttrib(shader, "vertexTexCoord");
-      shader.locs[SHADER_LOC_MATRIX_MVP] = rl::GetShaderLocation(shader, "mvp");
-      shader.locs[SHADER_LOC_COLOR_DIFFUSE] =
-          rl::GetShaderLocation(shader, "colDiffuse");
-      shader.locs[SHADER_LOC_MAP_DIFFUSE] =
-          rl::GetShaderLocation(shader, "texture0");
-      shader.locs[SHADER_LOC_MAP_NORMAL] =
-          rl::GetShaderLocation(shader, "u_normal_texture");
-      shader.locs[SHADER_LOC_MATRIX_MODEL] =
-          rl::GetShaderLocationAttrib(shader, "instanceTransform");
-
-      loaded = true;
-    }
-    return shader;
+      sh.locs[SHADER_LOC_VERTEX_POSITION] =
+          rl::GetShaderLocationAttrib(sh, "vertexPosition");
+      sh.locs[SHADER_LOC_VERTEX_NORMAL] =
+          rl::GetShaderLocationAttrib(sh, "vertexNormal");
+      sh.locs[SHADER_LOC_VERTEX_TEXCOORD01] =
+          rl::GetShaderLocationAttrib(sh, "vertexTexCoord");
+      sh.locs[SHADER_LOC_MATRIX_MVP] = rl::GetShaderLocation(sh, "mvp");
+      sh.locs[SHADER_LOC_COLOR_DIFFUSE] =
+          rl::GetShaderLocation(sh, "colDiffuse");
+      sh.locs[SHADER_LOC_MAP_DIFFUSE] =
+          rl::GetShaderLocation(sh, "texture0");
+      sh.locs[SHADER_LOC_MAP_NORMAL] =
+          rl::GetShaderLocation(sh, "u_normal_texture");
+      sh.locs[SHADER_LOC_MATRIX_MODEL] =
+          rl::GetShaderLocationAttrib(sh, "instanceTransform");
+      return sh;
+    }();
+    return &s;
   }
 };
 

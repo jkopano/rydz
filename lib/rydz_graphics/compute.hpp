@@ -5,10 +5,10 @@
 
 namespace ecs {
 template <typename C>
-concept IComputeShader = requires(const C m) {
-  { m.vertex_source() } -> std::convertible_to<const char *>;
-  { m.fragment_source() } -> std::convertible_to<const char *>;
-  { m.shader() } -> std::convertible_to<const rl::Shader *>;
+concept IComputeShader = requires {
+  { C::vertex_source() } -> std::convertible_to<const char *>;
+  { C::fragment_source() } -> std::convertible_to<const char *>;
+  { C::shader() } -> std::convertible_to<const rl::Shader *>;
 };
 
 template <IComputeShader C> class ICompute {
