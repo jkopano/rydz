@@ -20,9 +20,18 @@ let
     wayland-protocols
     libxkbcommon
   ];
+
+  compDeps = with pkgs; [
+    xmake
+  ];
+
+  typstDeps = with pkgs; [
+    typst
+    plantuml
+  ];
 in
 {
-  packages = raylibDeps ++ [ pkgs.xmake ];
+  packages = raylibDeps ++ compDeps ++ typstDeps;
 
   languages.cplusplus.enable = true;
 

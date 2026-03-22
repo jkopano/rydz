@@ -1,0 +1,227 @@
+@startuml component
+title rydz_ecs - Diagram komponentów
+
+package "Rdzeń ECS" {
+  [Entity\nMenedżer encji] as Entity
+  [Storage\nSparseSetStorage\nHashMapStorage] as Storage
+  [World\nEncje + Komponenty\n+ Zasoby + Ticki] as World
+  [Resource\nSingletony z wymazaniem typu] as Resource
+  [Ticks\nWykrywanie zmian] as Ticks
+}
+
+package "System zapytań" {
+  [Query\nQuery<Ts...>] as Query
+  [Filter\nWith Without Added\nChanged Or] as Filter
+  [Access\nSystemAccess\nŚledzenie odczytu/zapisu] as Access
+}
+
+package "Wykonanie" {
+  [System\nISystem\nFunctionSystem\nWstrzykiwanie zależności] as System
+  [Schedule\nSortowanie topologiczne\nGrupowanie równoległe\nTaskflow] as Schedule
+  [Condition\nrun_if\nrun_once] as Condition
+  [Command\nCmd\nCommandQueue\nOdroczone mutacje] as Command
+}
+
+package "Aplikacja" {
+  [App\nZarządzanie pluginami\nOrkiestracja harmonogramów\nGłówna pętla] as App
+  [Plugin\nIPlugin\nFunctionPlugin] as Plugin
+  [State\nState<S>\nNextState<S>\nOnEnter / OnExit] as State
+  [Event\nEvents<E>\nEventReader\nEventWriter\nPodwójne buforowanie] as Event
+}
+
+package "Domena" {
+  [Input\nKlawiatura / Mysz] as Input
+  [Asset\nAssetServer\nHandle<T>\nAsynchroniczne ładowanie] as Asset
+  [Hierarchy\nRodzic / Dzieci] as Hierarchy
+  [Time\nName] as CoreTypes
+}
+
+package "Zewnętrzne" {
+  [Raylib\nRenderowanie / Okno] as Raylib
+  [Taskflow\nRównoległe wykonanie] as Taskflow
+}
+
+World --> Entity
+World --> Storage
+World --> Resource
+Storage --> Ticks
+Storage --> Entity
+
+Query --> Storage
+Query --> Filter
+Query --> Access
+Query --> World
+Filter --> Ticks
+
+System --> Query
+System --> Access
+System --> World
+Command --> World
+Command --> System
+
+Schedule --> System
+Schedule --> Condition
+Schedule --> Access
+Schedule --> Taskflow
+Condition --> System
+
+App --> Schedule
+App --> World
+App --> Plugin
+App --> Command
+App --> Event
+App --> State
+
+State --> Schedule
+Event --> System
+
+Input --> App
+Input --> Raylib
+Asset --> World
+Asset --> System
+Hierarchy --> Entity
+Hierarchy --> World
+CoreTypes --> World
+@enduml
+
+@startuml sequence
+title rydz_ecs - Pętla aktualizacji App::update()
+
+participant App
+participant Schedules
+participant Schedule
+participant System
+participant World
+participant CommandQueue
+
+App -> App: startup()
+note over App: PreStartup -> Startup -> PostStartup (uruchomienie)
+
+loop while !WindowShouldClose()
+  App -> App: update()
+  App -> World: aktualizacja zasobu Time
+  App -> World: increment_change_tick()
+
+  loop dla każdego ScheduleLabel (First..Last)
+    App -> Schedules: run(label, world)
+    Schedules -> Schedule: run(world)
+    activate Schedule
+
+    Schedule -> Schedule: build_graph()\nsortowanie topologiczne\ngrupowanie kompatybilnych systemów
+
+    loop dla każdej grupy
+      Schedule -> System: run(world)
+      activate System
+
+      par równoległe systemy przez Taskflow
+        System -> World: zapytanie o komponenty
+        World --> System: wyniki
+        System -> CommandQueue: push(cmd)
+      end
+
+      deactivate System
+    end
+
+    Schedule --> Schedules: zakończono
+    deactivate Schedule
+
+    App -> CommandQueue: apply(world)
+    CommandQueue -> World: spawn / despawn / insert
+  end
+end
+@enduml
+
+@startuml storage
+title rydz_ecs - Warstwa przechowywania
+
+package "Warstwa przechowywania" {
+  interface IStorage {
+    +remove(Entity)
+    +has(Entity): bool
+    +entities(): span
+    +size(): usize
+  }
+
+  class "SparseSetStorage<T>" as Sparse {
+    -sparse_: vector<u32>
+    -dense_: vector<Entity>
+    -data_: vector<T>
+    -ticks_: vector<ComponentTicks>
+    +insert(Entity, T, Tick)
+    +get(Entity): T*
+    +remove(Entity)
+    +for_each(F)
+  }
+
+  class "HashMapStorage<T>" as HashMap {
+    -map_: unordered_map
+    +insert(Entity, T, Tick)
+    +get(Entity): T*
+    +remove(Entity)
+  }
+
+  class "storage_trait<T>" as Trait << (T,#FF7700) trait >> {
+    +type Storage
+  }
+}
+
+package "Dane" {
+  class Entity {
+    +index: u32
+    +generation: u32
+  }
+
+  class ComponentTicks {
+    +added: Tick
+    +changed: Tick
+  }
+}
+
+Sparse --|> IStorage
+HashMap --|> IStorage
+Trait ..> Sparse : domyślny
+Trait ..> HashMap : alternatywny
+
+Sparse --> Entity
+Sparse --> ComponentTicks
+HashMap --> Entity
+HashMap --> ComponentTicks
+@enduml
+
+@startuml activity
+title rydz_ecs - Wstrzykiwanie zależności systemu
+
+start
+
+:Rejestracja funkcji systemu;
+:Ekstrakcja typów parametrów
+przez function_traits<F>;
+
+if (Zawiera Query<Ts...>?) then (tak)
+  :Rozwiąż storage z World;
+  :Zapisz dostęp odczyt/zapis komponentów;
+else (nie)
+endif
+
+if (Zawiera Res<T> / ResMut<T>?) then (tak)
+  :Wyszukaj zasób w World;
+  :Zapisz dostęp odczyt/zapis zasobu;
+else (nie)
+endif
+
+if (Zawiera Cmd?) then (tak)
+  :Wstrzyknij referencję do CommandQueue;
+else (nie)
+endif
+
+if (Zawiera World?) then (tak)
+  :Oznacz jako ekskluzywny
+  (brak równoległości);
+else (nie)
+endif
+
+:Zbuduj SystemAccess;
+:Zarejestruj w Schedule;
+
+end
+@enduml
