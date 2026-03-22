@@ -54,6 +54,7 @@ using ::GetScreenWidth;
 // ---- Models / Meshes ----
 using ::DrawMesh;
 using ::DrawMeshInstanced;
+using ::DrawRectangle;
 using ::DrawTexture;
 using ::DrawTexturePro;
 using ::GenMeshCube;

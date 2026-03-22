@@ -150,7 +150,15 @@ struct CarHandles {
   bool spawned = false;
 };
 
-inline void spawn_some_texture(Cmd cmd, Assets<rl::Texture2D>) {}
+inline void spawn_some_texture(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
+                               NonSendMarker) {
+  auto stone_tex = textures->add(rl::LoadTexture("res/textures/stone.jpg"));
+  cmd.spawn(ecs::Texture{stone_tex},
+            Transform3D{
+                .translation = Vec3(10.0f, 10.0f, 0.0f),
+                .scale = Vec3::sReplicate(1.0f),
+            });
+}
 
 inline void spawn_car_on_input(Cmd cmd, Res<AssetServer> asset_server,
                                ResMut<CarHandles> car_handles,
@@ -224,7 +232,8 @@ inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Model>> models,
 inline void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
             Transform3D::from_xyz(8, 6, 8).look_at(Vec3::sZero()),
-            CameraController{}, Skybox::from("res/hdri/skybox"));
+            CameraController{} // Skybox::from("res/hdri/skybox")
+  );
   rl::DisableCursor();
 }
 
@@ -268,6 +277,7 @@ inline void scene_plugin(App &app) {
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
   app.add_systems(ScheduleLabel::Startup, spawn_player);
+  app.add_systems(ScheduleLabel::Startup, spawn_some_texture);
   app.add_systems(ScheduleLabel::Update,
                   group(print_player).run_if(run_once()));
   app.add_systems(ScheduleLabel::Update, group(spawn_map).run_if(run_once()));

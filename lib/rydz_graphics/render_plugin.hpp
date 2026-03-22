@@ -19,6 +19,7 @@
 #include <absl/container/flat_hash_map.h>
 #include <array>
 #include <cstring>
+#include <print>
 #include <vector>
 
 namespace ecs {
@@ -225,7 +226,6 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
   rl::BeginDrawing();
   rl::ClearBackground(bg);
 
-  // Begin 3D mode manually (replaces BeginMode3D)
   rl::rlDrawRenderBatchActive();
   rl::rlMatrixMode(RL_PROJECTION);
   rl::rlPushMatrix();
@@ -383,12 +383,10 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
 
     bool can_instance = false;
     if (draw_mat.shader.locs && mesh.vaoId != 0) {
-      // Set up instance transform ATTRIBUTE location (for DrawMeshInstanced)
       if (draw_mat.shader.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] < 0) {
         draw_mat.shader.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] =
             rl::GetShaderLocationAttrib(draw_mat.shader, "instanceTransform");
       }
-      // Set up matModel UNIFORM location (for DrawMesh non-instanced fallback)
       if (draw_mat.shader.locs[SHADER_LOC_MATRIX_MODEL] < 0) {
         draw_mat.shader.locs[SHADER_LOC_MATRIX_MODEL] =
             rl::GetShaderLocation(draw_mat.shader, "matModel");
@@ -411,14 +409,14 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
     }
   }
 
-  // End 3D mode manually (replaces EndMode3D)
   rl::rlDrawRenderBatchActive();
   rl::rlMatrixMode(RL_PROJECTION);
   rl::rlPopMatrix();
   rl::rlMatrixMode(RL_MODELVIEW);
   rl::rlLoadIdentity();
+  rl::rlDisableDepthTest();
+  rl::rlDisableBackfaceCulling();
 
-  // Draw 2D textures
   textures.each([&](const Texture *tex, const Transform3D *tx) {
     if (!tex || !tex->handle.is_valid())
       return;
@@ -428,13 +426,10 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
 
     rl::Vector2 pos = {tx->translation.GetX(), tx->translation.GetY()};
     float rotation_deg = 0.0f;
-    // Extract Z rotation from quaternion
-    float siny_cosp =
-        2.0f * (tx->rotation.GetW() * tx->rotation.GetZ() +
-                tx->rotation.GetX() * tx->rotation.GetY());
-    float cosy_cosp =
-        1.0f - 2.0f * (tx->rotation.GetY() * tx->rotation.GetY() +
-                        tx->rotation.GetZ() * tx->rotation.GetZ());
+    float siny_cosp = 2.0f * (tx->rotation.GetW() * tx->rotation.GetZ() +
+                              tx->rotation.GetX() * tx->rotation.GetY());
+    float cosy_cosp = 1.0f - 2.0f * (tx->rotation.GetY() * tx->rotation.GetY() +
+                                     tx->rotation.GetZ() * tx->rotation.GetZ());
     rotation_deg = atan2f(siny_cosp, cosy_cosp) * (180.0f / 3.14159265f);
 
     float scale_x = tx->scale.GetX();
