@@ -15,12 +15,12 @@ struct ArmTag {};
 void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   // kamera
   cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
-            Transform3D::from_xyz(0, 8, 15).look_at(Vec3::sZero()));
+            Transform::from_xyz(0, 8, 15).look_at(Vec3::sZero()));
 
   // podłoga
   auto floor_h = models->add(rl::LoadModelFromMesh(mesh::plane(20, 20)));
   cmd.spawn(Model3d{floor_h},
-            Material3d{StandardMaterial::from_color(DARKGRAY)}, Transform3D{});
+            Material3d{StandardMaterial::from_color(DARKGRAY)}, rlTransform{});
 
   // światło
   cmd.spawn(DirectionalLight{
@@ -33,19 +33,19 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   auto cube_h = models->add(rl::LoadModelFromMesh(mesh::cube(1, 1, 1)));
   auto pivot = cmd.spawn(Model3d{cube_h},
                          Material3d{StandardMaterial::from_color(YELLOW)},
-                         Transform3D::from_xyz(0, 2, 0), PivotTag{});
+                         Transform::from_xyz(0, 2, 0), PivotTag{});
 
   // child
   auto arm_h = models->add(rl::LoadModelFromMesh(mesh::cube(3, 0.4f, 0.4f)));
   auto arm =
       cmd.spawn(Model3d{arm_h}, Material3d{StandardMaterial::from_color(RED)},
-                Transform3D::from_xyz(2.0f, 0, 0), // offset od pivota
+                Transform::from_xyz(2.0f, 0, 0), // offset od pivota
                 Parent{pivot.id()}, ArmTag{});
 
   // child of child
   auto tip_h = models->add(rl::LoadModelFromMesh(mesh::sphere(0.4f)));
   cmd.spawn(Model3d{tip_h}, Material3d{StandardMaterial::from_color(BLUE)},
-            Transform3D::from_xyz(1.8f, 0, 0), // offset od ramienia
+            Transform::from_xyz(1.8f, 0, 0), // offset od ramienia
             Parent{arm.id()});
 
   std::println("hierarchy: pivot({}) -> arm({}) -> tip", pivot.id().index(),
@@ -53,14 +53,14 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
 }
 
 // filtrujesz entity które mają Parent
-void system(Query<Transform3D, Parent> children_query) {
+void system(Query<rlTransform, Parent> children_query) {
   for (auto [t, parent] : children_query.iter()) {
     // parent->entity
   }
 }
 
 // znajdź entity bez rodzica
-void system(Query<Transform3D, Opt<Parent>> query) {
+void system(Query<rlTransform, Opt<Parent>> query) {
   for (auto [t, parent] : query.iter()) {
     if (!parent) {
       // to jest root
@@ -76,7 +76,7 @@ void system(Query<Transform3D, Opt<Parent>> query) {
 // }
 
 // Obracamy rodzica - dzieci powinny się obracać razem z nim
-void rotate_pivot(Query<Mut<Transform3D>, PivotTag> query, Res<Time> time) {
+void rotate_pivot(Query<Mut<rlTransform>, PivotTag> query, Res<Time> time) {
   for (auto [t, _] : query.iter()) {
     f32 angle = time->delta_seconds * 1.0f;
     t->rotation = Quat::sRotation(Vec3(0, 1, 0), angle) * t->rotation;

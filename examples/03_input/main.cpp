@@ -18,17 +18,17 @@ struct Player {
 void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   // kamera (transformy by trzeba rozwinąć kiedyś tam)
   cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
-            Transform3D::from_xyz(0, 30, 0).look_at(Vec3::sZero()));
+            Transform::from_xyz(0, 30, 0).look_at(Vec3::sZero()));
 
   // ładowanko mesha
   auto cube_mesh = mesh::cube(1, 1, 1);
   auto cube_model = rl::LoadModelFromMesh(cube_mesh);
 
-  cmd.spawn(Player{20.0f}, Transform3D::from_xyz(0, 0.5f, 0),
+  cmd.spawn(Player{20.0f}, Transform::from_xyz(0, 0.5f, 0),
             Model3d{models->add(cube_model)});
 }
 
-void player_movement(Query<Mut<Transform3D>, Player> query, Res<Input> input,
+void player_movement(Query<Mut<rlTransform>, Player> query, Res<Input> input,
                      Res<Time> time) {
   for (auto [t, player] : query.iter()) {
     f32 dt = time->delta_seconds;

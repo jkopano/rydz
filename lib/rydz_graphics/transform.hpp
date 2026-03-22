@@ -9,28 +9,28 @@ namespace ecs {
 
 using namespace math;
 
-struct Transform3D {
+struct Transform {
   Vec3 translation = Vec3::sZero();
   Quat rotation = Quat::sIdentity();
   Vec3 scale = Vec3::sReplicate(1.0f);
 
-  static Transform3D from_xyz(float x, float y, float z) {
+  static Transform from_xyz(float x, float y, float z) {
     return {{Vec3(x, y, z)}, Quat::sIdentity(), Vec3::sReplicate(1.0f)};
   }
 
-  static Transform3D from_translation(Vec3 pos) {
+  static Transform from_translation(Vec3 pos) {
     return {pos, Quat::sIdentity(), Vec3::sReplicate(1.0f)};
   }
 
-  static Transform3D from_rotation(Quat q) {
+  static Transform from_rotation(Quat q) {
     return {Vec3::sZero(), q, Vec3::sReplicate(1.0f)};
   }
 
-  static Transform3D from_scale(Vec3 s) {
+  static Transform from_scale(Vec3 s) {
     return {Vec3::sZero(), Quat::sIdentity(), s};
   }
 
-  static Transform3D from_scale_uniform(float s) {
+  static Transform from_scale_uniform(float s) {
     return from_scale(Vec3::sReplicate(s));
   }
 
@@ -44,7 +44,7 @@ struct Transform3D {
 
   Vec3 up() const { return rotation * Vec3(0, 1, 0); }
 
-  Transform3D &look_at(Vec3 target, Vec3 world_up = Vec3(0, 1, 0)) {
+  Transform &look_at(Vec3 target, Vec3 world_up = Vec3(0, 1, 0)) {
     Vec3 dir = target - translation;
     if (dir.LengthSq() < 1e-10f)
       return *this;
@@ -72,7 +72,7 @@ struct GlobalTransform {
 };
 
 inline void propagate_transforms(
-    Query<Entity, Transform3D, Opt<Parent>, Mut<GlobalTransform>> query) {
+    Query<Entity, Transform, Opt<Parent>, Mut<GlobalTransform>> query) {
 
   std::unordered_map<Entity, Mat4> local_matrices;
   std::unordered_map<Entity, Entity> parents;

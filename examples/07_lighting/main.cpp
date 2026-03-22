@@ -17,14 +17,14 @@ struct OrbitLight {
 void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   // kamera
   cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
-            Transform3D::from_xyz(0, 8, 15).look_at(Vec3::sZero()));
+            Transform::from_xyz(0, 8, 15).look_at(Vec3::sZero()));
 
   // podłoga
   auto floor = rl::LoadModelFromMesh(mesh::plane(30, 30));
   auto floor_h = models->add(std::move(floor));
   cmd.spawn(Model3d{floor_h},
             Material3d{StandardMaterial::from_color({200, 200, 200, 255})},
-            Transform3D{});
+            rlTransform{});
 
   // kilka obiektów na scenie
   auto sphere = rl::LoadModelFromMesh(mesh::sphere(1.0f));
@@ -32,7 +32,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   for (int i = -2; i <= 2; ++i) {
     cmd.spawn(Model3d{sphere_h},
               Material3d{StandardMaterial::from_color(WHITE)},
-              Transform3D::from_xyz(i * 4.0f, 1.0f, 0.0f));
+              Transform::from_xyz(i * 4.0f, 1.0f, 0.0f));
   }
 
   // światło kierunkowe
@@ -48,7 +48,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
     cmd.spawn(
         Model3d{h}, Material3d{StandardMaterial::from_color(color)},
         PointLight{.color = color, .intensity = intensity, .range = 30.0f},
-        Transform3D::from_xyz(0, y, 0), OrbitLight{radius, speed, phase});
+        Transform::from_xyz(0, y, 0), OrbitLight{radius, speed, phase});
   };
 
   make_orbit_light({255, 50, 50, 255}, 6.0f, 1.5f, 0.0f, 3.0f, 20.0f);
@@ -57,7 +57,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
 }
 
 // obitujsz swiatlami
-void orbit_system(Query<Mut<Transform3D>, OrbitLight> query, Res<Time> time) {
+void orbit_system(Query<Mut<rlTransform>, OrbitLight> query, Res<Time> time) {
   f32 t = time->elapsed_seconds;
   for (auto [tx, orbit] : query.iter()) {
     f32 angle = t * orbit->speed + orbit->phase;

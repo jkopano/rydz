@@ -140,9 +140,9 @@ struct Texture {
 inline void
 render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
               Res<Assets<rl::Texture2D>> tex_assets, Res<RenderBatches> batches,
-              Query<const Texture, const Transform3D> textures,
+              Query<const Texture, const Transform> textures,
               Query<const Camera3DComponent, const ActiveCamera,
-                    const Transform3D, Opt<const Skybox>>
+                    const Transform, Opt<const Skybox>>
                   cam_query,
               Query<const DirectionalLight> dir_query,
               Query<const PointLight, const GlobalTransform> point_query,
@@ -157,7 +157,7 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
   const Skybox *active_skybox = nullptr;
 
   cam_query.each([&](const Camera3DComponent *cam_comp, const ActiveCamera *,
-                     const Transform3D *cam_tx, const Skybox *sky) {
+                     const Transform *cam_tx, const Skybox *sky) {
     if (cam_comp && cam_tx) {
       cam_view = compute_camera_view(*cam_tx, *cam_comp);
       active_skybox = sky;
@@ -417,7 +417,7 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
   rl::rlDisableDepthTest();
   rl::rlDisableBackfaceCulling();
 
-  textures.each([&](const Texture *tex, const Transform3D *tx) {
+  textures.each([&](const Texture *tex, const Transform *tx) {
     if (!tex || !tex->handle.is_valid())
       return;
     const rl::Texture2D *rl_tex = tex_assets->get(tex->handle);
@@ -466,12 +466,12 @@ inline void apply_model_transform(World &world) {
 }
 
 inline void auto_insert_global_transform(World &world) {
-  auto *transform_storage = world.get_storage<Transform3D>();
+  auto *transform_storage = world.get_storage<Transform>();
   auto *global_storage = world.get_storage<GlobalTransform>();
   if (!transform_storage)
     return;
 
-  transform_storage->for_each([&](Entity e, const Transform3D &) {
+  transform_storage->for_each([&](Entity e, const Transform &) {
     if (!global_storage || !global_storage->get(e)) {
       world.insert_component(e, GlobalTransform{});
       global_storage = world.get_storage<GlobalTransform>();

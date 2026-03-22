@@ -65,11 +65,11 @@ using ToonMat = MeshMaterial3d<ToonMaterial>;
 
 void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
-            Transform3D::from_xyz(0, 3, 6).look_at(Vec3::sZero()));
+            Transform::from_xyz(0, 3, 6).look_at(Vec3::sZero()));
 
   auto h = models->add(rl::LoadModelFromMesh(mesh::sphere(1.0f)));
   cmd.spawn(Model3d{h}, ToonMat{ToonMaterial{.base_color = ORANGE}},
-            Transform3D::from_xyz(0, 1, 0));
+            Transform::from_xyz(0, 1, 0));
 }
 
 int main() {

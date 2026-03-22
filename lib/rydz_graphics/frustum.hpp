@@ -130,7 +130,7 @@ compute_mesh_bounds_system(Query<Entity, Model3d, Without<MeshBounds>> query,
 }
 
 inline void frustum_cull_system(
-    Query<Camera3DComponent, Transform3D, With<ActiveCamera>> cam_query,
+    Query<Camera3DComponent, Transform, With<ActiveCamera>> cam_query,
     Query<Entity, MeshBounds, GlobalTransform, Opt<ComputedVisibility>>
         mesh_query,
     Cmd cmd) {

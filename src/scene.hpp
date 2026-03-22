@@ -34,7 +34,7 @@ struct CameraController {
 };
 
 inline void
-camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
+camera_controller_system(Query<Mut<ecs::Transform>, CameraController> query,
                          Res<Time> time, Res<Input> input) {
 
   for (auto [t, ctrl] : query.iter()) {
@@ -71,7 +71,7 @@ camera_controller_system(Query<Mut<Transform3D>, CameraController> query,
 }
 
 inline void
-camera_mouse_system(Query<Mut<CameraController>, Mut<Transform3D>> query,
+camera_mouse_system(Query<Mut<CameraController>, Mut<ecs::Transform>> query,
                     Res<Input> input) {
   Vector2 m = input->mouse_delta();
 
@@ -96,7 +96,7 @@ inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
   cmd.spawn(
       MapTag{},
       Model3d{asset_server->load<rl::Model>("res/models/sponza_atrium_3.glb")},
-      Transform3D{.scale = Vec3{10.1f, 10.1f, 10.1f}});
+      ecs::Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}});
 }
 
 struct HouseHandles {
@@ -118,14 +118,14 @@ inline void spawn_houses_on_input(Cmd cmd, Res<AssetServer> asset_server,
   f32 scale = 0.015f;
   i32 grid = 100;
 
-  std::vector<std::tuple<HouseTag, Transform3D, Model3d>> houses{};
+  std::vector<std::tuple<HouseTag, ecs::Transform, Model3d>> houses{};
   auto model_handle = asset_server->load<rl::Model>("res/models/old_house.glb");
 
   for (auto x : range(-grid, grid)) {
     for (auto z : range(-grid, grid)) {
       houses.emplace_back(
           HouseTag{},
-          Transform3D{
+          ecs::Transform{
               .translation = Vec3(x * spacing, 0.0f, z * spacing),
               .scale = Vec3::sReplicate(scale),
           },
@@ -156,7 +156,7 @@ inline void spawn_some_texture(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
                                NonSendMarker) {
   auto stone_tex = textures->add(rl::LoadTexture("res/textures/stone.jpg"));
   cmd.spawn(ecs::Texture{stone_tex},
-            Transform3D{
+            ecs::Transform{
                 .translation = Vec3(10.0f, 10.0f, 0.0f),
                 .scale = Vec3::sReplicate(1.0f),
             });
@@ -191,26 +191,26 @@ inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Model>> models,
             PointLight{.color = {255, 0, 0, 255},
                        .intensity = 8800.0f,
                        .range = 2000.0f},
-            Transform3D::from_xyz(-50.0f, 50.0f, 0.0f));
+            ecs::Transform::from_xyz(-50.0f, 50.0f, 0.0f));
 
   rl::Model cube_model2 = rl::LoadModelFromMesh(mesh::cube());
   auto cube_h2 = models->add(std::move(cube_model2));
 
   cmd.spawn(Model3d{cube_h2},
             Material3d{StandardMaterial::from_texture(stone_tex)},
-            Transform3D::from_xyz(50.0f, 50.0f, 0.0f));
+            ecs::Transform::from_xyz(50.0f, 50.0f, 0.0f));
 
   cmd.spawn(PointLight{.color = {75, 75, 255, 255},
                        .intensity = 800.0f,
                        .range = 200.0f},
-            Transform3D::from_xyz(100.0f, 100.0f, 0.0f));
+            ecs::Transform::from_xyz(100.0f, 100.0f, 0.0f));
 
   lights->done = true;
 }
 
 inline void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
-            Transform3D::from_xyz(8, 6, 8).look_at(Vec3::sZero()),
+            ecs::Transform::from_xyz(8, 6, 8).look_at(Vec3::sZero()),
             CameraController{} // Skybox::from("res/hdri/skybox")
   );
   rl::DisableCursor();

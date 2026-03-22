@@ -17,7 +17,7 @@ struct Lifetime {
 
 void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
-            Transform3D::from_xyz(0, 15, 20).look_at(Vec3::sZero()));
+            Transform::from_xyz(0, 15, 20).look_at(Vec3::sZero()));
 
   cmd.spawn(DirectionalLight{
       .color = WHITE,
@@ -28,7 +28,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   // podłoga
   auto floor_h = models->add(rl::LoadModelFromMesh(mesh::plane(30, 30)));
   cmd.spawn(Model3d{floor_h},
-            Material3d{StandardMaterial::from_color(DARKGRAY)}, Transform3D{});
+            Material3d{StandardMaterial::from_color(DARKGRAY)}, rlTransform{});
 }
 
 // spawn_batch
@@ -42,7 +42,7 @@ void batch_spawn(Cmd cmd, ResMut<Assets<rl::Model>> models, Res<Input> input,
   auto sphere_h = models->add(rl::LoadModelFromMesh(mesh::sphere(0.3f)));
 
   // budujemy wektor tupli — spawn_batch przyjmuje range
-  std::vector<std::tuple<BulletTag, Lifetime, Model3d, Material3d, Transform3D>>
+  std::vector<std::tuple<BulletTag, Lifetime, Model3d, Material3d, rlTransform>>
       batch;
 
   for (i32 x = -3; x <= 3; ++x) {
@@ -51,7 +51,7 @@ void batch_spawn(Cmd cmd, ResMut<Assets<rl::Model>> models, Res<Input> input,
                          Material3d{StandardMaterial::from_color(rl::Color{
                              static_cast<u8>(100 + x * 20),
                              static_cast<u8>(100 + z * 20), 200, 255})},
-                         Transform3D::from_xyz(x * 1.5f, 5.0f, z * 1.5f));
+                         Transform::from_xyz(x * 1.5f, 5.0f, z * 1.5f));
     }
   }
 
@@ -70,7 +70,7 @@ void lifetime_system(Query<Entity, Mut<Lifetime>> query, Res<Time> time,
   }
 }
 
-void gravity_system(Query<Mut<Transform3D>, With<BulletTag>> query,
+void gravity_system(Query<Mut<rlTransform>, With<BulletTag>> query,
                     Res<Time> time) {
   for (auto [t] : query.iter()) {
     f32 y = t->translation.GetY() - 3.0f * time->delta_seconds;
