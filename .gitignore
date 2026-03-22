@@ -11,3 +11,6 @@ devenv.local.yaml
 build/**
 .cache/**
 .xmake/**
+
+# for vs
+vsxmake2026/**
