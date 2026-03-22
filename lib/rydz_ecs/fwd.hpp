@@ -11,11 +11,10 @@ struct ComponentType {};
 struct ResourceType {};
 
 struct Entity;
-class EntityManager;
+struct EntityManager;
 
 struct Tick;
 struct ComponentTicks;
-
 
 struct SystemAccess;
 

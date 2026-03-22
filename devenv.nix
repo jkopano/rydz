@@ -23,6 +23,7 @@ let
 
   compDeps = with pkgs; [
     xmake
+    vcpkg
   ];
 
   typstDeps = with pkgs; [
