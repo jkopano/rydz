@@ -125,15 +125,21 @@ inline void build_render_batches_system(
         batches->batches.push_back(std::move(batch));
         batch_index.emplace(batches->batches.back().key, idx);
       } else {
-        batches->batches[it->second].transforms.push_back(to_rl(global->matrix));
+        batches->batches[it->second].transforms.push_back(
+            to_rl(global->matrix));
       }
     }
   });
 }
 
+struct Texture {
+  Handle<rl::Texture2D> handle;
+};
+
 inline void
 render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
               Res<Assets<rl::Texture2D>> tex_assets, Res<RenderBatches> batches,
+              Query<const Texture, const Transform3D> textures,
               Query<const Camera3DComponent, const ActiveCamera,
                     const Transform3D, Opt<const Skybox>>
                   cam_query,
@@ -411,6 +417,36 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
   rl::rlPopMatrix();
   rl::rlMatrixMode(RL_MODELVIEW);
   rl::rlLoadIdentity();
+
+  // Draw 2D textures
+  textures.each([&](const Texture *tex, const Transform3D *tx) {
+    if (!tex || !tex->handle.is_valid())
+      return;
+    const rl::Texture2D *rl_tex = tex_assets->get(tex->handle);
+    if (!rl_tex)
+      return;
+
+    rl::Vector2 pos = {tx->translation.GetX(), tx->translation.GetY()};
+    float rotation_deg = 0.0f;
+    // Extract Z rotation from quaternion
+    float siny_cosp =
+        2.0f * (tx->rotation.GetW() * tx->rotation.GetZ() +
+                tx->rotation.GetX() * tx->rotation.GetY());
+    float cosy_cosp =
+        1.0f - 2.0f * (tx->rotation.GetY() * tx->rotation.GetY() +
+                        tx->rotation.GetZ() * tx->rotation.GetZ());
+    rotation_deg = atan2f(siny_cosp, cosy_cosp) * (180.0f / 3.14159265f);
+
+    float scale_x = tx->scale.GetX();
+    float scale_y = tx->scale.GetY();
+
+    rl::Rectangle source = {0, 0, (float)rl_tex->width, (float)rl_tex->height};
+    rl::Rectangle dest = {pos.x, pos.y, rl_tex->width * scale_x,
+                          rl_tex->height * scale_y};
+    rl::Vector2 origin = {0, 0};
+
+    rl::DrawTexturePro(*rl_tex, source, dest, origin, rotation_deg, WHITE);
+  });
 
   rl::DrawFPS(10, 10);
   rl::EndDrawing();

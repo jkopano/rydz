@@ -150,6 +150,8 @@ struct CarHandles {
   bool spawned = false;
 };
 
+inline void spawn_some_texture(Cmd cmd, Assets<rl::Texture2D>) {}
+
 inline void spawn_car_on_input(Cmd cmd, Res<AssetServer> asset_server,
                                ResMut<CarHandles> car_handles,
                                Res<Input> input) {
