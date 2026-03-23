@@ -20,7 +20,7 @@ struct Health {
 struct Speed {
   // można zmienić storage który używają komponenty danego typu
   // dla komponentów które są często - default lepszy
-  // dla komponentów które są często - HashMapStorage lepszy
+  // dla komponentów które są rzadko - HashMapStorage lepszy
   using Storage = HashMapStorage<Speed>;
   f32 value = 5.0f;
 };
