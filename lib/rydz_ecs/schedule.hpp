@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <taskflow/taskflow.hpp>
+#include <variant>
 #include <vector>
 
 namespace ecs {
@@ -33,7 +34,7 @@ template <typename H> H AbslHashValue(H h, ScheduleLabel l) {
 } // namespace ecs
 
 template <> struct std::hash<ecs::ScheduleLabel> {
-  size_t operator()(ecs::ScheduleLabel l) const noexcept {
+  usize operator()(ecs::ScheduleLabel l) const noexcept {
     return std::hash<i32>{}(static_cast<i32>(l));
   }
 };
@@ -107,27 +108,20 @@ class Schedule {
     SystemOrdering ordering;
   };
 
+  struct InlineStep {
+    usize start, end;
+  };
+
+  struct ParallelStep {
+    tf::Taskflow taskflow;
+  };
+
+  using ExecutionStep = std::variant<InlineStep, ParallelStep>;
+
   std::vector<SystemEntry> entries_;
-  tf::Taskflow taskflow_;
-
-  // Inline-only segments for main_thread_only systems
-  struct InlineSegment {
-    size_t start;
-    size_t end;
-  };
-
-  enum class StepKind { Inline, Taskflow };
-  struct Step {
-    StepKind kind;
-    size_t inline_idx;
-  };
-
-  std::vector<InlineSegment> inline_segments_;
-  std::vector<Step> execution_plan_;
-
+  std::vector<ExecutionStep> steps_;
   World *current_world_ = nullptr;
   bool needs_rebuild_ = true;
-  bool has_parallel_ = false;
 
 public:
   Schedule() = default;
@@ -144,16 +138,17 @@ public:
 
   template <typename F> void add_system_fn(F &&func) {
     if constexpr (is_chained_systems_v<std::decay_t<F>>) {
-      for (auto &e : func.systems) {
+      for (auto &e : func.systems)
         add_system(std::move(e.system), std::move(e.ordering));
-      }
+
     } else if constexpr (is_system_group_descriptor_v<std::decay_t<F>>) {
-      for (auto &e : func.build()) {
+      for (auto &e : func.build())
         add_system(std::move(e.system), std::move(e.ordering));
-      }
+
     } else if constexpr (is_system_descriptor_v<std::decay_t<F>>) {
       auto ordering = func.take_ordering();
       add_system(func.build(), std::move(ordering));
+
     } else {
       add_system(make_system(std::forward<F>(func)));
     }
@@ -165,137 +160,131 @@ public:
 
     current_world_ = &world;
     if (needs_rebuild_) {
-      rebuild_graph();
+      rebuild();
       needs_rebuild_ = false;
     }
 
-    if (!has_parallel_ || !world.multithreaded()) {
+    if (!world.multithreaded()) {
       for (auto &entry : entries_)
         entry.system->run(world);
       return;
     }
 
-    for (auto &step : execution_plan_) {
-      if (step.kind == StepKind::Inline) {
-        auto &seg = inline_segments_[step.inline_idx];
-        for (size_t i : range(seg.start, seg.end))
+    for (auto &step : steps_) {
+      if (auto *s = std::get_if<InlineStep>(&step)) {
+        for (usize i : range(s->start, s->end))
           entries_[i].system->run(world);
       } else {
-        global_executor().run(taskflow_).wait();
+        auto &tf = std::get<ParallelStep>(step).taskflow;
+        global_executor().run(tf).wait();
       }
     }
   }
 
-  size_t system_count() const { return entries_.size(); }
+  usize system_count() const { return entries_.size(); }
   bool empty() const { return entries_.empty(); }
 
 private:
-  void rebuild_graph() {
-    taskflow_.clear();
-    inline_segments_.clear();
-    execution_plan_.clear();
-    has_parallel_ = false;
+  void rebuild() {
+    steps_.clear();
 
-    const size_t n = entries_.size();
+    const usize n = entries_.size();
     if (n == 0)
       return;
 
-    absl::flat_hash_map<std::string, size_t> name_to_index;
-    for (size_t i = 0; i < n; ++i) {
-      name_to_index[entries_[i].system->name()] = i;
-    }
+    topological_sort();
+    build_execution_steps();
+  }
 
-    std::vector<std::vector<size_t>> adj(n);
-    std::vector<size_t> in_degree(n, 0);
+  void topological_sort() {
+    const usize n = entries_.size();
 
-    for (size_t i = 0; i < n; ++i) {
+    absl::flat_hash_map<std::string, usize> name_to_idx;
+    for (usize i = 0; i < n; ++i)
+      name_to_idx[entries_[i].system->name()] = i;
+
+    std::vector<std::vector<usize>> adj(n);
+    std::vector<usize> in_degree(n, 0);
+
+    auto resolve = [&](const std::string &dep, const std::string &owner) {
+      auto it = name_to_idx.find(dep);
+      if (it == name_to_idx.end())
+        throw std::runtime_error("System '" + owner + "' references '" + dep +
+                                 "' which does not exist in this schedule");
+      return it->second;
+    };
+
+    for (usize i = 0; i < n; ++i) {
+      const auto &name = entries_[i].system->name();
       for (const auto &dep : entries_[i].ordering.after) {
-        auto it = name_to_index.find(dep);
-        if (it == name_to_index.end()) {
-          throw std::runtime_error("System '" + entries_[i].system->name() +
-                                   "' has .after() on '" + dep +
-                                   "' which does not exist in this schedule");
-        }
-        adj[it->second].push_back(i);
+        usize j = resolve(dep, name);
+        adj[j].push_back(i);
         in_degree[i]++;
       }
       for (const auto &dep : entries_[i].ordering.before) {
-        auto it = name_to_index.find(dep);
-        if (it == name_to_index.end()) {
-          throw std::runtime_error("System '" + entries_[i].system->name() +
-                                   "' has .before() on '" + dep +
-                                   "' which does not exist in this schedule");
-        }
-        adj[i].push_back(it->second);
-        in_degree[it->second]++;
+        usize j = resolve(dep, name);
+        adj[i].push_back(j);
+        in_degree[j]++;
       }
     }
 
     // Kahn's algorithm, stable by insertion order
-    std::vector<size_t> ready;
-    for (size_t i = 0; i < n; ++i) {
+    std::vector<usize> ready;
+    for (usize i = 0; i < n; ++i)
       if (in_degree[i] == 0)
         ready.push_back(i);
-    }
 
-    std::vector<size_t> order;
+    std::vector<usize> order;
     order.reserve(n);
     while (!ready.empty()) {
       auto min_it = std::min_element(ready.begin(), ready.end());
-      size_t curr = *min_it;
+      usize curr = *min_it;
       ready.erase(min_it);
       order.push_back(curr);
 
-      for (size_t next : adj[curr]) {
-        if (--in_degree[next] == 0) {
+      for (usize next : adj[curr])
+        if (--in_degree[next] == 0)
           ready.push_back(next);
-        }
-      }
     }
 
     if (order.size() != n) {
       std::string msg = "Cycle detected in system ordering. Systems in cycle:";
-      for (size_t i = 0; i < n; ++i) {
+      for (usize i = 0; i < n; ++i)
         if (in_degree[i] != 0)
           msg += " " + entries_[i].system->name();
-      }
       throw std::runtime_error(msg);
     }
 
-    // Reorder entries per topo sort
     std::vector<SystemEntry> sorted;
     sorted.reserve(n);
-    for (size_t idx : order) {
+    for (usize idx : order)
       sorted.push_back(std::move(entries_[idx]));
-    }
     entries_ = std::move(sorted);
+  }
 
-    // Chunk by main_thread_only, then batch within each chunk
-    auto chunked_view =
+  void build_execution_steps() {
+    auto chunks =
         entries_ |
         std::views::chunk_by([](const SystemEntry &a, const SystemEntry &b) {
           return a.access.main_thread_only == b.access.main_thread_only;
         });
 
-    for (auto chunk : chunked_view) {
-      size_t start =
-          static_cast<size_t>(std::distance(entries_.data(), &chunk.front()));
+    for (auto chunk : chunks) {
+      usize start =
+          static_cast<usize>(std::distance(entries_.data(), &chunk.front()));
+      usize end = start + chunk.size();
+      bool must_be_inline =
+          chunk.front().access.main_thread_only || chunk.size() == 1;
 
-      size_t end = start + chunk.size();
-
-      bool is_main = chunk.front().access.main_thread_only;
-
-      if (is_main || (chunk.size() == 1)) {
-        size_t idx = inline_segments_.size();
-        inline_segments_.push_back({start, end});
-        execution_plan_.push_back({StepKind::Inline, idx});
+      if (must_be_inline) {
+        steps_.emplace_back(InlineStep{start, end});
       } else {
-        build_taskflow_segment(start, end);
+        steps_.emplace_back(build_parallel_step(start, end));
       }
     }
   }
 
-  bool systems_conflict(size_t i, size_t j) const {
+  bool systems_conflict(usize i, usize j) const {
     const auto &a = entries_[i];
     const auto &b = entries_[j];
 
@@ -303,87 +292,94 @@ private:
         !a.access.is_compatible(b.access))
       return true;
 
-    const auto &name_a = a.system->name();
-    const auto &name_b = b.system->name();
-    for (const auto &dep : a.ordering.after)
-      if (dep == name_b)
-        return true;
-    for (const auto &dep : a.ordering.before)
-      if (dep == name_b)
-        return true;
-    for (const auto &dep : b.ordering.after)
-      if (dep == name_a)
-        return true;
-    for (const auto &dep : b.ordering.before)
-      if (dep == name_a)
-        return true;
-
-    return false;
+    return have_ordering_dependency(a, b);
   }
 
-  void build_taskflow_segment(size_t start, size_t end) {
-    const size_t count = end - start;
+  using Batch = std::vector<usize>;
 
-    // Greedy batch assignment: each batch holds mutually compatible systems
-    std::vector<std::vector<size_t>> batches;
+  std::vector<Batch> batch_compatible_systems(usize start, usize end) const {
+    std::vector<Batch> batches;
 
-    for (size_t i = 0; i < count; ++i) {
-      bool placed = false;
-      for (auto &batch : batches) {
-        bool compatible = true;
-        for (size_t j : batch) {
+    const usize count = end - start;
+    for (usize i = 0; i < count; ++i) {
+
+      auto compatible = [&](auto &batch) {
+        for (usize j : batch) {
           if (systems_conflict(start + i, start + j)) {
-            compatible = false;
-            break;
+            return false;
           }
         }
-        if (compatible) {
-          batch.push_back(i);
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) {
+        return true;
+      };
+
+      auto it = std::ranges::find_if(batches, compatible);
+
+      if (it != batches.end()) {
+        it->push_back(i);
+      } else {
         batches.push_back({i});
       }
     }
+    return batches;
+  }
 
-    // Reorder entries within [start, end) by batch
+  void reorder_entries_by_batches(usize start,
+                                  const std::vector<Batch> &batches) {
     std::vector<SystemEntry> reordered;
-    reordered.reserve(count);
+    reordered.reserve(batches.size());
+
     for (const auto &batch : batches) {
-      for (size_t idx : batch) {
+      for (usize idx : batch) {
         reordered.push_back(std::move(entries_[start + idx]));
       }
     }
-    for (size_t i = 0; i < count; ++i) {
+
+    for (usize i = 0; i < reordered.size(); ++i) {
       entries_[start + i] = std::move(reordered[i]);
     }
+  }
 
-    // Build tasks in a single taskflow with dependency edges between batches
-    size_t batch_start = start;
-    std::vector<tf::Task> prev_batch_tasks;
+  ParallelStep build_parallel_step(usize start, usize end) {
+    using Tasks = std::vector<tf::Task>;
+
+    auto batches = batch_compatible_systems(start, end);
+    reorder_entries_by_batches(start, batches);
+
+    ParallelStep step;
+    usize batch_start = start;
+    Tasks prev_tasks;
 
     for (const auto &batch : batches) {
-      size_t batch_end = batch_start + batch.size();
-      std::vector<tf::Task> current_tasks;
+      Tasks curr_tasks;
+      usize batch_end = batch_start + batch.size();
 
-      for (size_t i = batch_start; i < batch_end; ++i) {
-        auto task = taskflow_.emplace(
+      for (usize i = batch_start; i < batch_end; ++i) {
+        auto task = step.taskflow.emplace(
             [this, i] { entries_[i].system->run(*current_world_); });
-        // Each task in this batch depends on all tasks from the previous batch
-        for (auto &prev : prev_batch_tasks) {
+
+        for (auto &prev : prev_tasks) {
           prev.precede(task);
         }
-        current_tasks.push_back(task);
+
+        curr_tasks.push_back(task);
       }
 
-      prev_batch_tasks = std::move(current_tasks);
+      prev_tasks = std::move(curr_tasks);
       batch_start = batch_end;
     }
 
-    has_parallel_ = true;
-    execution_plan_.push_back({StepKind::Taskflow, 0});
+    return step;
+  }
+
+  static bool have_ordering_dependency(const SystemEntry &a,
+                                       const SystemEntry &b) {
+    const auto &na = a.system->name();
+    const auto &nb = b.system->name();
+
+    return std::ranges::contains(a.ordering.after, nb) ||
+           std::ranges::contains(a.ordering.before, nb) ||
+           std::ranges::contains(b.ordering.after, na) ||
+           std::ranges::contains(b.ordering.before, na);
   }
 };
 
@@ -415,7 +411,8 @@ void add_system_to_schedule(Schedule &schedule, F &&func) {
 } // namespace detail
 
 inline auto system_multithreading(TaskPoolOptions opts = {}) {
-  return [opts](auto &app) { app.world().set_multithreaded(opts.multithreaded); };
+  return
+      [opts](auto &app) { app.world().set_multithreaded(opts.multithreaded); };
 }
 
 } // namespace ecs
