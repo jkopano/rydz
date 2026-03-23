@@ -15,3 +15,6 @@ build/**
 # for vs
 vsxmake2026/**
 .vs/**
+
+# compile
+compile_commands.json
