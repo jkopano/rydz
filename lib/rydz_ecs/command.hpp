@@ -76,11 +76,10 @@ template <typename T> struct InsertResourceCommand : ICommand {
 class EntityCommands {
   Entity entity_;
   CommandQueue *queue_;
-  EntityManager *entities_;
 
 public:
-  EntityCommands(Entity entity, CommandQueue *queue, EntityManager *entities)
-      : entity_(entity), queue_(queue), entities_(entities) {}
+  EntityCommands(Entity entity, CommandQueue *queue)
+      : entity_(entity), queue_(queue) {}
 
   template <Spawnable T> EntityCommands &insert(T item) {
     queue_->push(detail::InsertCommand<T>(entity_, std::move(item)));
@@ -108,12 +107,12 @@ public:
   template <Spawnable... Ts> EntityCommands spawn(Ts... items) {
     Entity entity = entities_->create();
     (queue_->push(detail::InsertCommand<Ts>(entity, std::move(items))), ...);
-    return EntityCommands(entity, queue_, entities_);
+    return EntityCommands(entity, queue_);
   }
 
   EntityCommands spawn_empty() {
     Entity entity = entities_->create();
-    return EntityCommands(entity, queue_, entities_);
+    return EntityCommands(entity, queue_);
   }
 
   template <std::ranges::input_range R>
@@ -127,7 +126,6 @@ public:
   void despawn(Entity entity) { queue_->push(detail::DespawnCommand(entity)); }
 
   template <typename T> void insert_resource(T resource) {
-    static_assert(!Bundle<T>, "Bundles cannot be inserted as resources.");
     static_assert(Resource<T>,
                   "Only Resources can be inserted via insert_resource(). "
                   "Add 'using Type = ResourceType;' to your struct.");
@@ -135,7 +133,7 @@ public:
   }
 
   EntityCommands entity(Entity e) {
-    return EntityCommands(e, queue_, entities_);
+    return EntityCommands(e, queue_);
   }
 };
 

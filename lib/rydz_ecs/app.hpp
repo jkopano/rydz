@@ -41,42 +41,38 @@ public:
     return *this;
   }
 
-  template <typename Label, typename F>
-    requires(is_on_enter<std::decay_t<Label>>::value)
-  App &add_systems(Label &&label, F &&func) {
-    using S = decltype(label.value);
-    auto *schedules = world_.get_resource<StateSchedules<std::decay_t<S>>>();
-    if (!schedules) {
-      world_.insert_resource(StateSchedules<std::decay_t<S>>{});
-      schedules = world_.get_resource<StateSchedules<std::decay_t<S>>>();
-    }
-    schedules->on_enter[label.value].add_system_fn(std::forward<F>(func));
-    return *this;
-  }
-
-  template <typename Label, typename F>
-    requires(is_on_exit<std::decay_t<Label>>::value)
-  App &add_systems(Label &&label, F &&func) {
-    using S = decltype(label.value);
-    auto *schedules = world_.get_resource<StateSchedules<std::decay_t<S>>>();
-    if (!schedules) {
-      world_.insert_resource(StateSchedules<std::decay_t<S>>{});
-      schedules = world_.get_resource<StateSchedules<std::decay_t<S>>>();
-    }
-    schedules->on_exit[label.value].add_system_fn(std::forward<F>(func));
-    return *this;
-  }
-
-  template <typename Label, typename F>
-    requires(is_on_transition<std::decay_t<Label>>::value)
-  App &add_systems(Label &&, F &&func) {
-    using S = typename std::decay_t<Label>::state_type;
+private:
+  template <typename S> StateSchedules<S> &get_or_init_state_schedules() {
     auto *schedules = world_.get_resource<StateSchedules<S>>();
     if (!schedules) {
       world_.insert_resource(StateSchedules<S>{});
       schedules = world_.get_resource<StateSchedules<S>>();
     }
-    schedules->on_transition.add_system_fn(std::forward<F>(func));
+    return *schedules;
+  }
+
+public:
+  template <OnEnterLabel Label, typename F>
+  App &add_systems(Label &&label, F &&func) {
+    using S = std::decay_t<decltype(label.value)>;
+    get_or_init_state_schedules<S>().on_enter[label.value].add_system_fn(
+        std::forward<F>(func));
+    return *this;
+  }
+
+  template <OnExitLabel Label, typename F>
+  App &add_systems(Label &&label, F &&func) {
+    using S = std::decay_t<decltype(label.value)>;
+    get_or_init_state_schedules<S>().on_exit[label.value].add_system_fn(
+        std::forward<F>(func));
+    return *this;
+  }
+
+  template <OnTransitionLabel Label, typename F>
+  App &add_systems(Label &&, F &&func) {
+    using S = typename std::decay_t<Label>::state_type;
+    get_or_init_state_schedules<S>().on_transition.add_system_fn(
+        std::forward<F>(func));
     return *this;
   }
 

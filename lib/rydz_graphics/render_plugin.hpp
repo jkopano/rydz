@@ -31,25 +31,15 @@ struct ClearColor {
   rl::Color color = {30, 30, 40, 255};
 };
 
-inline void apply_materials_system(World &world) {
-  auto *model_storage = world.get_storage<Model3d>();
-  auto *mat_storage = world.get_storage<Material3d>();
-  auto *model_assets = world.get_resource<Assets<rl::Model>>();
-  auto *tex_assets = world.get_resource<Assets<rl::Texture2D>>();
-  if (!model_storage || !mat_storage || !model_assets)
-    return;
-
-  mat_storage->for_each([&](Entity e, const Material3d &mat_comp) {
-    auto *model_comp = model_storage->get(e);
-    if (!model_comp)
-      return;
-
-    rl::Model *model = model_assets->get(model_comp->model);
+inline void apply_materials_system(Query<const Model3d, const Material3d> query,
+                                   ResMut<Assets<rl::Model>> model_assets,
+                                   ResMut<Assets<rl::Texture2D>> tex_assets) {
+  for (auto [m3d, mat] : query.iter()) {
+    rl::Model *model = model_assets->get(m3d->model);
     if (!model)
-      return;
-
-    mat_comp.material.apply(*model, tex_assets);
-  });
+      continue;
+    mat->material.apply(*model, tex_assets.ptr);
+  }
 }
 
 inline void build_render_batches_system(
@@ -447,79 +437,39 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
   rl::EndDrawing();
 }
 
-inline void apply_model_transform(World &world) {
-  auto *model_storage = world.get_storage<Model3d>();
-  auto *gt_storage = world.get_storage<GlobalTransform>();
-  auto *model_assets = world.get_resource<Assets<rl::Model>>();
-  if (!model_storage || !gt_storage || !model_assets)
-    return;
-
-  model_storage->for_each([&](Entity e, const Model3d &m3d) {
-    auto *gt = gt_storage->get(e);
-    if (!gt)
-      return;
-    auto *model = model_assets->get(m3d.model);
+inline void apply_model_transform(Query<Model3d, Mut<GlobalTransform>> query,
+                                  Res<Assets<rl::Model>> model_assets) {
+  for (auto [m3d, gt] : query.iter()) {
+    auto *model = model_assets->get(m3d->model);
     if (!model)
-      return;
+      continue;
+
     gt->matrix = gt->matrix * from_rl(model->transform);
-  });
+  }
 }
 
-inline void auto_insert_global_transform(World &world) {
-  auto *transform_storage = world.get_storage<Transform>();
-  auto *global_storage = world.get_storage<GlobalTransform>();
-  if (!transform_storage)
-    return;
-
-  transform_storage->for_each([&](Entity e, const Transform &) {
-    if (!global_storage || !global_storage->get(e)) {
-      world.insert_component(e, GlobalTransform{});
-      global_storage = world.get_storage<GlobalTransform>();
-    }
-  });
+inline void auto_insert_global_transform(
+    Query<Entity, With<Transform>, Without<GlobalTransform>> query, Cmd cmd) {
+  for (auto [e] : query.iter())
+    cmd.entity(e).insert(GlobalTransform{});
 }
 
-inline void auto_insert_visibility(World &world) {
-  auto *model_storage = world.get_storage<Model3d>();
-  auto *vis_storage = world.get_storage<Visibility>();
-  if (!model_storage)
-    return;
-
-  model_storage->for_each([&](Entity e, const Model3d &) {
-    if (!vis_storage || !vis_storage->get(e)) {
-      world.insert_component(e, Visibility::Visible);
-      vis_storage = world.get_storage<Visibility>();
-    }
-  });
+inline void auto_insert_visibility(
+    Query<Entity, With<Model3d>, Without<Visibility>> query, Cmd cmd) {
+  for (auto [e] : query.iter())
+    cmd.entity(e).insert(Visibility::Visible);
 }
 
-inline void auto_insert_material(World &world) {
-  auto *model_storage = world.get_storage<Model3d>();
-  auto *mat_storage = world.get_storage<Material3d>();
-  if (!model_storage)
-    return;
-
-  model_storage->for_each([&](Entity e, const Model3d &) {
-    if (!mat_storage || !mat_storage->get(e)) {
-      world.insert_component(e,
-                             Material3d{StandardMaterial::from_color(WHITE)});
-      mat_storage = world.get_storage<Material3d>();
-    }
-  });
+inline void auto_insert_material(
+    Query<Entity, With<Model3d>, Without<Material3d>> query, Cmd cmd) {
+  for (auto [e] : query.iter())
+    cmd.entity(e).insert(Material3d{StandardMaterial::from_color(WHITE)});
 }
 
-inline void auto_insert_render_config(World &world) {
-  auto *model_storage = world.get_storage<Model3d>();
-  auto *rc_storage = world.get_storage<RenderConfig>();
-  if (!model_storage)
-    return;
-
-  model_storage->for_each([&](Entity e, const Model3d &) {
-    if (!rc_storage || !rc_storage->get(e)) {
-      world.insert_component(e, RenderConfig{});
-      rc_storage = world.get_storage<RenderConfig>();
-    }
-  });
+inline void auto_insert_render_config(
+    Query<Entity, With<Model3d>, Without<RenderConfig>> query, Cmd cmd) {
+  for (auto [e] : query.iter())
+    cmd.entity(e).insert(RenderConfig{});
 }
 
 inline void render_plugin(App &app) {

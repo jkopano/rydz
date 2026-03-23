@@ -2,6 +2,7 @@
 #include "access.hpp"
 #include "ticks.hpp"
 #include "world.hpp"
+#include <span>
 #include <tuple>
 #include <type_traits>
 
@@ -19,6 +20,8 @@ template <typename F> struct QueryFilterTraits;
 template <> struct QueryFilterTraits<Filters<>> {
   static bool matches(const World &, Entity) { return true; }
   static void access(SystemAccess &) {}
+  static std::span<const Entity> candidates(const World &) { return {}; }
+  static usize candidate_size(const World &) { return SIZE_MAX; }
 };
 
 template <typename F> struct QueryFilterTraits<Filters<F>> {
@@ -26,6 +29,12 @@ template <typename F> struct QueryFilterTraits<Filters<F>> {
     return QueryFilterTraits<F>::matches(world, entity);
   }
   static void access(SystemAccess &acc) { QueryFilterTraits<F>::access(acc); }
+  static std::span<const Entity> candidates(const World &world) {
+    return QueryFilterTraits<F>::candidates(world);
+  }
+  static usize candidate_size(const World &world) {
+    return QueryFilterTraits<F>::candidate_size(world);
+  }
 };
 
 template <typename F, typename... Fs>
@@ -38,6 +47,18 @@ struct QueryFilterTraits<Filters<F, Fs...>> {
     QueryFilterTraits<F>::access(acc);
     QueryFilterTraits<Filters<Fs...>>::access(acc);
   }
+  static std::span<const Entity> candidates(const World &world) {
+    usize size_f = QueryFilterTraits<F>::candidate_size(world);
+    usize size_rest = QueryFilterTraits<Filters<Fs...>>::candidate_size(world);
+    if (size_f <= size_rest)
+      return QueryFilterTraits<F>::candidates(world);
+    return QueryFilterTraits<Filters<Fs...>>::candidates(world);
+  }
+  static usize candidate_size(const World &world) {
+    usize size_f = QueryFilterTraits<F>::candidate_size(world);
+    usize size_rest = QueryFilterTraits<Filters<Fs...>>::candidate_size(world);
+    return size_f < size_rest ? size_f : size_rest;
+  }
 };
 
 template <typename T> struct QueryFilterTraits<With<T>> {
@@ -45,6 +66,15 @@ template <typename T> struct QueryFilterTraits<With<T>> {
     return world.has_component<T>(entity);
   }
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
+
+  static std::span<const Entity> candidates(const World &world) {
+    auto *storage = world.get_storage<T>();
+    return storage ? storage->entities() : std::span<const Entity>{};
+  }
+  static usize candidate_size(const World &world) {
+    auto *storage = world.get_storage<T>();
+    return storage ? storage->size() : 0;
+  }
 };
 
 template <typename T> struct QueryFilterTraits<Without<T>> {
@@ -52,6 +82,8 @@ template <typename T> struct QueryFilterTraits<Without<T>> {
     return !world.has_component<T>(entity);
   }
   static void access(SystemAccess &) {}
+  static std::span<const Entity> candidates(const World &) { return {}; }
+  static usize candidate_size(const World &) { return SIZE_MAX; }
 };
 
 template <typename T> struct QueryFilterTraits<Added<T>> {
@@ -64,6 +96,14 @@ template <typename T> struct QueryFilterTraits<Added<T>> {
     return ticks->added.is_newer_than(last_run, this_run);
   }
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
+  static std::span<const Entity> candidates(const World &world) {
+    auto *storage = world.get_storage<T>();
+    return storage ? storage->entities() : std::span<const Entity>{};
+  }
+  static usize candidate_size(const World &world) {
+    auto *storage = world.get_storage<T>();
+    return storage ? storage->size() : 0;
+  }
 };
 
 template <typename T> struct QueryFilterTraits<Changed<T>> {
@@ -76,6 +116,14 @@ template <typename T> struct QueryFilterTraits<Changed<T>> {
     return ticks->changed.is_newer_than(last_run, this_run);
   }
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
+  static std::span<const Entity> candidates(const World &world) {
+    auto *storage = world.get_storage<T>();
+    return storage ? storage->entities() : std::span<const Entity>{};
+  }
+  static usize candidate_size(const World &world) {
+    auto *storage = world.get_storage<T>();
+    return storage ? storage->size() : 0;
+  }
 };
 
 template <typename F1, typename F2> struct QueryFilterTraits<Or<F1, F2>> {
@@ -87,6 +135,8 @@ template <typename F1, typename F2> struct QueryFilterTraits<Or<F1, F2>> {
     QueryFilterTraits<F1>::access(acc);
     QueryFilterTraits<F2>::access(acc);
   }
+  static std::span<const Entity> candidates(const World &) { return {}; }
+  static usize candidate_size(const World &) { return SIZE_MAX; }
 };
 
 template <typename T> struct is_filter : std::false_type {};

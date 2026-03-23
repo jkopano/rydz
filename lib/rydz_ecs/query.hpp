@@ -197,9 +197,9 @@ private:
   }
 
   template <typename... Items>
-  static std::span<const Entity> find_smallest_entities_group(
-      const std::tuple<typename WorldQueryTraits<Items>::Fetcher...>
-          &fetchers) {
+  std::span<const Entity> find_smallest_entities_group(
+      const std::tuple<typename WorldQueryTraits<Items>::Fetcher...> &fetchers)
+      const {
     usize min_size = SIZE_MAX;
     std::span<const Entity> result;
     std::apply(
@@ -213,6 +213,14 @@ private:
           (check(f), ...);
         },
         fetchers);
+
+    if (min_size == SIZE_MAX) {
+      usize filter_size = QueryFilterTraits<FilterT>::candidate_size(*world_);
+      if (filter_size < min_size) {
+        result = QueryFilterTraits<FilterT>::candidates(*world_);
+      }
+    }
+
     return result;
   }
 
