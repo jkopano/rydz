@@ -3,6 +3,7 @@
 #include "rl.hpp"
 #include "rydz_ecs/fwd.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
@@ -250,6 +251,7 @@ inline auto print_player(Query<Health, Position, Damage> query) {
 
 inline void scene_plugin(App &app) {
   app.add_plugin(input_plugin);
+  app.add_plugin(system_multithreading({true}));
   app.insert_resource(HouseHandles{});
   app.insert_resource(LightsSpawned{});
 

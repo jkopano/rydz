@@ -45,6 +45,10 @@ inline tf::Executor &global_executor() {
   return executor;
 }
 
+struct TaskPoolOptions {
+  bool multithreaded = true;
+};
+
 struct ChainedSystems {
   struct Entry {
     std::unique_ptr<ISystem> system;
@@ -103,22 +107,27 @@ class Schedule {
     SystemOrdering ordering;
   };
 
-  enum class SegmentKind {
-    Inline,
-    Parallel,
-  };
-
-  struct Segment {
-    size_t start = 0;
-    size_t end = 0;
-    SegmentKind kind = SegmentKind::Inline;
-    tf::Taskflow taskflow;
-  };
-
   std::vector<SystemEntry> entries_;
-  std::vector<Segment> segments_;
+  tf::Taskflow taskflow_;
+
+  // Inline-only segments for main_thread_only systems
+  struct InlineSegment {
+    size_t start;
+    size_t end;
+  };
+
+  enum class StepKind { Inline, Taskflow };
+  struct Step {
+    StepKind kind;
+    size_t inline_idx;
+  };
+
+  std::vector<InlineSegment> inline_segments_;
+  std::vector<Step> execution_plan_;
+
   World *current_world_ = nullptr;
   bool needs_rebuild_ = true;
+  bool has_parallel_ = false;
 
 public:
   Schedule() = default;
@@ -160,12 +169,19 @@ public:
       needs_rebuild_ = false;
     }
 
-    for (auto &segment : segments_) {
-      if (segment.kind == SegmentKind::Inline) {
-        for (size_t i : range(segment.start, segment.end))
+    if (!has_parallel_ || !world.multithreaded()) {
+      for (auto &entry : entries_)
+        entry.system->run(world);
+      return;
+    }
+
+    for (auto &step : execution_plan_) {
+      if (step.kind == StepKind::Inline) {
+        auto &seg = inline_segments_[step.inline_idx];
+        for (size_t i : range(seg.start, seg.end))
           entries_[i].system->run(world);
       } else {
-        global_executor().run(segment.taskflow).wait();
+        global_executor().run(taskflow_).wait();
       }
     }
   }
@@ -175,7 +191,10 @@ public:
 
 private:
   void rebuild_graph() {
-    segments_.clear();
+    taskflow_.clear();
+    inline_segments_.clear();
+    execution_plan_.clear();
+    has_parallel_ = false;
 
     const size_t n = entries_.size();
     if (n == 0)
@@ -267,9 +286,11 @@ private:
       bool is_main = chunk.front().access.main_thread_only;
 
       if (is_main || (chunk.size() == 1)) {
-        segments_.push_back({start, end, SegmentKind::Inline, {}});
+        size_t idx = inline_segments_.size();
+        inline_segments_.push_back({start, end});
+        execution_plan_.push_back({StepKind::Inline, idx});
       } else {
-        build_batched_segments(start, end);
+        build_taskflow_segment(start, end);
       }
     }
   }
@@ -300,7 +321,7 @@ private:
     return false;
   }
 
-  void build_batched_segments(size_t start, size_t end) {
+  void build_taskflow_segment(size_t start, size_t end) {
     const size_t count = end - start;
 
     // Greedy batch assignment: each batch holds mutually compatible systems
@@ -339,23 +360,30 @@ private:
       entries_[start + i] = std::move(reordered[i]);
     }
 
-    // Push a segment per batch
+    // Build tasks in a single taskflow with dependency edges between batches
     size_t batch_start = start;
+    std::vector<tf::Task> prev_batch_tasks;
+
     for (const auto &batch : batches) {
       size_t batch_end = batch_start + batch.size();
-      if (batch.size() == 1) {
-        segments_.push_back({batch_start, batch_end, SegmentKind::Inline, {}});
-      } else {
-        // All systems in this batch are compatible — full parallel, no edges
-        Segment seg{batch_start, batch_end, SegmentKind::Parallel, {}};
-        for (size_t i = batch_start; i < batch_end; ++i) {
-          seg.taskflow.emplace(
-              [this, i] { entries_[i].system->run(*current_world_); });
+      std::vector<tf::Task> current_tasks;
+
+      for (size_t i = batch_start; i < batch_end; ++i) {
+        auto task = taskflow_.emplace(
+            [this, i] { entries_[i].system->run(*current_world_); });
+        // Each task in this batch depends on all tasks from the previous batch
+        for (auto &prev : prev_batch_tasks) {
+          prev.precede(task);
         }
-        segments_.push_back(std::move(seg));
+        current_tasks.push_back(task);
       }
+
+      prev_batch_tasks = std::move(current_tasks);
       batch_start = batch_end;
     }
+
+    has_parallel_ = true;
+    execution_plan_.push_back({StepKind::Taskflow, 0});
   }
 };
 
@@ -385,5 +413,9 @@ void add_system_to_schedule(Schedule &schedule, F &&func) {
 }
 
 } // namespace detail
+
+inline auto system_multithreading(TaskPoolOptions opts = {}) {
+  return [opts](auto &app) { app.world().set_multithreaded(opts.multithreaded); };
+}
 
 } // namespace ecs

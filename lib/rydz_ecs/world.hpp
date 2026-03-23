@@ -21,9 +21,13 @@ public:
 private:
   std::unordered_map<std::type_index, std::unique_ptr<IStorage>> storages_;
   Tick change_tick_{0};
+  bool multithreaded_ = true;
 
 public:
   World() = default;
+
+  bool multithreaded() const { return multithreaded_; }
+  void set_multithreaded(bool v) { multithreaded_ = v; }
 
   Tick read_change_tick() const { return change_tick_; }
   Tick increment_change_tick() {
