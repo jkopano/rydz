@@ -263,20 +263,23 @@ private:
   }
 
   void build_execution_steps() {
+    auto must_run_inline = [](const SystemEntry &e) {
+      return e.access.main_thread_only || e.access.exclusive;
+    };
+
     auto chunks =
         entries_ |
-        std::views::chunk_by([](const SystemEntry &a, const SystemEntry &b) {
-          return a.access.main_thread_only == b.access.main_thread_only;
+        std::views::chunk_by([&](const SystemEntry &a, const SystemEntry &b) {
+          return must_run_inline(a) == must_run_inline(b);
         });
 
     for (auto chunk : chunks) {
       usize start =
           static_cast<usize>(std::distance(entries_.data(), &chunk.front()));
       usize end = start + chunk.size();
-      bool must_be_inline =
-          chunk.front().access.main_thread_only || chunk.size() == 1;
+      bool is_inline = must_run_inline(chunk.front()) || chunk.size() == 1;
 
-      if (must_be_inline) {
+      if (is_inline) {
         steps_.emplace_back(InlineStep{start, end});
       } else {
         steps_.emplace_back(build_parallel_step(start, end));
