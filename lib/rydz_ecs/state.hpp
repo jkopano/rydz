@@ -36,6 +36,10 @@ template <typename S> struct OnExit {
   explicit OnExit(S v) : value(std::move(v)) {}
 };
 
+template <typename S> struct OnTransition {
+  using state_type = S;
+};
+
 template <typename S> struct StateTransitionEvent {
   using Type = ResourceType;
   bool changed = false;
@@ -45,6 +49,7 @@ template <typename S> struct StateSchedules {
   using Type = ResourceType;
   absl::flat_hash_map<S, Schedule> on_enter;
   absl::flat_hash_map<S, Schedule> on_exit;
+  Schedule on_transition;
 };
 
 template <typename T> struct is_on_enter : std::false_type {};
@@ -52,6 +57,9 @@ template <typename S> struct is_on_enter<OnEnter<S>> : std::true_type {};
 
 template <typename T> struct is_on_exit : std::false_type {};
 template <typename S> struct is_on_exit<OnExit<S>> : std::true_type {};
+
+template <typename T> struct is_on_transition : std::false_type {};
+template <typename S> struct is_on_transition<OnTransition<S>> : std::true_type {};
 
 template <typename S> auto in_state(S target) {
   return
@@ -92,6 +100,8 @@ template <typename S> void check_state_transitions(World &world) {
     state->value = std::move(new_value);
 
     if (schedules) {
+      schedules->on_transition.run(world);
+
       auto enter_it = schedules->on_enter.find(state->value);
       if (enter_it != schedules->on_enter.end())
         enter_it->second.run(world);

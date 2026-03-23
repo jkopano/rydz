@@ -28,7 +28,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   // podłoga
   auto floor_h = models->add(rl::LoadModelFromMesh(mesh::plane(30, 30)));
   cmd.spawn(Model3d{floor_h},
-            Material3d{StandardMaterial::from_color(DARKGRAY)}, rlTransform{});
+            Material3d{StandardMaterial::from_color(DARKGRAY)}, Transform{});
 }
 
 // spawn_batch
@@ -42,7 +42,7 @@ void batch_spawn(Cmd cmd, ResMut<Assets<rl::Model>> models, Res<Input> input,
   auto sphere_h = models->add(rl::LoadModelFromMesh(mesh::sphere(0.3f)));
 
   // budujemy wektor tupli — spawn_batch przyjmuje range
-  std::vector<std::tuple<BulletTag, Lifetime, Model3d, Material3d, rlTransform>>
+  std::vector<std::tuple<BulletTag, Lifetime, Model3d, Material3d, Transform>>
       batch;
 
   for (i32 x = -3; x <= 3; ++x) {
@@ -70,7 +70,7 @@ void lifetime_system(Query<Entity, Mut<Lifetime>> query, Res<Time> time,
   }
 }
 
-void gravity_system(Query<Mut<rlTransform>, With<BulletTag>> query,
+void gravity_system(Query<Mut<Transform>, With<BulletTag>> query,
                     Res<Time> time) {
   for (auto [t] : query.iter()) {
     f32 y = t->translation.GetY() - 3.0f * time->delta_seconds;

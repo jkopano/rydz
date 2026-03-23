@@ -28,7 +28,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
             Model3d{models->add(cube_model)});
 }
 
-void player_movement(Query<Mut<rlTransform>, Player> query, Res<Input> input,
+void player_movement(Query<Mut<Transform>, Player> query, Res<Input> input,
                      Res<Time> time) {
   for (auto [t, player] : query.iter()) {
     f32 dt = time->delta_seconds;

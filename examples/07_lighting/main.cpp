@@ -24,7 +24,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   auto floor_h = models->add(std::move(floor));
   cmd.spawn(Model3d{floor_h},
             Material3d{StandardMaterial::from_color({200, 200, 200, 255})},
-            rlTransform{});
+            Transform{});
 
   // kilka obiektów na scenie
   auto sphere = rl::LoadModelFromMesh(mesh::sphere(1.0f));
@@ -57,7 +57,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
 }
 
 // obitujsz swiatlami
-void orbit_system(Query<Mut<rlTransform>, OrbitLight> query, Res<Time> time) {
+void orbit_system(Query<Mut<Transform>, OrbitLight> query, Res<Time> time) {
   f32 t = time->elapsed_seconds;
   for (auto [tx, orbit] : query.iter()) {
     f32 angle = t * orbit->speed + orbit->phase;

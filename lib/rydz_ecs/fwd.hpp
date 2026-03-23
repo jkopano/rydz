@@ -8,6 +8,7 @@ namespace ecs {
 
 struct BundleType {};
 struct ComponentType {};
+struct EventType {};
 struct ResourceType {};
 
 struct Entity;

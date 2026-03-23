@@ -67,6 +67,19 @@ public:
     return *this;
   }
 
+  template <typename Label, typename F>
+    requires(is_on_transition<std::decay_t<Label>>::value)
+  App &add_systems(Label &&, F &&func) {
+    using S = typename std::decay_t<Label>::state_type;
+    auto *schedules = world_.get_resource<StateSchedules<S>>();
+    if (!schedules) {
+      world_.insert_resource(StateSchedules<S>{});
+      schedules = world_.get_resource<StateSchedules<S>>();
+    }
+    schedules->on_transition.add_system_fn(std::forward<F>(func));
+    return *this;
+  }
+
   template <typename F> App &add_plugin(F &&plugin_fn) {
     plugin_fn(*this);
     return *this;
@@ -105,6 +118,8 @@ public:
   }
 
   template <typename E> App &add_event() {
+    static_assert(is_event_v<E>,
+                  "Add 'using Type = EventType;' to your event struct.");
     world_.insert_resource(Events<E>{});
     schedules_.entry(ScheduleLabel::First)
         .add_system_fn(event_update_system<E>);

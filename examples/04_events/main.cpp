@@ -11,11 +11,13 @@ using namespace ecs;
 // NA PRZYSZŁOŚĆ DODAĆ using Type = EventType;
 
 struct DamageEvent {
+  using Type = EventType;
   i32 amount;
   const char *source;
 };
 
 struct ScoreEvent {
+  using Type = EventType;
   i32 points;
 };
 
@@ -23,8 +25,11 @@ struct ScoreEvent {
 void send_events(EventWriter<DamageEvent> dmg_writer,
                  EventWriter<ScoreEvent> score_writer, Res<Input> input) {
 
-  if (input->key_pressed(KEY_A))
+  if (input->key_pressed(KEY_A)) {
     dmg_writer.send(DamageEvent{10, "miecz"});
+    dmg_writer.send(DamageEvent{10, "miecz"});
+    dmg_writer.send(DamageEvent{10, "miecz"});
+  }
 
   if (input->key_pressed(KEY_S))
     dmg_writer.send(DamageEvent{25, "łuk"});

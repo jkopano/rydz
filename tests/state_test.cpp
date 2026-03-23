@@ -238,6 +238,75 @@ TEST(StateTest, OnExitRunsBeforeOnEnter) {
       << "OnExit should run before OnEnter during transition";
 }
 
+TEST(StateTest, OnTransitionScheduleRuns) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+  world.insert_resource(StateTransitionEvent<GameState>{});
+  world.insert_resource(StateSchedules<GameState>{});
+
+  int transition_count = 0;
+
+  auto *schedules = world.get_resource<StateSchedules<GameState>>();
+  schedules->on_transition.add_system_fn(
+      [&transition_count]() { transition_count++; });
+
+  world.get_resource<NextState<GameState>>()->set(GameState::Playing);
+  check_state_transitions<GameState>(world);
+  EXPECT_EQ(transition_count, 1);
+
+  world.get_resource<NextState<GameState>>()->set(GameState::Paused);
+  check_state_transitions<GameState>(world);
+  EXPECT_EQ(transition_count, 2);
+}
+
+TEST(StateTest, OnTransitionNotCalledForSameState) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+  world.insert_resource(StateTransitionEvent<GameState>{});
+  world.insert_resource(StateSchedules<GameState>{});
+
+  int transition_count = 0;
+
+  auto *schedules = world.get_resource<StateSchedules<GameState>>();
+  schedules->on_transition.add_system_fn(
+      [&transition_count]() { transition_count++; });
+
+  world.get_resource<NextState<GameState>>()->set(GameState::Menu);
+  check_state_transitions<GameState>(world);
+  EXPECT_EQ(transition_count, 0);
+}
+
+TEST(StateTest, OnTransitionOrderIsExitTransitionEnter) {
+  World world;
+  world.insert_resource(State<GameState>(GameState::Menu));
+  world.insert_resource(NextState<GameState>{});
+  world.insert_resource(StateTransitionEvent<GameState>{});
+  world.insert_resource(StateSchedules<GameState>{});
+
+  int order_counter = 0;
+  int exit_order = -1;
+  int transition_order = -1;
+  int enter_order = -1;
+
+  auto *schedules = world.get_resource<StateSchedules<GameState>>();
+  schedules->on_exit[GameState::Menu].add_system_fn(
+      [&]() { exit_order = order_counter++; });
+  schedules->on_transition.add_system_fn(
+      [&]() { transition_order = order_counter++; });
+  schedules->on_enter[GameState::Playing].add_system_fn(
+      [&]() { enter_order = order_counter++; });
+
+  world.get_resource<NextState<GameState>>()->set(GameState::Playing);
+  check_state_transitions<GameState>(world);
+
+  EXPECT_LT(exit_order, transition_order)
+      << "OnExit should run before OnTransition";
+  EXPECT_LT(transition_order, enter_order)
+      << "OnTransition should run before OnEnter";
+}
+
 TEST(StateTest, OnEnterNotCalledForSameState) {
   World world;
   world.insert_resource(State<GameState>(GameState::Menu));

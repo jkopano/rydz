@@ -23,8 +23,12 @@ inline constexpr bool is_component_v =
     std::is_same_v<type_tag_t<T>, ComponentType>;
 
 template <typename T>
+inline constexpr bool is_event_v = std::is_same_v<type_tag_t<T>, EventType>;
+
+template <typename T>
 inline constexpr bool is_resource_v =
     std::is_same_v<type_tag_t<T>, ResourceType>;
+
 
 template <typename T>
 concept Bundle = is_bundle_v<T>;

@@ -1,5 +1,5 @@
 // 05 - States - Dobre gówno polecam
-// Pokazuje: init_state, in_state, NextState, OnEnter, OnExit
+// Pokazuje: init_state, in_state, NextState, OnEnter, OnExit, OnTransition
 
 #include "math.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
@@ -10,12 +10,13 @@
 using namespace ecs;
 using namespace math;
 
-enum class GameState { Menu, Playing, Paused };
+enum struct GameState { Menu, Playing, Paused };
 
 void on_enter_menu(Cmd cmd) { std::println("[STATE] entered: Menu"); }
 void on_enter_playing(Cmd cmd) { std::println("[STATE] entered: Playing"); }
 void on_enter_paused(Cmd cmd) { std::println("[STATE] entered: Paused"); }
 void on_exit_menu() { std::println("[STATE] exited: Menu"); }
+void on_any_transition() { std::println("[STATE] transition"); }
 
 void state_input(Res<State<GameState>> state, ResMut<NextState<GameState>> next,
                  Res<Input> input) {
@@ -55,11 +56,14 @@ int main() {
       .add_plugin(render_plugin)
       .add_plugin(input_plugin)
       .init_state(GameState::Menu)
-      // OnEnter/OnExit - uruchamiane przy zmianie stanu
+      // OnEnter/OnExit - uruchamiane przy odpowiednio Wejściu w stan i Wyjściu
+      // z stanu
       .add_systems(OnEnter(GameState::Menu), on_enter_menu)
       .add_systems(OnEnter(GameState::Playing), on_enter_playing)
       .add_systems(OnEnter(GameState::Paused), on_enter_paused)
       .add_systems(OnExit(GameState::Menu), on_exit_menu)
+      // OnTransition - uruchamiane przy każdej zmianie stanu
+      .add_systems(OnTransition<GameState>{}, on_any_transition)
       // Systemy z warunkiem in_state
       .add_systems(ScheduleLabel::Update, state_input)
       .add_systems(ScheduleLabel::Update,

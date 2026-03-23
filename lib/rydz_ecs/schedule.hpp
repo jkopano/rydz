@@ -120,6 +120,7 @@ class Schedule {
 
   std::vector<SystemEntry> entries_;
   std::vector<ExecutionStep> steps_;
+
   World *current_world_ = nullptr;
   bool needs_rebuild_ = true;
 

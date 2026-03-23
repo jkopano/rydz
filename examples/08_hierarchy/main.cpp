@@ -20,7 +20,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   // podłoga
   auto floor_h = models->add(rl::LoadModelFromMesh(mesh::plane(20, 20)));
   cmd.spawn(Model3d{floor_h},
-            Material3d{StandardMaterial::from_color(DARKGRAY)}, rlTransform{});
+            Material3d{StandardMaterial::from_color(DARKGRAY)}, Transform{});
 
   // światło
   cmd.spawn(DirectionalLight{
@@ -53,14 +53,14 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
 }
 
 // filtrujesz entity które mają Parent
-void system(Query<rlTransform, Parent> children_query) {
+void system(Query<Transform, Parent> children_query) {
   for (auto [t, parent] : children_query.iter()) {
     // parent->entity
   }
 }
 
 // znajdź entity bez rodzica
-void system(Query<rlTransform, Opt<Parent>> query) {
+void system(Query<Transform, Opt<Parent>> query) {
   for (auto [t, parent] : query.iter()) {
     if (!parent) {
       // to jest root
@@ -76,7 +76,7 @@ void system(Query<rlTransform, Opt<Parent>> query) {
 // }
 
 // Obracamy rodzica - dzieci powinny się obracać razem z nim
-void rotate_pivot(Query<Mut<rlTransform>, PivotTag> query, Res<Time> time) {
+void rotate_pivot(Query<Mut<Transform>, PivotTag> query, Res<Time> time) {
   for (auto [t, _] : query.iter()) {
     f32 angle = time->delta_seconds * 1.0f;
     t->rotation = Quat::sRotation(Vec3(0, 1, 0), angle) * t->rotation;
