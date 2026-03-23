@@ -14,16 +14,7 @@ using namespace ecs;
 using namespace math;
 
 struct MapTag {};
-struct HouseTag {};
-struct CarTag {};
 struct RotateMarker {};
-
-struct lol {
-  using Type = BundleType;
-  MapTag map;
-  HouseTag tag;
-  CarTag car;
-};
 
 struct CameraController {
   using Storage = SparseSetStorage<CameraController>;
@@ -100,59 +91,6 @@ inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
       ecs::Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}});
 }
 
-struct HouseHandles {
-  using Type = ResourceType;
-  Handle<rl::Model> house;
-  bool loaded = false;
-};
-
-inline void spawn_houses_on_input(Cmd cmd, Res<AssetServer> asset_server,
-                                  ResMut<HouseHandles> handles,
-                                  Res<Input> input) {
-  if (handles->loaded)
-    return;
-  if (!input->key_pressed(KEY_H))
-    return;
-  handles->loaded = true;
-
-  f32 spacing = 20.0f;
-  f32 scale = 0.015f;
-  i32 grid = 100;
-
-  std::vector<std::tuple<HouseTag, ecs::Transform, Model3d>> houses{};
-  auto model_handle = asset_server->load<rl::Model>("res/models/old_house.glb");
-
-  for (auto x : range(-grid, grid)) {
-    for (auto z : range(-grid, grid)) {
-      houses.emplace_back(
-          HouseTag{},
-          ecs::Transform{
-              .translation = Vec3(x * spacing, 0.0f, z * spacing),
-              .scale = Vec3::sReplicate(scale),
-          },
-          Model3d{model_handle});
-    }
-  }
-
-  // auto houses =
-  //     std::views::cartesian_product(std::views::iota(-grid, grid),
-  //                                   std::views::iota(-grid, grid)) |
-  //     std::views::transform([&](auto &&tuple) {
-  //       auto [x, z] = tuple;
-  //       return std::tuple(
-  //           HouseTag{},
-  //           Transform3D{
-  //               .translation = Vec3(x * spacing, 0.0f, z * spacing),
-  //               .scale = Vec3::sReplicate(scale),
-  //           },
-  //           Model3d{
-  //               asset_server->load<rl::Model>("res/models/old_house.glb"),
-  //           });
-  //     });
-
-  cmd.spawn_batch(houses);
-}
-
 inline void spawn_some_texture(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
                                NonSendMarker) {
   auto stone_tex = textures->add(rl::LoadTexture("res/textures/stone.jpg"));
@@ -216,55 +154,17 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
   );
   rl::DisableCursor();
 }
-
-struct Health {
-  u32 value = 100;
-};
-struct Position {
-  i32 x = 10;
-  i32 y = 20;
-};
-struct Damage {
-  u32 value = 100;
-};
-
-inline auto player_bundle(Health health, Position position, Damage damage) {
-  struct PlayerBundle {
-    using Type = BundleType;
-    Position position;
-    Health health;
-    Damage damage;
-  };
-
-  return PlayerBundle{.position = position, .health = health, .damage = damage};
-}
-
-inline auto spawn_player(Cmd cmd) {
-  cmd.spawn(player_bundle({100}, {100, 100}, {100}));
-};
-
-inline auto print_player(Query<Health, Position, Damage> query) {
-  for (auto [h, p, d] : query.iter()) {
-    std::println("Player: {} {} {}", h->value, p->x, p->y);
-  }
-}
-
 inline void scene_plugin(App &app) {
   app.add_plugin(input_plugin);
   app.add_plugin(system_multithreading({true}));
-  app.insert_resource(HouseHandles{});
   app.insert_resource(LightsSpawned{});
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
-  app.add_systems(ScheduleLabel::Startup, spawn_player);
   app.add_systems(ScheduleLabel::Startup, spawn_some_texture);
-  app.add_systems(ScheduleLabel::Update,
-                  group(print_player).run_if(run_once()));
   app.add_systems(ScheduleLabel::Update, group(spawn_map).run_if(run_once()));
 
   app.add_systems(ScheduleLabel::Update, camera_controller_system);
   app.add_systems(ScheduleLabel::Update, camera_mouse_system);
 
-  app.add_systems(ScheduleLabel::Update, spawn_houses_on_input);
   app.add_systems(ScheduleLabel::Update, spawn_lights_on_input);
 }
