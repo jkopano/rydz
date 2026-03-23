@@ -85,10 +85,9 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<ecs::Transform>> query,
 }
 
 inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
-  cmd.spawn(
-      MapTag{},
-      Model3d{asset_server->load<rl::Model>("res/models/sponza_atrium_3.glb")},
-      ecs::Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}});
+  cmd.spawn(MapTag{},
+            Model3d{asset_server->load<rl::Model>("res/models/race_map.glb")},
+            ecs::Transform{.scale = Vec3{0.1f, 0.1f, 0.1f}});
 }
 
 inline void spawn_some_texture(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
