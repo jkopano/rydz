@@ -263,21 +263,18 @@ private:
   }
 
   void build_execution_steps() {
-    auto must_run_inline = [](const SystemEntry &e) {
-      return e.access.main_thread_only || e.access.exclusive;
-    };
-
     auto chunks =
         entries_ |
-        std::views::chunk_by([&](const SystemEntry &a, const SystemEntry &b) {
-          return must_run_inline(a) == must_run_inline(b);
+        std::views::chunk_by([](const SystemEntry &a, const SystemEntry &b) {
+          return a.access.main_thread_only == b.access.main_thread_only;
         });
 
     for (auto chunk : chunks) {
       usize start =
           static_cast<usize>(std::distance(entries_.data(), &chunk.front()));
       usize end = start + chunk.size();
-      bool is_inline = must_run_inline(chunk.front()) || chunk.size() == 1;
+      bool is_inline =
+          chunk.front().access.main_thread_only || chunk.size() == 1;
 
       if (is_inline) {
         steps_.emplace_back(InlineStep{start, end});
@@ -342,11 +339,16 @@ private:
     }
   }
 
-  ParallelStep build_parallel_step(usize start, usize end) {
+  ExecutionStep build_parallel_step(usize start, usize end) {
     using Tasks = std::vector<tf::Task>;
 
     auto batches = batch_compatible_systems(start, end);
     reorder_entries_by_batches(start, batches);
+
+    bool any_parallel =
+        std::ranges::any_of(batches, [](auto &b) { return b.size() > 1; });
+    if (!any_parallel)
+      return InlineStep{start, end};
 
     ParallelStep step;
     usize batch_start = start;
