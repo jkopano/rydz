@@ -108,7 +108,6 @@ class Schedule {
   };
 
   std::vector<SystemEntry> entries_;
-  tf::Taskflow taskflow_;
 
   // Inline-only segments for main_thread_only systems
   struct InlineSegment {
@@ -116,13 +115,18 @@ class Schedule {
     size_t end;
   };
 
+  struct TaskflowSegment {
+    tf::Taskflow taskflow;
+  };
+
   enum class StepKind { Inline, Taskflow };
   struct Step {
     StepKind kind;
-    size_t inline_idx;
+    size_t idx;
   };
 
   std::vector<InlineSegment> inline_segments_;
+  std::vector<TaskflowSegment> taskflow_segments_;
   std::vector<Step> execution_plan_;
 
   World *current_world_ = nullptr;
@@ -177,11 +181,11 @@ public:
 
     for (auto &step : execution_plan_) {
       if (step.kind == StepKind::Inline) {
-        auto &seg = inline_segments_[step.inline_idx];
+        auto &seg = inline_segments_[step.idx];
         for (size_t i : range(seg.start, seg.end))
           entries_[i].system->run(world);
       } else {
-        global_executor().run(taskflow_).wait();
+        global_executor().run(taskflow_segments_[step.idx].taskflow).wait();
       }
     }
   }
@@ -191,8 +195,8 @@ public:
 
 private:
   void rebuild_graph() {
-    taskflow_.clear();
     inline_segments_.clear();
+    taskflow_segments_.clear();
     execution_plan_.clear();
     has_parallel_ = false;
 
@@ -360,7 +364,11 @@ private:
       entries_[start + i] = std::move(reordered[i]);
     }
 
-    // Build tasks in a single taskflow with dependency edges between batches
+    // Build tasks in a dedicated taskflow with dependency edges between batches
+    size_t tf_idx = taskflow_segments_.size();
+    taskflow_segments_.emplace_back();
+    auto &tf = taskflow_segments_.back().taskflow;
+
     size_t batch_start = start;
     std::vector<tf::Task> prev_batch_tasks;
 
@@ -369,8 +377,8 @@ private:
       std::vector<tf::Task> current_tasks;
 
       for (size_t i = batch_start; i < batch_end; ++i) {
-        auto task = taskflow_.emplace(
-            [this, i] { entries_[i].system->run(*current_world_); });
+        auto task =
+            tf.emplace([this, i] { entries_[i].system->run(*current_world_); });
         // Each task in this batch depends on all tasks from the previous batch
         for (auto &prev : prev_batch_tasks) {
           prev.precede(task);
@@ -383,7 +391,7 @@ private:
     }
 
     has_parallel_ = true;
-    execution_plan_.push_back({StepKind::Taskflow, 0});
+    execution_plan_.push_back({StepKind::Taskflow, tf_idx});
   }
 };
 
@@ -415,7 +423,8 @@ void add_system_to_schedule(Schedule &schedule, F &&func) {
 } // namespace detail
 
 inline auto system_multithreading(TaskPoolOptions opts = {}) {
-  return [opts](auto &app) { app.world().set_multithreaded(opts.multithreaded); };
+  return
+      [opts](auto &app) { app.world().set_multithreaded(opts.multithreaded); };
 }
 
 } // namespace ecs
