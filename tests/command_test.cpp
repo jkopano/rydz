@@ -29,7 +29,7 @@ struct Score {
 };
 
 struct Value {
-  using Type = ResourceType;
+  using Type = Resource;
   int v;
   bool operator==(const Value &o) const { return v == o.v; }
 };

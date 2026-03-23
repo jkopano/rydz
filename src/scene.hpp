@@ -101,7 +101,7 @@ inline void spawn_some_texture(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
 }
 
 struct LightsSpawned {
-  using Type = ResourceType;
+  using Type = Resource;
   bool done = false;
 };
 

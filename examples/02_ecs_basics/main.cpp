@@ -34,7 +34,7 @@ struct NotEnemyTag {};
 
 // Resource - czyli basically singleton
 struct EnemyCount {
-  using Type = ResourceType;
+  using Type = Resource;
   u32 count;
 };
 
@@ -42,7 +42,7 @@ struct EnemyCount {
 // za to, gdy go spawnujesz to wszystkie jego pola (które powinny być
 // komponentami) zostają spawnione
 struct EnemyBundle {
-  using Type = BundleType;
+  using Type = Bundle;
   EnemyTag tag;
   Health health;
   Speed speed;

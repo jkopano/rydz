@@ -81,6 +81,7 @@ template <typename T> struct QueryFilterTraits<Without<T>> {
   static bool matches(const World &world, Entity entity) {
     return !world.has_component<T>(entity);
   }
+
   static void access(SystemAccess &) {}
   static std::span<const Entity> candidates(const World &) { return {}; }
   static usize candidate_size(const World &) { return SIZE_MAX; }
@@ -91,15 +92,19 @@ template <typename T> struct QueryFilterTraits<Added<T>> {
     auto ticks = world.get_component_ticks<T>(entity);
     if (!ticks)
       return false;
+
     Tick this_run = world.read_change_tick();
     Tick last_run = Tick{this_run.value - 1};
+
     return ticks->added.is_newer_than(last_run, this_run);
   }
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
+
   static std::span<const Entity> candidates(const World &world) {
     auto *storage = world.get_storage<T>();
     return storage ? storage->entities() : std::span<const Entity>{};
   }
+
   static usize candidate_size(const World &world) {
     auto *storage = world.get_storage<T>();
     return storage ? storage->size() : 0;
@@ -115,11 +120,14 @@ template <typename T> struct QueryFilterTraits<Changed<T>> {
     Tick last_run = Tick{this_run.value - 1};
     return ticks->changed.is_newer_than(last_run, this_run);
   }
+
   static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
+
   static std::span<const Entity> candidates(const World &world) {
     auto *storage = world.get_storage<T>();
     return storage ? storage->entities() : std::span<const Entity>{};
   }
+
   static usize candidate_size(const World &world) {
     auto *storage = world.get_storage<T>();
     return storage ? storage->size() : 0;
@@ -131,11 +139,14 @@ template <typename F1, typename F2> struct QueryFilterTraits<Or<F1, F2>> {
     return QueryFilterTraits<F1>::matches(world, entity) ||
            QueryFilterTraits<F2>::matches(world, entity);
   }
+
   static void access(SystemAccess &acc) {
     QueryFilterTraits<F1>::access(acc);
     QueryFilterTraits<F2>::access(acc);
   }
+
   static std::span<const Entity> candidates(const World &) { return {}; }
+
   static usize candidate_size(const World &) { return SIZE_MAX; }
 };
 

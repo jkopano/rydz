@@ -6,10 +6,10 @@
 
 namespace ecs {
 
-struct BundleType {};
-struct ComponentType {};
-struct EventType {};
-struct ResourceType {};
+struct Bundle {};
+struct Component {};
+struct Event {};
+struct Resource {};
 
 struct Entity;
 struct EntityManager;

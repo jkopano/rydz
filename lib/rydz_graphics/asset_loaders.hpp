@@ -41,7 +41,7 @@ struct PendingModelLoad {
 };
 
 struct PendingModelLoads {
-  using Type = ResourceType;
+  using Type = Resource;
   std::vector<PendingModelLoad> pending;
 };
 

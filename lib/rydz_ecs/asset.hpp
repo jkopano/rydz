@@ -25,7 +25,7 @@ template <typename T> struct Handle {
 
 template <typename T> class Assets {
 public:
-  using Type = ResourceType;
+  using Type = Resource;
 
 private:
   std::deque<std::optional<T>> items_;
@@ -104,7 +104,7 @@ public:
 
 class AssetServer {
 public:
-  using Type = ResourceType;
+  using Type = Resource;
 
 private:
   struct LoadedAsset {

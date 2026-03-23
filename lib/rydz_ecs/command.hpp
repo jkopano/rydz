@@ -18,7 +18,7 @@ public:
 
 class CommandQueue {
 public:
-  using Type = ResourceType;
+  using Type = Resource;
 
 private:
   std::vector<std::shared_ptr<ICommand>> queue_;
@@ -115,10 +115,8 @@ public:
     return EntityCommands(entity, queue_);
   }
 
-  template <std::ranges::input_range R>
-    requires Spawnable<std::ranges::range_value_t<R>>
-  void spawn_batch(R &&_range) {
-    for (auto &&item : std::forward<R>(_range)) {
+  void spawn_batch(SpawnableRange auto &&_range) {
+    for (auto &&item : _range) {
       spawn(std::forward<decltype(item)>(item));
     }
   }
@@ -126,15 +124,13 @@ public:
   void despawn(Entity entity) { queue_->push(detail::DespawnCommand(entity)); }
 
   template <typename T> void insert_resource(T resource) {
-    static_assert(Resource<T>,
+    static_assert(ResourceTrait<T>,
                   "Only Resources can be inserted via insert_resource(). "
-                  "Add 'using Type = ResourceType;' to your struct.");
+                  "Add 'using Type = Resource;' to your struct.");
     queue_->push(detail::InsertResourceCommand<T>(std::move(resource)));
   }
 
-  EntityCommands entity(Entity e) {
-    return EntityCommands(e, queue_);
-  }
+  EntityCommands entity(Entity e) { return EntityCommands(e, queue_); }
 };
 
 template <> struct SystemParamTraits<Cmd> {
@@ -145,6 +141,7 @@ template <> struct SystemParamTraits<Cmd> {
     if (!queue) {
       throw std::runtime_error("CommandQueue resource not found");
     }
+
     return Cmd(queue, &world.entities);
   }
 

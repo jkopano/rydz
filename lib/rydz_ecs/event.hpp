@@ -13,13 +13,20 @@ struct EventId {
 
 template <typename E> class Events {
 public:
-  using Type = ResourceType;
+  using Type = Resource;
 
 private:
-  std::vector<std::pair<E, EventId>> buffers_[2];
-  usize current_buffer_ = 0;
+  using EventInstance = std::pair<E, EventId>;
+
+  struct EventBuffers {
+    std::vector<EventInstance> current;
+    std::vector<EventInstance> prev;
+
+    void swap() { std::swap(current, prev); }
+  };
+
+  EventBuffers buffers_;
   usize event_count_ = 0;
-  usize start_of_current_buffer_ = 0;
 
   std::unordered_map<usize, EventId> reader_cursors_;
   usize next_reader_id_ = 0;
@@ -27,34 +34,38 @@ private:
 public:
   void send(const E &event) {
     EventId id{event_count_++};
-    buffers_[current_buffer_].push_back({event, id});
+    buffers_.current.push_back({event, id});
   }
 
   void send(E &&event) {
     EventId id{event_count_++};
-    buffers_[current_buffer_].push_back({std::move(event), id});
+    buffers_.current.push_back({std::move(event), id});
   }
 
-  usize total_count() const { return buffers_[0].size() + buffers_[1].size(); }
+  usize total_count() const {
+    return buffers_.current.size() + buffers_.prev.size();
+  }
 
-  bool is_empty() const { return buffers_[0].empty() && buffers_[1].empty(); }
+  bool is_empty() const {
+    return buffers_.current.empty() && buffers_.prev.empty();
+  }
 
   void update() {
-    usize oldest = 1 - current_buffer_;
-    buffers_[oldest].clear();
-    current_buffer_ = oldest;
-    start_of_current_buffer_ = event_count_;
+    buffers_.prev.clear();
+    buffers_.swap();
   }
 
   void clear() {
-    buffers_[0].clear();
-    buffers_[1].clear();
+    buffers_.current.clear();
+    buffers_.prev.clear();
     event_count_ = 0;
   }
 
   usize register_reader() {
     usize id = next_reader_id_++;
-    reader_cursors_[id] = EventId{start_of_current_buffer_};
+    usize start =
+        buffers_.prev.empty() ? event_count_ : buffers_.prev.front().second.id;
+    reader_cursors_[id] = EventId{start};
     return id;
   }
 
@@ -62,12 +73,11 @@ public:
     auto &cursor = reader_cursors_[reader_id];
     usize start_id = cursor.id;
 
-    usize oldest = 1 - current_buffer_;
-    for (auto &[evt, eid] : buffers_[oldest]) {
+    for (auto &[evt, eid] : buffers_.prev) {
       if (eid.id >= start_id)
         func(evt);
     }
-    for (auto &[evt, eid] : buffers_[current_buffer_]) {
+    for (auto &[evt, eid] : buffers_.current) {
       if (eid.id >= start_id)
         func(evt);
     }

@@ -6,7 +6,7 @@
 
 namespace ecs {
 template <typename T, typename = void> struct type_tag_of {
-  using type = ComponentType;
+  using type = Component;
 };
 
 template <typename T> struct type_tag_of<T, std::void_t<typename T::Type>> {
@@ -16,32 +16,36 @@ template <typename T> struct type_tag_of<T, std::void_t<typename T::Type>> {
 template <typename T> using type_tag_t = typename type_tag_of<T>::type;
 
 template <typename T>
-inline constexpr bool is_bundle_v = std::is_same_v<type_tag_t<T>, BundleType>;
+inline constexpr bool is_bundle_v = std::is_same_v<type_tag_t<T>, Bundle>;
 
 template <typename T>
 inline constexpr bool is_component_v =
-    std::is_same_v<type_tag_t<T>, ComponentType>;
-
-template <typename T>
-inline constexpr bool is_event_v = std::is_same_v<type_tag_t<T>, EventType>;
+    std::is_same_v<type_tag_t<T>, Component>;
 
 template <typename T>
 inline constexpr bool is_resource_v =
-    std::is_same_v<type_tag_t<T>, ResourceType>;
-
-
-template <typename T>
-concept Bundle = is_bundle_v<T>;
+    std::is_same_v<type_tag_t<T>, Resource>;
 
 template <typename T>
-concept Component = is_component_v<T>;
+concept BundleTrait = is_bundle_v<T>;
 
 template <typename T>
-concept Resource = is_resource_v<T>;
+concept ComponentTrait = is_component_v<T>;
+
+template <typename T>
+concept ResourceTrait = is_resource_v<T>;
+
+template <typename T>
+concept EventTrait = requires { typename T::Type; } &&
+                std::is_same_v<typename T::Type, Event>;
 
 template <typename T>
 concept Spawnable =
-    Component<std::remove_cvref_t<T>> || Bundle<std::remove_cvref_t<T>>;
+    ComponentTrait<std::remove_cvref_t<T>> || BundleTrait<std::remove_cvref_t<T>>;
+
+template <typename R>
+concept SpawnableRange =
+    std::ranges::input_range<R> && Spawnable<std::ranges::range_value_t<R>>;
 
 namespace detail {
 
@@ -117,15 +121,15 @@ void insert_tuple_items(World &world, Entity entity, std::tuple<Ts...> &&tup) {
 template <typename T>
 void insert_single(World &world, Entity entity, T &&item) {
   using Raw = std::remove_cvref_t<T>;
-  if constexpr (Bundle<Raw>) {
+  if constexpr (BundleTrait<Raw>) {
     insert_tuple_items(world, entity, to_tuple(std::forward<T>(item)));
   } else if constexpr (is_tuple_v<Raw>) {
     insert_tuple_items(world, entity, std::forward<T>(item));
   } else {
     static_assert(
-        Component<Raw>,
+        ComponentTrait<Raw>,
         "Only Components and Bundles can be inserted on entities. "
-        "Add 'using Type = ComponentType;' or 'using Type = BundleType;'.");
+        "Add 'using Type = Component;' or 'using Type = Bundle;'.");
     world.insert_component(entity, std::forward<T>(item));
   }
 }

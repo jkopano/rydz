@@ -8,7 +8,7 @@
 namespace ecs {
 
 template <typename S> struct State {
-  using Type = ResourceType;
+  using Type = Resource;
   S value;
 
   explicit State(S v) : value(std::move(v)) {}
@@ -17,7 +17,7 @@ template <typename S> struct State {
 };
 
 template <typename S> struct NextState {
-  using Type = ResourceType;
+  using Type = Resource;
   std::optional<S> pending;
 
   NextState() = default;
@@ -41,12 +41,12 @@ template <typename S> struct OnTransition {
 };
 
 template <typename S> struct StateTransitionEvent {
-  using Type = ResourceType;
+  using Type = Resource;
   bool changed = false;
 };
 
 template <typename S> struct StateSchedules {
-  using Type = ResourceType;
+  using Type = Resource;
   absl::flat_hash_map<S, Schedule> on_enter;
   absl::flat_hash_map<S, Schedule> on_exit;
   Schedule on_transition;

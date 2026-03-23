@@ -8,16 +8,16 @@
 
 using namespace ecs;
 
-// NA PRZYSZŁOŚĆ DODAĆ using Type = EventType;
+// NA PRZYSZŁOŚĆ DODAĆ using Type = Event;
 
 struct DamageEvent {
-  using Type = EventType;
+  using Type = Event;
   i32 amount;
   const char *source;
 };
 
 struct ScoreEvent {
-  using Type = EventType;
+  using Type = Event;
   i32 points;
 };
 

@@ -11,7 +11,7 @@
 
 namespace ecs {
 struct Window {
-  using Type = ecs::ResourceType;
+  using Type = ecs::Resource;
 
   u32 width;
   u32 height;
@@ -113,9 +113,7 @@ public:
     return *this;
   }
 
-  template <typename E> App &add_event() {
-    static_assert(is_event_v<E>,
-                  "Add 'using Type = EventType;' to your event struct.");
+  template <EventTrait E> App &add_event() {
     world_.insert_resource(Events<E>{});
     schedules_.entry(ScheduleLabel::First)
         .add_system_fn(event_update_system<E>);

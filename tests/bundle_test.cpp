@@ -34,20 +34,20 @@ struct Marker {};
 // ---- Test bundles (no components() needed — auto-decomposed) ----
 
 struct MovingBundle {
-  using Type = BundleType;
+  using Type = Bundle;
   Position pos;
   Velocity vel;
 };
 
 struct PlayerBundle {
-  using Type = BundleType;
+  using Type = Bundle;
   MovingBundle moving;
   Health health;
   Name name;
 };
 
 struct TaggedBundle {
-  using Type = BundleType;
+  using Type = Bundle;
   Marker marker;
   Position pos;
 };
@@ -59,33 +59,33 @@ struct TaggedBundle {
 // ============================================================
 
 TEST(BundleTest, BundleConceptDetection) {
-  static_assert(Bundle<MovingBundle>);
-  static_assert(Bundle<PlayerBundle>);
-  static_assert(Bundle<TaggedBundle>);
-  static_assert(!Bundle<Position>);
-  static_assert(!Bundle<int>);
-  static_assert(!Bundle<std::string>);
+  static_assert(BundleTrait<MovingBundle>);
+  static_assert(BundleTrait<PlayerBundle>);
+  static_assert(BundleTrait<TaggedBundle>);
+  static_assert(!BundleTrait<Position>);
+  static_assert(!BundleTrait<int>);
+  static_assert(!BundleTrait<std::string>);
 }
 
 TEST(BundleTest, ComponentConceptDetection) {
-  static_assert(Component<Position>);
-  static_assert(Component<Velocity>);
-  static_assert(Component<Health>);
-  static_assert(Component<Marker>);
-  static_assert(Component<int>);
-  static_assert(!Component<MovingBundle>);
+  static_assert(ComponentTrait<Position>);
+  static_assert(ComponentTrait<Velocity>);
+  static_assert(ComponentTrait<Health>);
+  static_assert(ComponentTrait<Marker>);
+  static_assert(ComponentTrait<int>);
+  static_assert(!ComponentTrait<MovingBundle>);
 }
 
 TEST(BundleTest, ResourceConceptDetection) {
-  static_assert(Resource<CommandQueue>);
-  static_assert(!Resource<Position>);
-  static_assert(!Resource<MovingBundle>);
+  static_assert(ResourceTrait<CommandQueue>);
+  static_assert(!ResourceTrait<Position>);
+  static_assert(!ResourceTrait<MovingBundle>);
 }
 
 TEST(BundleTest, SpawnableConceptDetection) {
   static_assert(Spawnable<Position>);
   static_assert(Spawnable<MovingBundle>);
-  static_assert(!Spawnable<CommandQueue>); // ResourceType, not spawnable
+  static_assert(!Spawnable<CommandQueue>); // Resource, not spawnable
 }
 
 // ============================================================
@@ -279,7 +279,7 @@ TEST(BundleTest, BundleOverwritesExistingComponents) {
 
 namespace {
 struct EmptyMarkerBundle {
-  using Type = BundleType;
+  using Type = Bundle;
   Marker marker;
 };
 } // namespace
@@ -330,18 +330,18 @@ TEST(BundleTest, QueryMatchesBundleSpawnedEntities) {
 
 namespace {
 struct InnerBundle {
-  using Type = BundleType;
+  using Type = Bundle;
   Position pos;
 };
 
 struct MiddleBundle {
-  using Type = BundleType;
+  using Type = Bundle;
   InnerBundle inner;
   Velocity vel;
 };
 
 struct OuterBundle {
-  using Type = BundleType;
+  using Type = Bundle;
   MiddleBundle middle;
   Health health;
 };
