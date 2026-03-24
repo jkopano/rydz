@@ -67,6 +67,8 @@ using ::GenMeshSphere;
 using ::GenMeshTorus;
 using ::LoadModel;
 using ::LoadModelFromMesh;
+using ::UnloadMesh;
+using ::UnloadModel;
 using ::UpdateMeshBuffer;
 using ::UploadMesh;
 
@@ -75,6 +77,7 @@ using ::ImageFormat;
 using ::LoadImage;
 using ::LoadTexture;
 using ::UnloadImage;
+using ::UnloadTexture;
 
 // ---- Audio ----
 using ::LoadSound;

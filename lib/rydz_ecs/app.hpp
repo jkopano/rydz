@@ -190,6 +190,8 @@ public:
       update();
     }
 
+    world_.resources.clear();
+
     rl::CloseWindow();
   }
 

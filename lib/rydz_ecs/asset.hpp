@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <deque>
 #include <fstream>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -29,8 +30,45 @@ public:
 
 private:
   std::deque<std::optional<T>> items_;
+  std::function<void(T &)> deleter_;
 
 public:
+  Assets() = default;
+
+  ~Assets() {
+    if (deleter_) {
+      for (auto &item : items_) {
+        if (item.has_value())
+          deleter_(item.value());
+      }
+    }
+  }
+
+  Assets(Assets &&other) noexcept
+      : items_(std::move(other.items_)), deleter_(std::move(other.deleter_)) {
+    other.items_.clear();
+  }
+
+  Assets &operator=(Assets &&other) noexcept {
+    if (this != &other) {
+      if (deleter_) {
+        for (auto &item : items_) {
+          if (item.has_value())
+            deleter_(item.value());
+        }
+      }
+      items_ = std::move(other.items_);
+      deleter_ = std::move(other.deleter_);
+      other.items_.clear();
+    }
+    return *this;
+  }
+
+  Assets(const Assets &) = delete;
+  Assets &operator=(const Assets &) = delete;
+
+  void set_deleter(std::function<void(T &)> d) { deleter_ = std::move(d); }
+
   Handle<T> add(T item) {
     u32 idx = static_cast<u32>(items_.size());
     items_.push_back(std::move(item));

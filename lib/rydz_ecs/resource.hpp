@@ -44,6 +44,8 @@ public:
     return data_.count(std::type_index(typeid(T))) > 0;
   }
 
+  void clear() { data_.clear(); }
+
   template <typename T> std::optional<T> remove() {
     auto it = data_.find(std::type_index(typeid(T)));
     if (it == data_.end())

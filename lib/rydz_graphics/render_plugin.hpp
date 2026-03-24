@@ -476,12 +476,20 @@ inline void render_plugin(App &app) {
   if (!app.world().has_resource<Assets<rl::Model>>()) {
     app.insert_resource(Assets<rl::Model>{});
   }
+  app.world().get_resource<Assets<rl::Model>>()->set_deleter(
+      [](rl::Model &m) { rl::UnloadModel(m); });
+
   if (!app.world().has_resource<Assets<rl::Mesh>>()) {
     app.insert_resource(Assets<rl::Mesh>{});
   }
+  app.world().get_resource<Assets<rl::Mesh>>()->set_deleter(
+      [](rl::Mesh &m) { rl::UnloadMesh(m); });
+
   if (!app.world().has_resource<Assets<rl::Texture2D>>()) {
     app.insert_resource(Assets<rl::Texture2D>{});
   }
+  app.world().get_resource<Assets<rl::Texture2D>>()->set_deleter(
+      [](rl::Texture2D &t) { rl::UnloadTexture(t); });
   if (!app.world().has_resource<ClearColor>()) {
     app.insert_resource(ClearColor{});
   }

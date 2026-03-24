@@ -238,9 +238,9 @@ inline void auto_generate_lods_system(World &world, NonSendMarker) {
       }
 
       if (any_valid) {
-        lod_model.materialCount = model->materialCount;
-        lod_model.materials = model->materials;
-        lod_model.meshMaterial = model->meshMaterial;
+        lod_model.materialCount = 0;
+        lod_model.materials = nullptr;
+        lod_model.meshMaterial = nullptr;
         lod_model.transform = model->transform;
 
         group.levels[lod] = model_assets->add(std::move(lod_model));
