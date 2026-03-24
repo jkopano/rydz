@@ -179,6 +179,10 @@ public:
       rl::InitWindow(800, 600, "ECS App");
       rl::SetTargetFPS(60);
     }
+    if (!rl::IsWindowReady()) {
+      rl::TraceLog(LOG_ERROR, "InitWindow failed; aborting run loop.");
+      return;
+    }
 
     startup();
 

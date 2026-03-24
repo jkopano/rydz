@@ -33,6 +33,7 @@ using ::DrawFPS;
 using ::EndDrawing;
 using ::GetFrameTime;
 using ::InitWindow;
+using ::IsWindowReady;
 using ::SetTargetFPS;
 using ::SetTraceLogLevel;
 using ::TraceLog;

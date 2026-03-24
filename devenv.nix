@@ -8,12 +8,17 @@
 
 let
   raylibDeps = with pkgs; [
+    mesa
+    mesa.drivers
     libGL
+    libglvnd
     xorg.libX11
     xorg.libXcursor
     xorg.libXi
     xorg.libXinerama
     xorg.libXrandr
+    xorg.libXext
+    xorg.libXxf86vm
     alsa-lib
     wayland
     wayland-scanner
@@ -32,7 +37,7 @@ let
   ];
 in
 {
-  packages = raylibDeps ++ compDeps ++ typstDeps ++ [ pkgs.gpu-viewer ];
+  packages = raylibDeps ++ compDeps ++ typstDeps;
 
   languages.cplusplus.enable = true;
 
