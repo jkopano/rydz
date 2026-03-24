@@ -5,7 +5,7 @@
 
 namespace ecs {
 
-using KeyCode = int;
+using KeyCode = i32;
 
 struct MouseState {
   f32 delta_x = 0.0f;

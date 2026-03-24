@@ -41,6 +41,11 @@ public:
     return *this;
   }
 
+  App &configure_set(ScheduleLabel label, SetConfigDescriptor &&desc) {
+    schedules_.entry(label).add_set_config(desc.take());
+    return *this;
+  }
+
 private:
   template <typename S> StateSchedules<S> &get_or_init_state_schedules() {
     auto *schedules = world_.get_resource<StateSchedules<S>>();

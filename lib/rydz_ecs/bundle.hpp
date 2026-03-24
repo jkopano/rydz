@@ -13,35 +13,25 @@ template <typename T> struct type_tag_of<T, std::void_t<typename T::Type>> {
   using type = typename T::Type;
 };
 
-template <typename T> using type_tag_t = typename type_tag_of<T>::type;
+template <typename T>
+concept ComponentTrait = std::is_same_v<typename type_tag_of<T>::type, Component>;
 
 template <typename T>
-inline constexpr bool is_bundle_v = std::is_same_v<type_tag_t<T>, Bundle>;
+concept ResourceTrait = requires { typename T::Type; } &&
+                        std::is_same_v<typename type_tag_of<T>::type, Resource>;
 
 template <typename T>
-inline constexpr bool is_component_v =
-    std::is_same_v<type_tag_t<T>, Component>;
+concept BundleTrait = requires { typename T::Type; } &&
+                      std::is_same_v<typename type_tag_of<T>::type, Bundle>;
 
 template <typename T>
-inline constexpr bool is_resource_v =
-    std::is_same_v<type_tag_t<T>, Resource>;
+concept EventTrait =
+    requires { typename T::Type; } && std::is_same_v<typename T::Type, Event>;
+
+template <typename T> using StripAll = std::remove_cvref_t<T>;
 
 template <typename T>
-concept BundleTrait = is_bundle_v<T>;
-
-template <typename T>
-concept ComponentTrait = is_component_v<T>;
-
-template <typename T>
-concept ResourceTrait = is_resource_v<T>;
-
-template <typename T>
-concept EventTrait = requires { typename T::Type; } &&
-                std::is_same_v<typename T::Type, Event>;
-
-template <typename T>
-concept Spawnable =
-    ComponentTrait<std::remove_cvref_t<T>> || BundleTrait<std::remove_cvref_t<T>>;
+concept Spawnable = ComponentTrait<StripAll<T>> || BundleTrait<StripAll<T>>;
 
 template <typename R>
 concept SpawnableRange =
@@ -79,7 +69,7 @@ template <typename T> consteval int field_count() {
 }
 
 template <typename T> auto to_tuple(T &&t) {
-  using Raw = std::remove_cvref_t<T>;
+  using Raw = StripAll<T>;
   constexpr int N = field_count<Raw>();
   if constexpr (N == 0) { return std::tuple{}; }
   else if constexpr (N == 1) { auto&& [a] = std::forward<T>(t); return std::make_tuple(std::forward<decltype(a)>(a)); }
@@ -120,16 +110,15 @@ void insert_tuple_items(World &world, Entity entity, std::tuple<Ts...> &&tup) {
 
 template <typename T>
 void insert_single(World &world, Entity entity, T &&item) {
-  using Raw = std::remove_cvref_t<T>;
+  using Raw = StripAll<T>;
   if constexpr (BundleTrait<Raw>) {
     insert_tuple_items(world, entity, to_tuple(std::forward<T>(item)));
   } else if constexpr (is_tuple_v<Raw>) {
     insert_tuple_items(world, entity, std::forward<T>(item));
   } else {
-    static_assert(
-        ComponentTrait<Raw>,
-        "Only Components and Bundles can be inserted on entities. "
-        "Add 'using Type = Component;' or 'using Type = Bundle;'.");
+    static_assert(ComponentTrait<Raw>,
+                  "Only Components and Bundles can be inserted on entities. "
+                  "Add 'using Type = Component;' or 'using Type = Bundle;'.");
     world.insert_component(entity, std::forward<T>(item));
   }
 }
@@ -148,10 +137,10 @@ void insert_bundle(World &world, Entity entity, Ts &&...items) {
 
 template <std::ranges::input_range R>
   requires Spawnable<std::ranges::range_value_t<R>>
-std::vector<Entity> spawn_batch(World &world, R &&range) {
+std::vector<Entity> spawn_batch(World &world, R &&_range) {
   std::vector<Entity> spawned;
   if constexpr (std::ranges::sized_range<R>)
-    spawned.reserve(std::ranges::size(range));
+    spawned.reserve(std::ranges::size(_range));
 
   for (auto &&item : std::forward<R>(range)) {
     Entity e = world.spawn();

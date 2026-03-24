@@ -1,14 +1,56 @@
 #pragma once
+#include "fwd.hpp"
 #include "system.hpp"
 #include <memory>
 #include <string>
+#include <typeindex>
 #include <vector>
 
 namespace ecs {
 
+struct SetId {
+  std::type_index type;
+  i32 value;
+
+  SetId(std::type_index t, i32 v) : type(t), value(v) {}
+
+  bool operator==(const SetId &o) const {
+    return type == o.type && value == o.value;
+  }
+};
+
+template <typename E>
+  requires std::is_enum_v<E>
+SetId set(E value) {
+  return SetId{typeid(E), static_cast<i32>(value)};
+}
+
+template <typename S>
+  requires std::is_same_v<typename S::Type, Set>
+SetId set() {
+  return SetId{typeid(S), 0};
+}
+
+} // namespace ecs
+
+template <> struct std::hash<ecs::SetId> {
+  usize operator()(const ecs::SetId &s) const noexcept {
+    usize h1 = std::hash<std::type_index>{}(s.type);
+    usize h2 = std::hash<i32>{}(s.value);
+    return h1 ^ (h2 * 2654435761u);
+  }
+};
+
+namespace ecs {
+
+template <typename H> H AbslHashValue(H h, const SetId &s) {
+  return H::combine(std::move(h), s.type.hash_code(), s.value);
+}
+
 struct SystemOrdering {
   std::vector<std::string> after;
   std::vector<std::string> before;
+  std::vector<SetId> in_sets;
 };
 
 class ICondition {
@@ -111,6 +153,11 @@ public:
     return std::move(*this);
   }
 
+  SystemDescriptor &&in_set(SetId id) && {
+    ordering_.in_sets.push_back(id);
+    return std::move(*this);
+  }
+
   SystemOrdering take_ordering() { return std::move(ordering_); }
 
   std::unique_ptr<ISystem> build() {
@@ -165,6 +212,11 @@ public:
     return std::move(*this);
   }
 
+  SystemGroupDescriptor &&in_set(SetId id) && {
+    ordering_.in_sets.push_back(id);
+    return std::move(*this);
+  }
+
   SystemGroupDescriptor &&chain() && {
     chained_ = true;
     return std::move(*this);
@@ -209,6 +261,54 @@ template <typename F1, typename F2, typename... Fs>
 SystemGroupDescriptor group(F1 &&f1, F2 &&f2, Fs &&...fs) {
   return SystemGroupDescriptor(std::forward<F1>(f1), std::forward<F2>(f2),
                                std::forward<Fs>(fs)...);
+}
+
+struct SetConfig {
+  SetId id;
+  std::vector<SetId> after;
+  std::vector<SetId> before;
+  std::shared_ptr<ICondition> condition;
+};
+
+class SetConfigDescriptor {
+  SetConfig config_;
+
+public:
+  explicit SetConfigDescriptor(SetId id) : config_{id, {}, {}, nullptr} {}
+
+  SetConfigDescriptor &&before(SetId id) && {
+    config_.before.push_back(id);
+    return std::move(*this);
+  }
+
+  SetConfigDescriptor &&after(SetId id) && {
+    config_.after.push_back(id);
+    return std::move(*this);
+  }
+
+  template <typename Cond> SetConfigDescriptor &&run_if(Cond &&cond) && {
+    config_.condition = make_condition(std::forward<Cond>(cond));
+    return std::move(*this);
+  }
+
+  SetConfigDescriptor &&run_if(std::unique_ptr<ICondition> cond) && {
+    config_.condition = std::move(cond);
+    return std::move(*this);
+  }
+
+  SetConfig take() { return std::move(config_); }
+};
+
+template <typename E>
+  requires std::is_enum_v<E>
+SetConfigDescriptor configure(E value) {
+  return SetConfigDescriptor(set(value));
+}
+
+template <typename S>
+  requires std::is_same_v<typename S::Type, Set>
+SetConfigDescriptor configure() {
+  return SetConfigDescriptor(set<S>());
 }
 
 } // namespace ecs

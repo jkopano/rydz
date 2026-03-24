@@ -130,6 +130,7 @@ local examples = {
 	"08_hierarchy",
 	"09_spawn_despawn",
 	"10_custom_material",
+	"11_sets",
 }
 
 for _, name in ipairs(examples) do

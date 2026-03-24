@@ -106,6 +106,7 @@ class Schedule {
     std::unique_ptr<ISystem> system;
     SystemAccess access;
     SystemOrdering ordering;
+    std::vector<SetId> in_sets;
   };
 
   struct InlineStep {
@@ -120,6 +121,7 @@ class Schedule {
 
   std::vector<SystemEntry> entries_;
   std::vector<ExecutionStep> steps_;
+  std::vector<SetConfig> set_configs_;
 
   World *current_world_ = nullptr;
   bool needs_rebuild_ = true;
@@ -131,9 +133,17 @@ public:
 
   void add_system(std::unique_ptr<ISystem> system,
                   SystemOrdering ordering = {}) {
-    SystemEntry entry{std::move(system), {}, std::move(ordering)};
+    SystemEntry entry;
+    entry.system = std::move(system);
     entry.access = entry.system->access();
+    entry.in_sets = std::move(ordering.in_sets);
+    entry.ordering = std::move(ordering);
     entries_.push_back(std::move(entry));
+    needs_rebuild_ = true;
+  }
+
+  void add_set_config(SetConfig config) {
+    set_configs_.push_back(std::move(config));
     needs_rebuild_ = true;
   }
 
@@ -193,8 +203,45 @@ private:
     if (n == 0)
       return;
 
+    apply_set_configs();
     topological_sort();
     build_execution_steps();
+  }
+
+  void apply_set_configs() {
+    absl::flat_hash_map<SetId, std::vector<usize>> set_members;
+    for (usize i = 0; i < entries_.size(); ++i)
+      for (const auto &sid : entries_[i].in_sets)
+        set_members[sid].push_back(i);
+
+    for (auto &cfg : set_configs_) {
+      if (cfg.condition) {
+        for (usize idx : set_members[cfg.id]) {
+          entries_[idx].system = std::make_unique<ConditionedSystem>(
+              std::move(entries_[idx].system), cfg.condition);
+        }
+      }
+
+      for (const auto &before_set : cfg.before) {
+        for (usize from : set_members[cfg.id]) {
+          for (usize to : set_members[before_set]) {
+            if (from != to)
+              entries_[from].ordering.before.push_back(
+                  entries_[to].system->name());
+          }
+        }
+      }
+
+      for (const auto &after_set : cfg.after) {
+        for (usize to : set_members[cfg.id]) {
+          for (usize from : set_members[after_set]) {
+            if (from != to)
+              entries_[to].ordering.after.push_back(
+                  entries_[from].system->name());
+          }
+        }
+      }
+    }
   }
 
   void topological_sort() {
@@ -215,17 +262,23 @@ private:
       return it->second;
     };
 
+    // Deduplicate edges to avoid double-counting in_degree
+    auto add_edge = [&](usize from, usize to) {
+      if (std::ranges::find(adj[from], to) == adj[from].end()) {
+        adj[from].push_back(to);
+        in_degree[to]++;
+      }
+    };
+
     for (usize i = 0; i < n; ++i) {
       const auto &name = entries_[i].system->name();
       for (const auto &dep : entries_[i].ordering.after) {
         usize j = resolve(dep, name);
-        adj[j].push_back(i);
-        in_degree[i]++;
+        add_edge(j, i);
       }
       for (const auto &dep : entries_[i].ordering.before) {
         usize j = resolve(dep, name);
-        adj[i].push_back(j);
-        in_degree[j]++;
+        add_edge(i, j);
       }
     }
 

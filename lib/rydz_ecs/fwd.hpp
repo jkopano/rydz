@@ -10,6 +10,7 @@ struct Bundle {};
 struct Component {};
 struct Event {};
 struct Resource {};
+struct Set {};
 
 struct Entity;
 struct EntityManager;
