@@ -1,9 +1,9 @@
 #pragma once
-#include "rydz_ecs/asset.hpp"
 #include "render_config.hpp"
-#include <absl/hash/hash.h>
-#include <cstdint>
 #include "rl.hpp"
+#include "rydz_ecs/asset.hpp"
+#include <cstdint>
+#include <functional>
 #include <utility>
 #include <vector>
 
@@ -58,20 +58,49 @@ struct RenderBatches {
   void clear() { batches.clear(); }
 };
 
-template <typename H>
-H AbslHashValue(H h, const MaterialKey &k) {
-  return H::combine(std::move(h), k.base_color.r, k.base_color.g,
-                    k.base_color.b, k.base_color.a, k.texture_id,
-                    k.normal_id, k.metallic, k.roughness,
-                    reinterpret_cast<uintptr_t>(k.shader));
-}
-
-template <typename H>
-H AbslHashValue(H h, const RenderBatchKey &k) {
-  return H::combine(std::move(h), k.model.id, k.mesh_index, k.material_index,
-                    k.material, k.has_rc, k.rc.depth.test, k.rc.depth.write,
-                    k.rc.depth.func, k.rc.blend, k.rc.cull, k.rc.polygon_mode,
-                    k.rc.wireframe);
-}
-
 } // namespace ecs
+
+namespace {
+inline void hash_combine(std::size_t &seed, std::size_t value) noexcept {
+  seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+}
+} // namespace
+
+namespace std {
+
+template <> struct hash<ecs::MaterialKey> {
+  size_t operator()(const ecs::MaterialKey &k) const noexcept {
+    size_t seed = 0;
+    ::hash_combine(seed, std::hash<unsigned char>{}(k.base_color.r));
+    ::hash_combine(seed, std::hash<unsigned char>{}(k.base_color.g));
+    ::hash_combine(seed, std::hash<unsigned char>{}(k.base_color.b));
+    ::hash_combine(seed, std::hash<unsigned char>{}(k.base_color.a));
+    ::hash_combine(seed, std::hash<uint32_t>{}(k.texture_id));
+    ::hash_combine(seed, std::hash<uint32_t>{}(k.normal_id));
+    ::hash_combine(seed, std::hash<float>{}(k.metallic));
+    ::hash_combine(seed, std::hash<float>{}(k.roughness));
+    ::hash_combine(seed, std::hash<const rl::Shader *>{}(k.shader));
+    return seed;
+  }
+};
+
+template <> struct hash<ecs::RenderBatchKey> {
+  size_t operator()(const ecs::RenderBatchKey &k) const noexcept {
+    size_t seed = 0;
+    ::hash_combine(seed, std::hash<uint32_t>{}(k.model.id));
+    ::hash_combine(seed, std::hash<int>{}(k.mesh_index));
+    ::hash_combine(seed, std::hash<int>{}(k.material_index));
+    ::hash_combine(seed, std::hash<ecs::MaterialKey>{}(k.material));
+    ::hash_combine(seed, std::hash<bool>{}(k.has_rc));
+    ::hash_combine(seed, std::hash<bool>{}(k.rc.depth.test));
+    ::hash_combine(seed, std::hash<bool>{}(k.rc.depth.write));
+    ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.rc.depth.func)));
+    ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.rc.blend)));
+    ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.rc.cull)));
+    ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.rc.polygon_mode)));
+    ::hash_combine(seed, std::hash<bool>{}(k.rc.wireframe));
+    return seed;
+  }
+};
+
+} // namespace std

@@ -32,7 +32,7 @@ let
   ];
 in
 {
-  packages = raylibDeps ++ compDeps ++ typstDeps;
+  packages = raylibDeps ++ compDeps ++ typstDeps ++ [ pkgs.gpu-viewer ];
 
   languages.cplusplus.enable = true;
 

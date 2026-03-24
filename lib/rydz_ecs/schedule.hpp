@@ -1,12 +1,12 @@
 #pragma once
 #include "condition.hpp"
 #include "system.hpp"
-#include <absl/container/flat_hash_map.h>
 #include <algorithm>
 #include <functional>
 #include <memory>
 #include <string>
 #include <taskflow/taskflow.hpp>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -209,7 +209,7 @@ private:
   }
 
   void apply_set_configs() {
-    absl::flat_hash_map<SetId, std::vector<usize>> set_members;
+    std::unordered_map<SetId, std::vector<usize>> set_members;
     for (usize i = 0; i < entries_.size(); ++i)
       for (const auto &sid : entries_[i].in_sets)
         set_members[sid].push_back(i);
@@ -247,7 +247,7 @@ private:
   void topological_sort() {
     const usize n = entries_.size();
 
-    absl::flat_hash_map<std::string, usize> name_to_idx;
+    std::unordered_map<std::string, usize> name_to_idx;
     for (usize i = 0; i < n; ++i)
       name_to_idx[entries_[i].system->name()] = i;
 
@@ -443,7 +443,7 @@ private:
 };
 
 class Schedules {
-  absl::flat_hash_map<ScheduleLabel, Schedule> schedules_;
+  std::unordered_map<ScheduleLabel, Schedule> schedules_;
 
 public:
   Schedule &entry(ScheduleLabel label) { return schedules_[label]; }

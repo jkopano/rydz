@@ -2,8 +2,8 @@
 #include "fwd.hpp"
 #include "schedule.hpp"
 #include "system.hpp"
-#include <absl/container/flat_hash_map.h>
 #include <optional>
+#include <unordered_map>
 
 namespace ecs {
 
@@ -47,8 +47,8 @@ template <typename S> struct StateTransitionEvent {
 
 template <typename S> struct StateSchedules {
   using Type = Resource;
-  absl::flat_hash_map<S, Schedule> on_enter;
-  absl::flat_hash_map<S, Schedule> on_exit;
+  std::unordered_map<S, Schedule> on_enter;
+  std::unordered_map<S, Schedule> on_exit;
   Schedule on_transition;
 };
 

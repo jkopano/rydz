@@ -16,10 +16,10 @@
 #include "rydz_graphics/visibility.hpp"
 #include "skybox.hpp"
 #include "types.hpp"
-#include <absl/container/flat_hash_map.h>
 #include <array>
 #include <cstring>
 #include <print>
+#include <unordered_map>
 #include <vector>
 
 namespace ecs {
@@ -50,7 +50,7 @@ inline void build_render_batches_system(
     ResMut<Assets<rl::Model>> model_assets, ResMut<RenderBatches> batches,
     Res<LodConfig> lod_config, ResMut<LodHistory> lod_history, NonSendMarker) {
   batches->clear();
-  absl::flat_hash_map<RenderBatchKey, size_t> batch_index;
+  std::unordered_map<RenderBatchKey, size_t> batch_index;
 
   query.each([&](const Model3d *model3d, const GlobalTransform *global,
                  const Material3d *mat, const RenderConfig *rc,

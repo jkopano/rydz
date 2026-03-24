@@ -1,12 +1,5 @@
 add_rules("mode.debug", "mode.release")
 
-if is_plat("windows") then
-	-- abseil z xmake-repo nie ma pakietu na windows; używamy systemowego (np. vcpkg)
-	add_requires("abseil")
--- add_requires("abseil", { system = true })
-else
-	add_requires("abseil")
-end
 add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
 
 set_languages("c++23")
@@ -100,7 +93,7 @@ set_default(true)
 set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
-add_packages("taskflow", "abseil", "meshoptimizer", "joltphysics")
+add_packages("taskflow", "meshoptimizer", "joltphysics")
 set_pcxxheader("lib/pch.hpp")
 
 -- Testy i benchmarki (pozostają bez zmian, xmake sam ogarnie gtest/benchmark na Windows)
@@ -109,14 +102,14 @@ set_kind("binary")
 set_default(false)
 add_files("tests/*.cpp")
 add_deps("raylib")
-add_packages("gtest", "taskflow", "abseil", "meshoptimizer", "joltphysics")
+add_packages("gtest", "taskflow", "meshoptimizer", "joltphysics")
 
 target("bench")
 set_kind("binary")
 set_default(false)
 add_files("benches/*.cpp")
 add_deps("raylib")
-add_packages("benchmark", "taskflow", "abseil", "meshoptimizer", "joltphysics")
+add_packages("benchmark", "taskflow", "meshoptimizer", "joltphysics")
 
 -- Examples
 local examples = {
@@ -140,6 +133,6 @@ for _, name in ipairs(examples) do
 	set_rundir("$(projectdir)")
 	add_files("examples/" .. name .. "/main.cpp")
 	add_deps("raylib")
-	add_packages("taskflow", "abseil", "meshoptimizer", "joltphysics")
+	add_packages("taskflow", "meshoptimizer", "joltphysics")
 	set_pcxxheader("lib/pch.hpp")
 end

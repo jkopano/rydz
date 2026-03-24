@@ -4,11 +4,11 @@
 #include "rl.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/transform.hpp"
-#include <absl/container/flat_hash_map.h>
 #include <algorithm>
 #include <array>
 #include <cstring>
 #include <meshoptimizer.h>
+#include <unordered_map>
 #include <vector>
 
 namespace ecs {
@@ -41,7 +41,7 @@ struct MeshLodGroup {
 /// Resource: per-entity LOD history for hysteresis.
 struct LodHistory {
   using Type = Resource;
-  absl::flat_hash_map<Entity, int> map;
+  std::unordered_map<Entity, int> map;
 };
 
 // ====== LOD mesh generation via meshoptimizer ======
@@ -194,7 +194,7 @@ inline void auto_generate_lods_system(World &world) {
   if (!model_storage || !model_assets || !config)
     return;
 
-  absl::flat_hash_map<uint64_t, MeshLodGroup> lod_cache;
+  std::unordered_map<uint64_t, MeshLodGroup> lod_cache;
 
   model_storage->for_each([&](Entity e, const Model3d &model3d) {
     if (lod_storage && lod_storage->get(e))
