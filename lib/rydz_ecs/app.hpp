@@ -32,7 +32,7 @@ class App {
 
 public:
   App() {
-    world_.insert_resource(CommandQueue{});
+    world_.insert_resource(CommandQueues{});
     world_.insert_resource(Time{});
   }
 
@@ -191,9 +191,9 @@ public:
 
 private:
   void apply_commands() {
-    auto *queue = world_.get_resource<CommandQueue>();
-    if (queue && !queue->empty()) {
-      queue->apply(world_);
+    auto *queues = world_.get_resource<CommandQueues>();
+    if (queues && !queues->empty()) {
+      queues->apply(world_);
     }
   }
 };

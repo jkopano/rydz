@@ -142,7 +142,7 @@ std::vector<Entity> spawn_batch(World &world, R &&_range) {
   if constexpr (std::ranges::sized_range<R>)
     spawned.reserve(std::ranges::size(_range));
 
-  for (auto &&item : std::forward<R>(range)) {
+  for (auto &&item : std::forward<R>(_range)) {
     Entity e = world.spawn();
     insert_bundle(world, e, std::forward<decltype(item)>(item));
     spawned.push_back(e);

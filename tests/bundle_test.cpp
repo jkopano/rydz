@@ -77,7 +77,7 @@ TEST(BundleTest, ComponentConceptDetection) {
 }
 
 TEST(BundleTest, ResourceConceptDetection) {
-  static_assert(ResourceTrait<CommandQueue>);
+  static_assert(ResourceTrait<CommandQueues>);
   static_assert(!ResourceTrait<Position>);
   static_assert(!ResourceTrait<MovingBundle>);
 }
@@ -85,7 +85,7 @@ TEST(BundleTest, ResourceConceptDetection) {
 TEST(BundleTest, SpawnableConceptDetection) {
   static_assert(Spawnable<Position>);
   static_assert(Spawnable<MovingBundle>);
-  static_assert(!Spawnable<CommandQueue>); // Resource, not spawnable
+  static_assert(!Spawnable<CommandQueues>); // Resource, not spawnable
 }
 
 // ============================================================
@@ -160,15 +160,18 @@ TEST(BundleTest, InsertBundleAndLooseComponentsTogether) {
 
 TEST(BundleTest, CmdSpawnBundle) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
+  Entity e;
 
-  auto *queue = world.get_resource<CommandQueue>();
-  Cmd cmd(queue, &world.entities);
+  {
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
+    auto ec =
+        cmd.spawn(MovingBundle{.pos = {1.0f, 2.0f}, .vel = {3.0f, 4.0f}});
+    e = ec.id();
+  }
 
-  auto ec = cmd.spawn(MovingBundle{.pos = {1.0f, 2.0f}, .vel = {3.0f, 4.0f}});
-  Entity e = ec.id();
-
-  queue->apply(world);
+  world.get_resource<CommandQueues>()->apply(world);
 
   EXPECT_EQ(*world.get_component<Position>(e), (Position{1.0f, 2.0f}));
   EXPECT_EQ(*world.get_component<Velocity>(e), (Velocity{3.0f, 4.0f}));
@@ -176,19 +179,21 @@ TEST(BundleTest, CmdSpawnBundle) {
 
 TEST(BundleTest, CmdSpawnNestedBundle) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
+  Entity e;
 
-  auto *queue = world.get_resource<CommandQueue>();
-  Cmd cmd(queue, &world.entities);
+  {
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
+    auto ec = cmd.spawn(PlayerBundle{
+        .moving = {.pos = {0.0f, 0.0f}, .vel = {5.0f, 5.0f}},
+        .health = {200},
+        .name = {"Player1"},
+    });
+    e = ec.id();
+  }
 
-  auto ec = cmd.spawn(PlayerBundle{
-      .moving = {.pos = {0.0f, 0.0f}, .vel = {5.0f, 5.0f}},
-      .health = {200},
-      .name = {"Player1"},
-  });
-  Entity e = ec.id();
-
-  queue->apply(world);
+  world.get_resource<CommandQueues>()->apply(world);
 
   EXPECT_EQ(*world.get_component<Position>(e), (Position{0.0f, 0.0f}));
   EXPECT_EQ(*world.get_component<Velocity>(e), (Velocity{5.0f, 5.0f}));
@@ -198,16 +203,19 @@ TEST(BundleTest, CmdSpawnNestedBundle) {
 
 TEST(BundleTest, CmdSpawnBundleMixedWithComponents) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
+  Entity e;
 
-  auto *queue = world.get_resource<CommandQueue>();
-  Cmd cmd(queue, &world.entities);
+  {
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
+    auto ec =
+        cmd.spawn(MovingBundle{.pos = {1.0f, 1.0f}, .vel = {2.0f, 2.0f}},
+                  Health{42});
+    e = ec.id();
+  }
 
-  auto ec = cmd.spawn(MovingBundle{.pos = {1.0f, 1.0f}, .vel = {2.0f, 2.0f}},
-                      Health{42});
-  Entity e = ec.id();
-
-  queue->apply(world);
+  world.get_resource<CommandQueues>()->apply(world);
 
   EXPECT_EQ(*world.get_component<Position>(e), (Position{1.0f, 1.0f}));
   EXPECT_EQ(*world.get_component<Velocity>(e), (Velocity{2.0f, 2.0f}));
@@ -220,16 +228,18 @@ TEST(BundleTest, CmdSpawnBundleMixedWithComponents) {
 
 TEST(BundleTest, EntityCommandsInsertBundle) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
+  Entity e;
 
-  auto *queue = world.get_resource<CommandQueue>();
-  Cmd cmd(queue, &world.entities);
+  {
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
+    auto ec = cmd.spawn_empty();
+    e = ec.id();
+    ec.insert(MovingBundle{.pos = {7.0f, 8.0f}, .vel = {9.0f, 10.0f}});
+  }
 
-  auto ec = cmd.spawn_empty();
-  Entity e = ec.id();
-  ec.insert(MovingBundle{.pos = {7.0f, 8.0f}, .vel = {9.0f, 10.0f}});
-
-  queue->apply(world);
+  world.get_resource<CommandQueues>()->apply(world);
 
   EXPECT_EQ(*world.get_component<Position>(e), (Position{7.0f, 8.0f}));
   EXPECT_EQ(*world.get_component<Velocity>(e), (Velocity{9.0f, 10.0f}));
@@ -237,20 +247,22 @@ TEST(BundleTest, EntityCommandsInsertBundle) {
 
 TEST(BundleTest, EntityCommandsInsertNestedBundle) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
+  Entity e;
 
-  auto *queue = world.get_resource<CommandQueue>();
-  Cmd cmd(queue, &world.entities);
+  {
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
+    auto ec = cmd.spawn_empty();
+    e = ec.id();
+    ec.insert(PlayerBundle{
+        .moving = {.pos = {1.0f, 2.0f}, .vel = {3.0f, 4.0f}},
+        .health = {99},
+        .name = {"NPC"},
+    });
+  }
 
-  auto ec = cmd.spawn_empty();
-  Entity e = ec.id();
-  ec.insert(PlayerBundle{
-      .moving = {.pos = {1.0f, 2.0f}, .vel = {3.0f, 4.0f}},
-      .health = {99},
-      .name = {"NPC"},
-  });
-
-  queue->apply(world);
+  world.get_resource<CommandQueues>()->apply(world);
 
   EXPECT_EQ(*world.get_component<Position>(e), (Position{1.0f, 2.0f}));
   EXPECT_EQ(*world.get_component<Velocity>(e), (Velocity{3.0f, 4.0f}));
@@ -371,21 +383,23 @@ TEST(BundleTest, DeeplyNestedBundle) {
 
 TEST(BundleTest, SpawnMultipleEntitiesWithSameBundle) {
   World world;
-  world.insert_resource(CommandQueue{});
-
-  auto *queue = world.get_resource<CommandQueue>();
-  Cmd cmd(queue, &world.entities);
-
+  world.insert_resource(CommandQueues{});
   std::vector<Entity> entities;
-  for (int i = 0; i < 100; i++) {
-    auto ec = cmd.spawn(MovingBundle{
-        .pos = {static_cast<float>(i), 0.0f},
-        .vel = {0.0f, static_cast<float>(i)},
-    });
-    entities.push_back(ec.id());
+
+  {
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
+
+    for (int i = 0; i < 100; i++) {
+      auto ec = cmd.spawn(MovingBundle{
+          .pos = {static_cast<float>(i), 0.0f},
+          .vel = {0.0f, static_cast<float>(i)},
+      });
+      entities.push_back(ec.id());
+    }
   }
 
-  queue->apply(world);
+  world.get_resource<CommandQueues>()->apply(world);
 
   for (size_t i = 0; i < 100; i++) {
     auto *pos = world.get_component<Position>(entities[i]);
@@ -400,18 +414,21 @@ TEST(BundleTest, SpawnMultipleEntitiesWithSameBundle) {
 
 TEST(BundleTest, ChainingInserts) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
+  Entity e;
 
-  auto *queue = world.get_resource<CommandQueue>();
-  Cmd cmd(queue, &world.entities);
+  {
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
 
-  auto ec = cmd.spawn_empty();
-  Entity e = ec.id();
-  ec.insert(MovingBundle{.pos = {1, 2}, .vel = {3, 4}})
-      .insert(Health{100})
-      .insert(Marker{});
+    auto ec = cmd.spawn_empty();
+    e = ec.id();
+    ec.insert(MovingBundle{.pos = {1, 2}, .vel = {3, 4}})
+        .insert(Health{100})
+        .insert(Marker{});
+  }
 
-  queue->apply(world);
+  world.get_resource<CommandQueues>()->apply(world);
 
   EXPECT_EQ(*world.get_component<Position>(e), (Position{1, 2}));
   EXPECT_EQ(*world.get_component<Velocity>(e), (Velocity{3, 4}));
@@ -461,21 +478,24 @@ TEST(BundleTest, SpawnBatchPlainComponent) {
 
 TEST(BundleTest, CmdSpawnBatch) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
 
-  auto *queue = world.get_resource<CommandQueue>();
-  Cmd cmd(queue, &world.entities);
+  {
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
 
-  std::vector<MovingBundle> bundles;
-  for (int i = 0; i < 10; i++) {
-    bundles.push_back(MovingBundle{
-        .pos = {static_cast<float>(i), 0.0f},
-        .vel = {0.0f, static_cast<float>(i)},
-    });
+    std::vector<MovingBundle> bundles;
+    for (int i = 0; i < 10; i++) {
+      bundles.push_back(MovingBundle{
+          .pos = {static_cast<float>(i), 0.0f},
+          .vel = {0.0f, static_cast<float>(i)},
+      });
+    }
+
+    cmd.spawn_batch(std::move(bundles));
   }
 
-  cmd.spawn_batch(std::move(bundles));
-  queue->apply(world);
+  world.get_resource<CommandQueues>()->apply(world);
 
   Query<Position, Velocity> query(world);
   int count = 0;

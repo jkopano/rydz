@@ -42,18 +42,18 @@ struct Value {
 
 TEST(CommandTest, SpawnWithComponents) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
 
   {
-    auto *queue = world.get_resource<CommandQueue>();
-    Cmd cmd(queue, &world.entities);
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
 
     cmd.spawn(Health{100}, Name{"Hero"});
   }
 
   // Apply commands
-  auto *queue = world.get_resource<CommandQueue>();
-  queue->apply(world);
+  auto *queues = world.get_resource<CommandQueues>();
+  queues->apply(world);
 
   // Verify
   int health_count = 0;
@@ -79,19 +79,19 @@ TEST(CommandTest, SpawnWithComponents) {
 
 TEST(CommandTest, SpawnMany) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
 
   {
-    auto *queue = world.get_resource<CommandQueue>();
-    Cmd cmd(queue, &world.entities);
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
 
     for (int i = 0; i < 5; i++) {
       cmd.spawn(Score{i});
     }
   }
 
-  auto *queue = world.get_resource<CommandQueue>();
-  queue->apply(world);
+  auto *queues = world.get_resource<CommandQueues>();
+  queues->apply(world);
 
   int count = 0;
   auto *storage = world.get_storage<Score>();
@@ -103,36 +103,36 @@ TEST(CommandTest, SpawnMany) {
 
 TEST(CommandTest, DespawnCommand) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
 
   auto entity = world.spawn();
   world.insert_component(entity, Health{100});
   EXPECT_NE(world.get_component<Health>(entity), nullptr);
 
   {
-    auto *queue = world.get_resource<CommandQueue>();
-    Cmd cmd(queue, &world.entities);
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
     cmd.despawn(entity);
   }
 
-  auto *queue = world.get_resource<CommandQueue>();
-  queue->apply(world);
+  auto *queues = world.get_resource<CommandQueues>();
+  queues->apply(world);
 
   EXPECT_EQ(world.get_component<Health>(entity), nullptr);
 }
 
 TEST(CommandTest, InsertResourceCommand) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
 
   {
-    auto *queue = world.get_resource<CommandQueue>();
-    Cmd cmd(queue, &world.entities);
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
     cmd.insert_resource(Value{42});
   }
 
-  auto *queue = world.get_resource<CommandQueue>();
-  queue->apply(world);
+  auto *queues = world.get_resource<CommandQueues>();
+  queues->apply(world);
 
   auto *val = world.get_resource<Value>();
   ASSERT_NE(val, nullptr);
@@ -141,18 +141,18 @@ TEST(CommandTest, InsertResourceCommand) {
 
 TEST(CommandTest, SpawnEmptyThenInsert) {
   World world;
-  world.insert_resource(CommandQueue{});
+  world.insert_resource(CommandQueues{});
 
   {
-    auto *queue = world.get_resource<CommandQueue>();
-    Cmd cmd(queue, &world.entities);
+    auto *queues = world.get_resource<CommandQueues>();
+    Cmd cmd(queues, &world.entities);
     auto ec = cmd.spawn_empty();
     ec.insert(Health{50});
     ec.insert(Name{"NPC"});
   }
 
-  auto *queue = world.get_resource<CommandQueue>();
-  queue->apply(world);
+  auto *queues = world.get_resource<CommandQueues>();
+  queues->apply(world);
 
   int count = 0;
   auto *storage = world.get_storage<Health>();

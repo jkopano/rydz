@@ -43,6 +43,7 @@ template <typename T> struct Res;
 template <typename T> struct ResMut;
 
 class CommandQueue;
+class CommandQueues;
 class Cmd;
 class EntityCommands;
 

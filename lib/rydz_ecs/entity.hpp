@@ -1,6 +1,8 @@
 #pragma once
 #include "types.hpp"
 #include <functional>
+#include <memory>
+#include <mutex>
 #include <unordered_set>
 #include <vector>
 
@@ -37,12 +39,14 @@ namespace ecs {
 
 struct EntityManager {
 private:
+  std::unique_ptr<std::mutex> mutex_ = std::make_unique<std::mutex>();
   u32 next_id_ = 0;
   std::vector<std::pair<u32, u32>> free_list_;
   std::unordered_set<Entity> active_;
 
 public:
   Entity create() {
+    std::lock_guard lock(*mutex_);
     Entity e;
     if (free_list_.empty()) {
       e = Entity::from_raw(next_id_++, 0);

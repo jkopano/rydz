@@ -5,6 +5,7 @@
 #include "world.hpp"
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <ranges>
 #include <vector>
 
@@ -17,10 +18,6 @@ public:
 };
 
 class CommandQueue {
-public:
-  using Type = Resource;
-
-private:
   std::vector<std::shared_ptr<ICommand>> queue_;
 
 public:
@@ -38,6 +35,29 @@ public:
   }
 
   bool empty() const { return queue_.empty(); }
+};
+
+class CommandQueues {
+public:
+  using Type = Resource;
+
+  void submit(CommandQueue queue) {
+    std::lock_guard lock(*mutex_);
+    queues_.push_back(std::move(queue));
+  }
+
+  void apply(World &world) {
+    for (auto &q : queues_) {
+      q.apply(world);
+    }
+    queues_.clear();
+  }
+
+  bool empty() const { return queues_.empty(); }
+
+private:
+  std::unique_ptr<std::mutex> mutex_ = std::make_unique<std::mutex>();
+  std::vector<CommandQueue> queues_;
 };
 
 namespace detail {
@@ -97,22 +117,34 @@ public:
 };
 
 class Cmd {
-  CommandQueue *queue_;
+  CommandQueue queue_;
+  CommandQueues *parent_;
   EntityManager *entities_;
 
 public:
-  Cmd(CommandQueue *queue, EntityManager *entities)
-      : queue_(queue), entities_(entities) {}
+  Cmd(CommandQueues *parent, EntityManager *entities)
+      : parent_(parent), entities_(entities) {}
+
+  ~Cmd() {
+    if (parent_ && !queue_.empty()) {
+      parent_->submit(std::move(queue_));
+    }
+  }
+
+  Cmd(Cmd &&) = default;
+  Cmd &operator=(Cmd &&) = default;
+  Cmd(const Cmd &) = delete;
+  Cmd &operator=(const Cmd &) = delete;
 
   template <Spawnable... Ts> EntityCommands spawn(Ts... items) {
     Entity entity = entities_->create();
-    (queue_->push(detail::InsertCommand<Ts>(entity, std::move(items))), ...);
-    return EntityCommands(entity, queue_);
+    (queue_.push(detail::InsertCommand<Ts>(entity, std::move(items))), ...);
+    return EntityCommands(entity, &queue_);
   }
 
   EntityCommands spawn_empty() {
     Entity entity = entities_->create();
-    return EntityCommands(entity, queue_);
+    return EntityCommands(entity, &queue_);
   }
 
   void spawn_batch(SpawnableRange auto &&_range) {
@@ -121,36 +153,36 @@ public:
     }
   }
 
-  void despawn(Entity entity) { queue_->push(detail::DespawnCommand(entity)); }
+  void despawn(Entity entity) { queue_.push(detail::DespawnCommand(entity)); }
 
   template <typename T> void insert_resource(T resource) {
     static_assert(ResourceTrait<T>,
                   "Only Resources can be inserted via insert_resource(). "
                   "Add 'using Type = Resource;' to your struct.");
-    queue_->push(detail::InsertResourceCommand<T>(std::move(resource)));
+    queue_.push(detail::InsertResourceCommand<T>(std::move(resource)));
   }
 
-  EntityCommands entity(Entity e) { return EntityCommands(e, queue_); }
+  EntityCommands entity(Entity e) { return EntityCommands(e, &queue_); }
 };
 
 template <> struct SystemParamTraits<Cmd> {
   using Item = Cmd;
 
   static Item retrieve(World &world) {
-    auto *queue = world.get_resource<CommandQueue>();
-    if (!queue) {
-      throw std::runtime_error("CommandQueue resource not found");
+    auto *queues = world.get_resource<CommandQueues>();
+    if (!queues) {
+      throw std::runtime_error("CommandQueues resource not found");
     }
 
-    return Cmd(queue, &world.entities);
+    return Cmd(queues, &world.entities);
   }
 
   static bool available(const World &world) {
-    return world.has_resource<CommandQueue>();
+    return world.has_resource<CommandQueues>();
   }
 
   static void access(SystemAccess &acc) {
-    acc.add_resource_read<CommandQueue>();
+    acc.add_resource_read<CommandQueues>();
   }
 };
 
