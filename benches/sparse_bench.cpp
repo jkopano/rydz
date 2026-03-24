@@ -49,7 +49,7 @@ static void BM_VecStorageIteration10Pct(benchmark::State &state) {
     });
   }
 }
-BENCHMARK(BM_VecStorageIteration10Pct);
+BENCHMARK(BM_VecStorageIteration10Pct)->MinTime(3);
 
 static void BM_HashMapStorageIteration10Pct(benchmark::State &state) {
   World world;
@@ -80,6 +80,6 @@ static void BM_HashMapStorageIteration10Pct(benchmark::State &state) {
     });
   }
 }
-BENCHMARK(BM_HashMapStorageIteration10Pct);
+BENCHMARK(BM_HashMapStorageIteration10Pct)->MinTime(3);
 
 // Main is in benches/main.cpp

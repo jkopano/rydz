@@ -79,6 +79,9 @@ public:
     if (handle.id >= items_.size()) {
       items_.resize(handle.id + 1, std::nullopt);
     }
+    if (deleter_ && items_[handle.id].has_value()) {
+      deleter_(items_[handle.id].value());
+    }
     items_[handle.id] = std::move(item);
   }
 

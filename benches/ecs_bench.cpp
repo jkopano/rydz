@@ -31,7 +31,7 @@ static void BM_EntityCreation10000(benchmark::State &state) {
     benchmark::DoNotOptimize(world);
   }
 }
-BENCHMARK(BM_EntityCreation10000);
+BENCHMARK(BM_EntityCreation10000)->MinTime(3);
 
 static void BM_QueryIterationReadWrite10000(benchmark::State &state) {
   World world;
@@ -52,7 +52,7 @@ static void BM_QueryIterationReadWrite10000(benchmark::State &state) {
     });
   }
 }
-BENCHMARK(BM_QueryIterationReadWrite10000);
+BENCHMARK(BM_QueryIterationReadWrite10000)->MinTime(3);
 
 static void BM_QueryIterationReadOnly10000(benchmark::State &state) {
   World world;
@@ -71,6 +71,6 @@ static void BM_QueryIterationReadOnly10000(benchmark::State &state) {
     });
   }
 }
-BENCHMARK(BM_QueryIterationReadOnly10000);
+BENCHMARK(BM_QueryIterationReadOnly10000)->MinTime(3);
 
 // Main is in benches/main.cpp

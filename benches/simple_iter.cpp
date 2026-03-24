@@ -45,6 +45,6 @@ static void BM_SimpleIteration(benchmark::State &state) {
     });
   }
 }
-BENCHMARK(BM_SimpleIteration);
+BENCHMARK(BM_SimpleIteration)->MinTime(3);
 
 // Main is in benches/main.cpp
