@@ -2,12 +2,25 @@
 
 #include "types.hpp"
 #include <cstdint>
+#include <cstdlib>
+#include <cxxabi.h>
 #include <ranges>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
 
 namespace ecs {
+
+inline std::string demangle(const char *mangled) {
+  int status = 0;
+  char *demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &status);
+  if (status == 0 && demangled) {
+    std::string result(demangled);
+    std::free(demangled);
+    return result;
+  }
+  return mangled;
+}
 
 template <typename From, typename To>
 using copy_const_t =

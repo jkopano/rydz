@@ -65,7 +65,10 @@ template <typename T> struct QueryFilterTraits<With<T>> {
   static bool matches(const World &world, Entity entity) {
     return world.has_component<T>(entity);
   }
-  static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
+  static void access(SystemAccess &acc) {
+    acc.add_component_read<T>();
+    acc.add_archetype_required<T>();
+  }
 
   static std::span<const Entity> candidates(const World &world) {
     auto *storage = world.get_storage<T>();
@@ -82,7 +85,7 @@ template <typename T> struct QueryFilterTraits<Without<T>> {
     return !world.has_component<T>(entity);
   }
 
-  static void access(SystemAccess &) {}
+  static void access(SystemAccess &acc) { acc.add_archetype_excluded<T>(); }
   static std::span<const Entity> candidates(const World &) { return {}; }
   static usize candidate_size(const World &) { return SIZE_MAX; }
 };

@@ -1,7 +1,9 @@
 #pragma once
 #include "condition.hpp"
 #include "system.hpp"
+#include "tracy_plugin.hpp"
 #include <algorithm>
+#include <cstring>
 #include <functional>
 #include <memory>
 #include <string>
@@ -12,7 +14,7 @@
 
 namespace ecs {
 
-enum class ScheduleLabel {
+enum struct ScheduleLabel {
   PreStartup,
   Startup,
   PostStartup,
@@ -40,6 +42,36 @@ template <> struct std::hash<ecs::ScheduleLabel> {
 };
 
 namespace ecs {
+
+inline constexpr const char *schedule_label_name(ScheduleLabel label) {
+  switch (label) {
+  case ScheduleLabel::PreStartup:
+    return "PreStartup";
+  case ScheduleLabel::Startup:
+    return "Startup";
+  case ScheduleLabel::PostStartup:
+    return "PostStartup";
+  case ScheduleLabel::First:
+    return "First";
+  case ScheduleLabel::PreUpdate:
+    return "PreUpdate";
+  case ScheduleLabel::Update:
+    return "Update";
+  case ScheduleLabel::PostUpdate:
+    return "PostUpdate";
+  case ScheduleLabel::ExtractRender:
+    return "ExtractRender";
+  case ScheduleLabel::Render:
+    return "Render";
+  case ScheduleLabel::PostRender:
+    return "PostRender";
+  case ScheduleLabel::Last:
+    return "Last";
+  case ScheduleLabel::FixedUpdate:
+    return "FixedUpdate";
+  }
+  return "Unknown";
+}
 
 inline tf::Executor &global_executor() {
   static tf::Executor executor;
@@ -176,15 +208,23 @@ public:
     }
 
     if (!world.multithreaded()) {
-      for (auto &entry : entries_)
+      for (auto &entry : entries_) {
+        ZoneScopedN("System");
+        const auto sys_name = entry.system->name();
+        ZoneText(sys_name.c_str(), sys_name.size());
         entry.system->run(world);
+      }
       return;
     }
 
     for (auto &step : steps_) {
       if (auto *s = std::get_if<InlineStep>(&step)) {
-        for (usize i : range(s->start, s->end))
+        for (usize i : range(s->start, s->end)) {
+          ZoneScopedN("System");
+          const auto sys_name = entries_[i].system->name();
+          ZoneText(sys_name.c_str(), sys_name.size());
           entries_[i].system->run(world);
+        }
       } else {
         auto &tf = std::get<ParallelStep>(step).taskflow;
         global_executor().run(tf).wait();
@@ -413,8 +453,12 @@ private:
       usize batch_end = batch_start + batch.size();
 
       for (usize i = batch_start; i < batch_end; ++i) {
-        auto task = step.taskflow.emplace(
-            [this, i] { entries_[i].system->run(*current_world_); });
+        auto task = step.taskflow.emplace([this, i] {
+          ZoneScopedN("System");
+          const auto sys_name = entries_[i].system->name();
+          ZoneText(sys_name.c_str(), sys_name.size());
+          entries_[i].system->run(*current_world_);
+        });
 
         for (auto &prev : prev_tasks) {
           prev.precede(task);
@@ -455,8 +499,12 @@ public:
 
   void run(ScheduleLabel label, World &world) {
     auto *schedule = get(label);
-    if (schedule)
+    if (schedule) {
+      ZoneScopedN("Schedule");
+      auto name = schedule_label_name(label);
+      ZoneText(name, std::strlen(name));
       schedule->run(world);
+    }
   }
 };
 
