@@ -1,13 +1,10 @@
 #pragma once
 #include "entity.hpp"
 #include "ticks.hpp"
-#include <any>
-#include <bit>
 #include <cassert>
 #include <functional>
 #include <optional>
 #include <span>
-#include <typeindex>
 #include <unordered_map>
 #include <vector>
 
@@ -30,124 +27,86 @@ template <typename T> class SparseSetStorage : public IStorage {
   std::vector<ComponentTicks> dense_ticks_;
   std::vector<Entity> dense_entities_;
 
+  std::optional<u32> get_dense_idx(Entity e) const {
+    u32 idx = e.index();
+    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
+        dense_entities_[sparse_[idx]] == e) {
+      return sparse_[idx];
+    }
+    return std::nullopt;
+  }
+
 public:
   void insert(Entity entity, T component, Tick current_tick) {
+    if (auto d_idx = get_dense_idx(entity)) {
+      dense_data_[*d_idx] = std::move(component);
+      dense_ticks_[*d_idx].changed = current_tick;
+      return;
+    }
+
     u32 idx = entity.index();
     if (idx >= sparse_.size())
       sparse_.resize(idx + 1, UINT32_MAX);
 
-    if (sparse_[idx] != UINT32_MAX) {
-      u32 dense_idx = sparse_[idx];
-      if (dense_entities_[dense_idx] == entity) {
-        dense_data_[dense_idx] = std::move(component);
-        dense_ticks_[dense_idx].changed = current_tick;
-        return;
-      }
-
-      dense_data_[dense_idx] = std::move(component);
-      dense_ticks_[dense_idx] = ComponentTicks{current_tick, current_tick};
-      dense_entities_[dense_idx] = entity;
-      return;
-    }
-
     sparse_[idx] = static_cast<u32>(dense_data_.size());
     dense_data_.push_back(std::move(component));
-    dense_ticks_.push_back(ComponentTicks{current_tick, current_tick});
+    dense_ticks_.push_back({current_tick, current_tick});
     dense_entities_.push_back(entity);
   }
 
-  T *get(Entity entity) {
-    u32 idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
-        dense_entities_[sparse_[idx]] == entity) {
-      return &dense_data_[sparse_[idx]];
-    }
-    return nullptr;
+  T *get(Entity e) {
+    auto i = get_dense_idx(e);
+    return i ? &dense_data_[*i] : nullptr;
   }
 
-  const T *get(Entity entity) const {
-    u32 idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
-        dense_entities_[sparse_[idx]] == entity) {
-      return &dense_data_[sparse_[idx]];
-    }
-    return nullptr;
-  }
-
-  ComponentTicks *get_ticks_mut(Entity entity) {
-    u32 idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
-        dense_entities_[sparse_[idx]] == entity) {
-      return &dense_ticks_[sparse_[idx]];
-    }
-    return nullptr;
-  }
-
-  const ComponentTicks *get_ticks_ptr(Entity entity) const {
-    u32 idx = entity.index();
-    if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
-        dense_entities_[sparse_[idx]] == entity) {
-      return &dense_ticks_[sparse_[idx]];
-    }
-    return nullptr;
+  const T *get(Entity e) const {
+    auto i = get_dense_idx(e);
+    return i ? &dense_data_[*i] : nullptr;
   }
 
   void remove(Entity entity) override {
-    u32 idx = entity.index();
-    if (idx >= sparse_.size() || sparse_[idx] == UINT32_MAX ||
-        dense_entities_[sparse_[idx]] != entity)
+    auto d_idx = get_dense_idx(entity);
+    if (!d_idx)
       return;
 
-    u32 dense_idx = sparse_[idx];
     u32 last = static_cast<u32>(dense_data_.size() - 1);
-    if (dense_idx != last) {
-      dense_data_[dense_idx] = std::move(dense_data_[last]);
-      dense_ticks_[dense_idx] = dense_ticks_[last];
-      dense_entities_[dense_idx] = dense_entities_[last];
-      sparse_[dense_entities_[dense_idx].index()] = dense_idx;
+    if (*d_idx != last) {
+      dense_data_[*d_idx] = std::move(dense_data_[last]);
+      dense_ticks_[*d_idx] = dense_ticks_[last];
+      dense_entities_[*d_idx] = dense_entities_[last];
+      sparse_[dense_entities_[*d_idx].index()] = *d_idx;
     }
 
     dense_data_.pop_back();
     dense_ticks_.pop_back();
     dense_entities_.pop_back();
-    sparse_[idx] = UINT32_MAX;
+    sparse_[entity.index()] = UINT32_MAX;
   }
 
-  bool has(Entity entity) const override {
-    u32 idx = entity.index();
-    return idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
-           dense_entities_[sparse_[idx]] == entity;
-  }
-
+  bool has(Entity e) const override { return get_dense_idx(e).has_value(); }
   usize size() const override { return dense_data_.size(); }
   bool empty() const override { return dense_data_.empty(); }
+  std::span<const Entity> entities() const override { return dense_entities_; }
 
-  std::optional<ComponentTicks> get_ticks(Entity entity) const override {
-    auto *t = get_ticks_ptr(entity);
-    return t ? std::optional(*t) : std::nullopt;
+  std::optional<ComponentTicks> get_ticks(Entity e) const override {
+    auto i = get_dense_idx(e);
+    return i ? std::optional(dense_ticks_[*i]) : std::nullopt;
   }
 
   void mark_changed(Entity entity, Tick tick) {
-    auto *t = get_ticks_mut(entity);
-    if (t)
-      t->changed = tick;
+    if (auto i = get_dense_idx(entity))
+      dense_ticks_[*i].changed = tick;
   }
 
   template <typename F> void for_each(F &&func) const {
-    for (usize i = 0; i < dense_data_.size(); ++i) {
+    for (usize i = 0; i < dense_data_.size(); ++i)
       func(dense_entities_[i], dense_data_[i]);
-    }
   }
 
   template <typename F> void for_each_mut(F &&func) {
-    for (usize i = 0; i < dense_data_.size(); ++i) {
+    for (usize i = 0; i < dense_data_.size(); ++i)
       func(dense_entities_[i], dense_data_[i]);
-    }
   }
-
-  usize data_size() const { return sparse_.size(); }
-
-  std::span<const Entity> entities() const override { return dense_entities_; }
 };
 
 template <typename T> class HashMapStorage : public IStorage {

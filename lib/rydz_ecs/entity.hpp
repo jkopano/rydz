@@ -43,6 +43,7 @@ private:
 public:
   Entity create() {
     std::lock_guard lock(*mutex_);
+
     Entity e;
     if (free_list_.empty()) {
       e = Entity::from_raw(next_id_++, 0);
@@ -51,6 +52,7 @@ public:
       free_list_.pop_back();
       e = Entity::from_raw(idx, gen);
     }
+
     active_.insert(e);
     return e;
   }
