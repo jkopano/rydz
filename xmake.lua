@@ -10,12 +10,26 @@ option_end()
 local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
 
 if tracy_enabled then
-	add_requires("tracy")
+  add_requires("tracy")
 end
 
 add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
-add_requires("lua 5.4.6") 
-add_requires("sol2 v3.3.0", {configs = {lua_version = "5.4"}})
+add_requires("sol2 v3.3.0", { configs = { includes_lua = false } })
+
+local function add_luajit(target)
+  local luajit_link = os.iorun("which luajit"):gsub("%s+$", "")
+  local luajit = luajit_link ~= "" and os.iorunv("readlink", { "-f", luajit_link }):gsub("%s+$", "") or ""
+  local luajit_prefix = luajit ~= "" and path.directory(path.directory(luajit)) or nil
+  if not luajit_prefix then
+    raise("LuaJIT binary not found in PATH. Reload `devenv shell` and verify `which luajit`.")
+  end
+  target:add("includedirs", path.join(luajit_prefix, "include", "luajit-2.1"), { public = true })
+  target:add("linkdirs", path.join(luajit_prefix, "lib"))
+  target:add("links", "luajit-5.1")
+  if is_plat("linux") then
+    target:add("rpathdirs", path.join(luajit_prefix, "lib"))
+  end
+end
 
 set_languages("c++23")
 add_includedirs("lib")
@@ -24,60 +38,60 @@ add_includedirs("lib")
 set_warnings("all", "extra")
 
 if is_plat("windows") then
-	add_defines("NOMINMAX", "_CRT_SECURE_NO_WARNINGS")
+  add_defines("NOMINMAX", "_CRT_SECURE_NO_WARNINGS")
 end
 
 local function is_msvc_like()
-	if not is_plat("windows") then
-		return false
-	end
-	if type(is_toolchain) == "function" then
-		return is_toolchain("msvc") or is_toolchain("clang-cl")
-	end
-	local tc = get_config("toolchain") or ""
-	return tc == "msvc" or tc == "clang-cl"
+  if not is_plat("windows") then
+    return false
+  end
+  if type(is_toolchain) == "function" then
+    return is_toolchain("msvc") or is_toolchain("clang-cl")
+  end
+  local tc = get_config("toolchain") or ""
+  return tc == "msvc" or tc == "clang-cl"
 end
 
 if is_mode("debug") then
-	if is_plat("windows") then
-		if is_msvc_like() then
-			-- Windows MSVC Sanitizer (wymaga zainstalowanego komponentu ASan w VS)
-			add_cxflags("/fsanitize=address")
-			add_ldflags("/fsanitize=address")
-		end
-	else
-		add_cxflags("-fsanitize=address,undefined", "-fno-omit-frame-pointer")
-		add_ldflags("-fsanitize=address,undefined")
-		add_cxflags("-fno-sanitize-recover=undefined")
-	end
-	add_cxflags("-Wshadow") -- shadow warning zazwyczaj działa na obu
+  if is_plat("windows") then
+    if is_msvc_like() then
+      -- Windows MSVC Sanitizer (wymaga zainstalowanego komponentu ASan w VS)
+      add_cxflags("/fsanitize=address")
+      add_ldflags("/fsanitize=address")
+    end
+  else
+    add_cxflags("-fsanitize=address,undefined", "-fno-omit-frame-pointer")
+    add_ldflags("-fsanitize=address,undefined")
+    add_cxflags("-fno-sanitize-recover=undefined")
+  end
+  add_cxflags("-Wshadow") -- shadow warning zazwyczaj działa na obu
 end
 
 if is_mode("release") or is_mode("profile") then
-	if is_plat("windows") then
-		if is_msvc_like() then
-			add_cxflags("/arch:AVX2") -- Odpowiednik x86-64-v3 dla MSVC
-		else
-			add_cxflags("-mavx2")
-		end
-	else
-		if os.getenv("NIX_ENFORCE_NO_NATIVE") then
-			add_cxflags("-march=x86-64-v3")
-		else
-			add_cxflags("-march=native")
-		end
-	end
-	set_optimize("fastest")
-	if is_mode("profile") then
-		set_symbols("debug")
-	else
-		set_symbols("hidden")
-	end
+  if is_plat("windows") then
+    if is_msvc_like() then
+      add_cxflags("/arch:AVX2") -- Odpowiednik x86-64-v3 dla MSVC
+    else
+      add_cxflags("-mavx2")
+    end
+  else
+    if os.getenv("NIX_ENFORCE_NO_NATIVE") then
+      add_cxflags("-march=x86-64-v3")
+    else
+      add_cxflags("-march=native")
+    end
+  end
+  set_optimize("fastest")
+  if is_mode("profile") then
+    set_symbols("debug")
+  else
+    set_symbols("hidden")
+  end
 end
 
 -- tracy define + package
 if tracy_enabled then
-	add_defines("TRACY_ENABLE")
+  add_defines("TRACY_ENABLE")
 end
 
 target("raylib")
@@ -85,13 +99,13 @@ set_kind("static")
 set_default(false)
 set_languages("c11")
 add_files(
-	"lib/external/raylib/src/rcore.c",
-	"lib/external/raylib/src/rshapes.c",
-	"lib/external/raylib/src/rtextures.c",
-	"lib/external/raylib/src/rtext.c",
-	"lib/external/raylib/src/rmodels.c",
-	"lib/external/raylib/src/raudio.c",
-	"lib/external/raylib/src/rglfw.c"
+  "lib/external/raylib/src/rcore.c",
+  "lib/external/raylib/src/rshapes.c",
+  "lib/external/raylib/src/rtextures.c",
+  "lib/external/raylib/src/rtext.c",
+  "lib/external/raylib/src/rmodels.c",
+  "lib/external/raylib/src/raudio.c",
+  "lib/external/raylib/src/rglfw.c"
 )
 add_includedirs("lib/external/raylib/src", { public = true })
 add_includedirs("lib/external/raylib/src/external/glfw/include", { private = true })
@@ -99,22 +113,22 @@ add_defines("PLATFORM_DESKTOP", "GRAPHICS_API_OPENGL_33", { public = true })
 
 -- Rozróżnienie systemów dla GLFW i linkowania
 if is_plat("windows") then
-	add_defines("_GLFW_WIN32")
-	add_syslinks("gdi32", "user32", "shell32", "winmm", "opengl32")
+  add_defines("_GLFW_WIN32")
+  add_syslinks("gdi32", "user32", "shell32", "winmm", "opengl32")
 else
-	add_defines("_GLFW_X11")
-	add_syslinks("GL", "X11", "pthread", "dl", "m", "rt")
+  add_defines("_GLFW_X11")
+  add_syslinks("GL", "X11", "pthread", "dl", "m", "rt")
 end
 
 add_cxflags("-w") -- Wycisz ostrzeżenia w raylib
 if is_mode("release") then
-	set_optimize("fastest")
+  set_optimize("fastest")
 end
 
 local function add_tracy()
-	if tracy_enabled then
-		add_packages("tracy")
-	end
+  if tracy_enabled then
+    add_packages("tracy")
+  end
 end
 
 target("main")
@@ -123,7 +137,8 @@ set_default(true)
 set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
-add_packages("taskflow", "meshoptimizer", "joltphysics", "lua", "sol2")
+add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2")
+on_load(add_luajit)
 add_tracy()
 set_pcxxheader("lib/pch.hpp")
 
@@ -143,27 +158,28 @@ add_deps("raylib")
 add_packages("benchmark", "taskflow", "meshoptimizer", "joltphysics")
 
 local examples = {
-	"01_hello_window",
-	"02_ecs_basics",
-	"03_input",
-	"04_events",
-	"05_states",
-	"06_rendering",
-	"07_lighting",
-	"08_hierarchy",
-	"09_spawn_despawn",
-	"10_custom_material",
-	"11_sets",
+  "01_hello_window",
+  "02_ecs_basics",
+  "03_input",
+  "04_events",
+  "05_states",
+  "06_rendering",
+  "07_lighting",
+  "08_hierarchy",
+  "09_spawn_despawn",
+  "10_custom_material",
+  "11_sets",
 }
 
 for _, name in ipairs(examples) do
-	target("example_" .. name)
-	set_kind("binary")
-	set_default(false)
-	set_rundir("$(projectdir)")
-	add_files("examples/" .. name .. "/main.cpp")
-	add_deps("raylib")
-	add_packages("taskflow", "meshoptimizer", "joltphysics", "lua", "sol2")
-	add_tracy()
-	set_pcxxheader("lib/pch.hpp")
+  target("example_" .. name)
+  set_kind("binary")
+  set_default(false)
+  set_rundir("$(projectdir)")
+  add_files("examples/" .. name .. "/main.cpp")
+  add_deps("raylib")
+  add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2")
+  on_load(add_luajit)
+  add_tracy()
+  set_pcxxheader("lib/pch.hpp")
 end

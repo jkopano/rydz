@@ -29,6 +29,8 @@ let
   compDeps = with pkgs; [
     xmake
     vcpkg
+    luajit
+    sol2
   ];
 
   typstDeps = with pkgs; [
@@ -41,5 +43,6 @@ in
 
   languages.cplusplus.enable = true;
 
+  env.PKG_CONFIG_PATH = lib.makeSearchPath "lib/pkgconfig" compDeps;
   env.LD_LIBRARY_PATH = lib.makeLibraryPath raylibDeps;
 }
