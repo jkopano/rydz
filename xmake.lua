@@ -14,9 +14,17 @@ if tracy_enabled then
 end
 
 add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
-add_requires("sol2 v3.3.0", { configs = { includes_lua = false } })
+if is_plat("windows") then
+  add_requires("sol2 v3.3.0", { configs = { includes_lua = "luajit" } })
+else
+  add_requires("sol2 v3.3.0", { configs = { includes_lua = false } })
+end
 
 local function add_luajit(target)
+  if not is_plat("linux") then
+    return
+  end
+
   local luajit_link = os.iorun("which luajit"):gsub("%s+$", "")
   local luajit = luajit_link ~= "" and os.iorunv("readlink", { "-f", luajit_link }):gsub("%s+$", "") or ""
   local luajit_prefix = luajit ~= "" and path.directory(path.directory(luajit)) or nil
