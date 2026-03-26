@@ -6,6 +6,7 @@
 #include "rl.hpp"
 #include "schedule.hpp"
 #include "state.hpp"
+#include "tracy_plugin.hpp"
 #include "world.hpp"
 #include <string>
 
@@ -188,6 +189,7 @@ public:
 
     while (!rl::WindowShouldClose()) {
       update();
+      FrameMark;
     }
 
     world_.resources.clear();

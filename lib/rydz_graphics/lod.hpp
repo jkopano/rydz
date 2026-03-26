@@ -187,7 +187,7 @@ inline int apply_lod_hysteresis(Entity entity, int desired_level,
   return resolved;
 }
 
-inline void auto_generate_lods_system(World &world, NonSendMarker) {
+inline void auto_generate_lods_system(World &world) {
   auto *model_storage = world.get_storage<Model3d>();
   auto *lod_storage = world.get_storage<MeshLodGroup>();
   auto *model_assets = world.get_resource<Assets<rl::Model>>();

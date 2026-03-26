@@ -9,15 +9,27 @@ struct SystemAccess {
   std::set<std::type_index> components_write;
   std::set<std::type_index> resources_read;
   std::set<std::type_index> resources_write;
+  std::set<std::type_index> archetype_required;
+  std::set<std::type_index> archetype_excluded;
   bool exclusive = false;
   bool main_thread_only = false;
 
   template <typename T> void add_component_read() {
     components_read.insert(std::type_index(typeid(T)));
+    archetype_required.insert(std::type_index(typeid(T)));
   }
 
   template <typename T> void add_component_write() {
     components_write.insert(std::type_index(typeid(T)));
+    archetype_required.insert(std::type_index(typeid(T)));
+  }
+
+  template <typename T> void add_archetype_required() {
+    archetype_required.insert(std::type_index(typeid(T)));
+  }
+
+  template <typename T> void add_archetype_excluded() {
+    archetype_excluded.insert(std::type_index(typeid(T)));
   }
 
   template <typename T> void add_resource_read() {
@@ -31,6 +43,21 @@ struct SystemAccess {
   void set_exclusive() { exclusive = true; }
   void set_main_thread_only() { main_thread_only = true; }
 
+  bool is_empty() const {
+    return components_read.empty() && components_write.empty() &&
+           resources_read.empty() && resources_write.empty() && !exclusive;
+  }
+
+  bool is_archetype_disjoint(const SystemAccess &other) const {
+    for (auto &req : archetype_required)
+      if (other.archetype_excluded.count(req))
+        return true;
+    for (auto &req : other.archetype_required)
+      if (archetype_excluded.count(req))
+        return true;
+    return false;
+  }
+
   void merge(const SystemAccess &other) {
     exclusive |= other.exclusive;
     main_thread_only |= other.main_thread_only;
@@ -42,6 +69,10 @@ struct SystemAccess {
                           other.resources_read.end());
     resources_write.insert(other.resources_write.begin(),
                            other.resources_write.end());
+    archetype_required.insert(other.archetype_required.begin(),
+                              other.archetype_required.end());
+    archetype_excluded.insert(other.archetype_excluded.begin(),
+                              other.archetype_excluded.end());
   }
 
   bool is_compatible(const SystemAccess &other) const {

@@ -2,6 +2,7 @@
 #include "access.hpp"
 #include "query.hpp"
 #include "world.hpp"
+#include <array>
 #include <concepts>
 #include <functional>
 #include <memory>
@@ -33,6 +34,7 @@ public:
   virtual ~ISystem() = default;
   virtual void run(World &world) = 0;
   virtual std::string name() const = 0;
+  virtual std::string type_name() const { return name(); }
   virtual SystemAccess access() const { return {}; }
 };
 
@@ -89,7 +91,10 @@ template <> struct SystemParamTraits<World> {
 
   static bool available(const World &) { return true; }
 
-  static void access(SystemAccess &acc) { acc.set_exclusive(); }
+  static void access(SystemAccess &acc) {
+    acc.set_exclusive();
+    acc.set_main_thread_only();
+  }
 };
 
 template <> struct SystemParamTraits<NonSendMarker> {
@@ -158,10 +163,12 @@ concept SystemParameter = requires(World &w, SystemAccess &acc) {
 template <typename F> class FunctionSystem : public ISystem {
   F func_;
   std::string name_;
+  std::string type_name_;
 
 public:
   explicit FunctionSystem(F func, std::string name = "")
-      : func_(std::move(func)) {
+      : func_(std::move(func)),
+        type_name_(demangle(typeid(F).name())) {
     if (!name.empty()) {
       name_ = std::move(name);
     } else {
@@ -175,11 +182,14 @@ public:
   }
 
   std::string name() const override { return name_; }
+  std::string type_name() const override { return type_name_; }
 
   SystemAccess access() const override {
     SystemAccess acc;
     function_traits<F>::apply(
-        [&]<SystemParameter... Args>() { access_with_args<Args...>(acc); });
+        [&]<SystemParameter... Args>() {
+          access_with_args<Args...>(acc, type_name_);
+        });
     return acc;
   }
 
@@ -189,8 +199,32 @@ private:
   }
 
   template <SystemParameter... Args>
-  static void access_with_args(SystemAccess &acc) {
-    (SystemParamTraits<bare_t<Args>>::access(acc), ...);
+  static void access_with_args(SystemAccess &acc,
+                               const std::string &system_name) {
+    std::array<SystemAccess, sizeof...(Args)> per_param;
+    std::size_t i = 0;
+    ((SystemParamTraits<bare_t<Args>>::access(per_param[i]), ++i), ...);
+
+    for (std::size_t a = 0; a < per_param.size(); ++a) {
+      if (per_param[a].is_empty())
+        continue;
+      for (std::size_t b = a + 1; b < per_param.size(); ++b) {
+        if (per_param[b].is_empty())
+          continue;
+        if (!per_param[a].is_compatible(per_param[b]) &&
+            !per_param[a].is_archetype_disjoint(per_param[b])) {
+          throw std::runtime_error(
+              "System '" + system_name +
+              "': parameter conflict detected between parameters " +
+              std::to_string(a) + " and " + std::to_string(b) +
+              " (conflicting access to the same component or resource)");
+        }
+      }
+    }
+
+    for (auto &p : per_param) {
+      acc.merge(p);
+    }
   }
 };
 

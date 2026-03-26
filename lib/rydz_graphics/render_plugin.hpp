@@ -515,9 +515,11 @@ inline void render_plugin(App &app) {
   if (!app.world().has_resource<PendingModelLoads>()) {
     app.insert_resource(PendingModelLoads{});
   }
-  app.add_systems(
-      ScheduleLabel::First,
-      [](ResMut<AssetServer> server, World &world) { server->update(world); });
+  app.add_systems(ScheduleLabel::First, [](World &world) {
+    if (auto *server = world.get_resource<AssetServer>()) {
+      server->update(world);
+    }
+  });
   app.add_systems(ScheduleLabel::First, process_pending_model_loads);
 
   app.add_systems(ScheduleLabel::First, auto_insert_global_transform);

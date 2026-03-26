@@ -58,7 +58,7 @@ int main() {
       // Set z warunkiem — debug tylko gdy trzymasz D (btw as you can see, nwm
       // czy to było wczesniej w examplu, można lambdy wrzucać jako systemy)
       .configure_set(ScheduleLabel::Update,
-                     configure<DebugSet>().run_if([&](Res<Input> input) {
+                     configure<DebugSet>().run_if([](Res<Input> input) {
                        return input->key_down(KEY_D);
                      }))
 

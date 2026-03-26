@@ -1,4 +1,17 @@
-add_rules("mode.debug", "mode.release")
+add_rules("mode.debug", "mode.release", "mode.profile")
+
+option("tracy")
+set_default(false)
+set_showmenu(true)
+set_description("Enable Tracy profiler")
+option_end()
+
+-- `xmake f --tracy=y` lub `xmake f -m profile`
+local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
+
+if tracy_enabled then
+	add_requires("tracy")
+end
 
 add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
 add_requires("lua 5.4.6") 
@@ -40,7 +53,7 @@ if is_mode("debug") then
 	add_cxflags("-Wshadow") -- shadow warning zazwyczaj działa na obu
 end
 
-if is_mode("release") then
+if is_mode("release") or is_mode("profile") then
 	if is_plat("windows") then
 		if is_msvc_like() then
 			add_cxflags("/arch:AVX2") -- Odpowiednik x86-64-v3 dla MSVC
@@ -54,8 +67,17 @@ if is_mode("release") then
 			add_cxflags("-march=native")
 		end
 	end
-	set_symbols("hidden")
 	set_optimize("fastest")
+	if is_mode("profile") then
+		set_symbols("debug")
+	else
+		set_symbols("hidden")
+	end
+end
+
+-- tracy define + package
+if tracy_enabled then
+	add_defines("TRACY_ENABLE")
 end
 
 target("raylib")
@@ -89,6 +111,12 @@ if is_mode("release") then
 	set_optimize("fastest")
 end
 
+local function add_tracy()
+	if tracy_enabled then
+		add_packages("tracy")
+	end
+end
+
 target("main")
 set_kind("binary")
 set_default(true)
@@ -96,6 +124,7 @@ set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
 add_packages("taskflow", "meshoptimizer", "joltphysics", "lua", "sol2")
+add_tracy()
 set_pcxxheader("lib/pch.hpp")
 
 -- Testy i benchmarki (pozostają bez zmian, xmake sam ogarnie gtest/benchmark na Windows)
@@ -113,7 +142,6 @@ add_files("benches/*.cpp")
 add_deps("raylib")
 add_packages("benchmark", "taskflow", "meshoptimizer", "joltphysics")
 
--- Examples
 local examples = {
 	"01_hello_window",
 	"02_ecs_basics",
@@ -136,5 +164,6 @@ for _, name in ipairs(examples) do
 	add_files("examples/" .. name .. "/main.cpp")
 	add_deps("raylib")
 	add_packages("taskflow", "meshoptimizer", "joltphysics", "lua", "sol2")
+	add_tracy()
 	set_pcxxheader("lib/pch.hpp")
 end
