@@ -60,7 +60,7 @@ private:
 public:
   template <OnEnterLabel Label, typename F>
   App &add_systems(Label &&label, F &&func) {
-    using S = std::decay_t<decltype(label.value)>;
+    using S = bare_t<decltype(label.value)>;
     get_or_init_state_schedules<S>().on_enter[label.value].add_system_fn(
         std::forward<F>(func));
     return *this;
@@ -68,7 +68,7 @@ public:
 
   template <OnExitLabel Label, typename F>
   App &add_systems(Label &&label, F &&func) {
-    using S = std::decay_t<decltype(label.value)>;
+    using S = bare_t<decltype(label.value)>;
     get_or_init_state_schedules<S>().on_exit[label.value].add_system_fn(
         std::forward<F>(func));
     return *this;
@@ -76,7 +76,7 @@ public:
 
   template <OnTransitionLabel Label, typename F>
   App &add_systems(Label &&, F &&func) {
-    using S = typename std::decay_t<Label>::state_type;
+    using S = typename bare_t<Label>::state_type;
     get_or_init_state_schedules<S>().on_transition.add_system_fn(
         std::forward<F>(func));
     return *this;
@@ -119,7 +119,7 @@ public:
     return *this;
   }
 
-  template <EventTrait E> App &add_event() {
+  template <IsEvent E> App &add_event() {
     world_.insert_resource(Events<E>{});
     schedules_.entry(ScheduleLabel::First)
         .add_system_fn(event_update_system<E>);

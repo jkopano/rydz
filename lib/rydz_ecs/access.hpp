@@ -50,10 +50,10 @@ struct SystemAccess {
 
   bool is_archetype_disjoint(const SystemAccess &other) const {
     for (auto &req : archetype_required)
-      if (other.archetype_excluded.count(req))
+      if (other.archetype_excluded.contains(req))
         return true;
     for (auto &req : other.archetype_required)
-      if (archetype_excluded.count(req))
+      if (archetype_excluded.contains(req))
         return true;
     return false;
   }
@@ -81,7 +81,7 @@ struct SystemAccess {
     auto disjoint = [](const std::set<std::type_index> &a,
                        const std::set<std::type_index> &b) {
       for (auto &x : a)
-        if (b.count(x))
+        if (b.contains(x))
           return false;
       return true;
     };

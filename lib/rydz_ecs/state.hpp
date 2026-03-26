@@ -63,13 +63,13 @@ template <typename S>
 struct is_on_transition<OnTransition<S>> : std::true_type {};
 
 template <typename T>
-concept OnEnterLabel = is_on_enter<std::decay_t<T>>::value;
+concept OnEnterLabel = is_on_enter<bare_t<T>>::value;
 
 template <typename T>
-concept OnExitLabel = is_on_exit<std::decay_t<T>>::value;
+concept OnExitLabel = is_on_exit<bare_t<T>>::value;
 
 template <typename T>
-concept OnTransitionLabel = is_on_transition<std::decay_t<T>>::value;
+concept OnTransitionLabel = is_on_transition<bare_t<T>>::value;
 
 template <typename S> auto in_state(S target) {
   return

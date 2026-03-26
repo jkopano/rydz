@@ -189,7 +189,7 @@ public:
     std::erase(entity_keys_, entity);
   }
 
-  bool has(Entity entity) const override { return data_.count(entity) > 0; }
+  bool has(Entity entity) const override { return data_.contains(entity); }
 
   template <typename F> void for_each(F &&func) const {
     for (auto &[e, comp] : data_)

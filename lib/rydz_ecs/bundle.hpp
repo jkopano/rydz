@@ -14,24 +14,22 @@ template <typename T> struct type_tag_of<T, std::void_t<typename T::Type>> {
 };
 
 template <typename T>
-concept ComponentTrait = std::is_same_v<typename type_tag_of<T>::type, Component>;
+concept IsComponent = std::is_same_v<typename type_tag_of<T>::type, Component>;
 
 template <typename T>
-concept ResourceTrait = requires { typename T::Type; } &&
-                        std::is_same_v<typename type_tag_of<T>::type, Resource>;
+concept IsResource = requires { typename T::Type; } &&
+                     std::is_same_v<typename type_tag_of<T>::type, Resource>;
 
 template <typename T>
-concept BundleTrait = requires { typename T::Type; } &&
-                      std::is_same_v<typename type_tag_of<T>::type, Bundle>;
+concept IsBundle = requires { typename T::Type; } &&
+                   std::is_same_v<typename type_tag_of<T>::type, Bundle>;
 
 template <typename T>
-concept EventTrait =
+concept IsEvent =
     requires { typename T::Type; } && std::is_same_v<typename T::Type, Event>;
 
-template <typename T> using StripAll = std::remove_cvref_t<T>;
-
 template <typename T>
-concept Spawnable = ComponentTrait<StripAll<T>> || BundleTrait<StripAll<T>>;
+concept Spawnable = IsComponent<bare_t<T>> || IsBundle<bare_t<T>>;
 
 template <typename R>
 concept SpawnableRange =
@@ -69,7 +67,7 @@ template <typename T> consteval int field_count() {
 }
 
 template <typename T> auto to_tuple(T &&t) {
-  using Raw = StripAll<T>;
+  using Raw = bare_t<T>;
   constexpr int N = field_count<Raw>();
   if constexpr (N == 0) { return std::tuple{}; }
   else if constexpr (N == 1) { auto&& [a] = std::forward<T>(t); return std::make_tuple(std::forward<decltype(a)>(a)); }
@@ -110,13 +108,13 @@ void insert_tuple_items(World &world, Entity entity, std::tuple<Ts...> &&tup) {
 
 template <typename T>
 void insert_single(World &world, Entity entity, T &&item) {
-  using Raw = StripAll<T>;
-  if constexpr (BundleTrait<Raw>) {
+  using Raw = bare_t<T>;
+  if constexpr (IsBundle<Raw>) {
     insert_tuple_items(world, entity, to_tuple(std::forward<T>(item)));
   } else if constexpr (is_tuple_v<Raw>) {
     insert_tuple_items(world, entity, std::forward<T>(item));
   } else {
-    static_assert(ComponentTrait<Raw>,
+    static_assert(IsComponent<Raw>,
                   "Only Components and Bundles can be inserted on entities. "
                   "Add 'using Type = Component;' or 'using Type = Bundle;'.");
     world.insert_component(entity, std::forward<T>(item));

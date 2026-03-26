@@ -112,40 +112,22 @@ template <typename T> struct WorldQueryTraits<Mut<T>> {
   };
 };
 
-template <typename T> struct WorldQueryTraits<Opt<T>> {
-  using Item = const T *;
+template <typename T> struct WorldQueryTraits<Opt<T>> : WorldQueryTraits<T> {
+  static bool is_valid(typename WorldQueryTraits<T>::Item) { return true; }
 
-  static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
-  static bool is_valid(Item) { return true; }
-
-  struct Fetcher : FetcherBase<T> {
-    void init(World &world) { this->storage = world.get_storage<T>(); }
-
-    Item fetch(Entity entity) const {
-      return this->storage ? this->storage->get(entity) : nullptr;
-    }
+  struct Fetcher : WorldQueryTraits<T>::Fetcher {
     usize size() const { return SIZE_MAX; }
     bool is_required() const { return false; }
   };
 };
 
-template <typename T> struct WorldQueryTraits<Opt<Mut<T>>> {
-  using Item = Mut<T>;
+template <typename T>
+struct WorldQueryTraits<Opt<Mut<T>>> : WorldQueryTraits<Mut<T>> {
+  static bool is_valid(const typename WorldQueryTraits<Mut<T>>::Item &) {
+    return true;
+  }
 
-  static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
-  static bool is_valid(const Item &) { return true; }
-
-  struct Fetcher : FetcherBase<T, storage_t<T> *> {
-    Tick tick{};
-
-    void init(World &world) {
-      this->storage = world.get_storage<T>();
-      tick = world.read_change_tick();
-    }
-    Item fetch(Entity entity) const {
-      return Item{this->storage ? this->storage->get(entity) : nullptr,
-                  this->storage, entity, tick};
-    }
+  struct Fetcher : WorldQueryTraits<Mut<T>>::Fetcher {
     usize size() const { return SIZE_MAX; }
     bool is_required() const { return false; }
   };

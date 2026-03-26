@@ -41,7 +41,7 @@ public:
   }
 
   template <typename T> bool has() const {
-    return data_.count(std::type_index(typeid(T))) > 0;
+    return data_.contains(std::type_index(typeid(T)));
   }
 
   void clear() { data_.clear(); }

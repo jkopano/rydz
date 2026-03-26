@@ -65,7 +65,7 @@ public:
     return {active_.begin(), active_.end()};
   }
 
-  bool is_alive(Entity entity) const { return active_.count(entity) > 0; }
+  bool is_alive(Entity entity) const { return active_.contains(entity); }
 
   size_t count() const { return active_.size(); }
 };

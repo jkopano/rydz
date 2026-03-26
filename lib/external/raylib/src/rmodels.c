@@ -1215,6 +1215,8 @@ void UnloadModel(Model model)
     // Unload animation data
     RL_FREE(model.skeleton.bones);
     RL_FREE(model.skeleton.bindPose);
+    RL_FREE(model.currentPose);
+    RL_FREE(model.boneMatrices);
 
     TRACELOG(LOG_INFO, "MODEL: Unloaded model (and meshes) from RAM and VRAM");
 }
@@ -6329,9 +6331,12 @@ static Model LoadGLTF(const char *fileName)
         }
 
         // Initialize runtime animation data: current pose and bone matrices
-        model.currentPose = (rlTransform *)RL_CALLOC(model.skeleton.boneCount, sizeof(rlTransform));
-        model.boneMatrices = (Matrix *)RL_CALLOC(model.skeleton.boneCount, sizeof(Matrix));
-        for (int j = 0; j < model.skeleton.boneCount; j++) model.boneMatrices[j] = MatrixIdentity();
+        if (model.skeleton.boneCount > 0)
+        {
+            model.currentPose = (rlTransform *)RL_CALLOC(model.skeleton.boneCount, sizeof(rlTransform));
+            model.boneMatrices = (Matrix *)RL_CALLOC(model.skeleton.boneCount, sizeof(Matrix));
+            for (int j = 0; j < model.skeleton.boneCount; j++) model.boneMatrices[j] = MatrixIdentity();
+        }
         //----------------------------------------------------------------------------------------------------
 
         // Free all cgltf loaded data

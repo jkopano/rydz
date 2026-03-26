@@ -252,7 +252,7 @@ public:
   }
 
   bool has_loader(const std::string &ext) const {
-    return loaders_.count(ext) > 0;
+    return loaders_.contains(ext);
   }
 
 private:

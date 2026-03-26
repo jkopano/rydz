@@ -18,12 +18,11 @@ public:
 };
 
 class CommandQueue {
-  std::vector<std::shared_ptr<ICommand>> queue_;
+  std::vector<std::unique_ptr<ICommand>> queue_;
 
 public:
   template <typename Cmd> void push(Cmd &&cmd) {
-    queue_.push_back(
-        std::make_shared<std::decay_t<Cmd>>(std::forward<Cmd>(cmd)));
+    queue_.push_back(std::make_unique<bare_t<Cmd>>(std::forward<Cmd>(cmd)));
   }
 
   void apply(World &world) {
@@ -156,7 +155,7 @@ public:
   void despawn(Entity entity) { queue_.push(detail::DespawnCommand(entity)); }
 
   template <typename T> void insert_resource(T resource) {
-    static_assert(ResourceTrait<T>,
+    static_assert(IsResource<T>,
                   "Only Resources can be inserted via insert_resource(). "
                   "Add 'using Type = Resource;' to your struct.");
     queue_.push(detail::InsertResourceCommand<T>(std::move(resource)));

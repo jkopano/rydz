@@ -29,6 +29,9 @@ inline std::string demangle(const char *mangled) {
   return mangled;
 #endif
 }
+template <typename T>
+using bare_t = std::remove_cv_t<std::remove_reference_t<T>>;
+template <typename T> using decay_t = std::decay_t<T>;
 
 template <typename From, typename To>
 using copy_const_t =
@@ -36,21 +39,16 @@ using copy_const_t =
                        To>;
 
 template <typename Fn> std::string system_name_of(Fn &&fn) {
-  using D = std::decay_t<Fn>;
+  using D = decay_t<Fn>;
   if constexpr (std::is_pointer_v<D> &&
                 std::is_function_v<std::remove_pointer_t<D>>) {
-    // Zmieniamy reinterpret_cast na formatowanie hex, aby łatwiej czytać w
-    // konsoli
     return std::to_string(reinterpret_cast<std::uintptr_t>(fn));
   } else {
-    // Używamy naszej nowej, bezpiecznej funkcji demangle
     return demangle(typeid(D).name());
   }
 }
 
 namespace views = std::ranges::views;
-template <typename T>
-using bare_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
 inline constexpr auto range = std::ranges::views::iota;
 

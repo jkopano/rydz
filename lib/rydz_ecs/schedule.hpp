@@ -1,10 +1,9 @@
 #pragma once
 #include "condition.hpp"
+#include "schedule_label.hpp"
 #include "system.hpp"
 #include "tracy_plugin.hpp"
 #include <algorithm>
-#include <cstring>
-#include <functional>
 #include <memory>
 #include <string>
 #include <taskflow/taskflow.hpp>
@@ -13,65 +12,6 @@
 #include <vector>
 
 namespace ecs {
-
-enum struct ScheduleLabel {
-  PreStartup,
-  Startup,
-  PostStartup,
-  First,
-  PreUpdate,
-  Update,
-  PostUpdate,
-  ExtractRender,
-  Render,
-  PostRender,
-  Last,
-  FixedUpdate,
-};
-
-template <typename H> H AbslHashValue(H h, ScheduleLabel l) {
-  return H::combine(std::move(h), static_cast<i32>(l));
-}
-
-} // namespace ecs
-
-template <> struct std::hash<ecs::ScheduleLabel> {
-  usize operator()(ecs::ScheduleLabel l) const noexcept {
-    return std::hash<i32>{}(static_cast<i32>(l));
-  }
-};
-
-namespace ecs {
-
-inline constexpr const char *schedule_label_name(ScheduleLabel label) {
-  switch (label) {
-  case ScheduleLabel::PreStartup:
-    return "PreStartup";
-  case ScheduleLabel::Startup:
-    return "Startup";
-  case ScheduleLabel::PostStartup:
-    return "PostStartup";
-  case ScheduleLabel::First:
-    return "First";
-  case ScheduleLabel::PreUpdate:
-    return "PreUpdate";
-  case ScheduleLabel::Update:
-    return "Update";
-  case ScheduleLabel::PostUpdate:
-    return "PostUpdate";
-  case ScheduleLabel::ExtractRender:
-    return "ExtractRender";
-  case ScheduleLabel::Render:
-    return "Render";
-  case ScheduleLabel::PostRender:
-    return "PostRender";
-  case ScheduleLabel::Last:
-    return "Last";
-  case ScheduleLabel::FixedUpdate:
-    return "FixedUpdate";
-  }
-  return "Unknown";
-}
 
 inline tf::Executor &global_executor() {
   static tf::Executor executor;
@@ -102,7 +42,7 @@ ChainedSystems::Entry make_chain_entry(Func &&func, const std::string &prev) {
   SystemOrdering ordering;
   std::unique_ptr<ISystem> sys;
 
-  if constexpr (is_system_descriptor_v<std::decay_t<Func>>) {
+  if constexpr (is_system_descriptor_v<bare_t<Func>>) {
     ordering = func.take_ordering();
     sys = func.build();
   } else {
@@ -180,15 +120,15 @@ public:
   }
 
   template <typename F> void add_system_fn(F &&func) {
-    if constexpr (is_chained_systems_v<std::decay_t<F>>) {
+    if constexpr (is_chained_systems_v<bare_t<F>>) {
       for (auto &e : func.systems)
         add_system(std::move(e.system), std::move(e.ordering));
 
-    } else if constexpr (is_system_group_descriptor_v<std::decay_t<F>>) {
+    } else if constexpr (is_system_group_descriptor_v<bare_t<F>>) {
       for (auto &e : func.build())
         add_system(std::move(e.system), std::move(e.ordering));
 
-    } else if constexpr (is_system_descriptor_v<std::decay_t<F>>) {
+    } else if constexpr (is_system_descriptor_v<bare_t<F>>) {
       auto ordering = func.take_ordering();
       add_system(func.build(), std::move(ordering));
 

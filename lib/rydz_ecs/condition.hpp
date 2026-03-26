@@ -93,8 +93,7 @@ public:
 };
 
 template <typename F> std::unique_ptr<ICondition> make_condition(F &&func) {
-  return std::make_unique<FunctionCondition<std::decay_t<F>>>(
-      std::forward<F>(func));
+  return std::make_unique<FunctionCondition<decay_t<F>>>(std::forward<F>(func));
 }
 
 inline std::unique_ptr<ICondition> run_once() {
@@ -116,13 +115,6 @@ std::unique_ptr<ISystem> make_system_run_if(F &&func, Cond &&cond) {
   return std::make_unique<ConditionedSystem>(
       make_system(std::forward<F>(func)),
       make_condition(std::forward<Cond>(cond)));
-}
-
-template <typename F>
-std::unique_ptr<ISystem> make_system_run_if(F &&func,
-                                            std::unique_ptr<ICondition> cond) {
-  return std::make_unique<ConditionedSystem>(make_system(std::forward<F>(func)),
-                                             std::move(cond));
 }
 
 template <typename F> class SystemDescriptor {
@@ -253,8 +245,8 @@ template <typename T>
 inline constexpr bool is_system_group_descriptor_v =
     is_system_group_descriptor<T>::value;
 
-template <typename F> SystemDescriptor<std::decay_t<F>> group(F &&func) {
-  return SystemDescriptor<std::decay_t<F>>(std::forward<F>(func));
+template <typename F> SystemDescriptor<decay_t<F>> group(F &&func) {
+  return SystemDescriptor<decay_t<F>>(std::forward<F>(func));
 }
 
 template <typename F1, typename F2, typename... Fs>

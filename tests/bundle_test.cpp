@@ -59,27 +59,27 @@ struct TaggedBundle {
 // ============================================================
 
 TEST(BundleTest, BundleConceptDetection) {
-  static_assert(BundleTrait<MovingBundle>);
-  static_assert(BundleTrait<PlayerBundle>);
-  static_assert(BundleTrait<TaggedBundle>);
-  static_assert(!BundleTrait<Position>);
-  static_assert(!BundleTrait<int>);
-  static_assert(!BundleTrait<std::string>);
+  static_assert(IsBundle<MovingBundle>);
+  static_assert(IsBundle<PlayerBundle>);
+  static_assert(IsBundle<TaggedBundle>);
+  static_assert(!IsBundle<Position>);
+  static_assert(!IsBundle<int>);
+  static_assert(!IsBundle<std::string>);
 }
 
 TEST(BundleTest, ComponentConceptDetection) {
-  static_assert(ComponentTrait<Position>);
-  static_assert(ComponentTrait<Velocity>);
-  static_assert(ComponentTrait<Health>);
-  static_assert(ComponentTrait<Marker>);
-  static_assert(ComponentTrait<int>);
-  static_assert(!ComponentTrait<MovingBundle>);
+  static_assert(IsComponent<Position>);
+  static_assert(IsComponent<Velocity>);
+  static_assert(IsComponent<Health>);
+  static_assert(IsComponent<Marker>);
+  static_assert(IsComponent<int>);
+  static_assert(!IsComponent<MovingBundle>);
 }
 
 TEST(BundleTest, ResourceConceptDetection) {
-  static_assert(ResourceTrait<CommandQueues>);
-  static_assert(!ResourceTrait<Position>);
-  static_assert(!ResourceTrait<MovingBundle>);
+  static_assert(IsResource<CommandQueues>);
+  static_assert(!IsResource<Position>);
+  static_assert(!IsResource<MovingBundle>);
 }
 
 TEST(BundleTest, SpawnableConceptDetection) {
@@ -166,8 +166,7 @@ TEST(BundleTest, CmdSpawnBundle) {
   {
     auto *queues = world.get_resource<CommandQueues>();
     Cmd cmd(queues, &world.entities);
-    auto ec =
-        cmd.spawn(MovingBundle{.pos = {1.0f, 2.0f}, .vel = {3.0f, 4.0f}});
+    auto ec = cmd.spawn(MovingBundle{.pos = {1.0f, 2.0f}, .vel = {3.0f, 4.0f}});
     e = ec.id();
   }
 
@@ -209,9 +208,8 @@ TEST(BundleTest, CmdSpawnBundleMixedWithComponents) {
   {
     auto *queues = world.get_resource<CommandQueues>();
     Cmd cmd(queues, &world.entities);
-    auto ec =
-        cmd.spawn(MovingBundle{.pos = {1.0f, 1.0f}, .vel = {2.0f, 2.0f}},
-                  Health{42});
+    auto ec = cmd.spawn(MovingBundle{.pos = {1.0f, 1.0f}, .vel = {2.0f, 2.0f}},
+                        Health{42});
     e = ec.id();
   }
 
