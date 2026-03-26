@@ -14,10 +14,9 @@ if tracy_enabled then
 end
 
 add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
+add_requires("sol2 v3.3.0", { configs = { includes_lua = false } })
 if is_plat("windows") then
-  add_requires("sol2 v3.3.0", { configs = { includes_lua = "luajit" } })
-else
-  add_requires("sol2 v3.3.0", { configs = { includes_lua = false } })
+  add_requires("luajit v2.1.0-beta3")
 end
 
 local function add_luajit(target)
@@ -146,6 +145,9 @@ set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
 add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2")
+if is_plat("windows") then
+  add_packages("luajit")
+end
 on_load(add_luajit)
 add_tracy()
 set_pcxxheader("lib/pch.hpp")
@@ -187,6 +189,9 @@ for _, name in ipairs(examples) do
   add_files("examples/" .. name .. "/main.cpp")
   add_deps("raylib")
   add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2")
+  if is_plat("windows") then
+    add_packages("luajit")
+  end
   on_load(add_luajit)
   add_tracy()
   set_pcxxheader("lib/pch.hpp")
