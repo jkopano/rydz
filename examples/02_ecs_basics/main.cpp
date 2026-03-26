@@ -6,7 +6,10 @@
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_ecs/system.hpp"
+#include "rydz_console/scripting.hpp"
+#include "rydz_console/console.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include "rydz_console/command_api.hpp"
 #include <print>
 
 using namespace ecs;
@@ -56,18 +59,17 @@ struct EnemyBundle {
 //
 // Istnieje Res<T> oraz ResMut<T> jezeli chce dostać jakis T resource
 // z Mut to tak jak w komponentach, możesz go także zmieniać nie jest const
-void spawn_enemies(Cmd cmd, ResMut<EnemyCount> count) {
-  for (i32 i = 0; i < 5; ++i) {
-    // spawn tworzy entity z konkretnymi komponentami
-    cmd.spawn(EnemyBundle{
-        .tag = {},
-        .health = {100 + i * 10},
-        .speed = {2.0f + i * 0.5f},
-        .position = {i * 10.0f, 0.0f},
-    });
-    count->count++;
-  }
-  std::println("spawned {} enemies", count->count);
+void spawn_enemies(Cmd cmd, ResMut<EnemyCount> count, i32 amount) {
+    for (i32 i = 0; i < amount; ++i) {
+        cmd.spawn(EnemyBundle{
+            .tag = {},
+            .health = {100 + i * 10},
+            .speed = {2.0f + i * 0.5f},
+            .position = {i * 10.0f, 0.0f},
+            });
+        count->count++;
+    }
+    std::println("spawned {} enemies. Total: {}", amount, count->count);
 }
 
 // Query to zapytanie do świata, daj mi wszystkie entity które posiadają
@@ -102,6 +104,39 @@ void print_enemies(
   }
 }
 
+// =========================================================================
+// 1. CZYSTA FUNKCJA DOCELOWA
+// Nie ma pojęcia o istnieniu Lua ani konsoli. Operuje tylko na silniku.
+// =========================================================================
+void kill_all_enemies_logic(Query<Mut<Health>, With<EnemyTag>> query) 
+{
+    for (auto [hp] : query.iter()) {
+        hp->value = 0;
+    }
+}
+
+// =========================================================================
+// 2. OPAKOWANIE (SYSTEM BINDUJĄCY)
+// Zespaja czystą funkcję z wirtualną maszyną Lua.
+// =========================================================================
+void bind_lua_commands(
+    ResMut<engine::LuaResource> lua,
+    ResMut<engine::ConsoleState> console,
+    World& world
+) {
+    engine::ConsoleAPI::bind_system(lua, world, "kill_all", kill_all_enemies_logic, &console);
+
+    engine::BindCommand<int>::to(lua, world, "spawn", [](int amount) {
+
+        // Zwracamy czysty system ECS. Twój silnik automatycznie znajdzie 'Cmd' i 'ResMut'!
+        return [amount](Cmd cmd, ResMut<EnemyCount> count) {
+            // Wywołanie naszej standardowej logiki gry
+            spawn_enemies(std::move(cmd), count, amount);
+            };
+
+        }, &console);
+}
+
 int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "02 - ECS BAZA", 60}))
@@ -109,7 +144,9 @@ int main() {
       .insert_resource(EnemyCount{0})
       .add_plugin(time_plugin)
       .add_plugin(render_plugin)
-      .add_systems(ScheduleLabel::Startup, spawn_enemies)
+      .add_plugin(engine::scripting_plugin)
+      .add_plugin(engine::console_plugin)
+      .add_systems(ScheduleLabel::Startup, bind_lua_commands)
       // Update - wypisujemy stan co sekundę (patrz % 2 != 0)
       .add_systems(ScheduleLabel::Update, group(print_enemies))
       // to samo co wyzej ale run_if(run_once()) powoduje że ten system
@@ -121,7 +158,7 @@ int main() {
       // chain() wymusza kolejność w grupie
       // bez chain() systemy w grupie mogą się odpalić w dowolnej kolejności
       .add_systems(ScheduleLabel::Update,
-                   group(move_enemies, apply_damage).chain())
+                   group(move_enemies))
 
       // after/before
       // print_enemies odpala się po move_enemies

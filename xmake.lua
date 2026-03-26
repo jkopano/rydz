@@ -1,6 +1,8 @@
 add_rules("mode.debug", "mode.release")
 
 add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
+add_requires("lua 5.4.6") 
+add_requires("sol2 v3.3.0", {configs = {lua_version = "5.4"}})
 
 set_languages("c++23")
 add_includedirs("lib")
@@ -93,7 +95,7 @@ set_default(true)
 set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
-add_packages("taskflow", "meshoptimizer", "joltphysics")
+add_packages("taskflow", "meshoptimizer", "joltphysics", "lua", "sol2")
 set_pcxxheader("lib/pch.hpp")
 
 -- Testy i benchmarki (pozostają bez zmian, xmake sam ogarnie gtest/benchmark na Windows)
@@ -133,6 +135,6 @@ for _, name in ipairs(examples) do
 	set_rundir("$(projectdir)")
 	add_files("examples/" .. name .. "/main.cpp")
 	add_deps("raylib")
-	add_packages("taskflow", "meshoptimizer", "joltphysics")
+	add_packages("taskflow", "meshoptimizer", "joltphysics", "lua", "sol2")
 	set_pcxxheader("lib/pch.hpp")
 end
