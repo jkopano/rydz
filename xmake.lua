@@ -14,29 +14,8 @@ if tracy_enabled then
 end
 
 add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
-add_requires("sol2 v3.3.0", { configs = { includes_lua = false } })
-if is_plat("windows") then
-  add_requires("luajit v2.1.0-beta3")
-end
-
-local function add_luajit(target)
-  if not is_plat("linux") then
-    return
-  end
-
-  local luajit_link = os.iorun("which luajit"):gsub("%s+$", "")
-  local luajit = luajit_link ~= "" and os.iorunv("readlink", { "-f", luajit_link }):gsub("%s+$", "") or ""
-  local luajit_prefix = luajit ~= "" and path.directory(path.directory(luajit)) or nil
-  if not luajit_prefix then
-    raise("LuaJIT binary not found in PATH. Reload `devenv shell` and verify `which luajit`.")
-  end
-  target:add("includedirs", path.join(luajit_prefix, "include", "luajit-2.1"), { public = true })
-  target:add("linkdirs", path.join(luajit_prefix, "lib"))
-  target:add("links", "luajit-5.1")
-  if is_plat("linux") then
-    target:add("rpathdirs", path.join(luajit_prefix, "lib"))
-  end
-end
+add_requires("luajit v2.1.0-beta3")
+add_requires("sol2 v3.3.0", { configs = { includes_lua = false, lua_version = "5.1" } })
 
 set_languages("c++23")
 add_includedirs("lib")
@@ -145,10 +124,7 @@ set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
 add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2")
-if is_plat("windows") then
-  add_packages("luajit")
-end
-on_load(add_luajit)
+add_packages("luajit")
 add_tracy()
 set_pcxxheader("lib/pch.hpp")
 
@@ -189,10 +165,7 @@ for _, name in ipairs(examples) do
   add_files("examples/" .. name .. "/main.cpp")
   add_deps("raylib")
   add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2")
-  if is_plat("windows") then
-    add_packages("luajit")
-  end
-  on_load(add_luajit)
+  add_packages("luajit")
   add_tracy()
   set_pcxxheader("lib/pch.hpp")
 end
