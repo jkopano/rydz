@@ -255,8 +255,15 @@ inline void auto_generate_lods_system(World &world) {
 }
 
 inline float compute_screen_radius(math::Vec3 center, float radius,
+                                   const Camera3DComponent &camera,
                                    math::Mat4 view, math::Mat4 proj,
                                    float half_screen_height) {
+  if (camera.is_orthographic()) {
+    float radius_ndc = radius * proj(1, 1);
+    float radius_px = std::abs(radius_ndc) * half_screen_height;
+    return std::isfinite(radius_px) ? radius_px : 0.0f;
+  }
+
   math::Vec3 view_pos = view * center;
   float depth = -view_pos.GetZ();
   float effective_depth = std::max(depth, 0.1f);

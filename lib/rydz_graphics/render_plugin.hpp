@@ -132,7 +132,7 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
               Res<Assets<rl::Texture2D>> tex_assets, Res<RenderBatches> batches,
               Query<const Texture, const Transform> textures,
               Query<const Camera3DComponent, const ActiveCamera,
-                    const Transform, Opt<const Skybox>>
+                    const GlobalTransform, Opt<const Skybox>>
                   cam_query,
               Query<const DirectionalLight> dir_query,
               Query<const PointLight, const GlobalTransform> point_query,
@@ -147,9 +147,9 @@ render_system(Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
   const Skybox *active_skybox = nullptr;
 
   cam_query.each([&](const Camera3DComponent *cam_comp, const ActiveCamera *,
-                     const Transform *cam_tx, const Skybox *sky) {
-    if (cam_comp && cam_tx) {
-      cam_view = compute_camera_view(*cam_tx, *cam_comp);
+                     const GlobalTransform *cam_gt, const Skybox *sky) {
+    if (cam_comp && cam_gt) {
+      cam_view = compute_camera_view(*cam_gt, *cam_comp);
       active_skybox = sky;
     }
   });

@@ -16,7 +16,7 @@ struct Lifetime {
 };
 
 void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
-  cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
+  cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             Transform::from_xyz(0, 15, 20).look_at(Vec3::sZero()));
 
   cmd.spawn(DirectionalLight{

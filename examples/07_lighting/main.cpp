@@ -16,7 +16,7 @@ struct OrbitLight {
 
 void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   // kamera
-  cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
+  cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             Transform::from_xyz(0, 8, 15).look_at(Vec3::sZero()));
 
   // podłoga

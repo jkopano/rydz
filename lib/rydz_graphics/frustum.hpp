@@ -130,25 +130,18 @@ compute_mesh_bounds_system(Query<Entity, Model3d, Without<MeshBounds>> query,
 }
 
 inline void frustum_cull_system(
-    Query<Camera3DComponent, Transform, With<ActiveCamera>> cam_query,
+    Query<Camera3DComponent, GlobalTransform, With<ActiveCamera>> cam_query,
     Query<Entity, MeshBounds, GlobalTransform, Opt<ComputedVisibility>>
         mesh_query,
     Cmd cmd) {
   auto cam_result = cam_query.single();
   if (!cam_result)
     return;
-  auto [cam_comp, cam_tx] = *cam_result;
+  auto [cam_comp, cam_gt] = *cam_result;
 
-  float aspect = static_cast<float>(rl::GetScreenWidth()) /
-                 static_cast<float>(std::max(rl::GetScreenHeight(), 1));
-  float fov_rad = static_cast<float>(cam_comp->fov) * DEG2RAD;
-
-  Mat4 view =
-      Mat4::sLookAt(cam_tx->translation,
-                    cam_tx->translation + cam_tx->forward(), cam_tx->up());
-  Mat4 proj = Mat4::sPerspective(fov_rad, aspect,
-                                 static_cast<float>(cam_comp->near_plane),
-                                 static_cast<float>(cam_comp->far_plane));
+  CameraView cam_view = compute_camera_view(*cam_gt, *cam_comp);
+  Mat4 view = cam_view.view;
+  Mat4 proj = cam_view.proj;
   Mat4 vp = proj * view;
   auto planes = extract_frustum_planes(vp);
 
@@ -174,10 +167,10 @@ inline void frustum_cull_system(
       }
     }
 
-    Vec3 fwd = cam_tx->forward();
+    Vec3 fwd = cam_gt->forward();
     rl::TraceLog(LOG_DEBUG, "CAM pos=(%.2f,%.2f,%.2f) fwd=(%.2f,%.2f,%.2f)",
-                 cam_tx->translation.GetX(), cam_tx->translation.GetY(),
-                 cam_tx->translation.GetZ(), fwd.GetX(), fwd.GetY(),
+                 cam_gt->translation().GetX(), cam_gt->translation().GetY(),
+                 cam_gt->translation().GetZ(), fwd.GetX(), fwd.GetY(),
                  fwd.GetZ());
     for (int pi = 0; pi < 6; ++pi) {
       const char *names[] = {"LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR", "FAR"};

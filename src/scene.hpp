@@ -147,7 +147,7 @@ inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Model>> models,
 }
 
 inline void setup_camera(Cmd cmd, NonSendMarker) {
-  cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
+  cmd.spawn(Camera3DComponent::orthographic(), ActiveCamera{},
             Transform::from_xyz(8, 6, 8).look_at(Vec3::sZero()),
             CameraController{} // Skybox::from("res/hdri/skybox")
   );

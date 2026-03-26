@@ -18,7 +18,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   // kamera ze skyboxem — Skybox ładuje 6 tekstur z folderu (kinda słabe do
   // poprawy) (right/left/top/bottom/front/back.jpg) Skybox na razie musi być w
   // kamerze, chyba dobre rozwiązanie, ale do ugadania
-  cmd.spawn(Camera3DComponent{60.0}, ActiveCamera{},
+  cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             ecs::Transform::from_xyz(0, 5, 12).look_at(Vec3::sZero()),
             Skybox::from("res/hdri/skybox"));
 
