@@ -91,8 +91,8 @@ void kill_all_enemies(Query<Mut<Health>, With<EnemyTag>> query) {
 C++
 
 ```
-void bind_lua_commands(ResMut<engine::LuaResource> lua, ResMut<engine::ConsoleState> console, World& world) {
-    engine::ConsoleAPI::bind_system(lua, world, "kill_all", kill_all_enemies, &console);
+void bind_lua_commands(ecs::World& world) {
+    engine::ConsoleAPI::bind_system(world, "kill_all", kill_all_enemies);
 }
 
 ```
@@ -121,17 +121,16 @@ void spawn_enemies(Cmd cmd, ResMut<EnemyCount> count, int amount) {
 C++
 
 ```
-void bind_lua_commands(ResMut<engine::LuaResource> lua, ResMut<engine::ConsoleState> console, World& world) {
-
+void bind_lua_commands(ecs::World& world) {
+    
     // Oczekujemy jednego inta <int>
-    engine::BindCommand<int>::to(lua, world, "spawn", [](int amount) {
-
+    engine::BindCommand<int>::to(world, "spawn", [](int amount) {
+        
         // Zwracamy lambdę, która jest poprawnym systemem ECS
         return [amount](Cmd cmd, ResMut<EnemyCount> count) {
-            // Przekazujemy 'amount' i przenosimy 'cmd'
             spawn_enemies(std::move(cmd), count, amount);
         };
-
-    }, &console);
+        
+    });
 }
 ```

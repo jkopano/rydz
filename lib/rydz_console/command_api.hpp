@@ -10,16 +10,24 @@ namespace engine {
     public:
         template <typename Func>
         static void bind_system(
-            ecs::ResMut<LuaResource>& lua, ecs::World& world,
-            const std::string& command_name, Func ecs_system,
-            ecs::ResMut<ConsoleState>* console = nullptr
+            ecs::World& world,
+            const std::string& command_name,
+            Func ecs_system
         ) {
+            auto* lua = world.get_resource<LuaResource>();
+            auto* console = world.get_resource<ConsoleState>();
+
+            if (!lua) return; 
+
             ecs::World* w_ptr = &world;
-            engine::ConsoleState* c_ptr = console ? &(**console) : nullptr;
-            lua->vm[command_name] = [w_ptr, c_ptr, command_name, ecs_system]() {
+
+            lua->vm[command_name] = [w_ptr, console, command_name, ecs_system]() {
                 auto sys = ecs::make_system(ecs_system);
                 sys->run(*w_ptr);
-                if (c_ptr) c_ptr->log("[API] Wykonano: " + command_name);
+
+                if (console) {
+                    console->log("[API] Wykonano: " + command_name);
+                }
                 };
         }
     };
@@ -28,31 +36,37 @@ namespace engine {
     struct BindCommand {
         template <typename BuilderFunc>
         static void to(
-            ecs::ResMut<LuaResource>& lua, ecs::World& world,
-            const std::string& name, BuilderFunc builder,
-            ecs::ResMut<ConsoleState>* console = nullptr
+            ecs::World& world,
+            const std::string& name,
+            BuilderFunc builder
         ) {
-            ecs::World* w_ptr = &world;
-            engine::ConsoleState* c_ptr = console ? &(**console) : nullptr;
+            auto* lua = world.get_resource<LuaResource>();
+            auto* console = world.get_resource<ConsoleState>();
 
-            lua->vm[name] = [w_ptr, c_ptr, name, builder](sol::optional<LuaArgs>... args) {
+            if (!lua) return;
+
+            ecs::World* w_ptr = &world;
+
+            lua->vm[name] = [w_ptr, console, name, builder](sol::optional<LuaArgs>... args) {
 
                 bool is_valid = (args.has_value() && ...);
 
                 if (!is_valid) {
-                    if (c_ptr) {
-                        c_ptr->log("[Blad] Komenda '" + name + "' otrzymala zly typ parametru.");
-                        c_ptr->log("       Oczekiwano " + std::to_string(sizeof...(LuaArgs)) + " parametru/ow.");
+                    if (console) {
+                        console->log("[Błąd] Komenda '" + name + "' - zły typ lub brak parametrów.");
+                        console->log("       Oczekiwano " + std::to_string(sizeof...(LuaArgs)) + " argumentów.");
                     }
-                    return; 
+                    return;
                 }
 
                 auto sys = ecs::make_system(builder(args.value()...));
                 sys->run(*w_ptr);
 
-                if (c_ptr) c_ptr->log("[API] Wykonano: " + name);
+                if (console) {
+                    console->log("[API] Wykonano: " + name);
+                }
                 };
         }
     };
 
-} 
+}

@@ -119,22 +119,17 @@ void kill_all_enemies_logic(Query<Mut<Health>, With<EnemyTag>> query)
 // 2. OPAKOWANIE (SYSTEM BINDUJĄCY)
 // Zespaja czystą funkcję z wirtualną maszyną Lua.
 // =========================================================================
-void bind_lua_commands(
-    ResMut<engine::LuaResource> lua,
-    ResMut<engine::ConsoleState> console,
-    World& world
-) {
-    engine::ConsoleAPI::bind_system(lua, world, "kill_all", kill_all_enemies_logic, &console);
+void bind_lua_commands(World& world) {
 
-    engine::BindCommand<int>::to(lua, world, "spawn", [](int amount) {
+    // Rejestracja komendy bez parametrów
+    engine::ConsoleAPI::bind_system(world, "kill_all", kill_all_enemies_logic);
 
-        // Zwracamy czysty system ECS. Twój silnik automatycznie znajdzie 'Cmd' i 'ResMut'!
+    // Rejestracja komendy z parametrem int
+    engine::BindCommand<int>::to(world, "spawn", [](int amount) {
         return [amount](Cmd cmd, ResMut<EnemyCount> count) {
-            // Wywołanie naszej standardowej logiki gry
             spawn_enemies(std::move(cmd), count, amount);
             };
-
-        }, &console);
+        });
 }
 
 int main() {
