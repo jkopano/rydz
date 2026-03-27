@@ -80,6 +80,7 @@ public:
   }
 
   template <typename T> void insert_component(Entity entity, T component) {
+    assert(entities.is_alive(entity) && "inserting component on dead entity");
     auto &storage = ensure_storage_exist<T>();
     storage.insert(entity, std::move(component), change_tick_);
   }

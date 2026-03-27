@@ -153,6 +153,7 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
   );
   rl::DisableCursor();
 }
+
 inline void scene_plugin(App &app) {
   app.add_plugin(input_plugin);
   app.add_plugin(system_multithreading({true}));

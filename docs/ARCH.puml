@@ -20,7 +20,7 @@ Texture -> Entity
 @enduml
 
 @startuml component
-skinparam linetype ortho
+#skinparam linetype ortho
 title rydz_ecs - Diagram komponentów
 
 package "Rdzeń ECS" {
