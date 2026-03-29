@@ -38,7 +38,7 @@ struct IsometricCamera {
 
 inline void
 isometric_camera_system(Query<Mut<Transform>, IsometricCamera> query,
-                        ecs::Res<ecs::Time> time) {
+                        Res<Time> time) {
 
   for (auto [t, cam] : query.iter()) {
     f32 dt = time->delta_seconds;
@@ -63,17 +63,19 @@ struct IsometricCameraBundle {
   Transform transform;
   IsometricCamera iso;
 
-  IsometricCameraBundle(Vec3 target = Vec3::sZero(),
-                        Vec3 offset = Vec3(10.0f, 10.0f, 10.0f),
-                        f32 ortho_height = 20.0f, f32 follow_speed = 5.0f) {
-    camera_component = Camera3DComponent::orthographic(ortho_height),
-    active_camera = ActiveCamera{},
-    transform = Transform::from_xyz(target.GetX() + offset.GetX(),
-                                    target.GetY() + offset.GetY(),
-                                    target.GetZ() + offset.GetZ())
-                    .look_at(target),
-    iso = IsometricCamera{
-        .target = target, .offset = offset, .follow_speed = follow_speed};
+  static IsometricCameraBundle setup(Vec3 target = Vec3::sZero(),
+                                     Vec3 offset = Vec3(10.0f, 10.0f, 10.0f),
+                                     f32 ortho_height = 20.0f,
+                                     f32 follow_speed = 5.0f) {
+    return IsometricCameraBundle{
+        .camera_component = Camera3DComponent::orthographic(ortho_height),
+        .active_camera = ActiveCamera{},
+        .transform = Transform::from_xyz(target.GetX() + offset.GetX(),
+                                         target.GetY() + offset.GetY(),
+                                         target.GetZ() + offset.GetZ())
+                         .look_at(target),
+        .iso = IsometricCamera{
+            .target = target, .offset = offset, .follow_speed = follow_speed}};
   }
 };
 
