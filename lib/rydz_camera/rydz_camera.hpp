@@ -7,12 +7,20 @@
  */
 
 #include "math.hpp"
+#include "rl.hpp"
+#include "rydz_camera/rydz_camera.hpp"
+#include "rydz_ecs/fwd.hpp"
 #include "rydz_ecs/query.hpp"
 #include "rydz_ecs/resource.hpp"
+#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/camera3d.hpp"
+#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/rydz_graphics.hpp"
 #include "rydz_graphics/transform.hpp"
 #include <algorithm>
+#include <print>
 
 namespace ecs {
 
@@ -30,7 +38,7 @@ struct IsometricCamera {
 
 inline void
 isometric_camera_system(Query<Mut<Transform>, IsometricCamera> query,
-                        Res<Time> time) {
+                        ecs::Res<ecs::Time> time) {
 
   for (auto [t, cam] : query.iter()) {
     f32 dt = time->delta_seconds;
