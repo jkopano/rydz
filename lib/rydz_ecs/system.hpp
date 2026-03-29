@@ -116,17 +116,29 @@ template <typename T>
 struct function_traits
     : function_traits<decltype(&std::decay_t<T>::operator())> {};
 
-template <typename C, typename R, typename... Args, bool Nx>
-struct function_traits<R (C::*)(Args...) noexcept(Nx)>
+template <typename C, typename R, typename... Args>
+struct function_traits<R (C::*)(Args...) noexcept>
     : detail::function_traits_impl<Args...> {};
 
-template <typename C, typename R, typename... Args, bool Nx>
-struct function_traits<R (C::*)(Args...) const noexcept(Nx)>
+template <typename C, typename R, typename... Args>
+struct function_traits<R (C::*)(Args...)>
     : detail::function_traits_impl<Args...> {};
 
-template <typename R, typename... Args, bool Nx>
-struct function_traits<R (*)(Args...) noexcept(Nx)>
+template <typename C, typename R, typename... Args>
+struct function_traits<R (C::*)(Args...) const noexcept>
     : detail::function_traits_impl<Args...> {};
+
+template <typename C, typename R, typename... Args>
+struct function_traits<R (C::*)(Args...) const>
+    : detail::function_traits_impl<Args...> {};
+
+template <typename R, typename... Args>
+struct function_traits<R (*)(Args...) noexcept>
+    : detail::function_traits_impl<Args...> {};
+
+template <typename R, typename... Args>
+struct function_traits<R (*)(Args...)> : detail::function_traits_impl<Args...> {
+};
 
 template <typename T>
 concept SystemParameter = requires(World &w, SystemAccess &acc) {
