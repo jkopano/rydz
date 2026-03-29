@@ -16,6 +16,21 @@ using namespace math;
 struct MapTag {};
 struct RotateMarker {};
 
+struct FreeLook {
+  f32 speed_mult = 1.0f;
+};
+struct Cinematic {
+  f32 smooth_factor = 0.5f;
+};
+struct Locked {
+  Entity target;
+};
+
+enum Ste { Working, NotWorking };
+
+using CameraState = Variant<FreeLook, Cinematic, Locked>;
+using NotCameraState = Variant<Cinematic, Locked>;
+
 struct CameraController {
   using Storage = SparseSetStorage<CameraController>;
   f32 move_speed = 20.0f;
@@ -85,9 +100,26 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform>> query,
 }
 
 inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
-  cmd.spawn(MapTag{},
+  cmd.spawn(MapTag{}, CameraState{FreeLook{}},
             Model3d{asset_server->load<rl::Model>("res/models/race_map.glb")},
             Transform{.scale = Vec3{0.1f, 0.1f, 0.1f}});
+}
+
+inline void some_shit(Query<CameraState> q) {
+  if (auto x = q.single(); x) {
+    auto [state] = *x;
+
+    std::visit(over{[&](const FreeLook &fl) {
+                      std::print("Kamera w trybie FreeLook\n");
+                    },
+                    [&](const Cinematic &c) {
+                      std::print("Kamera w trybie Cinematic\n");
+                    },
+                    [&](const Locked &l) {
+                      std::print("Kamera śledzi encję: {}\n", 10);
+                    }},
+               *state);
+  }
 }
 
 inline void spawn_some_texture(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
@@ -101,7 +133,7 @@ inline void spawn_some_texture(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
 }
 
 struct LightsSpawned {
-  using Type = Resource;
+  using T = Resource;
   bool done = false;
 };
 
@@ -165,6 +197,7 @@ inline void scene_plugin(App &app) {
 
   app.add_systems(ScheduleLabel::Update, camera_controller_system);
   app.add_systems(ScheduleLabel::Update, camera_mouse_system);
+  app.add_systems(ScheduleLabel::Update, some_shit);
 
   app.add_systems(ScheduleLabel::Update, spawn_lights_on_input);
 }

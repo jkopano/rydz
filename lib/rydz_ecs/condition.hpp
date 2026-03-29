@@ -3,6 +3,7 @@
 #include "system.hpp"
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <typeindex>
 #include <vector>
 
@@ -26,7 +27,8 @@ SetId set(E value) {
 }
 
 template <typename S>
-  requires std::is_same_v<typename S::Type, Set>
+  requires std::is_same_v<typename S::T, Set> ||
+           std::is_base_of<Set, S>::value
 SetId set() {
   return SetId{typeid(S), 0};
 }
@@ -298,7 +300,8 @@ SetConfigDescriptor configure(E value) {
 }
 
 template <typename S>
-  requires std::is_same_v<typename S::Type, Set>
+  requires std::is_same_v<typename S::T, Set> ||
+           std::is_base_of<Set, S>::value
 SetConfigDescriptor configure() {
   return SetConfigDescriptor(set<S>());
 }

@@ -42,8 +42,7 @@ void batch_spawn(Cmd cmd, ResMut<Assets<rl::Model>> models, Res<Input> input,
   auto sphere_h = models->add(rl::LoadModelFromMesh(mesh::sphere(0.3f)));
 
   // budujemy wektor tupli — spawn_batch przyjmuje range
-  std::vector<std::tuple<BulletTag, Lifetime, Model3d, Material3d, Transform>>
-      batch;
+  std::vector<Tuple<BulletTag, Lifetime, Model3d, Material3d, Transform>> batch;
 
   for (i32 x = -3; x <= 3; ++x) {
     for (i32 z = -3; z <= 3; ++z) {

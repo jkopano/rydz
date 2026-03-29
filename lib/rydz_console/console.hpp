@@ -10,7 +10,7 @@
 namespace engine {
 
 struct ConsoleState {
-  using Type = ecs::Resource;
+  using T = ecs::Resource;
   bool is_open = false;
   std::string current_input = "";
   std::vector<std::string> history = {

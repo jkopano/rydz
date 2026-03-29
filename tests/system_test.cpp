@@ -13,12 +13,12 @@ namespace {
 // ============================================================
 
 struct Flag {
-  using Type = Resource;
+  using T = Resource;
   bool value = false;
 };
 
 struct Counter {
-  using Type = Resource;
+  using T = Resource;
   int value = 0;
 };
 

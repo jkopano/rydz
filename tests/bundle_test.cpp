@@ -34,20 +34,20 @@ struct Marker {};
 // ---- Test bundles (no components() needed — auto-decomposed) ----
 
 struct MovingBundle {
-  using Type = Bundle;
+  using T = Bundle;
   Position pos;
   Velocity vel;
 };
 
 struct PlayerBundle {
-  using Type = Bundle;
+  using T = Bundle;
   MovingBundle moving;
   Health health;
   Name name;
 };
 
 struct TaggedBundle {
-  using Type = Bundle;
+  using T = Bundle;
   Marker marker;
   Position pos;
 };
@@ -289,7 +289,7 @@ TEST(BundleTest, BundleOverwritesExistingComponents) {
 
 namespace {
 struct EmptyMarkerBundle {
-  using Type = Bundle;
+  using T = Bundle;
   Marker marker;
 };
 } // namespace
@@ -340,18 +340,18 @@ TEST(BundleTest, QueryMatchesBundleSpawnedEntities) {
 
 namespace {
 struct InnerBundle {
-  using Type = Bundle;
+  using T = Bundle;
   Position pos;
 };
 
 struct MiddleBundle {
-  using Type = Bundle;
+  using T = Bundle;
   InnerBundle inner;
   Velocity vel;
 };
 
 struct OuterBundle {
-  using Type = Bundle;
+  using T = Bundle;
   MiddleBundle middle;
   Health health;
 };

@@ -13,7 +13,7 @@ if tracy_enabled then
   add_requires("tracy")
 end
 
-add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
+add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics", "glaze")
 add_requires("sol2 v3.3.0", { configs = { includes_lua = false } })
 if is_plat("windows") then
   add_requires("luajit v2.1.0-beta3")
@@ -144,7 +144,7 @@ set_default(true)
 set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
-add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2")
+add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2", "glaze")
 if is_plat("windows") then
   add_packages("luajit")
 end
@@ -158,14 +158,14 @@ set_kind("binary")
 set_default(false)
 add_files("tests/*.cpp")
 add_deps("raylib")
-add_packages("gtest", "taskflow", "meshoptimizer", "joltphysics")
+add_packages("gtest", "taskflow", "meshoptimizer", "joltphysics", "glaze")
 
 target("bench")
 set_kind("binary")
 set_default(false)
 add_files("benches/*.cpp")
 add_deps("raylib")
-add_packages("benchmark", "taskflow", "meshoptimizer", "joltphysics")
+add_packages("benchmark", "taskflow", "meshoptimizer", "joltphysics", "glaze")
 
 local examples = {
   "01_hello_window",
@@ -188,7 +188,7 @@ for _, name in ipairs(examples) do
   set_rundir("$(projectdir)")
   add_files("examples/" .. name .. "/main.cpp")
   add_deps("raylib")
-  add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2")
+  add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2", "glaze")
   if is_plat("windows") then
     add_packages("luajit")
   end

@@ -8,12 +8,14 @@
 using namespace ecs;
 
 // Enum set — kilka setów jako enum
-enum class GameSet { Input, Logic, Render };
+namespace GameSet {
+struct Input : Set {};
+struct Logic : Set {};
+struct Render : Set {};
+}; // namespace GameSet
 
 // Struct set — jeden struct - jeden set
-struct DebugSet {
-  using Type = Set;
-};
+struct DebugSet : Set {};
 
 void input_system(Res<Input> input) {
   if (input->key_pressed(KEY_SPACE))
@@ -39,10 +41,10 @@ int main() {
 
       // Systemy w setach enum
       .add_systems(ScheduleLabel::Update,
-                   group(input_system).in_set(set(GameSet::Input)))
-      .add_systems(
-          ScheduleLabel::Update,
-          group(movement_system, collision_system).in_set(set(GameSet::Logic)))
+                   group(input_system).in_set(set<GameSet::Input>()))
+      .add_systems(ScheduleLabel::Update,
+                   group(movement_system, collision_system)
+                       .in_set(set<GameSet::Logic>()))
 
       // Struct set
       .add_systems(ScheduleLabel::Update,
@@ -51,9 +53,9 @@ int main() {
       // kolejność
       // input -> logic (potem debug)
       .configure_set(ScheduleLabel::Update,
-                     configure(GameSet::Input).before(set(GameSet::Logic)))
+                     configure<GameSet::Input>().before(set<GameSet::Logic>()))
       .configure_set(ScheduleLabel::Update,
-                     configure<DebugSet>().after(set(GameSet::Logic)))
+                     configure<DebugSet>().after(set<GameSet::Logic>()))
 
       // Set z warunkiem — debug tylko gdy trzymasz D (btw as you can see, nwm
       // czy to było wczesniej w examplu, można lambdy wrzucać jako systemy)

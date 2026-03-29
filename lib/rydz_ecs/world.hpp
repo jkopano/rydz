@@ -3,6 +3,7 @@
 #include "fwd.hpp"
 #include "helpers.hpp"
 #include "resource.hpp"
+#include "rydz_ecs/bundle.hpp"
 #include "storage.hpp"
 #include "ticks.hpp"
 #include <cassert>
@@ -38,6 +39,9 @@ public:
   // <RESOURCY>
 
   template <typename T> void insert_resource(T resource) {
+    static_assert(IsResource<T>,
+                  "Only Resources can be inserted via insert_resource(). "
+                  "Add 'using T = Resource;' to your struct.");
     resources.insert<T>(std::move(resource));
   }
 

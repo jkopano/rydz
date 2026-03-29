@@ -8,7 +8,7 @@
 namespace engine {
 
 	struct LuaResource {
-		using Type = ecs::Resource;
+		using T = ecs::Resource;
 		sol::state vm;
 	};
 

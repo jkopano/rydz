@@ -12,7 +12,7 @@
 
 namespace ecs {
 struct Window {
-  using Type = ecs::Resource;
+  using T = ecs::Resource;
 
   u32 width;
   u32 height;

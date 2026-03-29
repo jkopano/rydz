@@ -38,7 +38,7 @@ public:
 
 class CommandQueues {
 public:
-  using Type = Resource;
+  using T = Resource;
 
   void submit(CommandQueue queue) {
     std::lock_guard lock(*mutex_);
@@ -155,9 +155,6 @@ public:
   void despawn(Entity entity) { queue_.push(detail::DespawnCommand(entity)); }
 
   template <typename T> void insert_resource(T resource) {
-    static_assert(IsResource<T>,
-                  "Only Resources can be inserted via insert_resource(). "
-                  "Add 'using Type = Resource;' to your struct.");
     queue_.push(detail::InsertResourceCommand<T>(std::move(resource)));
   }
 

@@ -13,7 +13,7 @@ struct EventId {
 
 template <typename E> class Events {
 public:
-  using Type = Resource;
+  using T = Resource;
 
 private:
   using EventInstance = std::pair<E, EventId>;

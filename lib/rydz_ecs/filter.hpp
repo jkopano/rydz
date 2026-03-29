@@ -178,7 +178,7 @@ struct MergeFilters<Filters<Fs1...>, Filters<Fs2...>> {
 template <typename... Qs> struct SplitTrailingFilters;
 
 template <> struct SplitTrailingFilters<> {
-  using Items = std::tuple<>;
+  using Items = Tuple<>;
   using FilterList = Filters<>;
 };
 
@@ -186,7 +186,7 @@ template <typename T, typename... Rest>
 struct SplitTrailingFilters<T, Rest...> {
   using Tail = SplitTrailingFilters<Rest...>;
   static constexpr bool tail_has_items =
-      !std::is_same_v<typename Tail::Items, std::tuple<>>;
+      !std::is_same_v<typename Tail::Items, Tuple<>>;
   static constexpr bool is_filter_v = is_filter<T>::value;
 
   static_assert(!(tail_has_items && is_filter_v),
@@ -195,7 +195,7 @@ struct SplitTrailingFilters<T, Rest...> {
   using Items =
       std::conditional_t<is_filter_v && !tail_has_items, typename Tail::Items,
                          decltype(std::tuple_cat(
-                             std::declval<std::tuple<T>>(),
+                             std::declval<Tuple<T>>(),
                              std::declval<typename Tail::Items>()))>;
 
   using FilterList = std::conditional_t<

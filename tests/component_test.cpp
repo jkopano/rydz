@@ -29,7 +29,7 @@ struct CompTag {
 };
 
 struct TestResource {
-  using Type = Resource;
+  using T = Resource;
   int value;
   bool operator==(const TestResource &o) const { return value == o.value; }
 };
