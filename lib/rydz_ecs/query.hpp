@@ -180,7 +180,7 @@ private:
 
   template <typename... Items>
   std::span<const Entity> find_smallest_entities_group(
-      const std::tuple<typename WorldQueryTraits<Items>::Fetcher...> &fetchers)
+      const Tuple<typename WorldQueryTraits<Items>::Fetcher...> &fetchers)
       const {
     usize min_size = SIZE_MAX;
     std::span<const Entity> result;
@@ -209,20 +209,19 @@ private:
   template <typename... Items, typename Fetchers>
   static auto fetch_all(const Fetchers &fetchers, Entity entity) {
     return std::apply(
-        [&](const auto &...f) { return std::tuple{f.fetch(entity)...}; },
-        fetchers);
+        [&](const auto &...f) { return Tuple{f.fetch(entity)...}; }, fetchers);
   }
 
   template <typename... Items>
-  static bool all_valid(
-      const std::tuple<typename WorldQueryTraits<Items>::Item...> &items) {
+  static bool
+  all_valid(const Tuple<typename WorldQueryTraits<Items>::Item...> &items) {
     return [&]<size_t... I>(std::index_sequence<I...>) {
       return (WorldQueryTraits<Items>::is_valid(std::get<I>(items)) && ...);
     }(std::index_sequence_for<Items...>{});
   }
 
   template <typename... Items>
-  static std::optional<std::tuple<typename WorldQueryTraits<Items>::Item...>>
+  static std::optional<Tuple<typename WorldQueryTraits<Items>::Item...>>
   try_fetch(const auto &fetchers, Entity entity, const World &world) {
     auto items = fetch_all<Items...>(fetchers, entity);
     if (!all_valid<Items...>(items) ||
@@ -231,8 +230,8 @@ private:
     return items;
   }
 
-  template <typename... Items> auto single_impl(std::tuple<Items...>) const {
-    using Result = std::tuple<typename WorldQueryTraits<Items>::Item...>;
+  template <typename... Items> auto single_impl(Tuple<Items...>) const {
+    using Result = Tuple<typename WorldQueryTraits<Items>::Item...>;
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);
     auto candidates = find_smallest_entities_group<Items...>(fetchers);
 
@@ -254,7 +253,7 @@ private:
     return result;
   }
 
-  template <typename... Items> auto make_iter(std::tuple<Items...>) const {
+  template <typename... Items> auto make_iter(Tuple<Items...>) const {
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);
     auto candidates = find_smallest_entities_group<Items...>(fetchers);
 
@@ -267,7 +266,7 @@ private:
   }
 
   template <typename Func, typename... Items>
-  void for_each_impl(Func &&func, std::tuple<Items...>) const {
+  void for_each_impl(Func &&func, Tuple<Items...>) const {
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);
     auto candidates = find_smallest_entities_group<Items...>(fetchers);
 
@@ -280,7 +279,7 @@ private:
   }
 
   template <typename... Items>
-  static void access_items(SystemAccess &acc, std::tuple<Items...>) {
+  static void access_items(SystemAccess &acc, Tuple<Items...>) {
     (WorldQueryTraits<Items>::access(acc), ...);
   }
 };

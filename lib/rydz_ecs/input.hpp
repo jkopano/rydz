@@ -13,7 +13,7 @@ struct MouseState {
 };
 
 struct Input {
-  using Type = Resource;
+  using T = Resource;
   bool key_down(KeyCode key) const { return keys_down_.contains(key); }
   bool key_pressed(KeyCode key) const { return keys_pressed_.contains(key); }
   bool key_released(KeyCode key) const { return keys_released_.contains(key); }

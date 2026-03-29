@@ -52,7 +52,7 @@ struct RenderBatch {
 };
 
 struct RenderBatches {
-  using Type = Resource;
+  using T = Resource;
   std::vector<RenderBatch> batches;
 
   void clear() { batches.clear(); }

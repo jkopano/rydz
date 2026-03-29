@@ -10,12 +10,12 @@ using namespace ecs;
 namespace {
 
 struct Counter {
-  using Type = Resource;
+  using T = Resource;
   int value = 0;
 };
 
 struct Log {
-  using Type = Resource;
+  using T = Resource;
   std::vector<std::string> entries;
 };
 
@@ -25,7 +25,7 @@ enum class GameSet { Input, Logic, Render };
 
 // Sets — struct-based
 struct AudioSet {
-  using Type = Set;
+  using T = Set;
 };
 
 // Named systems for ordering verification

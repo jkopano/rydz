@@ -1,6 +1,5 @@
 #pragma once
 #include "fwd.hpp"
-#include "world.hpp"
 #include <tuple>
 #include <type_traits>
 
@@ -9,24 +8,24 @@ template <typename T, typename = void> struct type_tag_of {
   using type = Component;
 };
 
-template <typename T> struct type_tag_of<T, std::void_t<typename T::Type>> {
-  using type = typename T::Type;
+template <typename T> struct type_tag_of<T, std::void_t<typename T::T>> {
+  using type = typename T::T;
 };
 
 template <typename T>
 concept IsComponent = std::is_same_v<typename type_tag_of<T>::type, Component>;
 
 template <typename T>
-concept IsResource = requires { typename T::Type; } &&
+concept IsResource = requires { typename T::T; } &&
                      std::is_same_v<typename type_tag_of<T>::type, Resource>;
 
 template <typename T>
-concept IsBundle = requires { typename T::Type; } &&
+concept IsBundle = requires { typename T::T; } &&
                    std::is_same_v<typename type_tag_of<T>::type, Bundle>;
 
 template <typename T>
 concept IsEvent =
-    requires { typename T::Type; } && std::is_same_v<typename T::Type, Event>;
+    requires { typename T::T; } && std::is_same_v<typename T::T, Event>;
 
 template <typename T>
 concept Spawnable = IsComponent<bare_t<T>> || IsBundle<bare_t<T>>;
@@ -69,7 +68,7 @@ template <typename T> consteval int field_count() {
 template <typename T> auto to_tuple(T &&t) {
   using Raw = bare_t<T>;
   constexpr int N = field_count<Raw>();
-  if constexpr (N == 0) { return std::tuple{}; }
+  if constexpr (N == 0) { return Tuple{}; }
   else if constexpr (N == 1) { auto&& [a] = std::forward<T>(t); return std::make_tuple(std::forward<decltype(a)>(a)); }
   else if constexpr (N == 2) { auto&& [a,b] = std::forward<T>(t); return std::make_tuple(std::forward<decltype(a)>(a), std::forward<decltype(b)>(b)); }
   else if constexpr (N == 3) { auto&& [a,b,c] = std::forward<T>(t); return std::make_tuple(std::forward<decltype(a)>(a), std::forward<decltype(b)>(b), std::forward<decltype(c)>(c)); }
@@ -89,15 +88,13 @@ template <typename T> auto to_tuple(T &&t) {
 }
 // clang-format on
 
-template <typename T> struct is_tuple : std::false_type {};
-template <typename... Ts>
-struct is_tuple<std::tuple<Ts...>> : std::true_type {};
-template <typename T> inline constexpr bool is_tuple_v = is_tuple<T>::value;
+template <typename T> struct IsTuple : std::false_type {};
+template <typename... Ts> struct IsTuple<std::tuple<Ts...>> : std::true_type {};
 
 template <typename T> void insert_single(World &world, Entity entity, T &&item);
 
 template <typename... Ts>
-void insert_tuple_items(World &world, Entity entity, std::tuple<Ts...> &&tup) {
+void insert_tuple_items(World &world, Entity entity, Tuple<Ts...> &&tup) {
   std::apply(
       [&](auto &&...elems) {
         (insert_single(world, entity, std::forward<decltype(elems)>(elems)),
@@ -107,19 +104,7 @@ void insert_tuple_items(World &world, Entity entity, std::tuple<Ts...> &&tup) {
 }
 
 template <typename T>
-void insert_single(World &world, Entity entity, T &&item) {
-  using Raw = bare_t<T>;
-  if constexpr (IsBundle<Raw>) {
-    insert_tuple_items(world, entity, to_tuple(std::forward<T>(item)));
-  } else if constexpr (is_tuple_v<Raw>) {
-    insert_tuple_items(world, entity, std::forward<T>(item));
-  } else {
-    static_assert(IsComponent<Raw>,
-                  "Only Components and Bundles can be inserted on entities. "
-                  "Add 'using Type = Component;' or 'using Type = Bundle;'.");
-    world.insert_component(entity, std::forward<T>(item));
-  }
-}
+void insert_single(World &world, Entity entity, T &&item);
 
 } // namespace detail
 
@@ -135,17 +120,6 @@ void insert_bundle(World &world, Entity entity, Ts &&...items) {
 
 template <std::ranges::input_range R>
   requires Spawnable<std::ranges::range_value_t<R>>
-std::vector<Entity> spawn_batch(World &world, R &&_range) {
-  std::vector<Entity> spawned;
-  if constexpr (std::ranges::sized_range<R>)
-    spawned.reserve(std::ranges::size(_range));
-
-  for (auto &&item : std::forward<R>(_range)) {
-    Entity e = world.spawn();
-    insert_bundle(world, e, std::forward<decltype(item)>(item));
-    spawned.push_back(e);
-  }
-  return spawned;
-}
+std::vector<Entity> spawn_batch(World &world, R &&_range);
 
 } // namespace ecs

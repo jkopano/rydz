@@ -1,6 +1,8 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
+#include <variant>
 
 using u8 = std::uint8_t;
 using u16 = std::uint16_t;
@@ -17,3 +19,11 @@ using f64 = double;
 
 using usize = std::size_t;
 using isize = std::ptrdiff_t;
+
+template <typename... T> using Variant = std::variant<T...>;
+template <typename... T> using Tuple = std::tuple<T...>;
+
+template <class... Ts> struct over : Ts... {
+  using Ts::operator()...;
+};
+template <class... Ts> over(Ts...) -> over<Ts...>;

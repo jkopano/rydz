@@ -3,13 +3,13 @@
 //           chain, after, before
 
 #include "rl.hpp"
+#include "rydz_console/command_api.hpp"
+#include "rydz_console/console.hpp"
+#include "rydz_console/scripting.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_ecs/system.hpp"
-#include "rydz_console/scripting.hpp"
-#include "rydz_console/console.hpp"
 #include "rydz_graphics/render_plugin.hpp"
-#include "rydz_console/command_api.hpp"
 #include <print>
 
 using namespace ecs;
@@ -37,7 +37,7 @@ struct NotEnemyTag {};
 
 // Resource - czyli basically singleton
 struct EnemyCount {
-  using Type = Resource;
+  using T = Resource;
   u32 count;
 };
 
@@ -45,7 +45,7 @@ struct EnemyCount {
 // za to, gdy go spawnujesz to wszystkie jego pola (które powinny być
 // komponentami) zostają spawnione
 struct EnemyBundle {
-  using Type = Bundle;
+  using T = Bundle;
   EnemyTag tag;
   Health health;
   Speed speed;
@@ -60,16 +60,16 @@ struct EnemyBundle {
 // Istnieje Res<T> oraz ResMut<T> jezeli chce dostać jakis T resource
 // z Mut to tak jak w komponentach, możesz go także zmieniać nie jest const
 void spawn_enemies(Cmd cmd, ResMut<EnemyCount> count, i32 amount) {
-    for (i32 i = 0; i < amount; ++i) {
-        cmd.spawn(EnemyBundle{
-            .tag = {},
-            .health = {100 + i * 10},
-            .speed = {2.0f + i * 0.5f},
-            .position = {i * 10.0f, 0.0f},
-            });
-        count->count++;
-    }
-    std::println("spawned {} enemies. Total: {}", amount, count->count);
+  for (i32 i = 0; i < amount; ++i) {
+    cmd.spawn(EnemyBundle{
+        .tag = {},
+        .health = {100 + i * 10},
+        .speed = {2.0f + i * 0.5f},
+        .position = {i * 10.0f, 0.0f},
+    });
+    count->count++;
+  }
+  std::println("spawned {} enemies. Total: {}", amount, count->count);
 }
 
 // Query to zapytanie do świata, daj mi wszystkie entity które posiadają
@@ -108,28 +108,27 @@ void print_enemies(
 // 1. CZYSTA FUNKCJA DOCELOWA
 // Nie ma pojęcia o istnieniu Lua ani konsoli. Operuje tylko na silniku.
 // =========================================================================
-void kill_all_enemies_logic(Query<Mut<Health>, With<EnemyTag>> query) 
-{
-    for (auto [hp] : query.iter()) {
-        hp->value = 0;
-    }
+void kill_all_enemies_logic(Query<Mut<Health>, With<EnemyTag>> query) {
+  for (auto [hp] : query.iter()) {
+    hp->value = 0;
+  }
 }
 
 // =========================================================================
 // 2. OPAKOWANIE (SYSTEM BINDUJĄCY)
 // Zespaja czystą funkcję z wirtualną maszyną Lua.
 // =========================================================================
-void bind_lua_commands(World& world) {
+void bind_lua_commands(World &world) {
 
-    // Rejestracja komendy bez parametrów
-    engine::ConsoleAPI::bind_system(world, "kill_all", kill_all_enemies_logic);
+  // Rejestracja komendy bez parametrów
+  engine::ConsoleAPI::bind_system(world, "kill_all", kill_all_enemies_logic);
 
-    // Rejestracja komendy z parametrem int
-    engine::BindCommand<int>::to(world, "spawn", [](int amount) {
-        return [amount](Cmd cmd, ResMut<EnemyCount> count) {
-            spawn_enemies(std::move(cmd), count, amount);
-            };
-        });
+  // Rejestracja komendy z parametrem int
+  engine::BindCommand<int>::to(world, "spawn", [](int amount) {
+    return [amount](Cmd cmd, ResMut<EnemyCount> count) {
+      spawn_enemies(std::move(cmd), count, amount);
+    };
+  });
 }
 
 int main() {
@@ -152,8 +151,7 @@ int main() {
       // chain/after/before
       // chain() wymusza kolejność w grupie
       // bez chain() systemy w grupie mogą się odpalić w dowolnej kolejności
-      .add_systems(ScheduleLabel::Update,
-                   group(move_enemies))
+      .add_systems(ScheduleLabel::Update, group(move_enemies))
 
       // after/before
       // print_enemies odpala się po move_enemies

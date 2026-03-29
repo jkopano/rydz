@@ -28,7 +28,7 @@ struct CompC {
 };
 
 struct Counter {
-  using Type = Resource;
+  using T = Resource;
   int value = 0;
 };
 

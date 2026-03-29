@@ -9,7 +9,7 @@ using namespace ecs;
 // ============================================================
 
 struct MyResource {
-  using Type = Resource;
+  using T = Resource;
   int value;
   bool operator==(const MyResource &o) const { return value == o.value; }
 };

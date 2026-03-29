@@ -17,7 +17,7 @@ namespace ecs {
 constexpr int LOD_LEVELS = 4;
 
 struct LodConfig {
-  using Type = Resource;
+  using T = Resource;
   /// Minimum vertex count before LOD levels are generated.
   int vertex_threshold = 500;
   /// Simplification ratios per level (fraction of original).
@@ -41,7 +41,7 @@ struct MeshLodGroup {
 
 /// Resource: per-entity LOD history for hysteresis.
 struct LodHistory {
-  using Type = Resource;
+  using T = Resource;
   std::unordered_map<Entity, int> map;
 };
 

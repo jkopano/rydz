@@ -24,13 +24,13 @@ template <typename T> struct Handle {
   bool operator!=(const Handle &o) const { return id != o.id; }
 };
 
-template <typename T> class Assets {
+template <typename AssetT> class Assets {
 public:
-  using Type = Resource;
+  using T = Resource;
 
 private:
-  std::deque<std::optional<T>> items_;
-  std::function<void(T &)> deleter_;
+  std::deque<std::optional<AssetT>> items_;
+  std::function<void(AssetT &)> deleter_;
 
 public:
   Assets() = default;
@@ -67,15 +67,15 @@ public:
   Assets(const Assets &) = delete;
   Assets &operator=(const Assets &) = delete;
 
-  void set_deleter(std::function<void(T &)> d) { deleter_ = std::move(d); }
+  void set_deleter(std::function<void(AssetT &)> d) { deleter_ = std::move(d); }
 
-  Handle<T> add(T item) {
+  Handle<AssetT> add(AssetT item) {
     u32 idx = static_cast<u32>(items_.size());
     items_.push_back(std::move(item));
-    return Handle<T>{idx};
+    return Handle<AssetT>{idx};
   }
 
-  void set(Handle<T> handle, T item) {
+  void set(Handle<AssetT> handle, AssetT item) {
     if (handle.id >= items_.size()) {
       items_.resize(handle.id + 1, std::nullopt);
     }
@@ -85,21 +85,21 @@ public:
     items_[handle.id] = std::move(item);
   }
 
-  T *get(Handle<T> handle) {
+  AssetT *get(Handle<AssetT> handle) {
     if (!handle.is_valid() || handle.id >= items_.size() ||
         !items_[handle.id].has_value())
       return nullptr;
     return &items_[handle.id].value();
   }
 
-  const T *get(Handle<T> handle) const {
+  const AssetT *get(Handle<AssetT> handle) const {
     if (!handle.is_valid() || handle.id >= items_.size() ||
         !items_[handle.id].has_value())
       return nullptr;
     return &items_[handle.id].value();
   }
 
-  bool contains(Handle<T> handle) const {
+  bool contains(Handle<AssetT> handle) const {
     return handle.is_valid() && handle.id < items_.size() &&
            items_[handle.id].has_value();
   }
@@ -145,7 +145,7 @@ public:
 
 class AssetServer {
 public:
-  using Type = Resource;
+  using T = Resource;
 
 private:
   struct LoadedAsset {

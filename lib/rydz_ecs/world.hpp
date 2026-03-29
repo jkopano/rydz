@@ -3,6 +3,7 @@
 #include "fwd.hpp"
 #include "helpers.hpp"
 #include "resource.hpp"
+#include "rydz_ecs/bundle.hpp"
 #include "storage.hpp"
 #include "ticks.hpp"
 #include <cassert>
@@ -38,6 +39,9 @@ public:
   // <RESOURCY>
 
   template <typename T> void insert_resource(T resource) {
+    static_assert(IsResource<T>,
+                  "Only Resources can be inserted via insert_resource(). "
+                  "Add 'using T = Resource;' to your struct.");
     resources.insert<T>(std::move(resource));
   }
 
@@ -80,6 +84,7 @@ public:
   }
 
   template <typename T> void insert_component(Entity entity, T component) {
+    assert(entities.is_alive(entity) && "inserting component on dead entity");
     auto &storage = ensure_storage_exist<T>();
     storage.insert(entity, std::move(component), change_tick_);
   }
@@ -128,5 +133,42 @@ public:
                : static_cast<ReturnT *>(it->second.get());
   }
 };
+
+// ── deferred definitions from bundle.hpp ──────────────────────────────
+// These need the full World definition, so they live here.
+
+namespace detail {
+
+template <typename T>
+void insert_single(World &world, Entity entity, T &&item) {
+  using Raw = bare_t<T>;
+  if constexpr (IsBundle<Raw>) {
+    insert_tuple_items(world, entity, to_tuple(std::forward<T>(item)));
+  } else if constexpr (IsTuple<Raw>::value) {
+    insert_tuple_items(world, entity, std::forward<T>(item));
+  } else {
+    static_assert(IsComponent<Raw>,
+                  "Only Components and Bundles can be inserted on entities. "
+                  "Add 'using T = Component;' or 'using T = Bundle;'.");
+    world.insert_component(entity, std::forward<T>(item));
+  }
+}
+
+} // namespace detail
+
+template <std::ranges::input_range R>
+  requires Spawnable<std::ranges::range_value_t<R>>
+std::vector<Entity> spawn_batch(World &world, R &&_range) {
+  std::vector<Entity> spawned;
+  if constexpr (std::ranges::sized_range<R>)
+    spawned.reserve(std::ranges::size(_range));
+
+  for (auto &&item : std::forward<R>(_range)) {
+    Entity e = world.spawn();
+    insert_bundle(world, e, std::forward<decltype(item)>(item));
+    spawned.push_back(e);
+  }
+  return spawned;
+}
 
 } // namespace ecs

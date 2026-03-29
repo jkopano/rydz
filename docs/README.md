@@ -297,7 +297,7 @@ Zasób to singleton — jedna instancja danego typu na cały World. Wymaga marke
 
 ```cpp
 struct GameConfig {
-    using Type = ecs::Resource;
+    using T = ecs::Resource;
     f32 gravity = 9.81f;
     i32 max_enemies = 100;
 };
@@ -332,7 +332,7 @@ Eventy to dane przesyłane między systemami. Wymagają markera `using Type = Ev
 
 ```cpp
 struct DamageEvent {
-    using Type = ecs::Event;
+    using T = ecs::Event;
     ecs::Entity target;
     i32 amount;
 };
@@ -509,7 +509,7 @@ app.configure_set(ScheduleLabel::Update,
 Sety mogą też być strukturami z markerem `using Type = Set`:
 
 ```cpp
-struct PhysicsSet { using Type = ecs::Set; };
+struct PhysicsSet { using T = ecs::Set; };
 // Użycie: ecs::set<PhysicsSet>()
 ```
 
@@ -643,7 +643,7 @@ Bundle to zestaw komponentów wstawianych razem. Wymaga markera `using Type = Bu
 
 ```cpp
 struct CharacterBundle {
-    using Type = ecs::Bundle;
+    using T = ecs::Bundle;
     Position pos;
     Velocity vel;
     Health hp;
