@@ -13,6 +13,7 @@
 #include "rydz_graphics/camera3d.hpp"
 #include "rydz_graphics/transform.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace ecs {
 
@@ -38,7 +39,8 @@ isometric_camera_system(Query<Mut<Transform>, IsometricCamera> query,
     Vec3 desired = cam->target + cam->offset;
 
     if (cam->smooth_follow) {
-      f32 alpha = std::min(cam->follow_speed * dt, 1.0f);
+      // Exponential smoothing gives stable feel across different frame rates.
+      f32 alpha = 1.0f - std::exp(-cam->follow_speed * dt);
       t->translation = t->translation + (desired - t->translation) * alpha;
     } else {
       t->translation = desired;
