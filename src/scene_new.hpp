@@ -80,7 +80,7 @@ update_isometric_camera_target_system(Query<Mut<IsometricCamera>> cam_query,
 // ── Startup systems ──────────────────────────────────────────────────────────
 
 inline void setup_camera(Cmd cmd, NonSendMarker) {
-  cmd.spawn(IsometricCameraBundle(
+  cmd.spawn(IsometricCameraBundle::setup(
       Vec3::sZero(), Vec3(kCamOffX, kCamOffY, kCamOffZ), 20.0f, 12.0f));
 }
 
