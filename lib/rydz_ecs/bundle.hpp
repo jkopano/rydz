@@ -1,6 +1,5 @@
 #pragma once
 #include "fwd.hpp"
-#include "world.hpp"
 #include <tuple>
 #include <type_traits>
 
@@ -105,19 +104,7 @@ void insert_tuple_items(World &world, Entity entity, Tuple<Ts...> &&tup) {
 }
 
 template <typename T>
-void insert_single(World &world, Entity entity, T &&item) {
-  using Raw = bare_t<T>;
-  if constexpr (IsBundle<Raw>) {
-    insert_tuple_items(world, entity, to_tuple(std::forward<T>(item)));
-  } else if constexpr (IsTuple<Raw>::value) {
-    insert_tuple_items(world, entity, std::forward<T>(item));
-  } else {
-    static_assert(IsComponent<Raw>,
-                  "Only Components and Bundles can be inserted on entities. "
-                  "Add 'using T = Component;' or 'using T = Bundle;'.");
-    world.insert_component(entity, std::forward<T>(item));
-  }
-}
+void insert_single(World &world, Entity entity, T &&item);
 
 } // namespace detail
 
@@ -133,17 +120,6 @@ void insert_bundle(World &world, Entity entity, Ts &&...items) {
 
 template <std::ranges::input_range R>
   requires Spawnable<std::ranges::range_value_t<R>>
-std::vector<Entity> spawn_batch(World &world, R &&_range) {
-  std::vector<Entity> spawned;
-  if constexpr (std::ranges::sized_range<R>)
-    spawned.reserve(std::ranges::size(_range));
-
-  for (auto &&item : std::forward<R>(_range)) {
-    Entity e = world.spawn();
-    insert_bundle(world, e, std::forward<decltype(item)>(item));
-    spawned.push_back(e);
-  }
-  return spawned;
-}
+std::vector<Entity> spawn_batch(World &world, R &&_range);
 
 } // namespace ecs
