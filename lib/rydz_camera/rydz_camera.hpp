@@ -7,10 +7,17 @@
  */
 
 #include "math.hpp"
+#include "rl.hpp"
+#include "rydz_camera/rydz_camera.hpp"
+#include "rydz_ecs/fwd.hpp"
 #include "rydz_ecs/query.hpp"
 #include "rydz_ecs/resource.hpp"
+#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/camera3d.hpp"
+#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/rydz_graphics.hpp"
 #include "rydz_graphics/transform.hpp"
 #include <algorithm>
 #include <cmath>
@@ -56,21 +63,21 @@ struct IsometricCameraBundle {
   ActiveCamera active_camera;
   Transform transform;
   IsometricCamera iso;
-};
 
-IsometricCameraBundle
-isometric_camera_bundle(Vec3 target = Vec3::sZero(),
-                        Vec3 offset = Vec3(10.0f, 10.0f, 10.0f),
-                        f32 ortho_height = 20.0f, f32 follow_speed = 5.0f) {
-  return IsometricCameraBundle{
-      .camera_component = Camera3DComponent::orthographic(ortho_height),
-      .active_camera = ActiveCamera{},
-      .transform = Transform::from_xyz(target.GetX() + offset.GetX(),
-                                       target.GetY() + offset.GetY(),
-                                       target.GetZ() + offset.GetZ())
-                       .look_at(target),
-      .iso = IsometricCamera{
-          .target = target, .offset = offset, .follow_speed = follow_speed}};
-}
+  static IsometricCameraBundle setup(Vec3 target = Vec3::sZero(),
+                                     Vec3 offset = Vec3(10.0f, 10.0f, 10.0f),
+                                     f32 ortho_height = 20.0f,
+                                     f32 follow_speed = 5.0f) {
+    return IsometricCameraBundle{
+        .camera_component = Camera3DComponent::orthographic(ortho_height),
+        .active_camera = ActiveCamera{},
+        .transform = Transform::from_xyz(target.GetX() + offset.GetX(),
+                                         target.GetY() + offset.GetY(),
+                                         target.GetZ() + offset.GetZ())
+                         .look_at(target),
+        .iso = IsometricCamera{
+            .target = target, .offset = offset, .follow_speed = follow_speed}};
+  }
+};
 
 } // namespace ecs
