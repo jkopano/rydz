@@ -16,9 +16,9 @@ end
 -- add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
 -- add_requires("sol2 v3.3.0", { configs = { includes_lua = false, lua_version = "5.1" } })
 --
--- local function is_nixos()
---   return is_host("linux") and os.exists("/etc/nixos")
--- end
+local function is_nixos()
+	return is_host("linux") and os.exists("/etc/nixos")
+end
 --
 -- if not is_nixos() then
 -- =======
