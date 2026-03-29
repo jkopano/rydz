@@ -12,6 +12,7 @@
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/camera3d.hpp"
 #include "rydz_graphics/transform.hpp"
+#include <algorithm>
 
 namespace ecs {
 
@@ -37,8 +38,8 @@ isometric_camera_system(Query<Mut<Transform>, IsometricCamera> query,
     Vec3 desired = cam->target + cam->offset;
 
     if (cam->smooth_follow) {
-      t->translation =
-          t->translation.Lerp(desired, std::min(cam->follow_speed * dt, 1.0f));
+      f32 alpha = std::min(cam->follow_speed * dt, 1.0f);
+      t->translation = t->translation + (desired - t->translation) * alpha;
     } else {
       t->translation = desired;
     }

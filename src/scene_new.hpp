@@ -5,6 +5,7 @@
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
+#include "rydz_camera/rydz_camera.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
 #include <algorithm>
@@ -52,9 +53,9 @@ inline void player_movement_system(Query<Mut<Transform>, Player> query,
   }
 }
 
-// Follow the player with the isometric camera
-inline void isometric_camera_system(
-    Query<Mut<Transform>, ActiveCamera, Without<Player>> cam_query,
+// Update isometric camera target to follow the player
+inline void update_isometric_camera_target_system(
+    Query<Mut<IsometricCamera>> cam_query,
     Query<Transform, Player> player_query) {
 
   Vec3 player_pos = Vec3::sZero();
@@ -67,19 +68,18 @@ inline void isometric_camera_system(
   if (!found)
     return;
 
-  for (auto [t, _] : cam_query.iter()) {
-    Vec3 desired = player_pos + Vec3(kCamOffX, kCamOffY, kCamOffZ);
-    t->translation = desired;
-    t->look_at(player_pos);
+  for (auto [cam] : cam_query.iter()) {
+    cam->target = player_pos;
   }
 }
 
 // ── Startup systems ──────────────────────────────────────────────────────────
 
 inline void setup_camera(Cmd cmd, NonSendMarker) {
-  cmd.spawn(Camera3DComponent::orthographic(20.0f), ActiveCamera{},
-            Transform::from_xyz(kCamOffX, kCamOffY, kCamOffZ)
-                .look_at(Vec3::sZero()));
+  cmd.spawn(isometric_camera_bundle(Vec3::sZero(),
+                                    Vec3(kCamOffX, kCamOffY, kCamOffZ),
+                                    20.0f,
+                                    12.0f));
 }
 
 inline void setup_lighting(Cmd cmd, NonSendMarker, ResMut<Assets<rl::Model>> models) {
@@ -141,5 +141,6 @@ inline void scene_plugin(App& app) {
   app.add_systems(ScheduleLabel::Startup, spawn_player);
 
   app.add_systems(ScheduleLabel::Update, player_movement_system);
+  app.add_systems(ScheduleLabel::Update, update_isometric_camera_target_system);
   app.add_systems(ScheduleLabel::Update, isometric_camera_system);
 }
