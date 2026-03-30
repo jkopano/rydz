@@ -1,5 +1,4 @@
 #pragma once
-#include "camera3d.hpp"
 #include "frustum.hpp"
 #include "light.hpp"
 #include "lod.hpp"
@@ -9,6 +8,7 @@
 #include "render_batches.hpp"
 #include "render_config.hpp"
 #include "rl.hpp"
+#include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/asset_loaders.hpp"
@@ -454,14 +454,16 @@ inline void auto_insert_global_transform(
     cmd.entity(e).insert(GlobalTransform{});
 }
 
-inline void auto_insert_visibility(
-    Query<Entity, With<Model3d>, Without<Visibility>> query, Cmd cmd) {
+inline void
+auto_insert_visibility(Query<Entity, With<Model3d>, Without<Visibility>> query,
+                       Cmd cmd) {
   for (auto [e] : query.iter())
     cmd.entity(e).insert(Visibility::Visible);
 }
 
-inline void auto_insert_material(
-    Query<Entity, With<Model3d>, Without<Material3d>> query, Cmd cmd) {
+inline void
+auto_insert_material(Query<Entity, With<Model3d>, Without<Material3d>> query,
+                     Cmd cmd) {
   for (auto [e] : query.iter())
     cmd.entity(e).insert(Material3d{StandardMaterial::from_color(WHITE)});
 }

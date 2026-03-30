@@ -1,7 +1,7 @@
 #define RLGL_ENABLE_OPENGL_DEBUG_CONTEXT 0
 // #include "rl.hpp"
-// #include "scene.hpp"
-#include "scene_new.hpp"
+#include "scene.hpp"
+// #include "scene_new.hpp"
 
 int main() {
   rl::SetTraceLogLevel(LOG_DEBUG);

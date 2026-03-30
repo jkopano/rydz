@@ -1,7 +1,7 @@
 #pragma once
-#include "camera3d.hpp"
 #include "mesh3d.hpp"
 #include "rl.hpp"
+#include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/system.hpp"
 #include "rydz_graphics/transform.hpp"

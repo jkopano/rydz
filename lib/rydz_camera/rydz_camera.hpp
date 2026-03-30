@@ -8,6 +8,7 @@
 
 #include "math.hpp"
 #include "rl.hpp"
+#include "rydz_camera/camera3d.hpp"
 #include "rydz_camera/rydz_camera.hpp"
 #include "rydz_ecs/fwd.hpp"
 #include "rydz_ecs/query.hpp"
@@ -15,7 +16,6 @@
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
-#include "rydz_graphics/camera3d.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
 #include "rydz_graphics/transform.hpp"

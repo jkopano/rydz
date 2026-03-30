@@ -19,3 +19,4 @@ vsxmake2026/**
 # compile
 compile_commands.json
 .luajit_path
+gmon.out

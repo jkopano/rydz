@@ -1,8 +1,8 @@
 #pragma once
-#include "camera3d.hpp"
 #include "math.hpp"
 #include "mesh3d.hpp"
 #include "rl.hpp"
+#include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"
