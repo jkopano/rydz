@@ -35,6 +35,9 @@ private:
 public:
   Assets() = default;
 
+  explicit Assets(std::function<void(AssetT &)> deleter)
+      : deleter_(std::move(deleter)) {}
+
   ~Assets() {
     if (deleter_) {
       for (auto &item : items_) {

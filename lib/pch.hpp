@@ -28,6 +28,5 @@
 #include <utility>
 #include <vector>
 
-#include <meshoptimizer.h>
 #include "math.hpp"
 #include "rl.hpp"

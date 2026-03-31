@@ -73,9 +73,11 @@ using ::UpdateMeshBuffer;
 using ::UploadMesh;
 
 // ---- Textures / Images ----
+using ::GenImageColor;
 using ::ImageFormat;
 using ::LoadImage;
 using ::LoadTexture;
+using ::LoadTextureFromImage;
 using ::UnloadImage;
 using ::UnloadTexture;
 

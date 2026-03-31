@@ -21,7 +21,7 @@ if tracy_enabled then
 	add_requires("tracy")
 end
 
--- add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics")
+-- add_requires("taskflow", "gtest", "benchmark", "joltphysics")
 -- add_requires("sol2 v3.3.0", { configs = { includes_lua = false, lua_version = "5.1" } })
 --
 local function is_nixos()
@@ -30,7 +30,7 @@ end
 --
 -- if not is_nixos() then
 -- =======
-add_requires("taskflow", "gtest", "benchmark", "meshoptimizer", "joltphysics", "glaze")
+add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze")
 add_requires("sol2 v3.3.0", { configs = { includes_lua = false } })
 if is_plat("windows") then
 	-- kopano
@@ -160,10 +160,10 @@ set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
 -- <<<<<<< HEAD
--- add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2")
+-- add_packages("taskflow", "joltphysics", "sol2")
 -- if not is_nixos() then
 -- =======
-add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2", "glaze")
+add_packages("taskflow", "joltphysics", "sol2", "glaze")
 if is_plat("windows") then
 	-- >>>>>>> kopano
 	add_packages("luajit")
@@ -178,14 +178,14 @@ set_kind("binary")
 set_default(false)
 add_files("tests/*.cpp")
 add_deps("raylib")
-add_packages("gtest", "taskflow", "meshoptimizer", "joltphysics", "glaze")
+add_packages("gtest", "taskflow", "joltphysics", "glaze")
 
 target("bench")
 set_kind("binary")
 set_default(false)
 add_files("benches/*.cpp")
 add_deps("raylib")
-add_packages("benchmark", "taskflow", "meshoptimizer", "joltphysics", "glaze")
+add_packages("benchmark", "taskflow", "joltphysics", "glaze")
 
 local examples = {
 	"01_hello_window",
@@ -209,10 +209,10 @@ for _, name in ipairs(examples) do
 	add_files("examples/" .. name .. "/main.cpp")
 	add_deps("raylib")
 	-- <<<<<<< HEAD
-	--   add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2")
+	--   add_packages("taskflow", "joltphysics", "sol2")
 	--   if not is_nixos() then
 	-- =======
-	add_packages("taskflow", "meshoptimizer", "joltphysics", "sol2", "glaze")
+	add_packages("taskflow", "joltphysics", "sol2", "glaze")
 	if is_plat("windows") then
 		-- >>>>>>> kopano
 		add_packages("luajit")

@@ -110,13 +110,13 @@ inline void some_shit(Query<CameraState> q) {
     auto [state] = *x;
 
     std::visit(over{[&](const FreeLook &fl) {
-                      std::print("Kamera w trybie FreeLook\n");
+                      // std::print("Kamera w trybie FreeLook\n");
                     },
                     [&](const Cinematic &c) {
-                      std::print("Kamera w trybie Cinematic\n");
+                      // std::print("Kamera w trybie Cinematic\n");
                     },
                     [&](const Locked &l) {
-                      std::print("Kamera śledzi encję: {}\n", 10);
+                      // std::print("Kamera śledzi encję: {}\n", 10);
                     }},
                *state);
   }

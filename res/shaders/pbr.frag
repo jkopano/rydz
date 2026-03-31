@@ -21,12 +21,6 @@ uniform sampler2D u_normal_texture;
 uniform sampler2D u_occlusion_texture;
 uniform sampler2D u_emissive_texture;
 
-uniform int u_has_metallic_texture;
-uniform int u_has_roughness_texture;
-uniform int u_has_normal_texture;
-uniform int u_has_occlusion_texture;
-uniform int u_has_emissive_texture;
-
 uniform vec4 u_color;
 uniform vec3 u_camera_pos;
 
@@ -179,31 +173,21 @@ void main() {
   // Metallic | roughness
   float metallic = clamp(u_metallic_factor, 0.0, 1.0);
   float roughness = clamp(u_roughness_factor, 0.045, 1.0);
-  if (u_has_metallic_texture != 0) {
-    metallic *= texture(u_metallic_texture, TexCoord).r;
-  }
-  if (u_has_roughness_texture != 0) {
-    roughness *= texture(u_roughness_texture, TexCoord).r;
-  }
+  metallic *= texture(u_metallic_texture, TexCoord).r;
+  roughness *= texture(u_roughness_texture, TexCoord).r;
   metallic = clamp(metallic, 0.0, 1.0);
   roughness = clamp(roughness, 0.045, 1.0);
 
-  if (u_has_normal_texture != 0) {
-    normal = sampleNormal(normal, FragPos, TexCoord);
-  }
+  normal = sampleNormal(normal, FragPos, TexCoord);
 
   // Ambient occlusion
   float ao = u_occlusion_factor;
-  if (u_has_occlusion_texture != 0) {
-    ao *= texture(u_occlusion_texture, TexCoord).r;
-  }
+  ao *= texture(u_occlusion_texture, TexCoord).r;
   ao = min(ao, 1.0);
 
   // Emissive
   vec3 emissive = u_emissive_factor;
-  if (u_has_emissive_texture != 0) {
-    emissive *= pow(texture(u_emissive_texture, TexCoord).rgb, vec3(2.2));
-  }
+  emissive *= pow(texture(u_emissive_texture, TexCoord).rgb, vec3(2.2));
 
   vec3 lighting = vec3(0.0);
 

@@ -97,6 +97,13 @@ public:
     return *this;
   }
 
+  template <typename R, typename... Args> App &init_resource(Args &&...args) {
+    if (!world_.has_resource<R>()) {
+      world_.insert_resource(R{std::forward<Args>(args)...});
+    }
+    return *this;
+  }
+
   template <typename S> App &init_state(S initial) {
     world_.insert_resource(State<S>(std::move(initial)));
     world_.insert_resource(NextState<S>{});
@@ -206,11 +213,7 @@ private:
   }
 };
 
-inline void time_plugin(App &app) {
-  if (!app.world().has_resource<Time>()) {
-    app.insert_resource(Time{});
-  }
-}
+inline void time_plugin(App &app) { app.init_resource<Time>(); }
 inline auto window_plugin(Window config = {}) {
   return [config = std::move(config)](ecs::App &app) {
     app.add_systems(ScheduleLabel::Update, Window::Update);

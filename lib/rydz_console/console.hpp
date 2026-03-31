@@ -153,9 +153,7 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
 }
 
 inline void console_plugin(ecs::App &app) {
-  if (!app.world().has_resource<ConsoleState>()) {
-    app.world().insert_resource(ConsoleState{});
-  }
+  app.init_resource<ConsoleState>();
   app.add_systems(ecs::ScheduleLabel::Update, ConsoleUpdateSystem);
   app.add_systems(ecs::ScheduleLabel::Render, ConsoleRenderSystem);
 }
