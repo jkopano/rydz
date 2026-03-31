@@ -20,7 +20,7 @@ void main() {
   vec4 world_pos = model * vec4(vertexPosition, 1.0);
   FragPos = world_pos.xyz;
 
-  mat3 normalMatrix = mat3(model);
+  mat3 normalMatrix = transpose(inverse(mat3(model)));
   Normal = normalize(normalMatrix * vertexNormal);
 
   TexCoord = vertexTexCoord;

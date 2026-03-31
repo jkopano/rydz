@@ -1,5 +1,7 @@
 #pragma once
 #include "fwd.hpp"
+#include "rydz_ecs/entity.hpp"
+#include "rydz_ecs/helpers.hpp"
 #include <tuple>
 #include <type_traits>
 
@@ -103,8 +105,7 @@ void insert_tuple_items(World &world, Entity entity, Tuple<Ts...> &&tup) {
       std::move(tup));
 }
 
-template <typename T>
-void insert_single(World &world, Entity entity, T &&item);
+template <typename T> void insert_single(World &world, Entity entity, T &&item);
 
 } // namespace detail
 

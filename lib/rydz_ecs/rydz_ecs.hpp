@@ -18,7 +18,7 @@
 #include "rydz_ecs/condition.hpp"
 #include "rydz_ecs/schedule.hpp"
 
-#include "rydz_ecs/hierarchy.hpp"
+#include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_ecs/plugin.hpp"
 #include "rydz_ecs/state.hpp"
 

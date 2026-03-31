@@ -1,5 +1,5 @@
+//PBR bez IBL
 #version 330
-/// BLINN PHONG
 
 in vec3 FragPos;
 in vec3 Normal;
@@ -15,20 +15,20 @@ uniform float u_occlusion_factor;
 uniform vec3 u_emissive_factor;
 
 uniform sampler2D texture0;
-uniform sampler2D u_roughness_metallic_texture;
+uniform sampler2D u_metallic_texture;
+uniform sampler2D u_roughness_texture;
 uniform sampler2D u_normal_texture;
 uniform sampler2D u_occlusion_texture;
 uniform sampler2D u_emissive_texture;
 
-uniform int u_has_roughness_metallic_texture;
+uniform int u_has_metallic_texture;
+uniform int u_has_roughness_texture;
 uniform int u_has_normal_texture;
 uniform int u_has_occlusion_texture;
 uniform int u_has_emissive_texture;
 
 uniform vec4 u_color;
 uniform vec3 u_camera_pos;
-
-// --- Light uniforms (individual, matching GlobalLightBuffer::visit_values) ---
 
 // Directional light
 uniform vec3 u_dir_light_direction;
@@ -46,9 +46,9 @@ struct PointLight {
   float range;
 };
 
-uniform vec3  u_point_lights_position[32];
+uniform vec3 u_point_lights_position[32];
 uniform float u_point_lights_intensity[32];
-uniform vec3  u_point_lights_color[32];
+uniform vec3 u_point_lights_color[32];
 uniform float u_point_lights_range[32];
 
 // Spot lights
@@ -64,141 +64,103 @@ struct SpotLight {
   float outer_cutoff;
 };
 
-uniform vec3  u_spot_lights_position[32];
+uniform vec3 u_spot_lights_position[32];
 uniform float u_spot_lights_range[32];
-uniform vec3  u_spot_lights_direction[32];
+uniform vec3 u_spot_lights_direction[32];
 uniform float u_spot_lights_intensity[32];
-uniform vec3  u_spot_lights_color[32];
+uniform vec3 u_spot_lights_color[32];
 uniform float u_spot_lights_inner_cutoff[32];
 uniform float u_spot_lights_outer_cutoff[32];
 
-vec3 calculateDirectionalLight(
-  vec3 lightDir_in,
-  float intensity,
-  vec3 lightColor,
-  vec3 normal,
-  vec3 viewDir,
-  vec3 baseColor,
-  float metallic,
-  float roughness
-) {
-  vec3 lightDir = normalize(-lightDir_in);
+const float PI = 3.14159265359;
 
-  // Diffuse
-  float NdotL = max(dot(normal, lightDir), 0.0);
-  vec3 diffuse = lightColor * baseColor * NdotL * intensity;
-
-  // Specular
-  vec3 halfDir = normalize(lightDir + viewDir);
-  float NdotH = max(dot(normal, halfDir), 0.0);
-  float shininess = mix(128.0, 32.0, roughness);
-  float spec = pow(NdotH, shininess);
-
-  vec3 F0 = mix(vec3(0.04), baseColor, metallic);
-  float specStrength = (1.0 - roughness) * 0.3;
-  vec3 specular = lightColor * spec * intensity * specStrength * F0 * step(0.01, NdotL);
-
-  return diffuse * (1.0 - metallic) + specular;
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+  return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
-vec3 calculatePointLight(
-  vec3 lightPos,
-  float intensity,
-  vec3 lightColor,
-  float range,
-  vec3 fragPos,
-  vec3 normal,
-  vec3 viewDir,
-  vec3 baseColor,
-  float metallic,
-  float roughness
-) {
-  vec3 lightDir = lightPos - fragPos;
-  float distance = length(lightDir);
-
-  if (distance > range) {
-    return vec3(0.0);
-  }
-
-  lightDir = normalize(lightDir);
-
-  float attenuation = intensity / (distance * distance + 0.01);
-  float factor = distance / range;
-  float smoothFactor = clamp(1.0 - factor * factor * factor * factor, 0.0, 1.0);
-  attenuation *= smoothFactor * smoothFactor;
-
-  // Diffuse
-  float NdotL = max(dot(normal, lightDir), 0.0);
-  vec3 diffuse = lightColor * baseColor * NdotL * attenuation;
-
-  // Specular
-  vec3 halfDir = normalize(lightDir + viewDir);
-  float NdotH = max(dot(normal, halfDir), 0.0);
-  float shininess = mix(128.0, 32.0, roughness);
-  float spec = pow(NdotH, shininess);
-
-  vec3 F0 = mix(vec3(0.04), baseColor, metallic);
-  float specStrength = (1.0 - roughness) * 0.3;
-  vec3 specular = lightColor * spec * attenuation * specStrength * F0 * step(0.01, NdotL);
-
-  return diffuse * (1.0 - metallic) + specular;
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+  return F0 + (max(vec3(1.0 - roughness), F0) - F0) *
+      pow(1.0 - cosTheta, 5.0);
 }
 
-vec3 calculateSpotLight(
-  vec3 lightPos,
-  float range,
-  vec3 spotDir,
-  float intensity,
-  vec3 lightColor,
-  float inner_cutoff,
-  float outer_cutoff,
-  vec3 fragPos,
-  vec3 normal,
-  vec3 viewDir,
-  vec3 baseColor,
+float distributionGGX(vec3 N, vec3 H, float roughness) {
+  float a = roughness * roughness;
+  float a2 = a * a;
+  float NdotH = max(dot(N, H), 0.0);
+  float NdotH2 = NdotH * NdotH;
+
+  float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+  return a2 / max(PI * denom * denom, 0.0001);
+}
+
+float geometrySchlickGGX(float NdotV, float roughness) {
+  float r = roughness + 1.0;
+  float k = (r * r) / 8.0;
+  return NdotV / max(NdotV * (1.0 - k) + k, 0.0001);
+}
+
+float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+  float NdotV = max(dot(N, V), 0.0);
+  float NdotL = max(dot(N, L), 0.0);
+  float ggx2 = geometrySchlickGGX(NdotV, roughness);
+  float ggx1 = geometrySchlickGGX(NdotL, roughness);
+  return ggx1 * ggx2;
+}
+
+vec3 evaluatePBR(
+  vec3 N,
+  vec3 V,
+  vec3 L,
+  vec3 radiance,
+  vec3 albedo,
   float metallic,
   float roughness
 ) {
-  vec3 lightDir = lightPos - fragPos;
-  float distance = length(lightDir);
+  vec3 H = normalize(V + L);
+  float NdotL = max(dot(N, L), 0.0);
+  float NdotV = max(dot(N, V), 0.0);
+  float HdotV = max(dot(H, V), 0.0);
 
-  if (distance > range) {
+  if (NdotL <= 0.0 || NdotV <= 0.0) {
     return vec3(0.0);
   }
 
-  lightDir = normalize(lightDir);
+  vec3 F0 = mix(vec3(0.04), albedo, metallic);
+  vec3 F = fresnelSchlick(HdotV, F0);
+  float NDF = distributionGGX(N, H, roughness);
+  float G = geometrySmith(N, V, L, roughness);
 
-  // Spotlight cone
-  float theta = dot(lightDir, normalize(-spotDir));
-  float epsilon = inner_cutoff - outer_cutoff;
-  float spotIntensity = clamp((theta - outer_cutoff) / epsilon, 0.0, 1.0);
+  vec3 numerator = NDF * G * F;
+  float denominator = max(4.0 * NdotV * NdotL, 0.0001);
+  vec3 specular = numerator / denominator;
 
-  if (spotIntensity <= 0.0) {
-    return vec3(0.0);
-  }
+  vec3 kS = F;
+  vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+  vec3 diffuse = kD * albedo / PI;
 
-  float attenuation = intensity / (distance * distance + 0.01);
-  float factor = distance / range;
-  float smoothFactor = clamp(1.0 - factor * factor * factor * factor, 0.0, 1.0);
+  return (diffuse + specular) * radiance * NdotL;
+}
 
-  attenuation *= smoothFactor * smoothFactor;
-  attenuation *= spotIntensity;
+mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
+  vec3 dp1 = dFdx(p);
+  vec3 dp2 = dFdy(p);
+  vec2 duv1 = dFdx(uv);
+  vec2 duv2 = dFdy(uv);
 
-  // Diffuse
-  float NdotL = max(dot(normal, lightDir), 0.0);
-  vec3 diffuse = lightColor * baseColor * NdotL * attenuation;
+  vec3 dp2perp = cross(dp2, N);
+  vec3 dp1perp = cross(N, dp1);
+  vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+  vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
 
-  // Specular
-  vec3 halfDir = normalize(lightDir + viewDir);
-  float NdotH = max(dot(normal, halfDir), 0.0);
-  float shininess = mix(128.0, 32.0, roughness);
-  float spec = pow(NdotH, shininess);
+  float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
+  return mat3(T * invmax, B * invmax, N);
+}
 
-  vec3 F0 = mix(vec3(0.04), baseColor, metallic);
-  float specStrength = (1.0 - roughness) * 0.3;
-  vec3 specular = lightColor * spec * attenuation * specStrength * F0 * step(0.01, NdotL);
-
-  return diffuse * (1.0 - metallic) + specular;
+vec3 sampleNormal(vec3 N, vec3 p, vec2 uv) {
+  vec3 tangentNormal = texture(u_normal_texture, uv).xyz * 2.0 - 1.0;
+  tangentNormal.xy *= u_normal_factor;
+  mat3 TBN = cotangentFrame(N, p, uv);
+  return normalize(TBN * tangentNormal);
 }
 
 void main() {
@@ -212,18 +174,22 @@ void main() {
     discard;
   }
   baseColor *= diff_tex;
+  vec3 albedo = pow(baseColor.rgb, vec3(2.2));
 
   // Metallic | roughness
-  float metallic = u_metallic_factor;
-  float roughness = u_roughness_factor;
-  if (u_has_roughness_metallic_texture != 0) {
-    metallic *= texture(u_roughness_metallic_texture, TexCoord).b;
-    roughness *= texture(u_roughness_metallic_texture, TexCoord).g;
+  float metallic = clamp(u_metallic_factor, 0.0, 1.0);
+  float roughness = clamp(u_roughness_factor, 0.045, 1.0);
+  if (u_has_metallic_texture != 0) {
+    metallic *= texture(u_metallic_texture, TexCoord).r;
   }
+  if (u_has_roughness_texture != 0) {
+    roughness *= texture(u_roughness_texture, TexCoord).r;
+  }
+  metallic = clamp(metallic, 0.0, 1.0);
+  roughness = clamp(roughness, 0.045, 1.0);
 
-  // Normal mapping ----- NIE KORZYSTAM FOR NOW
   if (u_has_normal_texture != 0) {
-    vec3 n = texture(u_normal_texture, TexCoord).rgb * 2.0 - 1.0;
+    normal = sampleNormal(normal, FragPos, TexCoord);
   }
 
   // Ambient occlusion
@@ -236,27 +202,17 @@ void main() {
   // Emissive
   vec3 emissive = u_emissive_factor;
   if (u_has_emissive_texture != 0) {
-    emissive *= texture(u_emissive_texture, TexCoord).rgb;
+    emissive *= pow(texture(u_emissive_texture, TexCoord).rgb, vec3(2.2));
   }
-
-  // -------------------
-  // Calculate Lighting
-  // -------------------
 
   vec3 lighting = vec3(0.0);
 
   // Directional light
   if (u_has_directional > 0 && u_dir_light_intensity > 0.0) {
-    lighting += calculateDirectionalLight(
-        u_dir_light_direction,
-        u_dir_light_intensity,
-        u_dir_light_color,
-        normal,
-        viewDir,
-        baseColor.rgb,
-        metallic,
-        roughness
-      );
+    vec3 lightDir = normalize(-u_dir_light_direction);
+    vec3 radiance = u_dir_light_color * u_dir_light_intensity;
+    lighting += evaluatePBR(
+        normal, viewDir, lightDir, radiance, albedo, metallic, roughness);
   }
 
   // Point lights
@@ -267,18 +223,21 @@ void main() {
       continue;
     }
 
-    lighting += calculatePointLight(
-        u_point_lights_position[i],
-        u_point_lights_intensity[i],
-        u_point_lights_color[i],
-        u_point_lights_range[i],
-        FragPos,
-        normal,
-        viewDir,
-        baseColor.rgb,
-        metallic,
-        roughness
-      );
+    vec3 lightVec = u_point_lights_position[i] - FragPos;
+    float distance = length(lightVec);
+    if (distance > u_point_lights_range[i]) {
+      continue;
+    }
+
+    vec3 lightDir = normalize(lightVec);
+    float attenuation = u_point_lights_intensity[i] / (distance * distance + 0.01);
+    float factor = distance / u_point_lights_range[i];
+    float smoothFactor = clamp(1.0 - factor * factor * factor * factor, 0.0, 1.0);
+    attenuation *= smoothFactor * smoothFactor;
+
+    vec3 radiance = u_point_lights_color[i] * attenuation;
+    lighting += evaluatePBR(
+        normal, viewDir, lightDir, radiance, albedo, metallic, roughness);
   }
 
   // Spot lights
@@ -289,35 +248,46 @@ void main() {
       continue;
     }
 
-    lighting += calculateSpotLight(
-        u_spot_lights_position[i],
-        u_spot_lights_range[i],
-        u_spot_lights_direction[i],
-        u_spot_lights_intensity[i],
-        u_spot_lights_color[i],
-        u_spot_lights_inner_cutoff[i],
-        u_spot_lights_outer_cutoff[i],
-        FragPos,
-        normal,
-        viewDir,
-        baseColor.rgb,
-        metallic,
-        roughness
-      );
+    vec3 lightVec = u_spot_lights_position[i] - FragPos;
+    float distance = length(lightVec);
+    if (distance > u_spot_lights_range[i]) {
+      continue;
+    }
+
+    vec3 lightDir = normalize(lightVec);
+    float theta = dot(lightDir, normalize(-u_spot_lights_direction[i]));
+    float epsilon = u_spot_lights_inner_cutoff[i] - u_spot_lights_outer_cutoff[i];
+    float spotIntensity = clamp((theta - u_spot_lights_outer_cutoff[i]) /
+          max(epsilon, 0.0001),
+        0.0, 1.0);
+    if (spotIntensity <= 0.0) {
+      continue;
+    }
+
+    float attenuation = u_spot_lights_intensity[i] / (distance * distance + 0.01);
+    float factor = distance / u_spot_lights_range[i];
+    float smoothFactor = clamp(1.0 - factor * factor * factor * factor, 0.0, 1.0);
+    attenuation *= smoothFactor * smoothFactor * spotIntensity;
+
+    vec3 radiance = u_spot_lights_color[i] * attenuation;
+    lighting += evaluatePBR(
+        normal, viewDir, lightDir, radiance, albedo, metallic, roughness);
   }
 
-  vec3 color;
+  vec3 F0 = mix(vec3(0.04), albedo, metallic);
+  vec3 F = fresnelSchlickRoughness(max(dot(normal, viewDir), 0.0), F0, roughness);
+  vec3 kS = F;
+  vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+  vec3 ambientColor = kD * albedo * 0.03 * ao;
+  vec3 color = ambientColor + lighting + emissive;
 
-  float ambientStrength = 0.02;
-  vec3 ambientColor = baseColor.rgb * ambientStrength;
-  color = (ambientColor + lighting) * ao + emissive;
-
-  // color tint
   float strength = u_color.a;
   color = mix(color, color * u_color.rgb, strength);
 
-  // Gamma correction (linear -> sRGB)
+  // Simple tone mapping before output to sRGB.
+  color = color / (color + vec3(1.0));
+
   color = pow(color, vec3(1.0 / 2.2));
 
-  FragColor = vec4(color, 1.0);
+  FragColor = vec4(color, baseColor.a);
 }

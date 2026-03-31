@@ -1,6 +1,6 @@
 #pragma once
-#include "rydz_ecs/asset.hpp"
 #include "rl.hpp"
+#include "rydz_ecs/asset.hpp"
 #include <concepts>
 
 namespace ecs {
@@ -15,16 +15,19 @@ concept IMaterial =
       { M::shader() } -> std::convertible_to<const rl::Shader *>;
     };
 
-template <IMaterial M> inline void preload_material_shader(NonSendMarker) {
-  M::shader();
-}
-
 struct StandardMaterial {
   rl::Color base_color = WHITE;
   Handle<rl::Texture2D> texture{};
   Handle<rl::Texture2D> normal_map{};
-  float metallic = 0.0f;
-  float roughness = 0.5f;
+  Handle<rl::Texture2D> metallic_map{};
+  Handle<rl::Texture2D> roughness_map{};
+  Handle<rl::Texture2D> occlusion_map{};
+  Handle<rl::Texture2D> emissive_map{};
+  rl::Color emissive_color = {0, 0, 0, 0};
+  float metallic = -1.0f;
+  float roughness = -1.0f;
+  float normal_scale = -1.0f;
+  float occlusion_strength = -1.0f;
 
   static StandardMaterial from_color(rl::Color c) { return {.base_color = c}; }
   static StandardMaterial from_texture(Handle<rl::Texture2D> tex,
@@ -36,22 +39,53 @@ struct StandardMaterial {
 
   void apply(rl::Model &model, Assets<rl::Texture2D> *tex_assets) const {
     const rl::Shader *s = shader();
-    if (model.materials && s) {
-      for (int i = 0; i < model.materialCount; ++i)
-        model.materials[i].shader = *s;
-    }
-    model.materials[0].maps[MATERIAL_MAP_DIFFUSE].color = base_color;
-
-    if (tex_assets && texture.is_valid()) {
-      rl::Texture2D *tex = tex_assets->get(texture);
-      if (tex)
-        model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = *tex;
+    if (!model.materials || model.materialCount <= 0) {
+      return;
     }
 
-    if (tex_assets && normal_map.is_valid()) {
-      rl::Texture2D *tex = tex_assets->get(normal_map);
-      if (tex)
-        model.materials[0].maps[MATERIAL_MAP_NORMAL].texture = *tex;
+    for (int i = 0; i < model.materialCount; ++i) {
+      auto &material = model.materials[i];
+      if (s) {
+        material.shader = *s;
+      }
+
+      material.maps[MATERIAL_MAP_DIFFUSE].color = base_color;
+
+      if (metallic >= 0.0f) {
+        material.maps[MATERIAL_MAP_METALNESS].value = metallic;
+      }
+      if (roughness >= 0.0f) {
+        material.maps[MATERIAL_MAP_ROUGHNESS].value = roughness;
+      }
+      if (normal_scale >= 0.0f) {
+        material.maps[MATERIAL_MAP_NORMAL].value = normal_scale;
+      }
+      if (occlusion_strength >= 0.0f) {
+        material.maps[MATERIAL_MAP_OCCLUSION].value = occlusion_strength;
+      }
+      if (emissive_color.a > 0) {
+        material.maps[MATERIAL_MAP_EMISSION].color = emissive_color;
+      }
+
+      if (!tex_assets) {
+        continue;
+      }
+
+      auto assign_map = [&](int map_type, Handle<rl::Texture2D> handle) {
+        if (!handle.is_valid()) {
+          return;
+        }
+        if (rl::Texture2D *tex = tex_assets->get(handle)) {
+          material.maps[map_type].texture = *tex;
+        }
+      };
+
+      assign_map(MATERIAL_MAP_DIFFUSE, texture);
+      assign_map(MATERIAL_MAP_NORMAL, normal_map);
+      assign_map(MATERIAL_MAP_METALNESS, metallic_map);
+      assign_map(MATERIAL_MAP_ROUGHNESS, roughness_map);
+      assign_map(MATERIAL_MAP_OCCLUSION, occlusion_map);
+      assign_map(MATERIAL_MAP_EMISSION, emissive_map);
     }
   }
 
@@ -78,11 +112,19 @@ struct StandardMaterial {
       sh.locs[SHADER_LOC_MATRIX_MVP] = rl::GetShaderLocation(sh, "mvp");
       sh.locs[SHADER_LOC_COLOR_DIFFUSE] =
           rl::GetShaderLocation(sh, "colDiffuse");
-      sh.locs[SHADER_LOC_MAP_DIFFUSE] =
-          rl::GetShaderLocation(sh, "texture0");
+      sh.locs[SHADER_LOC_MAP_DIFFUSE] = rl::GetShaderLocation(sh, "texture0");
+      sh.locs[SHADER_LOC_MAP_METALNESS] =
+          rl::GetShaderLocation(sh, "u_metallic_texture");
       sh.locs[SHADER_LOC_MAP_NORMAL] =
           rl::GetShaderLocation(sh, "u_normal_texture");
-      sh.locs[SHADER_LOC_MATRIX_MODEL] =
+      sh.locs[SHADER_LOC_MAP_ROUGHNESS] =
+          rl::GetShaderLocation(sh, "u_roughness_texture");
+      sh.locs[SHADER_LOC_MAP_OCCLUSION] =
+          rl::GetShaderLocation(sh, "u_occlusion_texture");
+      sh.locs[SHADER_LOC_MAP_EMISSION] =
+          rl::GetShaderLocation(sh, "u_emissive_texture");
+      sh.locs[SHADER_LOC_MATRIX_MODEL] = rl::GetShaderLocation(sh, "matModel");
+      sh.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] =
           rl::GetShaderLocationAttrib(sh, "instanceTransform");
       return sh;
     }();

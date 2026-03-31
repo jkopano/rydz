@@ -183,8 +183,8 @@ public:
           rl::UploadMesh(&model.meshes[i], false);
         }
 
-        model.materials =
-            (rl::Material *)RL_CALLOC(model.materialCount, sizeof(rl::Material));
+        model.materials = (rl::Material *)RL_CALLOC(model.materialCount,
+                                                    sizeof(rl::Material));
         for (int i = 0; i < model.materialCount; i++)
           model.materials[i] = scene->materials[i];
 

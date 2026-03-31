@@ -1,6 +1,6 @@
 #pragma once
 #include "rydz_ecs/entity.hpp"
-#include "rydz_ecs/hierarchy.hpp"
+#include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_ecs/world.hpp"
 #include <functional>
 #include <unordered_map>
@@ -19,18 +19,20 @@ struct ComputedVisibility {
 };
 
 inline void compute_visibility(World &world) {
-  std::unordered_map<Entity, Visibility> visibilities;
   auto *vis_storage = world.get_storage<Visibility>();
   if (!vis_storage)
     return;
 
+  std::unordered_map<Entity, Visibility> visibilities;
   std::vector<Entity> entities;
+
   vis_storage->for_each([&](Entity e, const Visibility &v) {
     visibilities[e] = v;
     entities.push_back(e);
   });
 
   std::unordered_map<Entity, Entity> parents;
+
   auto *parent_storage = world.get_storage<Parent>();
   if (parent_storage) {
     parent_storage->for_each(

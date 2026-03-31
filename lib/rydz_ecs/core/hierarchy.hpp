@@ -1,6 +1,6 @@
 #pragma once
-#include "entity.hpp"
-#include "world.hpp"
+#include "rydz_ecs/entity.hpp"
+#include "rydz_ecs/world.hpp"
 #include <vector>
 
 namespace ecs {

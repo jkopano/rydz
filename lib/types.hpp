@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <type_traits>
 #include <variant>
 
@@ -19,6 +20,21 @@ using f64 = double;
 
 using usize = std::size_t;
 using isize = std::ptrdiff_t;
+
+inline constexpr u8 U8_MAX = std::numeric_limits<u8>::max();
+inline constexpr u16 U16_MAX = std::numeric_limits<u16>::max();
+inline constexpr u32 U32_MAX = std::numeric_limits<u32>::max();
+inline constexpr u64 U64_MAX = std::numeric_limits<u64>::max();
+
+inline constexpr i8 I8_MAX = std::numeric_limits<i8>::max();
+inline constexpr i16 I16_MAX = std::numeric_limits<i16>::max();
+inline constexpr i32 I32_MAX = std::numeric_limits<i32>::max();
+inline constexpr i64 I64_MAX = std::numeric_limits<i64>::max();
+
+inline constexpr f32 F32_MAX = std::numeric_limits<f32>::max();
+inline constexpr f64 F64_MAX = std::numeric_limits<f64>::max();
+
+inline constexpr usize USIZE_MAX = std::numeric_limits<usize>::max();
 
 template <typename... T> using Variant = std::variant<T...>;
 template <typename... T> using Tuple = std::tuple<T...>;

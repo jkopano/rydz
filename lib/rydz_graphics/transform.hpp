@@ -1,6 +1,6 @@
 #pragma once
 #include "math.hpp"
-#include "rydz_ecs/hierarchy.hpp"
+#include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_ecs/query.hpp"
 #include <functional>
 #include <unordered_map>
@@ -15,23 +15,20 @@ struct Transform {
   Vec3 scale = Vec3::sReplicate(1.0f);
 
   static Transform from_xyz(float x, float y, float z) {
-    return {{Vec3(x, y, z)}, Quat::sIdentity(), Vec3::sReplicate(1.0f)};
+    return Transform{
+        {Vec3(x, y, z)}, Quat::sIdentity(), Vec3::sReplicate(1.0f)};
   }
 
   static Transform from_translation(Vec3 pos) {
-    return {pos, Quat::sIdentity(), Vec3::sReplicate(1.0f)};
+    return Transform{pos, Quat::sIdentity(), Vec3::sReplicate(1.0f)};
   }
 
   static Transform from_rotation(Quat q) {
-    return {Vec3::sZero(), q, Vec3::sReplicate(1.0f)};
+    return Transform{Vec3::sZero(), q, Vec3::sReplicate(1.0f)};
   }
 
   static Transform from_scale(Vec3 s) {
-    return {Vec3::sZero(), Quat::sIdentity(), s};
-  }
-
-  static Transform from_scale_uniform(float s) {
-    return from_scale(Vec3::sReplicate(s));
+    return Transform{Vec3::sZero(), Quat::sIdentity(), s};
   }
 
   Mat4 compute_matrix() const {
@@ -46,8 +43,9 @@ struct Transform {
 
   Transform &look_at(Vec3 target, Vec3 world_up = Vec3(0, 1, 0)) {
     Vec3 dir = target - translation;
-    if (dir.LengthSq() < 1e-10f)
+    if (dir.LengthSq() < 1e-10f) {
       return *this;
+    }
 
     Mat4 look = Mat4::sLookAt(translation, target, world_up);
     Mat4 inv = look.Inversed();
@@ -79,21 +77,24 @@ inline void propagate_transforms(
 
   for (auto [entity, transform, parent, global] : query.iter()) {
     local_matrices[entity] = transform->compute_matrix();
-    if (parent)
+    if (parent) {
       parents[entity] = parent->entity;
+    }
   }
 
   std::unordered_map<Entity, GlobalTransform> cache;
   std::function<GlobalTransform(Entity)> compute =
       [&](Entity entity) -> GlobalTransform {
     auto it = cache.find(entity);
-    if (it != cache.end())
+    if (it != cache.end()) {
       return it->second;
+    }
 
     Mat4 local_mat = Mat4::sIdentity();
     auto lit = local_matrices.find(entity);
-    if (lit != local_matrices.end())
+    if (lit != local_matrices.end()) {
       local_mat = lit->second;
+    }
 
     GlobalTransform result;
     auto pit = parents.find(entity);
@@ -108,13 +109,15 @@ inline void propagate_transforms(
     return result;
   };
 
-  for (auto &[entity, _] : local_matrices)
+  for (auto &[entity, _] : local_matrices) {
     compute(entity);
+  }
 
   for (auto [entity, transform, parent, global] : query.iter()) {
     auto it = cache.find(entity);
-    if (it != cache.end())
+    if (it != cache.end()) {
       global.bypass_change_detection() = it->second;
+    }
   }
 }
 
