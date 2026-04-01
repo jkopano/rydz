@@ -16,12 +16,10 @@ struct SystemAccess {
 
   template <typename T> void add_component_read() {
     components_read.insert(std::type_index(typeid(T)));
-    archetype_required.insert(std::type_index(typeid(T)));
   }
 
   template <typename T> void add_component_write() {
     components_write.insert(std::type_index(typeid(T)));
-    archetype_required.insert(std::type_index(typeid(T)));
   }
 
   template <typename T> void add_archetype_required() {
@@ -48,6 +46,7 @@ struct SystemAccess {
            resources_read.empty() && resources_write.empty() && !exclusive;
   }
 
+  // Not 100% sure it works as it should, tbh
   bool is_archetype_disjoint(const SystemAccess &other) const {
     for (auto &req : archetype_required)
       if (other.archetype_excluded.contains(req))

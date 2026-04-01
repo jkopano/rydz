@@ -102,7 +102,10 @@ template <typename T> struct QueryFilterTraits<Added<T>> {
 
     return ticks->added.is_newer_than(last_run, this_run);
   }
-  static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
+  static void access(SystemAccess &acc) {
+    acc.add_component_read<T>();
+    acc.add_archetype_required<T>();
+  }
 
   static std::span<const Entity> candidates(const World &world) {
     auto *storage = world.get_storage<T>();
@@ -124,7 +127,10 @@ template <typename T> struct QueryFilterTraits<Changed<T>> {
     return ticks->changed.is_newer_than(last_run, this_run);
   }
 
-  static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
+  static void access(SystemAccess &acc) {
+    acc.add_component_read<T>();
+    acc.add_archetype_required<T>();
+  }
 
   static std::span<const Entity> candidates(const World &world) {
     auto *storage = world.get_storage<T>();
@@ -145,8 +151,18 @@ template <typename F1, typename F2> struct QueryFilterTraits<Or<F1, F2>> {
   }
 
   static void access(SystemAccess &acc) {
-    QueryFilterTraits<F1>::access(acc);
-    QueryFilterTraits<F2>::access(acc);
+    SystemAccess temp_acc;
+    QueryFilterTraits<F1>::access(temp_acc);
+    QueryFilterTraits<F2>::access(temp_acc);
+
+    acc.components_read.insert(temp_acc.components_read.begin(),
+                               temp_acc.components_read.end());
+    acc.components_write.insert(temp_acc.components_write.begin(),
+                                temp_acc.components_write.end());
+    acc.resources_read.insert(temp_acc.resources_read.begin(),
+                              temp_acc.resources_read.end());
+    acc.resources_write.insert(temp_acc.resources_write.begin(),
+                               temp_acc.resources_write.end());
   }
 
   static std::span<const Entity> candidates(const World &) { return {}; }

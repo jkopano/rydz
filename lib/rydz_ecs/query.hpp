@@ -80,7 +80,10 @@ struct FetcherBase {
 template <typename T> struct WorldQueryTraits {
   using Item = const T *;
 
-  static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
+  static void access(SystemAccess &acc) {
+    acc.add_component_read<T>();
+    acc.add_archetype_required<T>();
+  }
   static bool is_valid(Item item) { return item != nullptr; }
 
   struct Fetcher : FetcherBase<T> {
@@ -95,7 +98,10 @@ template <typename T> struct WorldQueryTraits {
 template <typename T> struct WorldQueryTraits<Mut<T>> {
   using Item = Mut<T>;
 
-  static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
+  static void access(SystemAccess &acc) {
+    acc.add_component_write<T>();
+    acc.add_archetype_required<T>();
+  }
   static bool is_valid(const Item &item) { return item.ptr != nullptr; }
 
   struct Fetcher : FetcherBase<T, storage_t<T> *> {
@@ -113,6 +119,7 @@ template <typename T> struct WorldQueryTraits<Mut<T>> {
 };
 
 template <typename T> struct WorldQueryTraits<Opt<T>> : WorldQueryTraits<T> {
+  static void access(SystemAccess &acc) { acc.add_component_read<T>(); }
   static bool is_valid(typename WorldQueryTraits<T>::Item) { return true; }
 
   struct Fetcher : WorldQueryTraits<T>::Fetcher {
@@ -123,6 +130,7 @@ template <typename T> struct WorldQueryTraits<Opt<T>> : WorldQueryTraits<T> {
 
 template <typename T>
 struct WorldQueryTraits<Opt<Mut<T>>> : WorldQueryTraits<Mut<T>> {
+  static void access(SystemAccess &acc) { acc.add_component_write<T>(); }
   static bool is_valid(const typename WorldQueryTraits<Mut<T>>::Item &) {
     return true;
   }
