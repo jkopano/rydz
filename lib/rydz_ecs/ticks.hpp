@@ -24,4 +24,9 @@ struct ComponentTicks {
   Tick last_run{};
 };
 
+struct SystemContext {
+  Tick last_run{};
+  Tick this_run{};
+};
+
 } // namespace ecs

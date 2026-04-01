@@ -208,6 +208,7 @@ private:
   void apply_commands() {
     auto *queues = world_.get_resource<CommandQueues>();
     if (queues && !queues->empty()) {
+      world_.increment_change_tick();
       queues->apply(world_);
     }
   }

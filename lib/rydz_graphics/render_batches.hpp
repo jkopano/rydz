@@ -1,5 +1,4 @@
 #pragma once
-#include "render_config.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/asset.hpp"
 #include <cstdint>
@@ -46,18 +45,10 @@ struct RenderBatchKey {
   int mesh_index = 0;
   int material_index = 0;
   MaterialKey material;
-  RenderConfig rc{};
-  bool has_rc = false;
 
   bool operator==(const RenderBatchKey &o) const {
     return model == o.model && mesh_index == o.mesh_index &&
-           material_index == o.material_index && material == o.material &&
-           has_rc == o.has_rc &&
-           rc.depth.test == o.rc.depth.test &&
-           rc.depth.write == o.rc.depth.write &&
-           rc.depth.func == o.rc.depth.func && rc.blend == o.rc.blend &&
-           rc.cull == o.rc.cull && rc.polygon_mode == o.rc.polygon_mode &&
-           rc.wireframe == o.rc.wireframe;
+           material_index == o.material_index && material == o.material;
   }
 };
 
@@ -116,14 +107,6 @@ template <> struct hash<ecs::RenderBatchKey> {
     ::hash_combine(seed, std::hash<int>{}(k.mesh_index));
     ::hash_combine(seed, std::hash<int>{}(k.material_index));
     ::hash_combine(seed, std::hash<ecs::MaterialKey>{}(k.material));
-    ::hash_combine(seed, std::hash<bool>{}(k.has_rc));
-    ::hash_combine(seed, std::hash<bool>{}(k.rc.depth.test));
-    ::hash_combine(seed, std::hash<bool>{}(k.rc.depth.write));
-    ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.rc.depth.func)));
-    ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.rc.blend)));
-    ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.rc.cull)));
-    ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.rc.polygon_mode)));
-    ::hash_combine(seed, std::hash<bool>{}(k.rc.wireframe));
     return seed;
   }
 };

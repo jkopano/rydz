@@ -3,6 +3,8 @@
 
 in vec3 FragPos;
 in vec3 Normal;
+in vec3 Tangent;
+in vec3 Bitangent;
 in vec2 TexCoord;
 
 out vec4 FragColor;
@@ -135,25 +137,14 @@ vec3 evaluatePBR(
   return (diffuse + specular) * radiance * NdotL;
 }
 
-mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
-  vec3 dp1 = dFdx(p);
-  vec3 dp2 = dFdy(p);
-  vec2 duv1 = dFdx(uv);
-  vec2 duv2 = dFdy(uv);
+vec3 sampleNormal(vec3 N, vec3 T, vec3 B, vec2 uv) {
+  if (dot(T, T) < 0.0001) {
+    return N;
+  }
 
-  vec3 dp2perp = cross(dp2, N);
-  vec3 dp1perp = cross(N, dp1);
-  vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
-  vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
-
-  float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
-  return mat3(T * invmax, B * invmax, N);
-}
-
-vec3 sampleNormal(vec3 N, vec3 p, vec2 uv) {
   vec3 tangentNormal = texture(u_normal_texture, uv).xyz * 2.0 - 1.0;
   tangentNormal.xy *= u_normal_factor;
-  mat3 TBN = cotangentFrame(N, p, uv);
+  mat3 TBN = mat3(T, B, N);
   return normalize(TBN * tangentNormal);
 }
 
@@ -178,7 +169,8 @@ void main() {
   metallic = clamp(metallic, 0.0, 1.0);
   roughness = clamp(roughness, 0.045, 1.0);
 
-  normal = sampleNormal(normal, FragPos, TexCoord);
+  normal = sampleNormal(normalize(normal), normalize(Tangent),
+      normalize(Bitangent), TexCoord);
 
   // Ambient occlusion
   float ao = u_occlusion_factor;
@@ -268,7 +260,6 @@ void main() {
   float strength = u_color.a;
   color = mix(color, color * u_color.rgb, strength);
 
-  // Simple tone mapping before output to sRGB.
   color = color / (color + vec3(1.0));
 
   color = pow(color, vec3(1.0 / 2.2));

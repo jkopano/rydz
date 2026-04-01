@@ -319,12 +319,12 @@ TEST(BundleTest, QueryMatchesBundleSpawnedEntities) {
   // Only give e2 health
   world.insert_component(e2, Health{50});
 
-  Query<Position, Velocity> all_query(world);
+  Query<Position, Velocity> all_query(world, Tick{0}, world.read_change_tick());
   int count = 0;
   all_query.each([&](const Position *, const Velocity *) { count++; });
   EXPECT_EQ(count, 2);
 
-  Query<Position, Health> health_query(world);
+  Query<Position, Health> health_query(world, Tick{0}, world.read_change_tick());
   int health_count = 0;
   health_query.each([&](const Position *p, const Health *h) {
     health_count++;
@@ -495,7 +495,7 @@ TEST(BundleTest, CmdSpawnBatch) {
 
   world.get_resource<CommandQueues>()->apply(world);
 
-  Query<Position, Velocity> query(world);
+  Query<Position, Velocity> query(world, Tick{0}, world.read_change_tick());
   int count = 0;
   query.each([&](const Position *, const Velocity *) { count++; });
   EXPECT_EQ(count, 10);

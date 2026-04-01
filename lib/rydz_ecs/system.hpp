@@ -36,6 +36,12 @@ public:
   virtual std::string name() const = 0;
   virtual std::string type_name() const { return name(); }
   virtual SystemAccess access() const { return {}; }
+
+  Tick last_run() const { return last_run_; }
+  void set_last_run(Tick t) { last_run_ = t; }
+
+protected:
+  Tick last_run_{};
 };
 
 template <typename P> struct SystemParamTraits {};
@@ -43,7 +49,7 @@ template <typename P> struct SystemParamTraits {};
 template <typename T> struct SystemParamTraits<Res<T>> {
   using Item = Res<T>;
 
-  static Item retrieve(World &world) {
+  static Item retrieve(World &world, const SystemContext &) {
     const T *ptr = world.get_resource<T>();
     if (!ptr) {
       throw std::runtime_error(std::string("Resource not found: ") +
@@ -59,7 +65,7 @@ template <typename T> struct SystemParamTraits<Res<T>> {
 template <typename T> struct SystemParamTraits<ResMut<T>> {
   using Item = ResMut<T>;
 
-  static Item retrieve(World &world) {
+  static Item retrieve(World &world, const SystemContext &) {
     T *ptr = world.get_resource<T>();
     if (!ptr) {
       throw std::runtime_error(std::string("Resource not found: ") +
@@ -77,7 +83,9 @@ template <typename... Qs> struct SystemParamTraits<Query<Qs...>> {
 
   static void access(SystemAccess &acc) { Query<Qs...>::access(acc); }
 
-  static Item retrieve(World &world) { return Query<Qs...>(world); }
+  static Item retrieve(World &world, const SystemContext &ctx) {
+    return Query<Qs...>(world, ctx.last_run, ctx.this_run);
+  }
   static bool available(const World &) { return true; }
 };
 
@@ -89,7 +97,7 @@ template <> struct SystemParamTraits<World> {
     acc.set_main_thread_only();
   }
 
-  static Item retrieve(World &world) { return world; }
+  static Item retrieve(World &world, const SystemContext &) { return world; }
   static bool available(const World &) { return true; }
 };
 
@@ -98,7 +106,7 @@ template <> struct SystemParamTraits<NonSendMarker> {
 
   static void access(SystemAccess &acc) { acc.set_main_thread_only(); }
 
-  static Item retrieve(World &) { return {}; }
+  static Item retrieve(World &, const SystemContext &) { return {}; }
   static bool available(const World &) { return true; }
 };
 
@@ -141,10 +149,11 @@ struct function_traits<R (*)(Args...)> : detail::function_traits_impl<Args...> {
 };
 
 template <typename T>
-concept SystemParameter = requires(World &w, SystemAccess &acc) {
-  SystemParamTraits<bare_t<T>>::retrieve(w);
-  SystemParamTraits<bare_t<T>>::access(acc);
-};
+concept SystemParameter =
+    requires(World &w, const SystemContext &ctx, SystemAccess &acc) {
+      SystemParamTraits<bare_t<T>>::retrieve(w, ctx);
+      SystemParamTraits<bare_t<T>>::access(acc);
+    };
 
 template <typename F> class FunctionSystem : public ISystem {
   F func_;
@@ -162,8 +171,11 @@ public:
   }
 
   void run(World &world) override {
+    Tick this_run = world.read_change_tick();
+    SystemContext ctx{last_run_, this_run};
     function_traits<F>::apply(
-        [&]<SystemParameter... Args>() { run_with_args<Args...>(world); });
+        [&]<SystemParameter... Args>() { run_with_args<Args...>(world, ctx); });
+    last_run_ = this_run;
   }
 
   std::string name() const override { return name_; }
@@ -178,8 +190,9 @@ public:
   }
 
 private:
-  template <SystemParameter... Args> void run_with_args(World &world) {
-    func_(SystemParamTraits<bare_t<Args>>::retrieve(world)...);
+  template <SystemParameter... Args>
+  void run_with_args(World &world, const SystemContext &ctx) {
+    func_(SystemParamTraits<bare_t<Args>>::retrieve(world, ctx)...);
   }
 
   template <SystemParameter... Args>

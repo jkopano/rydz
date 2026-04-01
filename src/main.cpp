@@ -8,7 +8,7 @@ int main() {
   App app;
   app.add_plugin(window_plugin({1280, 720, "rydz_ecs 3D Demo", 800}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
+      .add_plugin(RenderPlugin::install)
       .add_plugin(scene_plugin)
       .run();
 

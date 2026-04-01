@@ -164,7 +164,7 @@ public:
 template <> struct SystemParamTraits<Cmd> {
   using Item = Cmd;
 
-  static Item retrieve(World &world) {
+  static Item retrieve(World &world, const SystemContext &) {
     auto *queues = world.get_resource<CommandQueues>();
     if (!queues) {
       throw std::runtime_error("CommandQueues resource not found");

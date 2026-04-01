@@ -109,6 +109,8 @@ struct StandardMaterial {
           rl::GetShaderLocationAttrib(sh, "vertexNormal");
       sh.locs[SHADER_LOC_VERTEX_TEXCOORD01] =
           rl::GetShaderLocationAttrib(sh, "vertexTexCoord");
+      sh.locs[SHADER_LOC_VERTEX_TANGENT] =
+          rl::GetShaderLocationAttrib(sh, "vertexTangent");
       sh.locs[SHADER_LOC_MATRIX_MVP] = rl::GetShaderLocation(sh, "mvp");
       sh.locs[SHADER_LOC_COLOR_DIFFUSE] =
           rl::GetShaderLocation(sh, "colDiffuse");

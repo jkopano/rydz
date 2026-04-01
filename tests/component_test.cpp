@@ -90,7 +90,7 @@ TEST(ComponentTest, Query) {
   world.insert_component(e2, Position{3, 4});
 
   int count = 0;
-  Query<Position> query(world);
+  Query<Position> query(world, Tick{0}, world.read_change_tick());
   query.each([&](const Position *pos) {
     count++;
     EXPECT_NE(pos, nullptr);
@@ -167,7 +167,7 @@ TEST(ComponentTest, Query2) {
   // e3 has no Position
 
   int count = 0;
-  Query<Position, Velocity> query(world);
+  Query<Position, Velocity> query(world, Tick{0}, world.read_change_tick());
   query.each([&](const Position *pos, const Velocity *vel) {
     count++;
     EXPECT_EQ(*pos, (Position{1, 2}));

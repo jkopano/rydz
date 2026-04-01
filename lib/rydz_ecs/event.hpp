@@ -121,7 +121,7 @@ public:
 template <typename E> struct SystemParamTraits<EventWriter<E>> {
   using Item = EventWriter<E>;
 
-  static Item retrieve(World &world) {
+  static Item retrieve(World &world, const SystemContext &) {
     auto *events = world.get_resource<Events<E>>();
     if (!events)
       throw std::runtime_error("Events resource not found");
@@ -138,7 +138,7 @@ template <typename E> struct SystemParamTraits<EventWriter<E>> {
 template <typename E> struct SystemParamTraits<EventReader<E>> {
   using Item = EventReader<E>;
 
-  static Item retrieve(World &world) {
+  static Item retrieve(World &world, const SystemContext &) {
     auto *events = world.get_resource<Events<E>>();
     if (!events)
       throw std::runtime_error("Events resource not found");

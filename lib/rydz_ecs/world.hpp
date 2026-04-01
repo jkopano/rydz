@@ -21,7 +21,7 @@ public:
 
 private:
   std::unordered_map<std::type_index, std::unique_ptr<IStorage>> storages_;
-  Tick change_tick_{0};
+  Tick change_tick_{1};
   bool multithreaded_ = true;
 
 public:

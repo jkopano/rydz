@@ -18,15 +18,16 @@ template <typename... Fs> struct Filters {};
 template <typename F> struct QueryFilterTraits;
 
 template <> struct QueryFilterTraits<Filters<>> {
-  static bool matches(const World &, Entity) { return true; }
+  static bool matches(const World &, Entity, Tick, Tick) { return true; }
   static void access(SystemAccess &) {}
   static std::span<const Entity> candidates(const World &) { return {}; }
   static usize candidate_size(const World &) { return SIZE_MAX; }
 };
 
 template <typename F> struct QueryFilterTraits<Filters<F>> {
-  static bool matches(const World &world, Entity entity) {
-    return QueryFilterTraits<F>::matches(world, entity);
+  static bool matches(const World &world, Entity entity, Tick last_run,
+                      Tick this_run) {
+    return QueryFilterTraits<F>::matches(world, entity, last_run, this_run);
   }
   static void access(SystemAccess &acc) { QueryFilterTraits<F>::access(acc); }
   static std::span<const Entity> candidates(const World &world) {
@@ -39,9 +40,11 @@ template <typename F> struct QueryFilterTraits<Filters<F>> {
 
 template <typename F, typename... Fs>
 struct QueryFilterTraits<Filters<F, Fs...>> {
-  static bool matches(const World &world, Entity entity) {
-    return QueryFilterTraits<F>::matches(world, entity) &&
-           QueryFilterTraits<Filters<Fs...>>::matches(world, entity);
+  static bool matches(const World &world, Entity entity, Tick last_run,
+                      Tick this_run) {
+    return QueryFilterTraits<F>::matches(world, entity, last_run, this_run) &&
+           QueryFilterTraits<Filters<Fs...>>::matches(world, entity, last_run,
+                                                      this_run);
   }
   static void access(SystemAccess &acc) {
     QueryFilterTraits<F>::access(acc);
@@ -62,7 +65,7 @@ struct QueryFilterTraits<Filters<F, Fs...>> {
 };
 
 template <typename T> struct QueryFilterTraits<With<T>> {
-  static bool matches(const World &world, Entity entity) {
+  static bool matches(const World &world, Entity entity, Tick, Tick) {
     return world.has_component<T>(entity);
   }
   static void access(SystemAccess &acc) {
@@ -81,7 +84,7 @@ template <typename T> struct QueryFilterTraits<With<T>> {
 };
 
 template <typename T> struct QueryFilterTraits<Without<T>> {
-  static bool matches(const World &world, Entity entity) {
+  static bool matches(const World &world, Entity entity, Tick, Tick) {
     return !world.has_component<T>(entity);
   }
 
@@ -91,13 +94,11 @@ template <typename T> struct QueryFilterTraits<Without<T>> {
 };
 
 template <typename T> struct QueryFilterTraits<Added<T>> {
-  static bool matches(const World &world, Entity entity) {
+  static bool matches(const World &world, Entity entity, Tick last_run,
+                      Tick this_run) {
     auto ticks = world.get_component_ticks<T>(entity);
     if (!ticks)
       return false;
-
-    Tick this_run = world.read_change_tick();
-    Tick last_run = Tick{this_run.value - 1};
 
     return ticks->added.is_newer_than(last_run, this_run);
   }
@@ -115,12 +116,11 @@ template <typename T> struct QueryFilterTraits<Added<T>> {
 };
 
 template <typename T> struct QueryFilterTraits<Changed<T>> {
-  static bool matches(const World &world, Entity entity) {
+  static bool matches(const World &world, Entity entity, Tick last_run,
+                      Tick this_run) {
     auto ticks = world.get_component_ticks<T>(entity);
     if (!ticks)
       return false;
-    Tick this_run = world.read_change_tick();
-    Tick last_run = Tick{this_run.value - 1};
     return ticks->changed.is_newer_than(last_run, this_run);
   }
 
@@ -138,9 +138,10 @@ template <typename T> struct QueryFilterTraits<Changed<T>> {
 };
 
 template <typename F1, typename F2> struct QueryFilterTraits<Or<F1, F2>> {
-  static bool matches(const World &world, Entity entity) {
-    return QueryFilterTraits<F1>::matches(world, entity) ||
-           QueryFilterTraits<F2>::matches(world, entity);
+  static bool matches(const World &world, Entity entity, Tick last_run,
+                      Tick this_run) {
+    return QueryFilterTraits<F1>::matches(world, entity, last_run, this_run) ||
+           QueryFilterTraits<F2>::matches(world, entity, last_run, this_run);
   }
 
   static void access(SystemAccess &acc) {

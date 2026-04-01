@@ -1,6 +1,7 @@
 #pragma once
 #include "rl.hpp"
 #include "rydz_ecs/asset.hpp"
+#include <cstring>
 
 namespace ecs {
 
@@ -20,7 +21,15 @@ struct Model3d {
 
 namespace mesh {
 
+inline void ensure_tangents(rl::Mesh &m) {
+  if (m.tangents == nullptr && m.vertexCount > 0 && m.texcoords != nullptr &&
+      m.normals != nullptr) {
+    rl::GenMeshTangents(&m);
+  }
+}
+
 inline void ensure_uploaded(rl::Mesh &m) {
+  ensure_tangents(m);
   if (m.vaoId == 0 && m.vboId != nullptr) {
     RL_FREE(m.vboId);
     m.vboId = nullptr;

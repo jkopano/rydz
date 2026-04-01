@@ -39,7 +39,7 @@ TEST(QueryTest, BasicReadQuery) {
   world.insert_component(e2, Position{30, 40});
 
   int count = 0;
-  Query<Position> query(world);
+  Query<Position> query(world, Tick{0}, world.read_change_tick());
   query.each([&](const Position *pos) {
     count++;
     EXPECT_NE(pos, nullptr);
@@ -55,7 +55,7 @@ TEST(QueryTest, MutQuery) {
 
   // Mutate
   {
-    Query<Mut<Position>> query(world);
+    Query<Mut<Position>> query(world, Tick{0}, world.read_change_tick());
     query.each([&](Position *pos) {
       pos->x += 5;
       pos->y += 5;
@@ -76,7 +76,7 @@ TEST(QueryTest, TupleQuery) {
   world.insert_component(e1, Velocity{1, 2});
 
   bool found = false;
-  Query<Position, Velocity> query(world);
+  Query<Position, Velocity> query(world, Tick{0}, world.read_change_tick());
   query.each([&](const Position *pos, const Velocity *vel) {
     EXPECT_EQ(*pos, (Position{10, 20}));
     EXPECT_EQ(*vel, (Velocity{1, 2}));
@@ -101,7 +101,7 @@ TEST(QueryTest, WithFilter) {
 
   // With<Tag>
   std::vector<int> results;
-  Query<Position, Filters<With<Tag>>> query(world);
+  Query<Position, Filters<With<Tag>>> query(world, Tick{0}, world.read_change_tick());
   query.each([&](const Position *pos) { results.push_back(pos->x); });
   EXPECT_EQ(results.size(), 1u);
   EXPECT_EQ(results[0], 0);
@@ -123,7 +123,7 @@ TEST(QueryTest, WithoutFilter) {
 
   // Without<Tag>
   std::vector<int> results;
-  Query<Position, Filters<Without<Tag>>> query(world);
+  Query<Position, Filters<Without<Tag>>> query(world, Tick{0}, world.read_change_tick());
   query.each([&](const Position *pos) { results.push_back(pos->x); });
   std::sort(results.begin(), results.end());
   ASSERT_EQ(results.size(), 2u);
@@ -147,7 +147,7 @@ TEST(QueryTest, OrFilter) {
 
   // Or<With<Tag>, With<Velocity>>
   std::vector<int> results;
-  Query<Position, Filters<Or<With<Tag>, With<Velocity>>>> query(world);
+  Query<Position, Filters<Or<With<Tag>, With<Velocity>>>> query(world, Tick{0}, world.read_change_tick());
   query.each([&](const Position *pos) { results.push_back(pos->x); });
   std::sort(results.begin(), results.end());
   ASSERT_EQ(results.size(), 2u);
@@ -171,7 +171,7 @@ TEST(QueryTest, AndFilter) {
 
   // Without<Tag> AND With<Velocity>
   std::vector<int> results;
-  Query<Position, Filters<Without<Tag>, With<Velocity>>> query(world);
+  Query<Position, Filters<Without<Tag>, With<Velocity>>> query(world, Tick{0}, world.read_change_tick());
   query.each([&](const Position *pos) { results.push_back(pos->x); });
   ASSERT_EQ(results.size(), 1u);
   EXPECT_EQ(results[0], 20);
@@ -194,7 +194,7 @@ TEST(QueryTest, OptionalComponent) {
 
   // Opt<Velocity> always matches, returns nullptr when absent
   std::vector<std::pair<int, bool>> results;
-  Query<Position, Opt<Velocity>> query(world);
+  Query<Position, Opt<Velocity>> query(world, Tick{0}, world.read_change_tick());
   query.each([&](const Position *pos, const Velocity *vel) {
     results.push_back({pos->x, vel != nullptr});
   });

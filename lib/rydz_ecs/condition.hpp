@@ -27,8 +27,7 @@ SetId set(E value) {
 }
 
 template <typename S>
-  requires std::is_same_v<typename S::T, Set> ||
-           std::is_base_of<Set, S>::value
+  requires std::is_same_v<typename S::T, Set> || std::is_base_of<Set, S>::value
 SetId set() {
   return SetId{typeid(S), 0};
 }
@@ -68,8 +67,9 @@ public:
   explicit FunctionCondition(F func) : func_(std::move(func)) {}
 
   bool is_true(World &world) override {
+    SystemContext ctx{Tick{0}, world.read_change_tick()};
     return function_traits<F>::apply([&]<SystemParameter... Args>() {
-      return func_(SystemParamTraits<bare_t<Args>>::retrieve(world)...);
+      return func_(SystemParamTraits<bare_t<Args>>::retrieve(world, ctx)...);
     });
   }
 };
@@ -300,8 +300,7 @@ SetConfigDescriptor configure(E value) {
 }
 
 template <typename S>
-  requires std::is_same_v<typename S::T, Set> ||
-           std::is_base_of<Set, S>::value
+  requires std::is_same_v<typename S::T, Set> || std::is_base_of<Set, S>::value
 SetConfigDescriptor configure() {
   return SetConfigDescriptor(set<S>());
 }

@@ -154,9 +154,12 @@ template <typename... Qs> class Query {
   using FilterT = typename Decomposed::FilterList;
 
   World *world_;
+  Tick last_run_{};
+  Tick this_run_{};
 
 public:
-  explicit Query(World &world) : world_(&world) {}
+  explicit Query(World &world, Tick last_run, Tick this_run)
+      : world_(&world), last_run_(last_run), this_run_(this_run) {}
 
   template <typename Func> void each(Func &&func) const {
     for_each_impl(std::forward<Func>(func), ItemTuple{});
@@ -222,10 +225,11 @@ private:
 
   template <typename... Items>
   static std::optional<Tuple<typename WorldQueryTraits<Items>::Item...>>
-  try_fetch(const auto &fetchers, Entity entity, const World &world) {
+  try_fetch(const auto &fetchers, Entity entity, const World &world,
+            Tick last_run, Tick this_run) {
     auto items = fetch_all<Items...>(fetchers, entity);
     if (!all_valid<Items...>(items) ||
-        !QueryFilterTraits<FilterT>::matches(world, entity))
+        !QueryFilterTraits<FilterT>::matches(world, entity, last_run, this_run))
       return std::nullopt;
     return items;
   }
@@ -237,7 +241,8 @@ private:
 
     std::optional<Result> result;
     for (Entity entity : candidates) {
-      auto fetched = try_fetch<Items...>(fetchers, entity, *world_);
+      auto fetched =
+          try_fetch<Items...>(fetchers, entity, *world_, last_run_, this_run_);
       if (!fetched)
         continue;
       if (result.has_value()) {
@@ -258,8 +263,9 @@ private:
     auto candidates = find_smallest_entities_group<Items...>(fetchers);
 
     return candidates |
-           views::transform([fetchers, world = world_](Entity entity) {
-             return try_fetch<Items...>(fetchers, entity, *world);
+           views::transform([fetchers, world = world_, lr = last_run_,
+                             tr = this_run_](Entity entity) {
+             return try_fetch<Items...>(fetchers, entity, *world, lr, tr);
            }) |
            views::filter([](const auto &opt) { return opt.has_value(); }) |
            views::transform([](auto &&opt) { return *std::move(opt); });
@@ -271,7 +277,8 @@ private:
     auto candidates = find_smallest_entities_group<Items...>(fetchers);
 
     for (Entity entity : candidates) {
-      auto fetched = try_fetch<Items...>(fetchers, entity, *world_);
+      auto fetched =
+          try_fetch<Items...>(fetchers, entity, *world_, last_run_, this_run_);
       if (!fetched)
         continue;
       std::apply(func, *fetched);
