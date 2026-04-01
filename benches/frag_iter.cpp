@@ -79,7 +79,7 @@ static World make_world() {
   return world;
 }
 
-static void BM_FragmentedIter(benchmark::State &state) {
+static void BM_FragIter(benchmark::State &state) {
   auto world = make_world();
 
   for (auto _ : state) {
@@ -87,6 +87,6 @@ static void BM_FragmentedIter(benchmark::State &state) {
     query.each([](Data *data) { data->value *= 2.0f; });
   }
 }
-BENCHMARK(BM_FragmentedIter)->MinTime(3);
+BENCHMARK(BM_FragIter)->MinTime(3);
 
 } // namespace bench_frag_iter

@@ -54,8 +54,8 @@ int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "04 - Events", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
-      .add_plugin(input_plugin)
+      .add_plugin(RenderPlugin::install)
+      .add_plugin(Input::install)
       .add_event<DamageEvent>()
       .add_event<ScoreEvent>()
       .add_systems(ScheduleLabel::Update, send_events)

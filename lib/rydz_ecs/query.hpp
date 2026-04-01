@@ -18,14 +18,13 @@ namespace ecs {
 
 template <typename T> struct Mut {
   T *ptr = nullptr;
-  SparseSetStorage<T> *storage = nullptr;
-  Entity entity{};
+  ComponentTicks *ticks = nullptr;
   Tick tick{};
   bool marked = false;
 
   Mut() = default;
-  Mut(T *p, SparseSetStorage<T> *s, Entity e, Tick t)
-      : ptr(p), storage(s), entity(e), tick(t) {}
+  Mut(T *p, ComponentTicks *t, Tick current_tick)
+      : ptr(p), ticks(t), tick(current_tick) {}
 
   T &get() {
     mark();
@@ -57,8 +56,8 @@ template <typename T> struct Mut {
 
 private:
   void mark() {
-    if (!marked && storage && ptr) {
-      storage->mark_changed(entity, tick);
+    if (!marked && ticks) {
+      ticks->changed = tick;
       marked = true;
     }
   }
@@ -112,8 +111,9 @@ template <typename T> struct WorldQueryTraits<Mut<T>> {
       tick = world.read_change_tick();
     }
     Item fetch(Entity entity) const {
-      return Item{this->storage ? this->storage->get(entity) : nullptr,
-                  this->storage, entity, tick};
+      if (!this->storage) return Item{};
+      auto [p, t] = this->storage->get_with_ticks(entity);
+      return Item{p, t, tick};
     }
   };
 };
@@ -168,6 +168,8 @@ template <typename... Qs> class Query {
 public:
   explicit Query(World &world, Tick last_run, Tick this_run)
       : world_(&world), last_run_(last_run), this_run_(this_run) {}
+
+  explicit Query(World &world) : Query(world, Tick{}, Tick{}) {}
 
   template <typename Func> void each(Func &&func) const {
     for_each_impl(std::forward<Func>(func), ItemTuple{});

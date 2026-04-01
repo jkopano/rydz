@@ -2,6 +2,7 @@
 #include "entity.hpp"
 #include "fwd.hpp"
 #include "helpers.hpp"
+#include "requires.hpp"
 #include "resource.hpp"
 #include "rydz_ecs/bundle.hpp"
 #include "storage.hpp"
@@ -23,6 +24,13 @@ private:
   std::unordered_map<std::type_index, std::unique_ptr<IStorage>> storages_;
   Tick change_tick_{1};
   bool multithreaded_ = true;
+
+  template <typename R> void insert_if_missing(Entity entity) {
+    using Decayed = std::decay_t<R>;
+    if (!this->has_component<Decayed>(entity)) {
+      this->insert_component<Decayed>(entity, Decayed{});
+    }
+  }
 
 public:
   World() = default;
@@ -87,6 +95,15 @@ public:
     assert(entities.is_alive(entity) && "inserting component on dead entity");
     auto &storage = ensure_storage_exist<T>();
     storage.insert(entity, std::move(component), change_tick_);
+
+    if constexpr (ecs::HasRequired<T>) {
+      using ReqTuple = typename T::Required::as_tuple;
+      std::apply(
+          [this, entity](auto... args) {
+            (this->insert_if_missing<decltype(args)>(entity), ...);
+          },
+          ReqTuple{});
+    }
   }
 
   template <typename T, typename Self>

@@ -1,6 +1,10 @@
 #pragma once
+#include "raylib.h"
 #include "rl.hpp"
 #include "rydz_ecs/asset.hpp"
+#include "rydz_ecs/requires.hpp"
+#include "rydz_graphics/material3d.hpp"
+#include "rydz_graphics/visibility.hpp"
 #include <cstring>
 
 namespace ecs {
@@ -13,6 +17,7 @@ struct Mesh3d {
 };
 
 struct Model3d {
+  using Required = Requires<Visibility, Material3d>;
   Handle<rl::Model> model;
 
   Model3d() = default;

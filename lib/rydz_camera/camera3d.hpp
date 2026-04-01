@@ -3,6 +3,8 @@
 #include "raymath.h"
 #include "rl.hpp"
 #include "rydz_graphics/transform.hpp"
+#include "rydz_ecs/requires.hpp"
+#include "rydz_graphics/render_config.hpp"
 #include <algorithm>
 
 namespace ecs {
@@ -15,6 +17,7 @@ enum class CameraProjection3D {
 };
 
 struct Camera3DComponent {
+  using Required = Requires<RenderConfig>;
   CameraProjection3D projection = CameraProjection3D::Perspective;
   float perspective_fov_y_deg = 45.0f;
   float orthographic_height = 10.0f;

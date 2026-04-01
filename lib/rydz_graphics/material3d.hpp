@@ -43,7 +43,7 @@ struct StandardMaterial {
       return;
     }
 
-    for (int i = 0; i < model.materialCount; ++i) {
+    for (i32 i = 0; i < model.materialCount; ++i) {
       auto &material = model.materials[i];
       if (s) {
         material.shader = *s;

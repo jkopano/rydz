@@ -64,6 +64,19 @@ public:
     return i ? &dense_data_[*i] : nullptr;
   }
 
+  ComponentTicks *get_ticks_mut(Entity e) {
+    auto i = get_dense_idx(e);
+    return i ? &dense_ticks_[*i] : nullptr;
+  }
+
+  std::pair<T *, ComponentTicks *> get_with_ticks(Entity e) {
+    auto i = get_dense_idx(e);
+    if (i) {
+      return {&dense_data_[*i], &dense_ticks_[*i]};
+    }
+    return {nullptr, nullptr};
+  }
+
   void remove(Entity entity) override {
     auto d_idx = get_dense_idx(entity);
     if (!d_idx)
@@ -140,6 +153,15 @@ public:
   const ComponentTicks *get_ticks_ptr(Entity entity) const {
     auto it = ticks_.find(entity);
     return it != ticks_.end() ? &it->second : nullptr;
+  }
+
+  std::pair<T *, ComponentTicks *> get_with_ticks(Entity entity) {
+    auto it = data_.find(entity);
+    if (it != data_.end()) {
+      auto ticks_it = ticks_.find(entity);
+      return {&it->second, &ticks_it->second};
+    }
+    return {nullptr, nullptr};
   }
 
   void remove(Entity entity) override {

@@ -1,5 +1,6 @@
 #pragma once
-#include "app.hpp"
+#include "rydz_ecs/app.hpp"
+#include "types.hpp"
 #include <unordered_set>
 #include <vector>
 
@@ -13,6 +14,11 @@ struct MouseState {
 };
 
 struct Input {
+  static void install(App &app) {
+    app.insert_resource(Input{});
+    app.add_systems(ScheduleLabel::First, input_polling_system);
+  }
+
   using T = Resource;
   bool key_down(KeyCode key) const { return keys_down_.contains(key); }
   bool key_pressed(KeyCode key) const { return keys_pressed_.contains(key); }
@@ -24,6 +30,7 @@ struct Input {
   f32 mouse_delta_x() const { return mouse_.delta_x; }
   f32 mouse_delta_y() const { return mouse_.delta_y; }
 
+public:
   void clear_frame() {
     keys_pressed_.clear();
     keys_released_.clear();
@@ -52,41 +59,33 @@ struct Input {
 
   std::unordered_set<KeyCode> &keys_down() { return keys_down_; }
 
-private:
   std::unordered_set<KeyCode> keys_down_;
   std::unordered_set<KeyCode> keys_pressed_;
   std::unordered_set<KeyCode> keys_released_;
   MouseState mouse_;
-};
 
-inline void input_polling_system(ResMut<Input> input, NonSendMarker) {
-  input->clear_frame();
+  static void input_polling_system(ResMut<Input> input, NonSendMarker) {
+    input->clear_frame();
 
-  // Drain raylib's key pressed queue
-  i32 key;
-  while ((key = rl::GetKeyPressed()) != 0) {
-    input->set_key_down(key);
-  }
-
-  // Check releases for currently tracked keys
-  auto &down = input->keys_down();
-  std::vector<KeyCode> released;
-  for (KeyCode k : down) {
-    if (rl::IsKeyUp(k)) {
-      released.push_back(k);
+    i32 key;
+    while ((key = rl::GetKeyPressed()) != 0) {
+      input->set_key_down(key);
     }
-  }
-  for (KeyCode k : released) {
-    input->set_key_up(k);
-  }
 
-  rl::Vector2 md = rl::GetMouseDelta();
-  input->set_mouse_delta(md.x, md.y);
-}
+    auto &down = input->keys_down();
+    std::vector<KeyCode> released;
+    for (KeyCode k : down) {
+      if (rl::IsKeyUp(k)) {
+        released.push_back(k);
+      }
+    }
+    for (KeyCode k : released) {
+      input->set_key_up(k);
+    }
 
-inline void input_plugin(App &app) {
-  app.insert_resource(Input{});
-  app.add_systems(ScheduleLabel::First, input_polling_system);
-}
+    rl::Vector2 md = rl::GetMouseDelta();
+    input->set_mouse_delta(md.x, md.y);
+  }
+};
 
 } // namespace ecs
