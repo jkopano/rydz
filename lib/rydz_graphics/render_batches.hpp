@@ -49,16 +49,9 @@ struct RenderBatchKey {
   }
 };
 
-struct RenderBatch {
+struct OpaqueBatch {
   RenderBatchKey key;
   std::vector<rl::Matrix> transforms;
-};
-
-struct RenderBatches {
-  using T = Resource;
-  std::vector<RenderBatch> batches;
-
-  void clear() { batches.clear(); }
 };
 
 } // namespace ecs
