@@ -137,7 +137,7 @@ int main() {
       // możemy to zrobić tutaj albo w systemach
       .insert_resource(EnemyCount{0})
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
+      .add_plugin(RenderPlugin::install)
       .add_plugin(engine::scripting_plugin)
       .add_plugin(engine::console_plugin)
       .add_systems(ScheduleLabel::Startup, bind_lua_commands)

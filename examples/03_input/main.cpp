@@ -68,7 +68,7 @@ int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "03 - Input", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
+      .add_plugin(RenderPlugin::install)
       .add_plugin(input_plugin)
       .add_systems(ScheduleLabel::Startup, setup)
       .add_systems(ScheduleLabel::Update, player_movement)

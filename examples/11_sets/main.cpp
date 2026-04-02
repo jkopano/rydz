@@ -36,7 +36,7 @@ int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "11 - System Sets", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
+      .add_plugin(RenderPlugin::install)
       .add_plugin(input_plugin)
 
       // Systemy w setach enum

@@ -26,7 +26,7 @@ int main() {
   // - render_plugin
   app.add_plugin(window_plugin({800, 600, "01 - Hello Window", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
+      .add_plugin(RenderPlugin::install)
       .insert_resource(ClearColor{{40, 80, 120, 255}})
       .add_systems(ScheduleLabel::Update, hello_system)
       .run();

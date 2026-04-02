@@ -3,6 +3,7 @@
 #include "math.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/schedule_label.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
 
@@ -76,7 +77,7 @@ int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "10 - Custom Material", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
+      .add_plugin(RenderPlugin::install)
       .add_systems(ScheduleLabel::Startup, setup)
       .run();
 }

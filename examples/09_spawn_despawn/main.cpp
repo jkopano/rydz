@@ -84,7 +84,7 @@ int main() {
   app.add_plugin(
          window_plugin({1024, 768, "09 - Spawn/Despawn (SPACE/F/X)", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
+      .add_plugin(RenderPlugin::install)
       .add_plugin(input_plugin)
       .add_systems(ScheduleLabel::Startup, setup)
       .add_systems(ScheduleLabel::Update,

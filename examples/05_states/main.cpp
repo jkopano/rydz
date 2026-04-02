@@ -59,7 +59,7 @@ int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "05 - States (Enter/P/M)", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
+      .add_plugin(RenderPlugin::install)
       .add_plugin(input_plugin)
       .init_state(GameState::Menu)
       // OnEnter/OnExit - uruchamiane przy odpowiednio Wejściu w stan i Wyjściu
