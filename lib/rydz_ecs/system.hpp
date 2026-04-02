@@ -1,7 +1,6 @@
 #pragma once
-#include "access.hpp"
-#include "query.hpp"
-#include "world.hpp"
+#include "helpers.hpp"
+#include "params.hpp"
 #include <array>
 #include <concepts>
 #include <functional>
@@ -12,22 +11,6 @@
 #include <utility>
 
 namespace ecs {
-
-struct NonSendMarker {};
-
-template <typename T> struct Res {
-  const T *ptr;
-  const T &operator*() const { return *ptr; }
-  const T *operator->() const { return ptr; }
-};
-
-template <typename T> struct ResMut {
-  T *ptr;
-  T &operator*() { return *ptr; }
-  T *operator->() { return ptr; }
-  const T &operator*() const { return *ptr; }
-  const T *operator->() const { return ptr; }
-};
 
 class ISystem {
 public:
@@ -42,72 +25,6 @@ public:
 
 protected:
   Tick last_run_{};
-};
-
-template <typename P> struct SystemParamTraits {};
-
-template <typename T> struct SystemParamTraits<Res<T>> {
-  using Item = Res<T>;
-
-  static Item retrieve(World &world, const SystemContext &) {
-    const T *ptr = world.get_resource<T>();
-    if (!ptr) {
-      throw std::runtime_error(std::string("Resource not found: ") +
-                               typeid(T).name());
-    }
-    return Res<T>{ptr};
-  }
-
-  static bool available(const World &world) { return world.has_resource<T>(); }
-  static void access(SystemAccess &acc) { acc.add_resource_read<T>(); }
-};
-
-template <typename T> struct SystemParamTraits<ResMut<T>> {
-  using Item = ResMut<T>;
-
-  static Item retrieve(World &world, const SystemContext &) {
-    T *ptr = world.get_resource<T>();
-    if (!ptr) {
-      throw std::runtime_error(std::string("Resource not found: ") +
-                               typeid(T).name());
-    }
-    return ResMut<T>{ptr};
-  }
-
-  static bool available(const World &world) { return world.has_resource<T>(); }
-  static void access(SystemAccess &acc) { acc.add_resource_write<T>(); }
-};
-
-template <typename... Qs> struct SystemParamTraits<Query<Qs...>> {
-  using Item = Query<Qs...>;
-
-  static void access(SystemAccess &acc) { Query<Qs...>::access(acc); }
-
-  static Item retrieve(World &world, const SystemContext &ctx) {
-    return Query<Qs...>(world, ctx.last_run, ctx.this_run);
-  }
-  static bool available(const World &) { return true; }
-};
-
-template <> struct SystemParamTraits<World> {
-  using Item = World &;
-
-  static void access(SystemAccess &acc) {
-    acc.set_exclusive();
-    acc.set_main_thread_only();
-  }
-
-  static Item retrieve(World &world, const SystemContext &) { return world; }
-  static bool available(const World &) { return true; }
-};
-
-template <> struct SystemParamTraits<NonSendMarker> {
-  using Item = NonSendMarker;
-
-  static void access(SystemAccess &acc) { acc.set_main_thread_only(); }
-
-  static Item retrieve(World &, const SystemContext &) { return {}; }
-  static bool available(const World &) { return true; }
 };
 
 namespace detail {

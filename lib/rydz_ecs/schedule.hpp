@@ -149,9 +149,10 @@ public:
 
     if (!world.multithreaded()) {
       for (auto &entry : entries_) {
-        ZoneScopedN("System");
+#ifdef TRACY_ENABLE
         const auto sys_name = entry.system->name();
-        ZoneText(sys_name.c_str(), sys_name.size());
+        ZoneScopedTransient(sys_name.c_str());
+#endif
         entry.system->run(world);
       }
       return;
@@ -160,9 +161,10 @@ public:
     for (auto &step : steps_) {
       if (auto *s = std::get_if<InlineStep>(&step)) {
         for (usize i : range(s->start, s->end)) {
-          ZoneScopedN("System");
+#ifdef TRACY_ENABLE
           const auto sys_name = entries_[i].system->name();
-          ZoneText(sys_name.c_str(), sys_name.size());
+          ZoneScopedTransient(sys_name.c_str());
+#endif
           entries_[i].system->run(world);
         }
       } else {
@@ -394,9 +396,10 @@ private:
 
       for (usize i = batch_start; i < batch_end; ++i) {
         auto task = step.taskflow.emplace([this, i] {
-          ZoneScopedN("System");
+#ifdef TRACY_ENABLE
           const auto sys_name = entries_[i].system->name();
-          ZoneText(sys_name.c_str(), sys_name.size());
+          ZoneScopedTransient(sys_name.c_str());
+#endif
           entries_[i].system->run(*current_world_);
         });
 
@@ -441,8 +444,10 @@ public:
     auto *schedule = get(label);
     if (schedule) {
       ZoneScopedN("Schedule");
+#ifdef TRACY_ENABLE
       auto name = schedule_label_name(label);
       ZoneText(name, std::strlen(name));
+#endif
       schedule->run(world);
     }
   }

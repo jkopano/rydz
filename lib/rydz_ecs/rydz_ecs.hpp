@@ -13,15 +13,17 @@
 
 #include "rydz_ecs/bundle.hpp"
 #include "rydz_ecs/filter.hpp"
+#include "rydz_ecs/params.hpp"
 #include "rydz_ecs/query.hpp"
+#include "rydz_ecs/query_traits.hpp"
 #include "rydz_ecs/system.hpp"
 
 #include "rydz_ecs/command.hpp"
 #include "rydz_ecs/event.hpp"
 
-#include "rydz_ecs/schedule_label.hpp"
 #include "rydz_ecs/condition.hpp"
 #include "rydz_ecs/schedule.hpp"
+#include "rydz_ecs/schedule_label.hpp"
 
 #include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_ecs/plugin.hpp"
@@ -31,7 +33,7 @@
 #include "rydz_ecs/core/time.hpp"
 
 #include "rydz_ecs/asset.hpp"
-#include "rydz_ecs/core/name.hpp"
 #include "rydz_ecs/core/input.hpp"
+#include "rydz_ecs/core/name.hpp"
 
 #include "rydz_ecs/tracy_plugin.hpp"

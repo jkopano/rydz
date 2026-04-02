@@ -39,8 +39,10 @@ template <typename... Fs> struct Filters;
 template <typename... Qs> class Query;
 
 class ISystem;
+struct NonSendMarker;
 template <typename T> struct Res;
 template <typename T> struct ResMut;
+template <typename P> struct SystemParamTraits;
 
 class CommandQueue;
 class CommandQueues;
