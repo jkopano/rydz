@@ -101,7 +101,7 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform>> query,
 
 inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
   cmd.spawn(MapTag{}, CameraState{FreeLook{}},
-            Model3d{asset_server->load<rl::Model>("res/models/sponza.glb")},
+            Model3d{asset_server->load<rl::Model>("res/models/forest_house.glb")},
             Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}});
 }
 

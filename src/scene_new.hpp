@@ -136,7 +136,7 @@ inline void spawn_player(Cmd cmd, ResMut<Assets<rl::Model>> models,
 // ── Plugin ───────────────────────────────────────────────────────────────────
 
 inline void scene_plugin(App &app) {
-  app.add_plugin(input_plugin);
+  app.add_plugin(Input::install);
   app.add_plugin(system_multithreading({true}));
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
