@@ -71,7 +71,7 @@ end
 
 if is_plat("windows") then
 	add_defines("NOMINMAX", "_CRT_SECURE_NO_WARNINGS")
-	add_requires("luajit v2.1.0-beta3")
+	add_requires("luajit v2.1")
 end
 
 -- debug flags
