@@ -11,14 +11,25 @@
 
 namespace ecs {
 
+enum class RenderExtractSet {
+  Extract,
+  Queue,
+  Prepare,
+};
+
+enum class RenderPassSet {
+  Setup,
+  Main,
+  Overlay,
+  Cleanup,
+};
+
 struct RenderPlugin {
   static void install(App &app) {
-    app.init_resource<Assets<rl::Mesh>>([](rl::Mesh &mesh) {
-           rl::UnloadMesh(mesh);
-         })
-        .init_resource<Assets<rl::Texture2D>>([](rl::Texture2D &texture) {
-          rl::UnloadTexture(texture);
-        })
+    app.init_resource<Assets<rl::Mesh>>(
+           [](rl::Mesh &mesh) { rl::UnloadMesh(mesh); })
+        .init_resource<Assets<rl::Texture2D>>(
+            [](rl::Texture2D &texture) { rl::UnloadTexture(texture); })
         .init_resource<Assets<Scene>>()
         .init_resource<AssetServer>()
         .init_resource<ClearColor>()
@@ -42,6 +53,22 @@ struct RenderPlugin {
       }
     });
 
+    app.configure_set(ScheduleLabel::ExtractRender,
+                      configure(RenderExtractSet::Queue)
+                          .after(set(RenderExtractSet::Extract)))
+        .configure_set(ScheduleLabel::ExtractRender,
+                       configure(RenderExtractSet::Prepare)
+                           .after(set(RenderExtractSet::Queue)))
+        .configure_set(
+            ScheduleLabel::Render,
+            configure(RenderPassSet::Main).after(set(RenderPassSet::Setup)))
+        .configure_set(
+            ScheduleLabel::Render,
+            configure(RenderPassSet::Overlay).after(set(RenderPassSet::Main)))
+        .configure_set(ScheduleLabel::Render,
+                       configure(RenderPassSet::Cleanup)
+                           .after(set(RenderPassSet::Overlay)));
+
     app.add_systems(ScheduleLabel::First, cleanup_orphan_scene_entities_system)
         .add_systems(ScheduleLabel::PreUpdate, sync_scene_roots_system)
 
@@ -49,23 +76,40 @@ struct RenderPlugin {
                      group(propagate_transforms, compute_visibility,
                            compute_mesh_bounds_system, frustum_cull_system))
 
-        .add_systems(ScheduleLabel::ExtractRender, extract_view_system)
-        .add_systems(ScheduleLabel::ExtractRender, extract_lighting_system)
-        .add_systems(ScheduleLabel::ExtractRender, extract_meshes_system)
-        .add_systems(ScheduleLabel::ExtractRender, extract_overlay_system)
-        .add_systems(ScheduleLabel::ExtractRender, queue_shadow_phase_system)
-        .add_systems(ScheduleLabel::ExtractRender, queue_opaque_phase_system)
         .add_systems(ScheduleLabel::ExtractRender,
-                     queue_transparent_phase_system)
-        .add_systems(ScheduleLabel::ExtractRender, queue_overlay_phase_system)
-        .add_systems(ScheduleLabel::ExtractRender, build_opaque_batches_system)
+                     group(extract_view_system, extract_lighting_system,
+                           extract_meshes_system, extract_overlay_system)
+                         .in_set(set(RenderExtractSet::Extract))
+                         .chain())
 
-        .add_systems(ScheduleLabel::Render, begin_frame_system)
-        .add_systems(ScheduleLabel::Render, run_shadow_pass_system)
-        .add_systems(ScheduleLabel::Render, run_opaque_pass_system)
-        .add_systems(ScheduleLabel::Render, run_transparent_pass_system)
-        .add_systems(ScheduleLabel::Render, run_overlay_pass_system)
-        .add_systems(ScheduleLabel::Render, end_frame_system);
+        .add_systems(ScheduleLabel::ExtractRender,
+                     group(RenderPhaseSystems::queue_shadow_phase,
+                           RenderPhaseSystems::queue_opaque_phase,
+                           RenderPhaseSystems::queue_transparent_phase,
+                           RenderPhaseSystems::queue_overlay_phase)
+                         .in_set(set(RenderExtractSet::Queue))
+                         .chain())
+
+        .add_systems(ScheduleLabel::ExtractRender,
+                     group(RenderPhaseSystems::build_opaque_batches)
+                         .in_set(set(RenderExtractSet::Prepare)))
+
+        .add_systems(ScheduleLabel::Render,
+                     group(RenderPassSystems::begin_frame)
+                         .in_set(set(RenderPassSet::Setup)))
+
+        .add_systems(ScheduleLabel::Render,
+                     group(RenderPassSystems::run_shadow_pass,
+                           RenderPassSystems::run_opaque_pass,
+                           RenderPassSystems::run_transparent_pass)
+                         .in_set(set(RenderPassSet::Main))
+                         .chain())
+        .add_systems(ScheduleLabel::Render,
+                     group(RenderPassSystems::run_overlay_pass)
+                         .in_set(set(RenderPassSet::Overlay)))
+        .add_systems(ScheduleLabel::Render,
+                     group(RenderPassSystems::end_frame)
+                         .in_set(set(RenderPassSet::Cleanup)));
   }
 };
 

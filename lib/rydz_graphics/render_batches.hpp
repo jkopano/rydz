@@ -35,8 +35,7 @@ struct MaterialKey {
            occlusion_id == o.occlusion_id && emissive_id == o.emissive_id &&
            metallic == o.metallic && roughness == o.roughness &&
            normal_scale == o.normal_scale &&
-           occlusion_strength == o.occlusion_strength &&
-           shader == o.shader;
+           occlusion_strength == o.occlusion_strength && shader == o.shader;
   }
 };
 

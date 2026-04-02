@@ -1,14 +1,15 @@
 #pragma once
-#include "scene_graph.hpp"
 #include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_graphics/visibility.hpp"
+#include "scene_graph.hpp"
 #include <algorithm>
 
 namespace ecs {
 
 namespace detail {
 
-inline bool scene_instance_alive(const World &world, const SceneInstance &inst) {
+inline bool scene_instance_alive(const World &world,
+                                 const SceneInstance &inst) {
   for (Entity entity : inst.owned_entities) {
     if (!world.entities.is_alive(entity)) {
       return false;
@@ -141,7 +142,8 @@ inline SceneInstance build_scene_instance(World &world, Entity root_entity,
         node.parent >= 0 ? instance.node_entities[node.parent] : root_entity;
 
     ensure_scene_owned(world, entity, root_entity);
-    ensure_node_instance(world, entity, root_entity, node_index, node.bone_index);
+    ensure_node_instance(world, entity, root_entity, node_index,
+                         node.bone_index);
     ensure_visibility(world, entity);
     ensure_transform(world, entity, node.local_transform);
     ensure_parent(world, entity, parent_entity);
@@ -203,7 +205,8 @@ inline void sync_scene_instance(World &world, Entity root_entity,
         node.parent >= 0 ? instance.node_entities[node.parent] : root_entity;
 
     ensure_scene_owned(world, entity, root_entity);
-    ensure_node_instance(world, entity, root_entity, node_index, node.bone_index);
+    ensure_node_instance(world, entity, root_entity, node_index,
+                         node.bone_index);
     ensure_visibility(world, entity);
     ensure_transform(world, entity, node.local_transform);
     ensure_parent(world, entity, parent_entity);

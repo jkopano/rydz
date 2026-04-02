@@ -46,7 +46,8 @@ inline rl::Material &fallback_material(NonSendMarker) {
     fallback.shader.id = rl::rlGetShaderIdDefault();
     fallback.shader.locs = rl::rlGetShaderLocsDefault();
     fallback.maps = (rl::MaterialMap *)RL_CALLOC(12, sizeof(rl::MaterialMap));
-    fallback.maps[MATERIAL_MAP_DIFFUSE].texture.id = rl::rlGetTextureIdDefault();
+    fallback.maps[MATERIAL_MAP_DIFFUSE].texture.id =
+        rl::rlGetTextureIdDefault();
     fallback.maps[MATERIAL_MAP_DIFFUSE].texture.width = 1;
     fallback.maps[MATERIAL_MAP_DIFFUSE].texture.height = 1;
     fallback.maps[MATERIAL_MAP_DIFFUSE].texture.mipmaps = 1;
@@ -141,16 +142,14 @@ inline void prepare_material(NonSendMarker marker, const MaterialKey &key,
     };
   };
 
-  prepared.material.maps[MATERIAL_MAP_DIFFUSE].color =
-      multiply_color(prepared.material.maps[MATERIAL_MAP_DIFFUSE].color,
-                     key.base_color);
+  prepared.material.maps[MATERIAL_MAP_DIFFUSE].color = multiply_color(
+      prepared.material.maps[MATERIAL_MAP_DIFFUSE].color, key.base_color);
 
   auto assign_texture = [&](int map_type, uint32_t texture_id) {
     if (texture_id == UINT32_MAX) {
       return;
     }
-    if (auto *texture =
-            texture_assets.get(Handle<rl::Texture2D>{texture_id})) {
+    if (auto *texture = texture_assets.get(Handle<rl::Texture2D>{texture_id})) {
       prepared.material.maps[map_type].texture = *texture;
     }
   };

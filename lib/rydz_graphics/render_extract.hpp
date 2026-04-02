@@ -7,6 +7,7 @@
 #include "rl.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_graphics/frustum.hpp"
 #include "skybox.hpp"
 #include "transform.hpp"
 #include "visibility.hpp"
@@ -131,10 +132,10 @@ extract_view_system(Query<Camera3DComponent, ActiveCamera, GlobalTransform,
   }
 }
 
-inline void extract_lighting_system(
-    Query<DirectionalLight> dir_query,
-    Query<PointLight, GlobalTransform> point_query,
-    ResMut<ExtractedLights> lights) {
+inline void
+extract_lighting_system(Query<DirectionalLight> dir_query,
+                        Query<PointLight, GlobalTransform> point_query,
+                        ResMut<ExtractedLights> lights) {
   lights->reset();
 
   for (auto [dir] : dir_query.iter()) {
@@ -153,17 +154,17 @@ inline void extract_lighting_system(
     }
 
     lights->point_positions[lights->point_count] = to_rl(global->translation());
-    lights->point_colors[lights->point_count] = color_to_vec3(point_light->color);
+    lights->point_colors[lights->point_count] =
+        color_to_vec3(point_light->color);
     lights->point_intensities[lights->point_count] = point_light->intensity;
     lights->point_ranges[lights->point_count] = point_light->range;
     ++lights->point_count;
   }
 }
 
-inline void
-extract_meshes_system(Query<Mesh3d, GlobalTransform, Material3d,
-                            Opt<ViewVisibility>> query,
-                      Res<ExtractedView> view, ResMut<ExtractedMeshes> meshes) {
+inline void extract_meshes_system(
+    Query<Mesh3d, GlobalTransform, Material3d, Opt<ViewVisibility>> query,
+    Res<ExtractedView> view, ResMut<ExtractedMeshes> meshes) {
   meshes->clear();
 
   for (auto [mesh3d, global, material, visibility] : query.iter()) {

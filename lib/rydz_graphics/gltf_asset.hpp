@@ -2,11 +2,12 @@
 #include "rl.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/scene_graph.hpp"
-#include <external/cgltf.h>
-#include <raymath.h>
+#include "rydz_graphics/transform.hpp"
 #include <algorithm>
 #include <array>
+#include <external/cgltf.h>
 #include <functional>
+#include <raymath.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -53,8 +54,7 @@ inline Transform transform_from_cgltf_node(const cgltf_node &node) {
     rl::Vector3 scale{};
     MatrixDecompose(matrix, &translation, &rotation, &scale);
 
-    transform.translation =
-        Vec3(translation.x, translation.y, translation.z);
+    transform.translation = Vec3(translation.x, translation.y, translation.z);
     transform.rotation = Quat(rotation.x, rotation.y, rotation.z, rotation.w);
     transform.scale = Vec3(scale.x, scale.y, scale.z);
   }
@@ -77,10 +77,9 @@ inline Transform transform_from_matrix(const Mat4 &matrix) {
 
 inline bool has_texture(const rl::Texture2D &texture) { return texture.id > 0; }
 
-inline Handle<rl::Texture2D>
-transfer_texture(Assets<rl::Texture2D> &textures, const rl::Texture2D &texture,
-                 std::unordered_map<unsigned int, Handle<rl::Texture2D>>
-                     &texture_cache) {
+inline Handle<rl::Texture2D> transfer_texture(
+    Assets<rl::Texture2D> &textures, const rl::Texture2D &texture,
+    std::unordered_map<unsigned int, Handle<rl::Texture2D>> &texture_cache) {
   if (!has_texture(texture)) {
     return {};
   }
@@ -95,12 +94,10 @@ transfer_texture(Assets<rl::Texture2D> &textures, const rl::Texture2D &texture,
   return handle;
 }
 
-inline SceneMaterial
-material_from_rl_material(const rl::Material &material,
-                          Assets<rl::Texture2D> &textures,
-                          std::unordered_map<unsigned int, Handle<rl::Texture2D>>
-                              &texture_cache,
-                          const std::string &name = {}) {
+inline SceneMaterial material_from_rl_material(
+    const rl::Material &material, Assets<rl::Texture2D> &textures,
+    std::unordered_map<unsigned int, Handle<rl::Texture2D>> &texture_cache,
+    const std::string &name = {}) {
   SceneMaterial scene_material;
   scene_material.name = name;
 
@@ -113,18 +110,14 @@ material_from_rl_material(const rl::Material &material,
         textures, material.maps[MATERIAL_MAP_DIFFUSE].texture, texture_cache);
     scene_material.material.normal_map = transfer_texture(
         textures, material.maps[MATERIAL_MAP_NORMAL].texture, texture_cache);
-    scene_material.material.metallic_map =
-        transfer_texture(textures, material.maps[MATERIAL_MAP_METALNESS].texture,
-                         texture_cache);
-    scene_material.material.roughness_map =
-        transfer_texture(textures, material.maps[MATERIAL_MAP_ROUGHNESS].texture,
-                         texture_cache);
-    scene_material.material.occlusion_map =
-        transfer_texture(textures, material.maps[MATERIAL_MAP_OCCLUSION].texture,
-                         texture_cache);
-    scene_material.material.emissive_map =
-        transfer_texture(textures, material.maps[MATERIAL_MAP_EMISSION].texture,
-                         texture_cache);
+    scene_material.material.metallic_map = transfer_texture(
+        textures, material.maps[MATERIAL_MAP_METALNESS].texture, texture_cache);
+    scene_material.material.roughness_map = transfer_texture(
+        textures, material.maps[MATERIAL_MAP_ROUGHNESS].texture, texture_cache);
+    scene_material.material.occlusion_map = transfer_texture(
+        textures, material.maps[MATERIAL_MAP_OCCLUSION].texture, texture_cache);
+    scene_material.material.emissive_map = transfer_texture(
+        textures, material.maps[MATERIAL_MAP_EMISSION].texture, texture_cache);
     scene_material.material.metallic =
         material.maps[MATERIAL_MAP_METALNESS].value;
     scene_material.material.roughness =
@@ -189,7 +182,8 @@ public:
     scene.nodes.resize(data->nodes_count);
 
     std::unordered_map<unsigned int, Handle<rl::Texture2D>> texture_cache;
-    const usize material_count = static_cast<usize>(std::max(model.materialCount, 1));
+    const usize material_count =
+        static_cast<usize>(std::max(model.materialCount, 1));
     scene.materials.reserve(material_count);
     for (int i = 0; i < static_cast<int>(material_count); ++i) {
       std::string material_name;
@@ -222,7 +216,8 @@ public:
 
       for (cgltf_size primitive_index = 0;
            primitive_index < node.mesh->primitives_count; ++primitive_index) {
-        const cgltf_primitive &primitive = node.mesh->primitives[primitive_index];
+        const cgltf_primitive &primitive =
+            node.mesh->primitives[primitive_index];
         if (primitive.type != cgltf_primitive_type_triangles) {
           continue;
         }
@@ -230,16 +225,17 @@ public:
           break;
         }
 
-        Handle<rl::Mesh> mesh_handle = mesh_assets->add(model.meshes[model_mesh_index]);
+        Handle<rl::Mesh> mesh_handle =
+            mesh_assets->add(model.meshes[model_mesh_index]);
         model.meshes[model_mesh_index] = rl::Mesh{};
 
         usize material_index = 0;
         if (model.meshMaterial && model_mesh_index < model.meshCount &&
             model.meshMaterial[model_mesh_index] >= 0) {
-          material_index = static_cast<usize>(model.meshMaterial[model_mesh_index]);
+          material_index =
+              static_cast<usize>(model.meshMaterial[model_mesh_index]);
         }
-        material_index =
-            std::min(material_index, scene.materials.size() - 1);
+        material_index = std::min(material_index, scene.materials.size() - 1);
 
         ScenePrimitive scene_primitive;
         scene_primitive.mesh = mesh_handle;
@@ -260,18 +256,20 @@ public:
     std::unordered_map<std::string, i32> bone_index_by_name;
     bone_index_by_name.reserve(model.skeleton.boneCount);
     scene.bones.reserve(model.skeleton.boneCount);
-    for (int bone_index = 0; bone_index < model.skeleton.boneCount; ++bone_index) {
+    for (int bone_index = 0; bone_index < model.skeleton.boneCount;
+         ++bone_index) {
       SceneBoneData bone;
       bone.name = model.skeleton.bones[bone_index].name;
       bone.parent = model.skeleton.bones[bone_index].parent;
 
       if (model.skeleton.bindPose) {
         const auto &bind_pose = model.skeleton.bindPose[bone_index];
-        bone.bind_pose.translation = Vec3(bind_pose.translation.x,
-                                          bind_pose.translation.y,
-                                          bind_pose.translation.z);
-        bone.bind_pose.rotation = Quat(bind_pose.rotation.x, bind_pose.rotation.y,
-                                       bind_pose.rotation.z, bind_pose.rotation.w);
+        bone.bind_pose.translation =
+            Vec3(bind_pose.translation.x, bind_pose.translation.y,
+                 bind_pose.translation.z);
+        bone.bind_pose.rotation =
+            Quat(bind_pose.rotation.x, bind_pose.rotation.y,
+                 bind_pose.rotation.z, bind_pose.rotation.w);
         bone.bind_pose.scale =
             Vec3(bind_pose.scale.x, bind_pose.scale.y, bind_pose.scale.z);
       }
@@ -286,8 +284,8 @@ public:
       auto &scene_node = scene.nodes[node_index];
       scene_node.name = node.name ? node.name : "";
       scene_node.local_transform = detail::transform_from_cgltf_node(node);
-      scene_node.parent = node.parent ? static_cast<i32>(node.parent - data->nodes)
-                                      : -1;
+      scene_node.parent =
+          node.parent ? static_cast<i32>(node.parent - data->nodes) : -1;
       scene_node.primitives = std::move(node_primitives[node_index]);
 
       for (cgltf_size child_index = 0; child_index < node.children_count;
@@ -304,7 +302,8 @@ public:
         auto bone_it = bone_index_by_name.find(node.name);
         if (bone_it != bone_index_by_name.end()) {
           scene_node.bone_index = bone_it->second;
-          scene.bones[bone_it->second].node_index = static_cast<i32>(node_index);
+          scene.bones[bone_it->second].node_index =
+              static_cast<i32>(node_index);
         }
       }
     }
@@ -319,9 +318,9 @@ public:
 
       Mat4 local = scene.nodes[node_index].local_transform.compute_matrix();
       if (scene.nodes[node_index].parent >= 0) {
-        local =
-            compute_node_world(static_cast<usize>(scene.nodes[node_index].parent)) *
-            local;
+        local = compute_node_world(
+                    static_cast<usize>(scene.nodes[node_index].parent)) *
+                local;
       }
 
       node_world_transforms[node_index] = local;
@@ -363,7 +362,8 @@ public:
       }
 
       if (skin.inverse_bind_matrices) {
-        scene_skin.inverse_bind_matrices.resize(skin.inverse_bind_matrices->count);
+        scene_skin.inverse_bind_matrices.resize(
+            skin.inverse_bind_matrices->count);
         for (cgltf_size matrix_index = 0;
              matrix_index < skin.inverse_bind_matrices->count; ++matrix_index) {
           std::array<float, 16> values{};
