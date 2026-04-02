@@ -8,6 +8,8 @@
 #include "rydz_graphics/render_batches.hpp"
 #include "rydz_graphics/render_config.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/scene_graph.hpp"
+#include "rydz_graphics/scene_runtime.hpp"
 #include "rydz_graphics/skybox.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"

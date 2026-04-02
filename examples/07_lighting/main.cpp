@@ -14,23 +14,21 @@ struct OrbitLight {
   f32 phase;
 };
 
-void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   // kamera
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             Transform::from_xyz(0, 8, 15).look_at(Vec3::sZero()));
 
   // podłoga
-  auto floor = rl::LoadModelFromMesh(mesh::plane(30, 30));
-  auto floor_h = models->add(std::move(floor));
-  cmd.spawn(Model3d{floor_h},
+  auto floor_h = meshes->add(mesh::plane(30, 30));
+  cmd.spawn(Mesh3d{floor_h},
             Material3d{StandardMaterial::from_color({200, 200, 200, 255})},
             Transform{});
 
   // kilka obiektów na scenie
-  auto sphere = rl::LoadModelFromMesh(mesh::sphere(1.0f));
-  auto sphere_h = models->add(std::move(sphere));
+  auto sphere_h = meshes->add(mesh::sphere(1.0f));
   for (int i = -2; i <= 2; ++i) {
-    cmd.spawn(Model3d{sphere_h},
+    cmd.spawn(Mesh3d{sphere_h},
               Material3d{StandardMaterial::from_color(WHITE)},
               Transform::from_xyz(i * 4.0f, 1.0f, 0.0f));
   }
@@ -44,9 +42,9 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
 
   auto make_orbit_light = [&](rl::Color color, f32 radius, f32 speed, f32 phase,
                               f32 y, f32 intensity) {
-    auto h = models->add(rl::LoadModelFromMesh(mesh::cube(0.3f, 0.3f, 0.3f)));
+    auto h = meshes->add(mesh::cube(0.3f, 0.3f, 0.3f));
     cmd.spawn(
-        Model3d{h}, Material3d{StandardMaterial::from_color(color)},
+        Mesh3d{h}, Material3d{StandardMaterial::from_color(color)},
         PointLight{.color = color, .intensity = intensity, .range = 30.0f},
         Transform::from_xyz(0, y, 0), OrbitLight{radius, speed, phase});
   };

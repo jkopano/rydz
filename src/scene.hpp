@@ -101,7 +101,7 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform>> query,
 
 inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
   cmd.spawn(MapTag{}, CameraState{FreeLook{}},
-            Model3d{asset_server->load<rl::Model>("res/models/sponza.glb")},
+            SceneRoot{asset_server->load<Scene>("res/models/sponza.glb")},
             Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}});
 }
 
@@ -137,8 +137,7 @@ struct LightsSpawned {
   bool done = false;
 };
 
-inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Model>> models,
-                                  ResMut<Assets<rl::Texture2D>> textures,
+inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
                                   ResMut<Assets<rl::Mesh>> meshes,
                                   ResMut<LightsSpawned> lights,
                                   Res<Input> input, NonSendMarker) {
@@ -153,20 +152,17 @@ inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Model>> models,
 
   auto stone_tex = textures->add(rl::LoadTexture("res/textures/stone.jpg"));
 
-  rl::Mesh cube_mesh = mesh::cube();
-  rl::Model cube_model = rl::LoadModelFromMesh(cube_mesh);
-  auto cube_h = models->add(std::move(cube_model));
+  auto cube_h = meshes->add(mesh::cube());
 
-  cmd.spawn(Model3d{cube_h},
+  cmd.spawn(Mesh3d{cube_h},
             PointLight{.color = {255, 0, 0, 255},
                        .intensity = 8800.0f,
                        .range = 2000.0f},
             Transform::from_xyz(-50.0f, 50.0f, 0.0f));
 
-  rl::Model cube_model2 = rl::LoadModelFromMesh(mesh::cube());
-  auto cube_h2 = models->add(std::move(cube_model2));
+  auto cube_h2 = meshes->add(mesh::cube());
 
-  cmd.spawn(Model3d{cube_h2},
+  cmd.spawn(Mesh3d{cube_h2},
             Material3d{StandardMaterial::from_texture(stone_tex)},
             Transform::from_xyz(50.0f, 50.0f, 0.0f));
 

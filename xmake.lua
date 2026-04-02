@@ -2,9 +2,9 @@ add_rules("mode.debug", "mode.release", "mode.profile")
 add_rules("plugin.compile_commands.autoupdate", { outputdir = "." })
 
 -- clangd works best when xmake emits compile commands from a clang driver.
-if is_plat("windows") then
+if is_host("windows") then
 	set_toolchains("clang-cl")
-elseif is_plat("linux") then
+else
 	set_toolchains("clang")
 end
 

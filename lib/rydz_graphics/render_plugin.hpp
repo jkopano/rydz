@@ -11,6 +11,7 @@
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/asset_loaders.hpp"
+#include "rydz_graphics/scene_runtime.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"
 #include "skybox.hpp"
@@ -36,15 +37,13 @@ struct Texture {
 
 struct RenderPlugin {
   static void install(App &app) {
-    app.init_resource<Assets<rl::Model>>(
-           [](rl::Model &m) { rl::UnloadModel(m); })
-        .init_resource<Assets<rl::Mesh>>([](rl::Mesh &m) { rl::UnloadMesh(m); })
+    app.init_resource<Assets<rl::Mesh>>([](rl::Mesh &m) { rl::UnloadMesh(m); })
         .init_resource<Assets<rl::Texture2D>>(
             [](rl::Texture2D &t) { rl::UnloadTexture(t); })
+        .init_resource<Assets<Scene>>()
         .init_resource<ClearColor>()
         .init_resource<RenderBatches>()
-        .init_resource<AssetServer>()
-        .init_resource<PendingModelLoads>();
+        .init_resource<AssetServer>();
 
     if (auto *server = app.world().get_resource<AssetServer>()) {
       register_default_loaders(*server);
@@ -56,15 +55,14 @@ struct RenderPlugin {
       }
     });
 
-    app.add_systems(ScheduleLabel::First, process_pending_model_loads)
+    app.add_systems(ScheduleLabel::First, cleanup_orphan_scene_entities_system)
+        .add_systems(ScheduleLabel::PreUpdate, sync_scene_roots_system)
 
         .add_systems(ScheduleLabel::PostUpdate,
-                     group(propagate_transforms, apply_model_transform,
-                           compute_visibility, compute_mesh_bounds_system,
-                           frustum_cull_system))
+                     group(propagate_transforms, compute_visibility,
+                           compute_mesh_bounds_system, frustum_cull_system))
 
-        .add_systems(ScheduleLabel::ExtractRender,
-                     group(apply_materials_system, build_render_batches_system))
+        .add_systems(ScheduleLabel::ExtractRender, build_render_batches_system)
 
         .add_systems(ScheduleLabel::Render, render_system);
   }
@@ -80,101 +78,75 @@ private:
 
   using PointLightRenderQuery = Query<PointLight, GlobalTransform>;
 
-  static void
-  apply_materials_system(Query<const Model3d, const Material3d> query,
-                         ResMut<Assets<rl::Model>> model_assets,
-                         ResMut<Assets<rl::Texture2D>> tex_assets) {
-    for (auto [m3d, mat] : query.iter()) {
-      rl::Model *model = model_assets->get(m3d->model);
-      if (!model)
-        continue;
-      mat->material.apply(*model, tex_assets.ptr);
-    }
-  }
-
   static void build_render_batches_system(
-      Query<Model3d, GlobalTransform, Opt<Material3d>, Opt<ViewVisibility>>
-          query,
-      ResMut<Assets<rl::Model>> model_assets, ResMut<RenderBatches> batches,
+      Query<Mesh3d, GlobalTransform, Material3d, Opt<ViewVisibility>> query,
+      ResMut<Assets<rl::Mesh>> mesh_assets, ResMut<RenderBatches> batches,
       NonSendMarker) {
     batches->clear();
     std::unordered_map<RenderBatchKey, usize> batch_index;
 
-    for (auto [model3d, global, mat, vv] : query.iter()) {
-      if (!model3d || !model3d->model.is_valid())
+    for (auto [mesh3d, global, mat, vv] : query.iter()) {
+      if (!mesh3d || !mesh3d->mesh.is_valid())
         continue;
       if (vv && !vv->visible)
         continue;
 
-      rl::Model *model = model_assets->get(model3d->model);
-      if (!model || model->meshCount <= 0 || model->meshes == nullptr)
+      rl::Mesh *mesh = mesh_assets->get(mesh3d->mesh);
+      if (!mesh || mesh->vertexCount <= 0 || mesh->vertices == nullptr)
         continue;
 
-      if (model->meshes[0].vaoId == 0) {
-        for (int i = 0; i < model->meshCount; ++i) {
-          rl::UploadMesh(&model->meshes[i], false);
-        }
+      if (mesh->vaoId == 0) {
+        rl::UploadMesh(mesh, false);
       }
 
       MaterialKey mat_key{};
-      if (mat) {
-        const auto &m = mat->material;
-        mat_key.base_color = m.base_color;
-        mat_key.emissive_color = m.emissive_color;
-        mat_key.texture_id = m.texture.id;
-        mat_key.normal_id = m.normal_map.id;
-        mat_key.metallic_id = m.metallic_map.id;
-        mat_key.roughness_id = m.roughness_map.id;
-        mat_key.occlusion_id = m.occlusion_map.id;
-        mat_key.emissive_id = m.emissive_map.id;
-        mat_key.metallic = m.metallic;
-        mat_key.roughness = m.roughness;
-        mat_key.normal_scale = m.normal_scale;
-        mat_key.occlusion_strength = m.occlusion_strength;
-        mat_key.shader = m.shader();
-      }
+      const auto &m = mat->material;
+      mat_key.base_color = m.base_color;
+      mat_key.emissive_color = m.emissive_color;
+      mat_key.texture_id = m.texture.id;
+      mat_key.normal_id = m.normal_map.id;
+      mat_key.metallic_id = m.metallic_map.id;
+      mat_key.roughness_id = m.roughness_map.id;
+      mat_key.occlusion_id = m.occlusion_map.id;
+      mat_key.emissive_id = m.emissive_map.id;
+      mat_key.metallic = m.metallic;
+      mat_key.roughness = m.roughness;
+      mat_key.normal_scale = m.normal_scale;
+      mat_key.occlusion_strength = m.occlusion_strength;
+      mat_key.shader = m.shader();
 
-      for (int i = 0; i < model->meshCount; ++i) {
-        int mat_index = 0;
-        if (model->meshMaterial && model->meshMaterial[i] >= 0 &&
-            model->meshMaterial[i] < model->materialCount) {
-          mat_index = model->meshMaterial[i];
-        }
+      RenderBatchKey key{};
+      key.mesh = mesh3d->mesh;
+      key.material = mat_key;
 
-        RenderBatchKey key{};
-        key.model = model3d->model;
-        key.mesh_index = i;
-        key.material_index = mat_index;
-        key.material = mat_key;
-
-        auto it = batch_index.find(key);
-        if (it == batch_index.end()) {
-          size_t idx = batches->batches.size();
-          RenderBatch batch{};
-          batch.key = key;
-          batch.transforms.push_back(to_rl(global->matrix));
-          batches->batches.push_back(std::move(batch));
-          batch_index.emplace(batches->batches.back().key, idx);
-        } else {
-          batches->batches[it->second].transforms.push_back(
-              to_rl(global->matrix));
-        }
+      auto it = batch_index.find(key);
+      if (it == batch_index.end()) {
+        size_t idx = batches->batches.size();
+        RenderBatch batch{};
+        batch.key = key;
+        batch.transforms.push_back(to_rl(global->matrix));
+        batches->batches.push_back(std::move(batch));
+        batch_index.emplace(batches->batches.back().key, idx);
+      } else {
+        batches->batches[it->second].transforms.push_back(
+            to_rl(global->matrix));
       }
     }
   }
 
-  static void render_system(
-      Res<ClearColor> clear_color, Res<Assets<rl::Model>> model_assets,
-      Res<Assets<rl::Texture2D>> tex_assets, Res<RenderBatches> batches,
-      TextureRenderQuery textures, ActiveCameraRenderQuery cam_query,
-      DirectionalLightRenderQuery dir_query, PointLightRenderQuery point_query,
-      NonSendMarker marker) {
+  static void
+  render_system(Res<ClearColor> clear_color, Res<Assets<rl::Mesh>> mesh_assets,
+                Res<Assets<rl::Texture2D>> tex_assets,
+                Res<RenderBatches> batches, TextureRenderQuery textures,
+                ActiveCameraRenderQuery cam_query,
+                DirectionalLightRenderQuery dir_query,
+                PointLightRenderQuery point_query, NonSendMarker marker) {
     const auto scene = collect_render_scene(cam_query, dir_query, point_query);
 
     begin_world_pass(marker, clear_color->color, scene);
 
-    for (const auto &batch : batches->batches) {
-      draw_render_batch(marker, batch, *model_assets, *tex_assets, scene);
+    for (auto &batch : batches->batches) {
+      draw_render_batch(marker, batch, *mesh_assets, *tex_assets, scene);
     }
 
     if (scene.has_render_config) {
@@ -185,17 +157,6 @@ private:
     draw_screen_textures(textures, *tex_assets);
     rl::DrawFPS(10, 10);
     rl::EndDrawing();
-  }
-
-  static void apply_model_transform(Query<Model3d, Mut<GlobalTransform>> query,
-                                    Res<Assets<rl::Model>> model_assets) {
-    for (auto [m3d, gt] : query.iter()) {
-      auto *model = model_assets->get(m3d->model);
-      if (!model)
-        continue;
-
-      gt->matrix = gt->matrix * from_rl(model->transform);
-    }
   }
 
   struct RenderSceneState {
@@ -320,35 +281,33 @@ private:
                        PointLightRenderQuery point_query) {
     RenderSceneState scene{};
 
-    cam_query.each([&](const Camera3DComponent *cam_comp, const ActiveCamera *,
-                       const GlobalTransform *cam_gt, const Skybox *sky,
-                       const RenderConfig *rc) {
+    for (auto [cam_comp, _, cam_gt, sky, rc] : cam_query.iter()) {
       if (!cam_comp || !cam_gt)
-        return;
+        break;
       scene.camera_view = compute_camera_view(*cam_gt, *cam_comp);
       scene.active_skybox = sky;
       if (rc) {
         scene.render_config = *rc;
         scene.has_render_config = true;
       }
-    });
+    }
 
-    dir_query.each([&](const DirectionalLight *dir) {
+    for (auto [dir] : dir_query.iter()) {
       if (!dir || scene.has_directional)
-        return;
+        break;
       scene.dir_light = *dir;
       scene.has_directional = true;
-    });
+    }
 
-    point_query.each([&](const PointLight *pl, const GlobalTransform *gt) {
+    for (auto [pl, gt] : point_query.iter()) {
       if (!pl || !gt || scene.point_count >= scene.point_positions.size())
-        return;
+        break;
       scene.point_positions[scene.point_count] = to_rl(gt->translation());
       scene.point_colors[scene.point_count] = color_to_vec3(pl->color);
       scene.point_intensities[scene.point_count] = pl->intensity;
       scene.point_ranges[scene.point_count] = pl->range;
       ++scene.point_count;
-    });
+    }
 
     return scene;
   }
@@ -387,28 +346,13 @@ private:
     rl::rlDisableBackfaceCulling();
   }
 
-  static const rl::Material *resolve_source_material(NonSendMarker marker,
-                                                     const rl::Model &model,
-                                                     int material_index) {
-    if (model.materials && model.materialCount > 0 && material_index >= 0 &&
-        material_index < model.materialCount) {
-      const rl::Material *material = &model.materials[material_index];
-      if (material->maps) {
-        return material;
-      }
-    }
-    return &fallback_material(marker);
-  }
-
   static void prepare_draw_material(NonSendMarker marker,
                                     const RenderBatchKey &key,
-                                    const rl::Model &model,
                                     const Assets<rl::Texture2D> &tex_assets,
                                     PreparedMaterial &prepared) {
-    const rl::Material *src_mat =
-        resolve_source_material(marker, model, key.material_index);
-    prepared.material = *src_mat;
-    std::memcpy(prepared.local_maps.data(), src_mat->maps,
+    const rl::Material &src_mat = fallback_material(marker);
+    prepared.material = src_mat;
+    std::memcpy(prepared.local_maps.data(), src_mat.maps,
                 sizeof(prepared.local_maps));
     prepared.material.maps = prepared.local_maps.data();
     apply_pbr_defaults(prepared.material);
@@ -620,22 +564,21 @@ private:
   }
 
   static void draw_render_batch(NonSendMarker marker, const RenderBatch &batch,
-                                const Assets<rl::Model> &model_assets,
+                                const Assets<rl::Mesh> &mesh_assets,
                                 const Assets<rl::Texture2D> &tex_assets,
                                 const RenderSceneState &scene) {
     const auto &key = batch.key;
-    const rl::Model *model = model_assets.get(key.model);
-    if (!model || key.mesh_index < 0 || key.mesh_index >= model->meshCount) {
+    const rl::Mesh *mesh = mesh_assets.get(key.mesh);
+    if (!mesh) {
       return;
     }
 
-    const rl::Mesh &mesh = model->meshes[key.mesh_index];
     PreparedMaterial prepared{};
-    prepare_draw_material(marker, key, *model, tex_assets, prepared);
+    prepare_draw_material(marker, key, tex_assets, prepared);
 
     apply_shader_uniforms(marker, prepared.material.shader, prepared, scene);
 
-    draw_batch_instances(mesh, prepared.material, batch);
+    draw_batch_instances(*mesh, prepared.material, batch);
   }
 
   static float texture_rotation_degrees(const Transform &tx) {
@@ -668,5 +611,7 @@ private:
     }
   }
 };
+
+inline void render_plugin(App &app) { RenderPlugin::install(app); }
 
 } // namespace ecs

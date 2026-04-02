@@ -63,12 +63,12 @@ struct ToonMaterial {
 
 using ToonMat = MeshMaterial3d<ToonMaterial>;
 
-void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             Transform::from_xyz(0, 3, 6).look_at(Vec3::sZero()));
 
-  auto h = models->add(rl::LoadModelFromMesh(mesh::sphere(1.0f)));
-  cmd.spawn(Model3d{h}, ToonMat{ToonMaterial{.base_color = ORANGE}},
+  auto h = meshes->add(mesh::sphere(1.0f));
+  cmd.spawn(Mesh3d{h}, ToonMat{ToonMaterial{.base_color = ORANGE}},
             Transform::from_xyz(0, 1, 0));
 }
 

@@ -41,14 +41,11 @@ struct MaterialKey {
 };
 
 struct RenderBatchKey {
-  Handle<rl::Model> model{};
-  int mesh_index = 0;
-  int material_index = 0;
+  Handle<rl::Mesh> mesh{};
   MaterialKey material;
 
   bool operator==(const RenderBatchKey &o) const {
-    return model == o.model && mesh_index == o.mesh_index &&
-           material_index == o.material_index && material == o.material;
+    return mesh == o.mesh && material == o.material;
   }
 };
 
@@ -103,9 +100,7 @@ template <> struct hash<ecs::MaterialKey> {
 template <> struct hash<ecs::RenderBatchKey> {
   size_t operator()(const ecs::RenderBatchKey &k) const noexcept {
     size_t seed = 0;
-    ::hash_combine(seed, std::hash<uint32_t>{}(k.model.id));
-    ::hash_combine(seed, std::hash<int>{}(k.mesh_index));
-    ::hash_combine(seed, std::hash<int>{}(k.material_index));
+    ::hash_combine(seed, std::hash<uint32_t>{}(k.mesh.id));
     ::hash_combine(seed, std::hash<ecs::MaterialKey>{}(k.material));
     return seed;
   }

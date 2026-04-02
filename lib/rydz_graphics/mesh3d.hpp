@@ -10,18 +10,11 @@
 namespace ecs {
 
 struct Mesh3d {
+  using Required = Requires<Visibility, Material3d>;
   Handle<rl::Mesh> mesh;
 
   Mesh3d() = default;
   explicit Mesh3d(Handle<rl::Mesh> h) : mesh(h) {}
-};
-
-struct Model3d {
-  using Required = Requires<Visibility, Material3d>;
-  Handle<rl::Model> model;
-
-  Model3d() = default;
-  explicit Model3d(Handle<rl::Model> h) : model(h) {}
 };
 
 namespace mesh {
