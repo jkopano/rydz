@@ -10,13 +10,13 @@
 using namespace ecs;
 using namespace math;
 
-// enum struct GameState { Menu, Playing, Paused };
+enum struct GameState { Menu, Playing, Paused };
 
-struct GameState {
-  struct Menu;
-  struct Playing;
-  struct Paused;
-};
+// struct GameState {
+//   struct Menu;
+//   struct Playing;
+//   struct Paused;
+// };
 
 void on_enter_menu(Cmd cmd) { std::println("[STATE] entered: Menu"); }
 void on_enter_playing(Cmd cmd) { std::println("[STATE] entered: Playing"); }
