@@ -101,8 +101,8 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform>> query,
 
 inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
   cmd.spawn(MapTag{}, CameraState{FreeLook{}},
-            Model3d{asset_server->load<rl::Model>("res/models/race_map.glb")},
-            Transform{.scale = Vec3{0.1f, 0.1f, 0.1f}});
+            Model3d{asset_server->load<rl::Model>("res/models/sponza.glb")},
+            Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}});
 }
 
 inline void some_shit(Query<CameraState> q) {
@@ -179,7 +179,7 @@ inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Model>> models,
 }
 
 inline void setup_camera(Cmd cmd, NonSendMarker) {
-  cmd.spawn(Camera3DComponent::orthographic(), ActiveCamera{},
+  cmd.spawn(Camera3DComponent::perspective(), ActiveCamera{},
             Transform::from_xyz(8, 6, 8).look_at(Vec3::sZero()),
             CameraController{} // Skybox::from("res/hdri/skybox")
   );
@@ -187,7 +187,6 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
 }
 
 inline void scene_plugin(App &app) {
-  app.add_plugin(input_plugin);
   app.add_plugin(system_multithreading({true}));
   app.insert_resource(LightsSpawned{});
 

@@ -11,6 +11,7 @@
 #include <string>
 
 namespace ecs {
+
 struct Window {
   using T = ecs::Resource;
 
@@ -20,10 +21,12 @@ struct Window {
   u32 target_fps = 60;
 
 public:
-  static void Update(ecs::ResMut<Window> window, ecs::NonSendMarker) {
+  static void update(ecs::ResMut<Window> window, ecs::NonSendMarker) {
     window->height = rl::GetScreenHeight();
     window->width = rl::GetScreenWidth();
   }
+
+  static auto install(Window config);
 };
 
 class App {
@@ -215,11 +218,11 @@ private:
 };
 
 inline void time_plugin(App &app) { app.init_resource<Time>(); }
-inline auto window_plugin(Window config = {}) {
+
+inline auto Window::install(Window config) {
   return [config = std::move(config)](ecs::App &app) {
-    app.add_systems(ScheduleLabel::Update, Window::Update);
+    app.add_systems(ScheduleLabel::Update, Window::update);
     app.insert_resource(config);
   };
 }
-
 } // namespace ecs

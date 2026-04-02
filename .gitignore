@@ -20,3 +20,5 @@ vsxmake2026/**
 compile_commands.json
 .luajit_path
 gmon.out
+
+res/models/sponza.glb

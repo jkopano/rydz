@@ -15,7 +15,7 @@ struct B {
   float value;
 };
 
-static void BM_AddRemoveComponent(benchmark::State &state) {
+static void BM_AddRemove(benchmark::State &state) {
   World world;
   std::vector<Entity> entities;
   entities.reserve(10000);
@@ -35,6 +35,6 @@ static void BM_AddRemoveComponent(benchmark::State &state) {
     }
   }
 }
-BENCHMARK(BM_AddRemoveComponent)->MinTime(3);
+BENCHMARK(BM_AddRemove)->MinTime(3);
 
 } // namespace bench_add_remove

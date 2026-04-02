@@ -1,7 +1,7 @@
 #pragma once
 #include "bundle.hpp"
 #include "entity.hpp"
-#include "system.hpp"
+#include "params.hpp"
 #include "world.hpp"
 #include <functional>
 #include <memory>

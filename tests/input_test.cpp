@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "rydz_ecs/input.hpp"
-
+#include "rydz_ecs/core/input.hpp"
 using namespace ecs;
 
 TEST(InputTest, KeyPressedOnFirstFrame) {

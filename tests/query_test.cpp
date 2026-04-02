@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "rydz_ecs/query.hpp"
+#include "rydz_ecs/query_types.hpp"
 #include "rydz_ecs/world.hpp"
 
 using namespace ecs;

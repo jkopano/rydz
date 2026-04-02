@@ -56,11 +56,7 @@ struct RenderPlugin {
       }
     });
 
-    app.add_systems(ScheduleLabel::First,
-                    group(process_pending_model_loads,
-                          auto_insert_global_transform,
-                          auto_insert_render_config, auto_insert_visibility,
-                          auto_insert_material))
+    app.add_systems(ScheduleLabel::First, process_pending_model_loads)
 
         .add_systems(ScheduleLabel::PostUpdate,
                      group(propagate_transforms, apply_model_transform,
@@ -202,35 +198,8 @@ private:
     }
   }
 
-  static void auto_insert_global_transform(
-      Query<Entity, Added<Transform>, Without<GlobalTransform>> query,
-      Cmd cmd) {
-    for (auto [e] : query.iter())
-      cmd.entity(e).insert(GlobalTransform{});
-  }
-
-  static void auto_insert_visibility(
-      Query<Entity, With<Model3d>, Without<Visibility>> query, Cmd cmd) {
-    for (auto [e] : query.iter())
-      cmd.entity(e).insert(Visibility::Visible);
-  }
-
-  static void
-  auto_insert_material(Query<Entity, With<Model3d>, Without<Material3d>> query,
-                       Cmd cmd) {
-    for (auto [e] : query.iter())
-      cmd.entity(e).insert(Material3d{StandardMaterial::from_color(WHITE)});
-  }
-
-  static void auto_insert_render_config(
-      Query<Entity, With<Camera3DComponent>, Without<RenderConfig>> query,
-      Cmd cmd) {
-    for (auto [e] : query.iter())
-      cmd.entity(e).insert(RenderConfig{});
-  }
-  static constexpr int kMaxPointLights = 16;
-
   struct RenderSceneState {
+    static constexpr u8 kMaxPointLights = 16;
     CameraView camera_view{
         .view = Mat4::sIdentity(),
         .proj = Mat4::sIdentity(),
@@ -641,7 +610,7 @@ private:
                                    const RenderBatch &batch) {
     if (can_draw_instanced(material, mesh)) {
       rl::DrawMeshInstanced(mesh, material, batch.transforms.data(),
-                            static_cast<int>(batch.transforms.size()));
+                            static_cast<i32>(batch.transforms.size()));
       return;
     }
 
@@ -679,7 +648,7 @@ private:
 
   static void draw_screen_textures(TextureRenderQuery textures,
                                    const Assets<rl::Texture2D> &tex_assets) {
-    textures.each([&](const Texture *tex, const Transform *tx) {
+    for (auto [tex, tx] : textures.iter()) {
       if (!tex || !tx || !tex->handle.is_valid())
         return;
 
@@ -696,7 +665,7 @@ private:
 
       rl::DrawTexturePro(*rl_tex, source, dest, origin,
                          texture_rotation_degrees(*tx), WHITE);
-    });
+    }
   }
 };
 

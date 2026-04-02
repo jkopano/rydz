@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "rydz_ecs/params.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/system.hpp"
 #include "rydz_ecs/world.hpp"

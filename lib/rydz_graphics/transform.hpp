@@ -2,6 +2,7 @@
 #include "math.hpp"
 #include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_ecs/query.hpp"
+#include "rydz_ecs/requires.hpp"
 #include <functional>
 #include <unordered_map>
 
@@ -9,7 +10,10 @@ namespace ecs {
 
 using namespace math;
 
+struct GlobalTransform;
+
 struct Transform {
+  using Required = Requires<GlobalTransform>;
   Vec3 translation = Vec3::sZero();
   Quat rotation = Quat::sIdentity();
   Vec3 scale = Vec3::sReplicate(1.0f);
