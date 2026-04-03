@@ -489,28 +489,28 @@ Sety pozwalają grupować systemy logicznie i nakładać wspólne zależności/w
 enum class GameSets { Input, Logic, Render };
 
 // Przypisanie do setu
-app.add_systems(ScheduleLabel::Update,
-    group(handle_input).in_set(ecs::set(GameSets::Input)));
+app.add_systems(GameSets::Input, group(handle_input));
 
-app.add_systems(ScheduleLabel::Update,
-    group(update_physics, update_ai).in_set(ecs::set(GameSets::Logic)));
+app.add_systems(GameSets::Logic, group(update_physics, update_ai));
 
 // Konfiguracja kolejności setów
 app.configure_set(ScheduleLabel::Update,
-    ecs::configure(GameSets::Logic)
-        .after(ecs::set(GameSets::Input))
-        .before(ecs::set(GameSets::Render)));
+    ecs::configure(GameSets::Input, GameSets::Logic, GameSets::Render).chain());
 
 // Warunek na cały set
 app.configure_set(ScheduleLabel::Update,
     ecs::configure(GameSets::Logic).run_if(ecs::in_state(GameState::Playing)));
 ```
 
+Set użyty przez `add_systems(ecs::set(...), ...)` musi być wcześniej lub później
+zarejestrowany przez `configure_set(...)`. Jeśli nie będzie skonfigurowany,
+scheduler zgłosi wyjątek przy pierwszym uruchomieniu.
+
 Sety mogą też być strukturami z markerem `using Type = Set`:
 
 ```cpp
 struct PhysicsSet { using T = ecs::Set; };
-// Użycie: ecs::set<PhysicsSet>()
+// Użycie: app.add_systems(PhysicsSet{}, group(...))
 ```
 
 ---
@@ -726,7 +726,7 @@ app
 
     // Konfiguracja setów
     .configure_set(ecs::ScheduleLabel::Update,
-        ecs::configure(GameSets::Logic).after(ecs::set(GameSets::Input)))
+        ecs::configure(GameSets::Input, GameSets::Logic).chain())
 
     // Start
     .run();

@@ -120,21 +120,29 @@ public:
   }
 
   template <typename F> void add_system_fn(F &&func) {
-    if constexpr (is_chained_systems_v<bare_t<F>>) {
-      for (auto &e : func.systems)
-        add_system(std::move(e.system), std::move(e.ordering));
+    add_system_fn_with_ordering(std::forward<F>(func), {});
+  }
 
-    } else if constexpr (is_system_group_descriptor_v<bare_t<F>>) {
-      for (auto &e : func.build())
-        add_system(std::move(e.system), std::move(e.ordering));
+  template <typename E, typename F>
+    requires(std::is_enum_v<bare_t<E>> &&
+             !std::same_as<bare_t<E>, ScheduleLabel>)
+  void add_system_fn(E set_id, F &&func) {
+    add_system_fn(set(set_id), std::forward<F>(func));
+  }
 
-    } else if constexpr (is_system_descriptor_v<bare_t<F>>) {
-      auto ordering = func.take_ordering();
-      add_system(func.build(), std::move(ordering));
+  template <typename S, typename F>
+    requires(detail::is_set_marker_v<S>)
+  void add_system_fn(S &&, F &&func) {
+    add_system_fn(set<bare_t<S>>(), std::forward<F>(func));
+  }
 
-    } else {
-      add_system(make_system(std::forward<F>(func)));
-    }
+  template <typename S, typename F>
+    requires(std::same_as<bare_t<S>, SetId> || std::same_as<bare_t<S>, SetList>)
+  void add_system_fn(S &&selector, F &&func) {
+    SystemOrdering ordering;
+    ordering.in_sets = detail::to_set_ids(std::forward<S>(selector));
+    detail::ensure_unique_sets(ordering.in_sets, "add_system_fn(...)");
+    add_system_fn_with_ordering(std::forward<F>(func), std::move(ordering));
   }
 
   void run(World &world) {
@@ -178,6 +186,40 @@ public:
   bool empty() const { return entries_.empty(); }
 
 private:
+  template <typename F>
+  void add_system_fn_with_ordering(F &&func, SystemOrdering base_ordering) {
+    if constexpr (is_chained_systems_v<bare_t<F>>) {
+      for (auto &e : func.systems) {
+        merge_ordering(e.ordering, base_ordering);
+        add_system(std::move(e.system), std::move(e.ordering));
+      }
+
+    } else if constexpr (is_system_group_descriptor_v<bare_t<F>>) {
+      for (auto &e : func.build()) {
+        merge_ordering(e.ordering, base_ordering);
+        add_system(std::move(e.system), std::move(e.ordering));
+      }
+
+    } else if constexpr (is_system_descriptor_v<bare_t<F>>) {
+      auto ordering = func.take_ordering();
+      merge_ordering(ordering, std::move(base_ordering));
+      add_system(func.build(), std::move(ordering));
+
+    } else {
+      add_system(make_system(std::forward<F>(func)), std::move(base_ordering));
+    }
+  }
+ 
+  static void merge_ordering(SystemOrdering &target,
+                             const SystemOrdering &extra) {
+    target.after.insert(target.after.end(), extra.after.begin(),
+                        extra.after.end());
+    target.before.insert(target.before.end(), extra.before.begin(),
+                         extra.before.end());
+    target.in_sets.insert(target.in_sets.end(), extra.in_sets.begin(),
+                          extra.in_sets.end());
+  }
+
   void rebuild() {
     steps_.clear();
 
@@ -195,6 +237,19 @@ private:
     for (usize i = 0; i < entries_.size(); ++i)
       for (const auto &sid : entries_[i].in_sets)
         set_members[sid].push_back(i);
+
+    std::unordered_map<SetId, bool> configured_sets;
+    for (const auto &cfg : set_configs_) {
+      configured_sets[cfg.id] = true;
+    }
+
+    for (const auto &[sid, _] : set_members) {
+      if (!configured_sets.contains(sid)) {
+        throw std::runtime_error("Set '" + set_name(sid) +
+                                 "' is used by systems in this schedule but "
+                                 "was never configured");
+      }
+    }
 
     for (auto &cfg : set_configs_) {
       if (cfg.condition) {

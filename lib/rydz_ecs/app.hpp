@@ -8,7 +8,11 @@
 #include "state.hpp"
 #include "tracy_plugin.hpp"
 #include "world.hpp"
+#include <memory>
+#include <optional>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace ecs {
 
@@ -30,9 +34,29 @@ public:
 };
 
 class App {
+  struct PendingSetSystemsBase {
+    virtual ~PendingSetSystemsBase() = default;
+    virtual void attach(App &app) = 0;
+  };
+
+  template <typename F> struct PendingSetSystems final : PendingSetSystemsBase {
+    SetList sets;
+    bare_t<F> func;
+
+    PendingSetSystems(SetList selector, F &&system_fn)
+        : sets(std::move(selector)), func(std::forward<F>(system_fn)) {}
+
+    void attach(App &app) override {
+      auto label = app.resolve_set_schedule(sets);
+      app.schedules_.entry(label).add_system_fn(std::move(sets), std::move(func));
+    }
+  };
+
   World world_;
   Schedules schedules_;
   bool startup_done_ = false;
+  std::unordered_map<SetId, ScheduleLabel> set_schedules_;
+  std::vector<std::unique_ptr<PendingSetSystemsBase>> pending_set_systems_;
 
 public:
   App() {
@@ -45,8 +69,50 @@ public:
     return *this;
   }
 
+  template <typename E, typename F>
+    requires(std::is_enum_v<bare_t<E>> &&
+             !std::same_as<bare_t<E>, ScheduleLabel>)
+  App &add_systems(E set_id, F &&func) {
+    return add_systems(set(set_id), std::forward<F>(func));
+  }
+
+  template <typename S, typename F>
+    requires(detail::is_set_marker_v<S>)
+  App &add_systems(S &&, F &&func) {
+    return add_systems(set<bare_t<S>>(), std::forward<F>(func));
+  }
+
+  template <typename S, typename F>
+    requires(std::same_as<bare_t<S>, SetId> || std::same_as<bare_t<S>, SetList>)
+  App &add_systems(S &&selector, F &&func) {
+    auto sets = SetList{detail::to_set_ids(std::forward<S>(selector))};
+    detail::ensure_unique_sets(sets.ids, "add_systems(...)");
+
+    if (auto label = try_resolve_set_schedule(sets)) {
+      schedules_.entry(*label).add_system_fn(std::move(sets),
+                                             std::forward<F>(func));
+      return *this;
+    }
+
+    pending_set_systems_.push_back(std::make_unique<PendingSetSystems<F>>(
+        std::move(sets), std::forward<F>(func)));
+    return *this;
+  }
+
   App &configure_set(ScheduleLabel label, SetConfigDescriptor &&desc) {
+    register_set_schedule(label, desc.id());
     schedules_.entry(label).add_set_config(desc.take());
+    return *this;
+  }
+
+  App &configure_set(ScheduleLabel label, ChainedSetConfigDescriptor &&desc) {
+    auto configs = desc.take();
+    for (const auto &config : configs) {
+      register_set_schedule(label, config.id);
+    }
+    for (auto &config : configs) {
+      schedules_.entry(label).add_set_config(std::move(config));
+    }
     return *this;
   }
 
@@ -141,6 +207,7 @@ public:
   Schedules &schedules() { return schedules_; }
 
   void startup() {
+    flush_pending_set_systems();
     if (startup_done_)
       return;
     startup_done_ = true;
@@ -154,6 +221,7 @@ public:
   }
 
   void update() {
+    flush_pending_set_systems();
     auto *time = world_.get_resource<Time>();
     if (time) {
       time->delta_seconds = rl::GetFrameTime();
@@ -208,6 +276,58 @@ public:
   }
 
 private:
+  void register_set_schedule(ScheduleLabel label, const SetId &set_id) {
+    auto [it, inserted] = set_schedules_.emplace(set_id, label);
+    if (!inserted && it->second != label) {
+      throw std::runtime_error("Set '" + set_name(set_id) +
+                               "' is configured for both schedules '" +
+                               std::string(schedule_label_name(it->second)) +
+                               "' and '" +
+                               std::string(schedule_label_name(label)) + "'");
+    }
+  }
+
+  std::optional<ScheduleLabel> try_resolve_set_schedule(const SetList &sets) const {
+    std::optional<ScheduleLabel> label;
+
+    for (const auto &set_id : sets.ids) {
+      auto it = set_schedules_.find(set_id);
+      if (it == set_schedules_.end()) {
+        return std::nullopt;
+      }
+
+      if (label && *label != it->second) {
+        throw std::runtime_error("Sets '" + detail::set_names(sets.ids) +
+                                 "' are configured for different schedules");
+      }
+      label = it->second;
+    }
+
+    return label;
+  }
+
+  ScheduleLabel resolve_set_schedule(const SetList &sets) const {
+    auto label = try_resolve_set_schedule(sets);
+    if (!label) {
+      throw std::runtime_error("Sets '" + detail::set_names(sets.ids) +
+                               "' were used by add_systems(...) but were not "
+                               "configured");
+    }
+    return *label;
+  }
+
+  void flush_pending_set_systems() {
+    if (pending_set_systems_.empty()) {
+      return;
+    }
+
+    auto pending = std::move(pending_set_systems_);
+    pending_set_systems_.clear();
+    for (auto &entry : pending) {
+      entry->attach(*this);
+    }
+  }
+
   void apply_commands() {
     auto *queues = world_.get_resource<CommandQueues>();
     if (queues && !queues->empty()) {

@@ -40,20 +40,17 @@ int main() {
       .add_plugin(input_plugin)
 
       // Systemy w setach enum
-      .add_systems(ScheduleLabel::Update,
-                   group(input_system).in_set(set<GameSet::Input>()))
-      .add_systems(ScheduleLabel::Update,
-                   group(movement_system, collision_system)
-                       .in_set(set<GameSet::Logic>()))
+      .add_systems(GameSet::Input, group(input_system))
+      .add_systems(GameSet::Logic,
+                   group(movement_system, collision_system))
 
       // Struct set
-      .add_systems(ScheduleLabel::Update,
-                   group(debug_overlay).in_set(set<DebugSet>()))
+      .add_systems(DebugSet{}, group(debug_overlay))
 
       // kolejność
       // input -> logic (potem debug)
       .configure_set(ScheduleLabel::Update,
-                     configure<GameSet::Input>().before(set<GameSet::Logic>()))
+                     configure(GameSet::Input, GameSet::Logic).chain())
       .configure_set(ScheduleLabel::Update,
                      configure<DebugSet>().after(set<GameSet::Logic>()))
 
