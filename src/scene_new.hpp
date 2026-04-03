@@ -2,6 +2,9 @@
 #include "math.hpp"
 #include "rl.hpp"
 #include "rydz_camera/rydz_camera.hpp"
+#include "rydz_console/console.hpp"
+#include "rydz_console/scripting.hpp"
+#include "rydz_ecs/core/input.hpp"
 #include "rydz_ecs/fwd.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_ecs/schedule.hpp"
@@ -136,8 +139,10 @@ inline void spawn_player(Cmd cmd, ResMut<Assets<rl::Model>> models,
 // ── Plugin ───────────────────────────────────────────────────────────────────
 
 inline void scene_plugin(App &app) {
-  app.add_plugin(input_plugin);
+  app.add_plugin(Input::install);
   app.add_plugin(system_multithreading({true}));
+  app.add_plugin(engine::scripting_plugin);
+  app.add_plugin(engine::console_plugin);
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
   app.add_systems(ScheduleLabel::Startup, setup_lighting);
