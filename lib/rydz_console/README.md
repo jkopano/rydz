@@ -53,7 +53,7 @@ int main() {
 Obsługa w grze
 --------------------
 
--   `[ ~ ]` / `[` ]` -- Otwieranie / zamykanie konsoli.
+-   `[ ~ ]` / `[` ]` / `[ F1 ]` -- Otwieranie / zamykanie konsoli. `F1` jest zapasowym skrótem, jeśli środowisko pulpitu przechwytuje klawisz tyldy.
 
 -   `[ Enter ]` -- Wykonanie komendy. (Uwaga: Konsola automatycznie dodaje nawiasy `()` jeśli wpiszesz samo słowo, np. `kill_all` nie dotyczy to funkcji  którym przekazujemy parametry wtedy nawiasy są konieczne np. `spawn(5)`) .
 
