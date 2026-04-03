@@ -28,8 +28,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   // kilka obiektów na scenie
   auto sphere_h = meshes->add(mesh::sphere(1.0f));
   for (int i = -2; i <= 2; ++i) {
-    cmd.spawn(Mesh3d{sphere_h},
-              Material3d{StandardMaterial::from_color(WHITE)},
+    cmd.spawn(Mesh3d{sphere_h}, Material3d{StandardMaterial::from_color(WHITE)},
               Transform::from_xyz(i * 4.0f, 1.0f, 0.0f));
   }
 
@@ -49,9 +48,21 @@ void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
         Transform::from_xyz(0, y, 0), OrbitLight{radius, speed, phase});
   };
 
-  make_orbit_light({255, 50, 50, 255}, 6.0f, 1.5f, 0.0f, 3.0f, 20.0f);
-  make_orbit_light({50, 50, 255, 255}, 8.0f, 1.0f, 2.1f, 4.0f, 20.0f);
-  make_orbit_light({50, 255, 50, 255}, 5.0f, 2.0f, 4.2f, 2.5f, 20.0f);
+  constexpr int kLightCount = 64;
+  const rl::Color palette[] = {
+      {255, 90, 90, 255},  {90, 140, 255, 255},  {100, 255, 140, 255},
+      {255, 210, 90, 255}, {255, 120, 220, 255}, {120, 255, 255, 255},
+  };
+
+  for (int i = 0; i < kLightCount; ++i) {
+    rl::Color color = palette[i % (sizeof(palette) / sizeof(palette[0]))];
+    f32 radius = 4.5f + static_cast<f32>(i % 6) * 1.2f;
+    f32 speed = 0.5f + static_cast<f32>(i % 8) * 0.18f;
+    f32 phase = static_cast<f32>(i) * 0.47f;
+    f32 y = 1.5f + static_cast<f32>(i % 5) * 0.8f;
+    f32 intensity = 10.0f + static_cast<f32>(i % 4) * 4.0f;
+    make_orbit_light(color, radius, speed, phase, y, intensity);
+  }
 }
 
 // obitujsz swiatlami

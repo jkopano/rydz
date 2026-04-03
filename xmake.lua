@@ -131,7 +131,7 @@ add_files(
 )
 add_includedirs("lib/external/raylib/src", { public = true })
 add_includedirs("lib/external/raylib/src/external/glfw/include", { private = true })
-add_defines("PLATFORM_DESKTOP", "GRAPHICS_API_OPENGL_33", { public = true })
+add_defines("PLATFORM_DESKTOP", "GRAPHICS_API_OPENGL_43", { public = true })
 add_defines("SUPPORT_GPU_SKINNING", { public = true })
 
 -- Rozróżnienie systemów dla GLFW i linkowania

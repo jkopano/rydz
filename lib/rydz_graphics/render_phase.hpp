@@ -52,17 +52,22 @@ struct TransparentPhase {
   void clear() { items.clear(); }
 };
 
-struct OverlayPhaseItem {
+struct UiPhaseItem {
   Handle<rl::Texture2D> texture{};
   Transform transform{};
+  rl::Color tint = WHITE;
+  i32 layer = 0;
 };
 
-struct OverlayPhase {
+struct UiPhase {
   using T = Resource;
-  std::vector<OverlayPhaseItem> items;
+  std::vector<UiPhaseItem> items;
 
   void clear() { items.clear(); }
 };
+
+using OverlayPhaseItem = UiPhaseItem;
+using OverlayPhase = UiPhase;
 
 struct RenderPhaseSystems {
   static void queue_shadow_phase(Res<ExtractedMeshes> meshes,
@@ -124,16 +129,28 @@ struct RenderPhaseSystems {
         });
   }
 
-  static void queue_overlay_phase(Res<ExtractedOverlay> overlay,
-                                  ResMut<OverlayPhase> phase) {
+  static void queue_ui_phase(Res<ExtractedUi> ui, ResMut<UiPhase> phase) {
     phase->clear();
 
-    for (const auto &item : overlay->items) {
-      phase->items.push_back(OverlayPhaseItem{
+    for (const auto &item : ui->items) {
+      phase->items.push_back(UiPhaseItem{
           .texture = item.texture,
           .transform = item.transform,
+          .tint = item.tint,
+          .layer = item.layer,
       });
     }
+
+    std::stable_sort(
+        phase->items.begin(), phase->items.end(),
+        [](const UiPhaseItem &lhs, const UiPhaseItem &rhs) {
+          return lhs.layer < rhs.layer;
+        });
+  }
+
+  static void queue_overlay_phase(Res<ExtractedOverlay> overlay,
+                                  ResMut<OverlayPhase> phase) {
+    queue_ui_phase(overlay, phase);
   }
 
   static void build_opaque_batches(ResMut<OpaquePhase> phase,

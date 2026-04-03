@@ -225,4 +225,8 @@ inline auto Window::install(Window config) {
     app.insert_resource(config);
   };
 }
+
+inline auto window_plugin(Window config) {
+  return Window::install(std::move(config));
+}
 } // namespace ecs

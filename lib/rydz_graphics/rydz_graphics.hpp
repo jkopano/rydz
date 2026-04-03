@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rydz_graphics/asset_loaders.hpp"
+#include "rydz_graphics/clustered_lighting.hpp"
 #include "rydz_graphics/frustum.hpp"
 #include "rydz_graphics/light.hpp"
 #include "rydz_graphics/material3d.hpp"
@@ -12,6 +13,7 @@
 #include "rydz_graphics/render_passes.hpp"
 #include "rydz_graphics/render_phase.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/screen_pipeline.hpp"
 #include "rydz_graphics/scene_graph.hpp"
 #include "rydz_graphics/scene_runtime.hpp"
 #include "rydz_graphics/skybox.hpp"

@@ -23,6 +23,8 @@ struct ClearColor {
 
 struct Texture {
   Handle<rl::Texture2D> handle;
+  rl::Color tint = WHITE;
+  i32 layer = 0;
 };
 
 struct ExtractedView {
@@ -36,6 +38,9 @@ struct ExtractedView {
   RenderConfig render_config{};
   bool active = false;
   bool has_render_config = false;
+  bool orthographic = false;
+  float near_plane = 0.1f;
+  float far_plane = 1000.0f;
 
   void reset() {
     camera_view = {
@@ -47,29 +52,30 @@ struct ExtractedView {
     render_config = {};
     active = false;
     has_render_config = false;
+    orthographic = false;
+    near_plane = 0.1f;
+    far_plane = 1000.0f;
   }
+};
+
+struct ExtractedPointLight {
+  rl::Vector3 position = {0, 0, 0};
+  rl::Color color = WHITE;
+  float intensity = 0.0f;
+  float range = 0.0f;
 };
 
 struct ExtractedLights {
   using T = Resource;
-  static constexpr u8 kMaxPointLights = 16;
 
   DirectionalLight dir_light{};
   bool has_directional = false;
-  std::array<rl::Vector3, kMaxPointLights> point_positions{};
-  std::array<rl::Vector3, kMaxPointLights> point_colors{};
-  std::array<float, kMaxPointLights> point_intensities{};
-  std::array<float, kMaxPointLights> point_ranges{};
-  usize point_count = 0;
+  std::vector<ExtractedPointLight> point_lights;
 
   void reset() {
     dir_light = {};
     has_directional = false;
-    point_positions = {};
-    point_colors = {};
-    point_intensities = {};
-    point_ranges = {};
-    point_count = 0;
+    point_lights.clear();
   }
 };
 
@@ -89,17 +95,22 @@ struct ExtractedMeshes {
   void clear() { items.clear(); }
 };
 
-struct ExtractedOverlayItem {
+struct ExtractedUiItem {
   Handle<rl::Texture2D> texture{};
   Transform transform{};
+  rl::Color tint = WHITE;
+  i32 layer = 0;
 };
 
-struct ExtractedOverlay {
+struct ExtractedUi {
   using T = Resource;
-  std::vector<ExtractedOverlayItem> items;
+  std::vector<ExtractedUiItem> items;
 
   void clear() { items.clear(); }
 };
+
+using ExtractedOverlayItem = ExtractedUiItem;
+using ExtractedOverlay = ExtractedUi;
 
 inline rl::Vector3 color_to_vec3(rl::Color color) {
   return {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f};
@@ -124,6 +135,9 @@ extract_view_system(Query<Camera3DComponent, ActiveCamera, GlobalTransform,
     view->camera_view = compute_camera_view(*cam_gt, *cam_comp);
     view->active_skybox = skybox;
     view->active = true;
+    view->orthographic = cam_comp->is_orthographic();
+    view->near_plane = cam_comp->near_plane;
+    view->far_plane = cam_comp->far_plane;
     if (render_config) {
       view->render_config = *render_config;
       view->has_render_config = true;
@@ -148,17 +162,16 @@ extract_lighting_system(Query<DirectionalLight> dir_query,
   }
 
   for (auto [point_light, global] : point_query.iter()) {
-    if (!point_light || !global ||
-        lights->point_count >= lights->point_positions.size()) {
+    if (!point_light || !global) {
       continue;
     }
 
-    lights->point_positions[lights->point_count] = to_rl(global->translation());
-    lights->point_colors[lights->point_count] =
-        color_to_vec3(point_light->color);
-    lights->point_intensities[lights->point_count] = point_light->intensity;
-    lights->point_ranges[lights->point_count] = point_light->range;
-    ++lights->point_count;
+    lights->point_lights.push_back(ExtractedPointLight{
+        .position = to_rl(global->translation()),
+        .color = point_light->color,
+        .intensity = point_light->intensity,
+        .range = point_light->range,
+    });
   }
 }
 
@@ -188,20 +201,27 @@ inline void extract_meshes_system(
   }
 }
 
-inline void extract_overlay_system(Query<Texture, Transform> textures,
-                                   ResMut<ExtractedOverlay> overlay) {
-  overlay->clear();
+inline void extract_ui_system(Query<Texture, Transform> textures,
+                              ResMut<ExtractedUi> ui) {
+  ui->clear();
 
   for (auto [texture, transform] : textures.iter()) {
     if (!texture || !transform || !texture->handle.is_valid()) {
       continue;
     }
 
-    overlay->items.push_back(ExtractedOverlayItem{
+    ui->items.push_back(ExtractedUiItem{
         .texture = texture->handle,
         .transform = *transform,
+        .tint = texture->tint,
+        .layer = texture->layer,
     });
   }
+}
+
+inline void extract_overlay_system(Query<Texture, Transform> textures,
+                                   ResMut<ExtractedOverlay> overlay) {
+  extract_ui_system(textures, overlay);
 }
 
 } // namespace ecs

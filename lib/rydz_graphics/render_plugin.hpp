@@ -1,8 +1,10 @@
 #pragma once
+#include "clustered_lighting.hpp"
 #include "frustum.hpp"
 #include "render_extract.hpp"
 #include "render_passes.hpp"
 #include "render_phase.hpp"
+#include "screen_pipeline.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
@@ -20,7 +22,8 @@ enum class RenderExtractSet {
 enum class RenderPassSet {
   Setup,
   Main,
-  Overlay,
+  PostProcess,
+  Ui,
   Cleanup,
 };
 
@@ -36,11 +39,16 @@ struct RenderPlugin {
         .init_resource<ExtractedView>()
         .init_resource<ExtractedLights>()
         .init_resource<ExtractedMeshes>()
-        .init_resource<ExtractedOverlay>()
+        .init_resource<ExtractedUi>()
+        .init_resource<ClusterConfig>()
+        .init_resource<ClusteredLightingState>()
+        .init_resource<PostProcessSettings>()
+        .init_resource<DebugOverlaySettings>()
+        .init_resource<ScreenPipelineState>()
         .init_resource<ShadowPhase>()
         .init_resource<OpaquePhase>()
         .init_resource<TransparentPhase>()
-        .init_resource<OverlayPhase>()
+        .init_resource<UiPhase>()
         .init_resource<RenderExecutionState>();
 
     if (auto *server = app.world().get_resource<AssetServer>()) {
@@ -64,10 +72,14 @@ struct RenderPlugin {
             configure(RenderPassSet::Main).after(set(RenderPassSet::Setup)))
         .configure_set(
             ScheduleLabel::Render,
-            configure(RenderPassSet::Overlay).after(set(RenderPassSet::Main)))
+            configure(RenderPassSet::PostProcess)
+                .after(set(RenderPassSet::Main)))
         .configure_set(ScheduleLabel::Render,
-                       configure(RenderPassSet::Cleanup)
-                           .after(set(RenderPassSet::Overlay)));
+                       configure(RenderPassSet::Ui)
+                           .after(set(RenderPassSet::PostProcess)))
+        .configure_set(
+            ScheduleLabel::Render,
+            configure(RenderPassSet::Cleanup).after(set(RenderPassSet::Ui)));
 
     app.add_systems(ScheduleLabel::First,
                      SceneRuntimeSystems::cleanup_orphan_scene_entities_system)
@@ -80,7 +92,7 @@ struct RenderPlugin {
 
         .add_systems(ScheduleLabel::ExtractRender,
                      group(extract_view_system, extract_lighting_system,
-                           extract_meshes_system, extract_overlay_system)
+                           extract_meshes_system, extract_ui_system)
                          .in_set(set(RenderExtractSet::Extract))
                          .chain())
 
@@ -88,7 +100,7 @@ struct RenderPlugin {
                      group(RenderPhaseSystems::queue_shadow_phase,
                            RenderPhaseSystems::queue_opaque_phase,
                            RenderPhaseSystems::queue_transparent_phase,
-                           RenderPhaseSystems::queue_overlay_phase)
+                           RenderPhaseSystems::queue_ui_phase)
                          .in_set(set(RenderExtractSet::Queue))
                          .chain())
 
@@ -102,13 +114,18 @@ struct RenderPlugin {
 
         .add_systems(ScheduleLabel::Render,
                      group(RenderPassSystems::run_shadow_pass,
+                           RenderPassSystems::run_depth_prepass,
+                           RenderPassSystems::run_cluster_build_pass,
                            RenderPassSystems::run_opaque_pass,
                            RenderPassSystems::run_transparent_pass)
                          .in_set(set(RenderPassSet::Main))
                          .chain())
         .add_systems(ScheduleLabel::Render,
-                     group(RenderPassSystems::run_overlay_pass)
-                         .in_set(set(RenderPassSet::Overlay)))
+                     group(RenderPassSystems::run_postprocess_pass)
+                         .in_set(set(RenderPassSet::PostProcess)))
+        .add_systems(ScheduleLabel::Render,
+                     group(RenderPassSystems::run_ui_pass)
+                         .in_set(set(RenderPassSet::Ui)))
         .add_systems(ScheduleLabel::Render,
                      group(RenderPassSystems::end_frame)
                          .in_set(set(RenderPassSet::Cleanup)));

@@ -1,6 +1,8 @@
 #pragma once
+#include "clustered_lighting.hpp"
 #include "render_batches.hpp"
 #include "render_extract.hpp"
+#include <algorithm>
 #include <array>
 #include <cstring>
 
@@ -198,10 +200,35 @@ inline void set_shader_value_v(NonSendMarker, rl::Shader &shader,
   }
 }
 
+inline void set_shader_matrix(NonSendMarker, rl::Shader &shader,
+                              const char *name, rl::Matrix value) {
+  int loc = rl::GetShaderLocation(shader, name);
+  if (loc >= 0) {
+    rl::SetShaderValueMatrix(shader, loc, value);
+  }
+}
+
+inline void bind_clustered_lighting(const ClusteredLightingState &state) {
+  if (state.point_light_buffer != 0) {
+    rl::rlBindShaderBuffer(state.point_light_buffer, 0);
+  }
+  if (state.cluster_buffer != 0) {
+    rl::rlBindShaderBuffer(state.cluster_buffer, 1);
+  }
+  if (state.light_index_buffer != 0) {
+    rl::rlBindShaderBuffer(state.light_index_buffer, 2);
+  }
+  if (state.overflow_buffer != 0) {
+    rl::rlBindShaderBuffer(state.overflow_buffer, 3);
+  }
+}
+
 inline void apply_shader_uniforms(NonSendMarker marker, rl::Shader &shader,
                                   const PreparedMaterial &prepared,
                                   const ExtractedView &view,
-                                  const ExtractedLights &lights) {
+                                  const ExtractedLights &lights,
+                                  const ClusterConfig &cluster_config,
+                                  const ClusteredLightingState &cluster_state) {
   float metallic = prepared.material.maps[MATERIAL_MAP_METALNESS].value;
   float roughness = prepared.material.maps[MATERIAL_MAP_ROUGHNESS].value;
   float normal_factor = prepared.material.maps[MATERIAL_MAP_NORMAL].value;
@@ -222,9 +249,24 @@ inline void apply_shader_uniforms(NonSendMarker marker, rl::Shader &shader,
   rl::Vector3 dir_color = color_to_vec3(lights.dir_light.color);
   rl::Vector3 dir_dir = to_rl(lights.dir_light.direction.Normalized());
   float dir_intensity = lights.dir_light.intensity;
+  rl::Matrix view_matrix = to_rl(view.camera_view.view);
+  rl::Vector2 cluster_screen_size = {
+      static_cast<float>(std::max(rl::GetScreenWidth(), 1)),
+      static_cast<float>(std::max(rl::GetScreenHeight(), 1)),
+  };
+  rl::Vector2 cluster_near_far = {
+      std::max(view.near_plane, 0.001f),
+      std::max(view.far_plane, view.near_plane + 0.001f),
+  };
+  int cluster_dimensions[4] = {cluster_config.tile_count_x,
+                               cluster_config.tile_count_y,
+                               cluster_config.slice_count_z,
+                               0};
+  int cluster_max_lights = static_cast<int>(cluster_config.max_lights_per_cluster);
+  int is_orthographic = view.orthographic ? 1 : 0;
+  float alpha_cutoff = 0.1f;
 
-  int point_count = static_cast<int>(lights.point_count);
-  int spot_count = 0;
+  bind_clustered_lighting(cluster_state);
 
   set_shader_value(marker, shader, "u_metallic_factor", &metallic,
                    SHADER_UNIFORM_FLOAT);
@@ -248,26 +290,19 @@ inline void apply_shader_uniforms(NonSendMarker marker, rl::Shader &shader,
                    SHADER_UNIFORM_FLOAT);
   set_shader_value(marker, shader, "u_dir_light_color", &dir_color,
                    SHADER_UNIFORM_VEC3);
-
-  set_shader_value(marker, shader, "u_point_light_count", &point_count,
+  set_shader_matrix(marker, shader, "u_view", view_matrix);
+  set_shader_value(marker, shader, "u_cluster_dimensions", cluster_dimensions,
+                   SHADER_UNIFORM_IVEC4);
+  set_shader_value(marker, shader, "u_cluster_screen_size",
+                   &cluster_screen_size, SHADER_UNIFORM_VEC2);
+  set_shader_value(marker, shader, "u_cluster_near_far", &cluster_near_far,
+                   SHADER_UNIFORM_VEC2);
+  set_shader_value(marker, shader, "u_cluster_max_lights",
+                   &cluster_max_lights, SHADER_UNIFORM_INT);
+  set_shader_value(marker, shader, "u_is_orthographic", &is_orthographic,
                    SHADER_UNIFORM_INT);
-  if (lights.point_count > 0) {
-    set_shader_value_v(marker, shader, "u_point_lights_position",
-                       lights.point_positions.data(), SHADER_UNIFORM_VEC3,
-                       point_count);
-    set_shader_value_v(marker, shader, "u_point_lights_intensity",
-                       lights.point_intensities.data(), SHADER_UNIFORM_FLOAT,
-                       point_count);
-    set_shader_value_v(marker, shader, "u_point_lights_color",
-                       lights.point_colors.data(), SHADER_UNIFORM_VEC3,
-                       point_count);
-    set_shader_value_v(marker, shader, "u_point_lights_range",
-                       lights.point_ranges.data(), SHADER_UNIFORM_FLOAT,
-                       point_count);
-  }
-
-  set_shader_value(marker, shader, "u_spot_light_count", &spot_count,
-                   SHADER_UNIFORM_INT);
+  set_shader_value(marker, shader, "u_alpha_cutoff", &alpha_cutoff,
+                   SHADER_UNIFORM_FLOAT);
 }
 
 inline bool can_draw_instanced(rl::Material &material, const rl::Mesh &mesh) {
