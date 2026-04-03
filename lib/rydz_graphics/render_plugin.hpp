@@ -69,8 +69,10 @@ struct RenderPlugin {
                        configure(RenderPassSet::Cleanup)
                            .after(set(RenderPassSet::Overlay)));
 
-    app.add_systems(ScheduleLabel::First, cleanup_orphan_scene_entities_system)
-        .add_systems(ScheduleLabel::PreUpdate, sync_scene_roots_system)
+    app.add_systems(ScheduleLabel::First,
+                     SceneRuntimeSystems::cleanup_orphan_scene_entities_system)
+        .add_systems(ScheduleLabel::PreUpdate,
+                     SceneRuntimeSystems::sync_scene_roots_system)
 
         .add_systems(ScheduleLabel::PostUpdate,
                      group(propagate_transforms, compute_visibility,

@@ -4,13 +4,14 @@
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/requires.hpp"
 #include "rydz_graphics/material3d.hpp"
+#include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"
 #include <cstring>
 
 namespace ecs {
 
 struct Mesh3d {
-  using Required = Requires<Visibility, Material3d>;
+  using Required = Requires<Visibility, Material3d, Transform>;
   Handle<rl::Mesh> mesh;
 
   Mesh3d() = default;
@@ -19,20 +20,11 @@ struct Mesh3d {
 
 namespace mesh {
 
-inline void ensure_tangents(rl::Mesh &m) {
-  if (m.tangents == nullptr && m.vertexCount > 0 && m.texcoords != nullptr &&
-      m.normals != nullptr) {
-    rl::GenMeshTangents(&m);
-  }
-}
+inline void ensure_tangents(rl::Mesh &m) { rl::GenMeshTangents(&m); }
 
 inline void ensure_uploaded(rl::Mesh &m) {
   ensure_tangents(m);
-  if (m.vaoId == 0 && m.vboId != nullptr) {
-    RL_FREE(m.vboId);
-    m.vboId = nullptr;
-    rl::UploadMesh(&m, false);
-  }
+  rl::UploadMesh(&m, false);
 }
 
 inline rl::Mesh cube(float width = 1, float height = 1, float length = 1) {
