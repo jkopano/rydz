@@ -82,10 +82,10 @@ void gravity_system(Query<Mut<Transform>, With<BulletTag>> query,
 int main() {
   App app;
   app.add_plugin(
-         window_plugin({1024, 768, "09 - Spawn/Despawn (SPACE/F/X)", 60}))
+         Window::install({1024, 768, "09 - Spawn/Despawn (SPACE/F/X)", 60}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_plugin(input_plugin)
+      .add_plugin(Input::install)
       .add_systems(ScheduleLabel::Startup, setup)
       .add_systems(ScheduleLabel::Update,
                    group(batch_spawn, lifetime_system, gravity_system))

@@ -75,7 +75,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({800, 600, "10 - Custom Material", 60}))
+  app.add_plugin(Window::install({800, 600, "10 - Custom Material", 60}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_systems(ScheduleLabel::Startup, setup)

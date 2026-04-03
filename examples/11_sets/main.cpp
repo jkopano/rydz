@@ -1,6 +1,7 @@
 // 11 - System Sets
 // Sety grupują systemy i dają możliwość wspólnego orderingu/warunki
 
+#include "rydz_ecs/core/input.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include <print>
@@ -34,10 +35,10 @@ void debug_overlay() { std::println("[Debug] frame"); }
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({800, 600, "11 - System Sets", 60}))
+  app.add_plugin(Window::install({800, 600, "11 - System Sets", 60}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_plugin(input_plugin)
+      .add_plugin(Input::install)
 
       // Systemy w setach enum
       .add_systems(ScheduleLabel::Update,

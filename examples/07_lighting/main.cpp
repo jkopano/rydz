@@ -68,7 +68,7 @@ void orbit_system(Query<Mut<Transform>, OrbitLight> query, Res<Time> time) {
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({1024, 768, "07 - Lighting", 60}))
+  app.add_plugin(Window::install({1024, 768, "07 - Lighting", 60}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .insert_resource(ClearColor{{15, 15, 25, 255}})

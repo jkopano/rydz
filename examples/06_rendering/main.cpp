@@ -100,7 +100,7 @@ void rotate_system(Query<Mut<Transform>, With<RotateTag>> query,
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({1024, 768, "06 - Rendering", 60}))
+  app.add_plugin(Window::install({1024, 768, "06 - Rendering", 60}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_systems(ScheduleLabel::Startup, setup)

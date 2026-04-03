@@ -3,6 +3,7 @@
 
 #include "math.hpp"
 #include "rl.hpp"
+#include "rydz_ecs/core/input.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
@@ -66,10 +67,10 @@ void print_mouse(Res<Input> input) {
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({800, 600, "03 - Input", 60}))
+  app.add_plugin(Window::install({800, 600, "03 - Input", 60}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_plugin(input_plugin)
+      .add_plugin(Input::install)
       .add_systems(ScheduleLabel::Startup, setup)
       .add_systems(ScheduleLabel::Update, player_movement)
       .add_systems(ScheduleLabel::Update, print_mouse)

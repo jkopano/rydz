@@ -52,7 +52,7 @@ void read_score(EventReader<ScoreEvent> reader) {
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({800, 600, "04 - Events", 60}))
+  app.add_plugin(Window::install({800, 600, "04 - Events", 60}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)
