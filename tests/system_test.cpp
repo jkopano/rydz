@@ -23,6 +23,10 @@ struct Counter {
   int value = 0;
 };
 
+struct LocalCounter {
+  int value = 0;
+};
+
 } // namespace
 
 // ============================================================
@@ -84,4 +88,44 @@ TEST(SystemTest, MultipleSystemsInSchedule) {
 
   schedule.run(world);
   EXPECT_EQ(world.get_resource<Counter>()->value, 11);
+}
+
+TEST(SystemTest, LocalPersistsBetweenRuns) {
+  World world;
+  int seen = 0;
+
+  auto sys = make_system([&](Local<LocalCounter> local) {
+    local->value += 1;
+    seen = local->value;
+  });
+
+  sys->run(world);
+  EXPECT_EQ(seen, 1);
+  sys->run(world);
+  EXPECT_EQ(seen, 2);
+  sys->run(world);
+  EXPECT_EQ(seen, 3);
+}
+
+TEST(SystemTest, LocalIsPerSystemInstance) {
+  World world;
+  int a_seen = 0;
+  int b_seen = 0;
+
+  auto sys_a = make_system([&](Local<LocalCounter> local) {
+    local->value += 1;
+    a_seen = local->value;
+  });
+  auto sys_b = make_system([&](Local<LocalCounter> local) {
+    local->value += 10;
+    b_seen = local->value;
+  });
+
+  sys_a->run(world);
+  sys_b->run(world);
+  sys_a->run(world);
+  sys_b->run(world);
+
+  EXPECT_EQ(a_seen, 2);
+  EXPECT_EQ(b_seen, 20);
 }

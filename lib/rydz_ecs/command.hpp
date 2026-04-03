@@ -161,7 +161,7 @@ public:
   EntityCommands entity(Entity e) { return EntityCommands(e, &queue_); }
 };
 
-template <> struct SystemParamTraits<Cmd> {
+template <> struct SystemParamTraits<Cmd> : DefaultSystemParamState<Cmd> {
   using Item = Cmd;
 
   static Item retrieve(World &world, const SystemContext &) {

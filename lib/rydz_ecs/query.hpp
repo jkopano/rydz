@@ -2,8 +2,8 @@
 #include "filter.hpp"
 #include "helpers.hpp"
 #include "params.hpp"
-#include "query_types.hpp"
 #include "query_traits.hpp"
+#include "query_types.hpp"
 #include "rl.hpp"
 #include <optional>
 #include <tuple>
@@ -156,7 +156,8 @@ private:
   }
 };
 
-template <typename... Qs> struct SystemParamTraits<Query<Qs...>> {
+template <typename... Qs>
+struct SystemParamTraits<Query<Qs...>> : DefaultSystemParamState<Query<Qs...>> {
   using Item = Query<Qs...>;
 
   static void access(SystemAccess &acc) { Query<Qs...>::access(acc); }

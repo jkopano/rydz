@@ -40,6 +40,7 @@ template <typename... Qs> class Query;
 
 class ISystem;
 struct NonSendMarker;
+template <typename T> struct Local;
 template <typename T> struct Res;
 template <typename T> struct ResMut;
 template <typename P> struct SystemParamTraits;

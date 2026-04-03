@@ -62,15 +62,57 @@ public:
 
 template <typename F> class FunctionCondition : public ICondition {
   F func_;
+  using ParamTuple = typename function_traits<F>::args_tuple;
+
+  template <typename TupleT> struct ParamStateTuple;
+  template <typename... Args> struct ParamStateTuple<Tuple<Args...>> {
+    using type = Tuple<typename SystemParamTraits<bare_t<Args>>::State...>;
+  };
+
+  typename ParamStateTuple<ParamTuple>::type param_states_{};
+  World *state_world_ = nullptr;
 
 public:
   explicit FunctionCondition(F func) : func_(std::move(func)) {}
 
   bool is_true(World &world) override {
+    ensure_param_states(world);
+
     SystemContext ctx{Tick{0}, world.read_change_tick()};
     return function_traits<F>::apply([&]<SystemParameter... Args>() {
-      return func_(SystemParamTraits<bare_t<Args>>::retrieve(world, ctx)...);
+      return evaluate_with_args<Args...>(world, ctx,
+                                         std::index_sequence_for<Args...>{});
     });
+  }
+
+private:
+  void ensure_param_states(World &world) {
+    if (state_world_ == &world)
+      return;
+
+    function_traits<F>::apply([&]<SystemParameter... Args>() {
+      param_states_ = Tuple<typename SystemParamTraits<bare_t<Args>>::State...>{
+          SystemParamTraits<bare_t<Args>>::init_state(world)...};
+    });
+    state_world_ = &world;
+  }
+
+  template <SystemParameter Arg>
+  static decltype(auto)
+  retrieve_param(World &world, const SystemContext &ctx,
+                 typename SystemParamTraits<bare_t<Arg>>::State &state) {
+    if constexpr (HasStatefulParamRetrieve<Arg>) {
+      return SystemParamTraits<bare_t<Arg>>::retrieve(world, ctx, state);
+    } else {
+      return SystemParamTraits<bare_t<Arg>>::retrieve(world, ctx);
+    }
+  }
+
+  template <SystemParameter... Args, std::size_t... I>
+  bool evaluate_with_args(World &world, const SystemContext &ctx,
+                          std::index_sequence<I...>) {
+    return func_(
+        retrieve_param<Args>(world, ctx, std::get<I>(param_states_))...);
   }
 };
 
