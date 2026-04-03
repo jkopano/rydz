@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <unordered_map>
 
 namespace ecs {
 
@@ -21,25 +22,20 @@ struct PbrFallbackTextures {
   rl::Texture2D emission_black{};
 };
 
-inline bool has_texture(const rl::Texture2D &texture) { return texture.id > 0; }
+struct ShaderCache {
+  using T = Resource;
+  std::unordered_map<ShaderProgramSpec, rl::Shader> shaders;
 
-inline MaterialKey material_key(const StandardMaterial &material) {
-  MaterialKey key{};
-  key.base_color = material.base_color;
-  key.emissive_color = material.emissive_color;
-  key.texture_id = material.texture.id;
-  key.normal_id = material.normal_map.id;
-  key.metallic_id = material.metallic_map.id;
-  key.roughness_id = material.roughness_map.id;
-  key.occlusion_id = material.occlusion_map.id;
-  key.emissive_id = material.emissive_map.id;
-  key.metallic = material.metallic;
-  key.roughness = material.roughness;
-  key.normal_scale = material.normal_scale;
-  key.occlusion_strength = material.occlusion_strength;
-  key.shader = material.shader();
-  return key;
-}
+  ~ShaderCache() {
+    for (auto &[_, shader] : shaders) {
+      if (shader.id != 0 && shader.id != rl::rlGetShaderIdDefault()) {
+        ::UnloadShader(shader);
+      }
+    }
+  }
+};
+
+inline bool has_texture(const rl::Texture2D &texture) { return texture.id > 0; }
 
 inline rl::Material &fallback_material(NonSendMarker) {
   static rl::Material fallback = {};
@@ -117,70 +113,116 @@ inline void apply_pbr_fallback_textures(rl::Material &material) {
   }
 }
 
-inline void prepare_material(NonSendMarker marker, const MaterialKey &key,
+inline void initialize_common_shader_locations(rl::Shader &shader) {
+  if (shader.id == 0) {
+    shader.id = rl::rlGetShaderIdDefault();
+    shader.locs = rl::rlGetShaderLocsDefault();
+    return;
+  }
+
+  if (shader.locs == nullptr) {
+    shader.locs = (int *)RL_CALLOC(RL_MAX_SHADER_LOCATIONS, sizeof(int));
+    for (int i = 0; i < RL_MAX_SHADER_LOCATIONS; ++i) {
+      shader.locs[i] = -1;
+    }
+  }
+
+  shader.locs[SHADER_LOC_VERTEX_POSITION] =
+      rl::GetShaderLocationAttrib(shader, "vertexPosition");
+  shader.locs[SHADER_LOC_VERTEX_NORMAL] =
+      rl::GetShaderLocationAttrib(shader, "vertexNormal");
+  shader.locs[SHADER_LOC_VERTEX_TEXCOORD01] =
+      rl::GetShaderLocationAttrib(shader, "vertexTexCoord");
+  shader.locs[SHADER_LOC_VERTEX_TANGENT] =
+      rl::GetShaderLocationAttrib(shader, "vertexTangent");
+  shader.locs[SHADER_LOC_MATRIX_MVP] = rl::GetShaderLocation(shader, "mvp");
+  shader.locs[SHADER_LOC_MATRIX_MODEL] =
+      rl::GetShaderLocation(shader, "matModel");
+  shader.locs[SHADER_LOC_COLOR_DIFFUSE] =
+      rl::GetShaderLocation(shader, "colDiffuse");
+  shader.locs[SHADER_LOC_MAP_DIFFUSE] = rl::GetShaderLocation(shader, "texture0");
+  shader.locs[SHADER_LOC_MAP_METALNESS] =
+      rl::GetShaderLocation(shader, "u_metallic_texture");
+  shader.locs[SHADER_LOC_MAP_NORMAL] =
+      rl::GetShaderLocation(shader, "u_normal_texture");
+  shader.locs[SHADER_LOC_MAP_ROUGHNESS] =
+      rl::GetShaderLocation(shader, "u_roughness_texture");
+  shader.locs[SHADER_LOC_MAP_OCCLUSION] =
+      rl::GetShaderLocation(shader, "u_occlusion_texture");
+  shader.locs[SHADER_LOC_MAP_EMISSION] =
+      rl::GetShaderLocation(shader, "u_emissive_texture");
+  shader.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] =
+      rl::GetShaderLocationAttrib(shader, "instanceTransform");
+}
+
+inline rl::Shader load_shader_program(NonSendMarker,
+                                      const ShaderProgramSpec &spec) {
+  if (spec.vertex_path.empty() || spec.fragment_path.empty()) {
+    rl::Shader shader{};
+    shader.id = rl::rlGetShaderIdDefault();
+    shader.locs = rl::rlGetShaderLocsDefault();
+    return shader;
+  }
+
+  rl::Shader shader =
+      rl::LoadShader(spec.vertex_path.c_str(), spec.fragment_path.c_str());
+  initialize_common_shader_locations(shader);
+  return shader;
+}
+
+inline rl::Shader &resolve_shader(NonSendMarker marker, ShaderCache &cache,
+                                  const ShaderProgramSpec &spec) {
+  auto [it, inserted] =
+      cache.shaders.try_emplace(spec, rl::Shader{});
+  if (inserted) {
+    it->second = load_shader_program(marker, spec);
+  }
+  return it->second;
+}
+
+inline void apply_material_map_binding(rl::Material &material,
+                                       const MaterialMapBinding &binding,
+                                       const Assets<rl::Texture2D> &textures) {
+  if (binding.map_type < 0 || binding.map_type >= 12) {
+    return;
+  }
+
+  auto &map = material.maps[binding.map_type];
+  if (binding.has_color) {
+    map.color = binding.color;
+  }
+  if (binding.has_value) {
+    map.value = binding.value;
+  }
+  if (binding.has_texture) {
+    if (const auto *texture = textures.get(binding.texture)) {
+      map.texture = *texture;
+    }
+  }
+}
+
+inline void prepare_material(NonSendMarker marker,
+                             const MaterialDescriptor &descriptor,
                              const Assets<rl::Texture2D> &texture_assets,
+                             ShaderCache &shader_cache,
                              PreparedMaterial &prepared) {
   const rl::Material &src_mat = fallback_material(marker);
   prepared.material = src_mat;
   std::memcpy(prepared.local_maps.data(), src_mat.maps,
               sizeof(prepared.local_maps));
   prepared.material.maps = prepared.local_maps.data();
-  apply_pbr_defaults(prepared.material);
 
-  if (key.shader) {
-    prepared.material.shader = *key.shader;
-  } else if (prepared.material.shader.id == 0 ||
-             prepared.material.shader.locs == nullptr) {
-    prepared.material.shader.id = rl::rlGetShaderIdDefault();
-    prepared.material.shader.locs = rl::rlGetShaderLocsDefault();
+  prepared.material.shader = resolve_shader(marker, shader_cache,
+                                            descriptor.shader);
+
+  for (const auto &binding : descriptor.maps) {
+    apply_material_map_binding(prepared.material, binding, texture_assets);
   }
 
-  auto multiply_color = [](rl::Color lhs, rl::Color rhs) -> rl::Color {
-    return rl::Color{
-        static_cast<u8>((lhs.r * rhs.r) / 255),
-        static_cast<u8>((lhs.g * rhs.g) / 255),
-        static_cast<u8>((lhs.b * rhs.b) / 255),
-        static_cast<u8>((lhs.a * rhs.a) / 255),
-    };
-  };
-
-  prepared.material.maps[MATERIAL_MAP_DIFFUSE].color = multiply_color(
-      prepared.material.maps[MATERIAL_MAP_DIFFUSE].color, key.base_color);
-
-  auto assign_texture = [&](int map_type, uint32_t texture_id) {
-    if (texture_id == UINT32_MAX) {
-      return;
-    }
-    if (auto *texture = texture_assets.get(Handle<rl::Texture2D>{texture_id})) {
-      prepared.material.maps[map_type].texture = *texture;
-    }
-  };
-
-  assign_texture(MATERIAL_MAP_DIFFUSE, key.texture_id);
-  assign_texture(MATERIAL_MAP_NORMAL, key.normal_id);
-  assign_texture(MATERIAL_MAP_METALNESS, key.metallic_id);
-  assign_texture(MATERIAL_MAP_ROUGHNESS, key.roughness_id);
-  assign_texture(MATERIAL_MAP_OCCLUSION, key.occlusion_id);
-  assign_texture(MATERIAL_MAP_EMISSION, key.emissive_id);
-
-  if (key.metallic >= 0.0f) {
-    prepared.material.maps[MATERIAL_MAP_METALNESS].value = key.metallic;
+  if (descriptor.shading_model == MaterialShadingModel::ClusteredPbr) {
+    apply_pbr_defaults(prepared.material);
+    apply_pbr_fallback_textures(prepared.material);
   }
-  if (key.roughness >= 0.0f) {
-    prepared.material.maps[MATERIAL_MAP_ROUGHNESS].value = key.roughness;
-  }
-  if (key.normal_scale >= 0.0f) {
-    prepared.material.maps[MATERIAL_MAP_NORMAL].value = key.normal_scale;
-  }
-  if (key.occlusion_strength >= 0.0f) {
-    prepared.material.maps[MATERIAL_MAP_OCCLUSION].value =
-        key.occlusion_strength;
-  }
-  if (key.emissive_color.a > 0) {
-    prepared.material.maps[MATERIAL_MAP_EMISSION].color = key.emissive_color;
-  }
-
-  apply_pbr_fallback_textures(prepared.material);
 }
 
 inline void set_shader_value(NonSendMarker, rl::Shader &shader,
@@ -223,12 +265,11 @@ inline void bind_clustered_lighting(const ClusteredLightingState &state) {
   }
 }
 
-inline void apply_shader_uniforms(NonSendMarker marker, rl::Shader &shader,
-                                  const PreparedMaterial &prepared,
-                                  const ExtractedView &view,
-                                  const ExtractedLights &lights,
-                                  const ClusterConfig &cluster_config,
-                                  const ClusteredLightingState &cluster_state) {
+inline void apply_pbr_shader_uniforms(
+    NonSendMarker marker, rl::Shader &shader, const PreparedMaterial &prepared,
+    const ExtractedView &view, const ExtractedLights &lights,
+    const ClusterConfig &cluster_config,
+    const ClusteredLightingState &cluster_state) {
   float metallic = prepared.material.maps[MATERIAL_MAP_METALNESS].value;
   float roughness = prepared.material.maps[MATERIAL_MAP_ROUGHNESS].value;
   float normal_factor = prepared.material.maps[MATERIAL_MAP_NORMAL].value;
@@ -262,7 +303,8 @@ inline void apply_shader_uniforms(NonSendMarker marker, rl::Shader &shader,
                                cluster_config.tile_count_y,
                                cluster_config.slice_count_z,
                                0};
-  int cluster_max_lights = static_cast<int>(cluster_config.max_lights_per_cluster);
+  int cluster_max_lights =
+      static_cast<int>(cluster_config.max_lights_per_cluster);
   int is_orthographic = view.orthographic ? 1 : 0;
   float alpha_cutoff = 0.1f;
 
@@ -303,6 +345,79 @@ inline void apply_shader_uniforms(NonSendMarker marker, rl::Shader &shader,
                    SHADER_UNIFORM_INT);
   set_shader_value(marker, shader, "u_alpha_cutoff", &alpha_cutoff,
                    SHADER_UNIFORM_FLOAT);
+}
+
+inline void apply_descriptor_uniforms(NonSendMarker marker, rl::Shader &shader,
+                                      const MaterialDescriptor &descriptor) {
+  for (const auto &uniform : descriptor.uniforms) {
+    switch (uniform.type) {
+    case ShaderUniformType::Float:
+      if (uniform.count > 1) {
+        set_shader_value_v(marker, shader, uniform.name.c_str(),
+                           uniform.float_data.data(), SHADER_UNIFORM_FLOAT,
+                           uniform.count);
+      } else {
+        set_shader_value(marker, shader, uniform.name.c_str(),
+                         uniform.float_data.data(), SHADER_UNIFORM_FLOAT);
+      }
+      break;
+    case ShaderUniformType::Vec2:
+      set_shader_value(marker, shader, uniform.name.c_str(),
+                       uniform.float_data.data(), SHADER_UNIFORM_VEC2);
+      break;
+    case ShaderUniformType::Vec3:
+      set_shader_value(marker, shader, uniform.name.c_str(),
+                       uniform.float_data.data(), SHADER_UNIFORM_VEC3);
+      break;
+    case ShaderUniformType::Vec4:
+      set_shader_value(marker, shader, uniform.name.c_str(),
+                       uniform.float_data.data(), SHADER_UNIFORM_VEC4);
+      break;
+    case ShaderUniformType::Int:
+      set_shader_value(marker, shader, uniform.name.c_str(),
+                       uniform.int_data.data(), SHADER_UNIFORM_INT);
+      break;
+    case ShaderUniformType::IVec2:
+      set_shader_value(marker, shader, uniform.name.c_str(),
+                       uniform.int_data.data(), SHADER_UNIFORM_IVEC2);
+      break;
+    case ShaderUniformType::IVec3:
+      set_shader_value(marker, shader, uniform.name.c_str(),
+                       uniform.int_data.data(), SHADER_UNIFORM_IVEC3);
+      break;
+    case ShaderUniformType::IVec4:
+      set_shader_value(marker, shader, uniform.name.c_str(),
+                       uniform.int_data.data(), SHADER_UNIFORM_IVEC4);
+      break;
+    case ShaderUniformType::Mat4: {
+      rl::Matrix matrix = {
+          uniform.float_data[0],  uniform.float_data[1],  uniform.float_data[2],
+          uniform.float_data[3],  uniform.float_data[4],  uniform.float_data[5],
+          uniform.float_data[6],  uniform.float_data[7],  uniform.float_data[8],
+          uniform.float_data[9],  uniform.float_data[10],
+          uniform.float_data[11], uniform.float_data[12],
+          uniform.float_data[13], uniform.float_data[14],
+          uniform.float_data[15],
+      };
+      set_shader_matrix(marker, shader, uniform.name.c_str(), matrix);
+      break;
+    }
+    }
+  }
+}
+
+inline void apply_shader_uniforms(
+    NonSendMarker marker, rl::Shader &shader,
+    const MaterialDescriptor &descriptor, const PreparedMaterial &prepared,
+    const ExtractedView &view, const ExtractedLights &lights,
+    const ClusterConfig &cluster_config,
+    const ClusteredLightingState &cluster_state) {
+  if (descriptor.shading_model == MaterialShadingModel::ClusteredPbr) {
+    apply_pbr_shader_uniforms(marker, shader, prepared, view, lights,
+                              cluster_config, cluster_state);
+  }
+
+  apply_descriptor_uniforms(marker, shader, descriptor);
 }
 
 inline bool can_draw_instanced(rl::Material &material, const rl::Mesh &mesh) {

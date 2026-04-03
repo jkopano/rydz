@@ -11,7 +11,7 @@
 namespace ecs {
 
 struct Mesh3d {
-  using Required = Requires<Visibility, Material3d, Transform>;
+  using Required = Requires<Visibility, Transform>;
   Handle<rl::Mesh> mesh;
 
   Mesh3d() = default;

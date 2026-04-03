@@ -197,10 +197,10 @@ private:
 
     static void ensure_material(World &world, Entity entity,
                                 const StandardMaterial &material) {
-      if (auto *existing = world.get_component<Material3d>(entity)) {
+      if (auto *existing = world.get_component<MeshMaterial3d<>>(entity)) {
         existing->material = material;
       } else {
-        world.insert_component(entity, Material3d{material});
+        world.insert_component(entity, MeshMaterial3d<>{material});
       }
     }
 

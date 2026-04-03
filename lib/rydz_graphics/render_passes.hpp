@@ -4,8 +4,8 @@
 #include "render_extract.hpp"
 #include "render_material.hpp"
 #include "render_phase.hpp"
-#include "screen_pipeline.hpp"
 #include "rydz_ecs/core/time.hpp"
+#include "screen_pipeline.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -53,6 +53,7 @@ struct RenderPassSystems {
                                 Res<OpaquePhase> phase,
                                 Res<Assets<rl::Mesh>> mesh_assets,
                                 Res<Assets<rl::Texture2D>> texture_assets,
+                                ResMut<ShaderCache> shader_cache,
                                 Res<ExtractedView> view, NonSendMarker marker) {
     if (!state->world_pass_active) {
       return;
@@ -60,17 +61,16 @@ struct RenderPassSystems {
 
     detail::begin_depth_prepass(marker);
     for (const auto &batch : phase->batches) {
-      detail::draw_depth_batch(marker, batch, *mesh_assets, *texture_assets);
+      detail::draw_depth_batch(marker, batch, *mesh_assets, *texture_assets,
+                               *shader_cache);
     }
     detail::end_depth_prepass(marker, *view);
   }
 
-  static void run_cluster_build_pass(Res<RenderExecutionState> state,
-                                     Res<ExtractedView> view,
-                                     Res<ExtractedLights> lights,
-                                     Res<ClusterConfig> cluster_config,
-                                     ResMut<ClusteredLightingState> cluster_state,
-                                     NonSendMarker marker) {
+  static void run_cluster_build_pass(
+      Res<RenderExecutionState> state, Res<ExtractedView> view,
+      Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
+      ResMut<ClusteredLightingState> cluster_state, NonSendMarker marker) {
     if (!state->world_pass_active) {
       return;
     }
@@ -79,43 +79,39 @@ struct RenderPassSystems {
                                   *cluster_state);
   }
 
-  static void run_opaque_pass(Res<RenderExecutionState> state,
-                              Res<OpaquePhase> phase,
-                              Res<Assets<rl::Mesh>> mesh_assets,
-                              Res<Assets<rl::Texture2D>> texture_assets,
-                              Res<ExtractedView> view,
-                              Res<ExtractedLights> lights,
-                              Res<ClusterConfig> cluster_config,
-                              Res<ClusteredLightingState> cluster_state,
-                              NonSendMarker marker) {
+  static void run_opaque_pass(
+      Res<RenderExecutionState> state, Res<OpaquePhase> phase,
+      Res<Assets<rl::Mesh>> mesh_assets,
+      Res<Assets<rl::Texture2D>> texture_assets,
+      ResMut<ShaderCache> shader_cache, Res<ExtractedView> view,
+      Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
+      Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
     if (!state->world_pass_active) {
       return;
     }
 
     for (const auto &batch : phase->batches) {
       detail::draw_opaque_batch(marker, batch, *mesh_assets, *texture_assets,
-                                *view, *lights, *cluster_config,
+                                *shader_cache, *view, *lights, *cluster_config,
                                 *cluster_state);
     }
   }
 
-  static void run_transparent_pass(Res<RenderExecutionState> state,
-                                   Res<TransparentPhase> phase,
-                                   Res<Assets<rl::Mesh>> mesh_assets,
-                                   Res<Assets<rl::Texture2D>> texture_assets,
-                                   Res<ExtractedView> view,
-                                   Res<ExtractedLights> lights,
-                                   Res<ClusterConfig> cluster_config,
-                                   Res<ClusteredLightingState> cluster_state,
-                                   NonSendMarker marker) {
+  static void run_transparent_pass(
+      Res<RenderExecutionState> state, Res<TransparentPhase> phase,
+      Res<Assets<rl::Mesh>> mesh_assets,
+      Res<Assets<rl::Texture2D>> texture_assets,
+      ResMut<ShaderCache> shader_cache, Res<ExtractedView> view,
+      Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
+      Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
     if (!state->world_pass_active) {
       return;
     }
 
     for (const auto &item : phase->items) {
       detail::draw_transparent_item(marker, item, *mesh_assets, *texture_assets,
-                                    *view, *lights, *cluster_config,
-                                    *cluster_state);
+                                    *shader_cache, *view, *lights,
+                                    *cluster_config, *cluster_state);
     }
   }
 
@@ -149,8 +145,7 @@ struct RenderPassSystems {
 
   static void run_ui_pass(Res<UiPhase> phase,
                           Res<Assets<rl::Texture2D>> texture_assets,
-                          ResMut<RenderExecutionState> state,
-                          NonSendMarker) {
+                          ResMut<RenderExecutionState> state, NonSendMarker) {
     if (!state->backbuffer_active) {
       rl::BeginDrawing();
       state->backbuffer_active = true;
@@ -311,14 +306,16 @@ private:
 
     static void draw_depth_batch(NonSendMarker marker, const OpaqueBatch &batch,
                                  const Assets<rl::Mesh> &mesh_assets,
-                                 const Assets<rl::Texture2D> &texture_assets) {
+                                 const Assets<rl::Texture2D> &texture_assets,
+                                 ShaderCache &shader_cache) {
       const rl::Mesh *mesh = mesh_assets.get(batch.key.mesh);
       if (!mesh) {
         return;
       }
 
       PreparedMaterial prepared{};
-      prepare_material(marker, batch.key.material, texture_assets, prepared);
+      prepare_material(marker, batch.key.material, texture_assets, shader_cache,
+                       prepared);
       prepared.material.shader = depth_prepass_shader();
 
       float alpha_cutoff = 0.1f;
@@ -340,10 +337,10 @@ private:
           std::min(lights.point_lights.size(),
                    static_cast<usize>(config.max_point_lights));
       if (lights.point_lights.size() > point_light_count) {
-        rl::TraceLog(LOG_WARNING,
-                     "Forward+: dropping %d point lights beyond configured cap",
-                     static_cast<int>(lights.point_lights.size() -
-                                      point_light_count));
+        rl::TraceLog(
+            LOG_WARNING,
+            "Forward+: dropping %d point lights beyond configured cap",
+            static_cast<int>(lights.point_lights.size() - point_light_count));
       }
 
       for (usize i = 0; i < point_light_count; ++i) {
@@ -376,9 +373,9 @@ private:
            ++light_index) {
         const auto &light = state.point_lights_cpu[light_index];
         const Vec3 view_position_math =
-            view.camera_view.view *
-            Vec3(light.position_range.x, light.position_range.y,
-                 light.position_range.z);
+            view.camera_view.view * Vec3(light.position_range.x,
+                                         light.position_range.y,
+                                         light.position_range.z);
         const rl::Vector3 view_position = to_rl(view_position_math);
 
         for (u32 cluster_index = 0;
@@ -415,7 +412,8 @@ private:
           0);
       rl::rlUpdateShaderBuffer(
           state.light_index_buffer, state.light_indices_cpu.data(),
-          static_cast<unsigned int>(state.light_indices_cpu.size() * sizeof(u32)),
+          static_cast<unsigned int>(state.light_indices_cpu.size() *
+                                    sizeof(u32)),
           0);
       rl::rlUpdateShaderBuffer(state.overflow_buffer, &overflow_count,
                                sizeof(overflow_count), 0);
@@ -436,6 +434,7 @@ private:
                                   const OpaqueBatch &batch,
                                   const Assets<rl::Mesh> &mesh_assets,
                                   const Assets<rl::Texture2D> &texture_assets,
+                                  ShaderCache &shader_cache,
                                   const ExtractedView &view,
                                   const ExtractedLights &lights,
                                   const ClusterConfig &cluster_config,
@@ -446,17 +445,20 @@ private:
       }
 
       PreparedMaterial prepared{};
-      prepare_material(marker, batch.key.material, texture_assets, prepared);
-      apply_shader_uniforms(marker, prepared.material.shader, prepared, view,
-                            lights, cluster_config, cluster_state);
+      prepare_material(marker, batch.key.material, texture_assets, shader_cache,
+                       prepared);
+      apply_shader_uniforms(marker, prepared.material.shader,
+                            batch.key.material, prepared, view, lights,
+                            cluster_config, cluster_state);
       draw_batch_instances(*mesh, prepared.material, batch);
     }
 
     static void draw_transparent_item(
         NonSendMarker marker, const TransparentPhaseItem &item,
         const Assets<rl::Mesh> &mesh_assets,
-        const Assets<rl::Texture2D> &texture_assets, const ExtractedView &view,
-        const ExtractedLights &lights, const ClusterConfig &cluster_config,
+        const Assets<rl::Texture2D> &texture_assets, ShaderCache &shader_cache,
+        const ExtractedView &view, const ExtractedLights &lights,
+        const ClusterConfig &cluster_config,
         const ClusteredLightingState &cluster_state) {
       const rl::Mesh *mesh = mesh_assets.get(item.mesh);
       if (!mesh) {
@@ -464,10 +466,11 @@ private:
       }
 
       PreparedMaterial prepared{};
-      prepare_material(marker, material_key(item.material), texture_assets,
+      prepare_material(marker, item.material, texture_assets, shader_cache,
                        prepared);
-      apply_shader_uniforms(marker, prepared.material.shader, prepared, view,
-                            lights, cluster_config, cluster_state);
+      apply_shader_uniforms(marker, prepared.material.shader, item.material,
+                            prepared, view, lights, cluster_config,
+                            cluster_state);
       rl::DrawMesh(*mesh, prepared.material, to_rl(item.world_transform));
     }
 
@@ -498,8 +501,7 @@ private:
                        SHADER_UNIFORM_FLOAT);
       set_shader_value(marker, shader, "u_grain", &settings.grain,
                        SHADER_UNIFORM_FLOAT);
-      rl::SetShaderValueTexture(shader,
-                                shader.locs[SHADER_LOC_MAP_DIFFUSE],
+      rl::SetShaderValueTexture(shader, shader.locs[SHADER_LOC_MAP_DIFFUSE],
                                 source_texture);
 
       const rl::Rectangle source = {

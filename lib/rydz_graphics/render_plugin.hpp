@@ -4,12 +4,12 @@
 #include "render_extract.hpp"
 #include "render_passes.hpp"
 #include "render_phase.hpp"
-#include "screen_pipeline.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/asset_loaders.hpp"
 #include "rydz_graphics/scene_runtime.hpp"
+#include "screen_pipeline.hpp"
 
 namespace ecs {
 
@@ -28,6 +28,13 @@ enum class RenderPassSet {
 };
 
 struct RenderPlugin {
+  template <IsMaterial M> static void register_material(App &app) {
+    app.add_systems(ScheduleLabel::ExtractRender,
+                    group(extract_meshes_system<M>)
+                        .in_set(set(RenderExtractSet::Extract))
+                        .after(clear_extracted_meshes_system));
+  }
+
   static void install(App &app) {
     app.init_resource<Assets<rl::Mesh>>(
            [](rl::Mesh &mesh) { rl::UnloadMesh(mesh); })
@@ -42,6 +49,7 @@ struct RenderPlugin {
         .init_resource<ExtractedUi>()
         .init_resource<ClusterConfig>()
         .init_resource<ClusteredLightingState>()
+        .init_resource<ShaderCache>()
         .init_resource<PostProcessSettings>()
         .init_resource<DebugOverlaySettings>()
         .init_resource<ScreenPipelineState>()
@@ -70,19 +78,18 @@ struct RenderPlugin {
         .configure_set(
             ScheduleLabel::Render,
             configure(RenderPassSet::Main).after(set(RenderPassSet::Setup)))
+        .configure_set(ScheduleLabel::Render,
+                       configure(RenderPassSet::PostProcess)
+                           .after(set(RenderPassSet::Main)))
         .configure_set(
             ScheduleLabel::Render,
-            configure(RenderPassSet::PostProcess)
-                .after(set(RenderPassSet::Main)))
-        .configure_set(ScheduleLabel::Render,
-                       configure(RenderPassSet::Ui)
-                           .after(set(RenderPassSet::PostProcess)))
+            configure(RenderPassSet::Ui).after(set(RenderPassSet::PostProcess)))
         .configure_set(
             ScheduleLabel::Render,
             configure(RenderPassSet::Cleanup).after(set(RenderPassSet::Ui)));
 
     app.add_systems(ScheduleLabel::First,
-                     SceneRuntimeSystems::cleanup_orphan_scene_entities_system)
+                    SceneRuntimeSystems::cleanup_orphan_scene_entities_system)
         .add_systems(ScheduleLabel::PreUpdate,
                      SceneRuntimeSystems::sync_scene_roots_system)
 
@@ -91,8 +98,8 @@ struct RenderPlugin {
                            compute_mesh_bounds_system, frustum_cull_system))
 
         .add_systems(ScheduleLabel::ExtractRender,
-                     group(extract_view_system, extract_lighting_system,
-                           extract_meshes_system, extract_ui_system)
+                     group(clear_extracted_meshes_system, extract_view_system,
+                           extract_lighting_system, extract_ui_system)
                          .in_set(set(RenderExtractSet::Extract))
                          .chain())
 
@@ -129,9 +136,15 @@ struct RenderPlugin {
         .add_systems(ScheduleLabel::Render,
                      group(RenderPassSystems::end_frame)
                          .in_set(set(RenderPassSet::Cleanup)));
+
+    register_material<StandardMaterial>(app);
   }
 };
 
 inline void render_plugin(App &app) { RenderPlugin::install(app); }
+
+template <IsMaterial M> inline void render_material_plugin(App &app) {
+  RenderPlugin::register_material<M>(app);
+}
 
 } // namespace ecs

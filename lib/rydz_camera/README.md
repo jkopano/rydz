@@ -43,7 +43,8 @@ Add to Update schedule to drive camera movement.
 inline void setup_scene(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   // Spawn player entity
   auto cube = meshes->add(mesh::cube(1.0f, 1.0f, 1.0f));
-  cmd.spawn(Mesh3d{cube}, Material3d{StandardMaterial::from_color(WHITE)},
+  cmd.spawn(Mesh3d{cube},
+            MeshMaterial3d<>{StandardMaterial::from_color(WHITE)},
             Transform::from_xyz(0, 0.5f, 0), Player{});
   
   // Spawn isometric camera following origin with offset

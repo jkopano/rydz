@@ -1,5 +1,6 @@
 // 06 - Rendering
-// Pokazuje: mesh::cube/sphere/cylinder, Mesh3d, Material3d, Transform3D,
+// Pokazuje: mesh::cube/sphere/cylinder, Mesh3d,
+//           MeshMaterial3d<>, Transform3D,
 //           Skybox, Assets, AssetServer (GLTF), Textures
 #include "math.hpp"
 #include "rl.hpp"
@@ -24,29 +25,32 @@ void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
 
   // cube - czerwona
   auto cube_h = meshes->add(mesh::cube(2, 2, 2));
-  cmd.spawn(Mesh3d{cube_h}, Material3d{StandardMaterial::from_color(RED)},
+  cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d<>{StandardMaterial::from_color(RED)},
             ecs::Transform::from_xyz(-4, 1, 0), RotateTag{});
 
   // kula - zielona
   auto sphere_h = meshes->add(mesh::sphere(1.0f));
-  cmd.spawn(Mesh3d{sphere_h}, Material3d{StandardMaterial::from_color(GREEN)},
-            ecs::Transform::from_xyz(0, 1, 0));
+  cmd.spawn(
+      Mesh3d{sphere_h}, MeshMaterial3d<>{StandardMaterial::from_color(GREEN)},
+      ecs::Transform::from_xyz(0, 1, 0));
 
   // cylinder - niebieski
   auto cyl_h = meshes->add(mesh::cylinder(0.8f, 2.0f));
-  cmd.spawn(Mesh3d{cyl_h}, Material3d{StandardMaterial::from_color(BLUE)},
+  cmd.spawn(Mesh3d{cyl_h},
+            MeshMaterial3d<>{StandardMaterial::from_color(BLUE)},
             ecs::Transform::from_xyz(4, 1, 0));
 
   // floor
   auto floor_h = meshes->add(mesh::plane(20, 20));
   cmd.spawn(Mesh3d{floor_h},
-            Material3d{StandardMaterial::from_color(DARKGRAY)},
+            MeshMaterial3d<>{StandardMaterial::from_color(DARKGRAY)},
             ecs::Transform::from_xyz(0, 0, 0));
 
   // torus
   auto torus_h = meshes->add(mesh::torus(1.0f, 0.3f));
-  cmd.spawn(Mesh3d{torus_h}, Material3d{StandardMaterial::from_color(PURPLE)},
-            ecs::Transform::from_xyz(0, 3, -4), RotateTag{});
+  cmd.spawn(
+      Mesh3d{torus_h}, MeshMaterial3d<>{StandardMaterial::from_color(PURPLE)},
+      ecs::Transform::from_xyz(0, 3, -4), RotateTag{});
 
   // światło żeby coś było widać
   cmd.spawn(DirectionalLight{
@@ -78,7 +82,7 @@ void load_textured_cube(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
 
   auto cube_h = meshes->add(mesh::cube(2, 2, 2));
 
-  cmd.spawn(Mesh3d{cube_h}, Material3d{mat},
+  cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d<>{mat},
             ecs::Transform::from_xyz(-8, 1, 0), RotateTag{});
 }
 

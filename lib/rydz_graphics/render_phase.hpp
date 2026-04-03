@@ -22,7 +22,7 @@ struct ShadowPhase {
 
 struct OpaquePhaseItem {
   Handle<rl::Mesh> mesh{};
-  StandardMaterial material{};
+  MaterialDescriptor material{};
   Mat4 world_transform = Mat4::sIdentity();
   float distance_to_camera = 0.0f;
 };
@@ -40,7 +40,7 @@ struct OpaquePhase {
 
 struct TransparentPhaseItem {
   Handle<rl::Mesh> mesh{};
-  StandardMaterial material{};
+  MaterialDescriptor material{};
   Mat4 world_transform = Mat4::sIdentity();
   float sort_key = 0.0f;
 };
@@ -179,7 +179,7 @@ private:
 
         RenderBatchKey key{};
         key.mesh = item.mesh;
-        key.material = material_key(item.material);
+        key.material = item.material;
 
         auto it = batch_index.find(key);
         if (it == batch_index.end()) {

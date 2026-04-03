@@ -22,13 +22,15 @@ void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   // podłoga
   auto floor_h = meshes->add(mesh::plane(30, 30));
   cmd.spawn(Mesh3d{floor_h},
-            Material3d{StandardMaterial::from_color({200, 200, 200, 255})},
+            MeshMaterial3d<>{
+                StandardMaterial::from_color({200, 200, 200, 255})},
             Transform{});
 
   // kilka obiektów na scenie
   auto sphere_h = meshes->add(mesh::sphere(1.0f));
   for (int i = -2; i <= 2; ++i) {
-    cmd.spawn(Mesh3d{sphere_h}, Material3d{StandardMaterial::from_color(WHITE)},
+    cmd.spawn(Mesh3d{sphere_h}, MeshMaterial3d<>{StandardMaterial::from_color(
+                                     WHITE)},
               Transform::from_xyz(i * 4.0f, 1.0f, 0.0f));
   }
 
@@ -43,7 +45,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
                               f32 y, f32 intensity) {
     auto h = meshes->add(mesh::cube(0.3f, 0.3f, 0.3f));
     cmd.spawn(
-        Mesh3d{h}, Material3d{StandardMaterial::from_color(color)},
+        Mesh3d{h}, MeshMaterial3d<>{StandardMaterial::from_color(color)},
         PointLight{.color = color, .intensity = intensity, .range = 30.0f},
         Transform::from_xyz(0, y, 0), OrbitLight{radius, speed, phase});
   };

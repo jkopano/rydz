@@ -20,7 +20,8 @@ void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   // podłoga
   auto floor_h = meshes->add(mesh::plane(20, 20));
   cmd.spawn(Mesh3d{floor_h},
-            Material3d{StandardMaterial::from_color(DARKGRAY)}, Transform{});
+            MeshMaterial3d<>{StandardMaterial::from_color(DARKGRAY)},
+            Transform{});
 
   // światło
   cmd.spawn(DirectionalLight{
@@ -31,20 +32,23 @@ void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
 
   // parent
   auto cube_h = meshes->add(mesh::cube(1, 1, 1));
-  auto pivot = cmd.spawn(Mesh3d{cube_h},
-                         Material3d{StandardMaterial::from_color(YELLOW)},
-                         Transform::from_xyz(0, 2, 0), PivotTag{});
+  auto pivot =
+      cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d<>{StandardMaterial::from_color(
+                                   YELLOW)},
+                Transform::from_xyz(0, 2, 0), PivotTag{});
 
   // child
   auto arm_h = meshes->add(mesh::cube(3, 0.4f, 0.4f));
   auto arm =
-      cmd.spawn(Mesh3d{arm_h}, Material3d{StandardMaterial::from_color(RED)},
+      cmd.spawn(Mesh3d{arm_h}, MeshMaterial3d<>{StandardMaterial::from_color(
+                                  RED)},
                 Transform::from_xyz(2.0f, 0, 0), // offset od pivota
                 Parent{pivot.id()}, ArmTag{});
 
   // child of child
   auto tip_h = meshes->add(mesh::sphere(0.4f));
-  cmd.spawn(Mesh3d{tip_h}, Material3d{StandardMaterial::from_color(BLUE)},
+  cmd.spawn(Mesh3d{tip_h},
+            MeshMaterial3d<>{StandardMaterial::from_color(BLUE)},
             Transform::from_xyz(1.8f, 0, 0), // offset od ramienia
             Parent{arm.id()});
 

@@ -28,7 +28,8 @@ void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   // podłoga
   auto floor_h = meshes->add(mesh::plane(30, 30));
   cmd.spawn(Mesh3d{floor_h},
-            Material3d{StandardMaterial::from_color(DARKGRAY)}, Transform{});
+            MeshMaterial3d<>{StandardMaterial::from_color(DARKGRAY)},
+            Transform{});
 }
 
 // spawn_batch
@@ -42,14 +43,16 @@ void batch_spawn(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, Res<Input> input,
   auto sphere_h = meshes->add(mesh::sphere(0.3f));
 
   // budujemy wektor tupli — spawn_batch przyjmuje range
-  std::vector<Tuple<BulletTag, Lifetime, Mesh3d, Material3d, Transform>> batch;
+  std::vector<Tuple<BulletTag, Lifetime, Mesh3d, MeshMaterial3d<>, Transform>>
+      batch;
 
   for (i32 x = -3; x <= 3; ++x) {
     for (i32 z = -3; z <= 3; ++z) {
       batch.emplace_back(BulletTag{}, Lifetime{3.0f}, Mesh3d{sphere_h},
-                         Material3d{StandardMaterial::from_color(rl::Color{
-                             static_cast<u8>(100 + x * 20),
-                             static_cast<u8>(100 + z * 20), 200, 255})},
+                         MeshMaterial3d<>{StandardMaterial::from_color(
+                             rl::Color{static_cast<u8>(100 + x * 20),
+                                       static_cast<u8>(100 + z * 20), 200,
+                                       255})},
                          Transform::from_xyz(x * 1.5f, 5.0f, z * 1.5f));
     }
   }

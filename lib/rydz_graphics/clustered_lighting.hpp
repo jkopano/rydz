@@ -6,8 +6,8 @@
 #include "rydz_ecs/fwd.hpp"
 #include "types.hpp"
 #include <array>
-#include <cmath>
 #include <cfloat>
+#include <cmath>
 #include <utility>
 #include <vector>
 
@@ -61,8 +61,7 @@ struct ClusteredLightingState {
 
   ClusteredLightingState() = default;
   ClusteredLightingState(const ClusteredLightingState &) = delete;
-  ClusteredLightingState &
-  operator=(const ClusteredLightingState &) = delete;
+  ClusteredLightingState &operator=(const ClusteredLightingState &) = delete;
   ClusteredLightingState(ClusteredLightingState &&other) noexcept
       : point_light_buffer(other.point_light_buffer),
         cluster_buffer(other.cluster_buffer),
@@ -76,8 +75,7 @@ struct ClusteredLightingState {
     other.overflow_buffer = 0;
   }
 
-  ClusteredLightingState &
-  operator=(ClusteredLightingState &&other) noexcept {
+  ClusteredLightingState &operator=(ClusteredLightingState &&other) noexcept {
     if (this == &other) {
       return *this;
     }
@@ -96,9 +94,7 @@ struct ClusteredLightingState {
     return *this;
   }
 
-  ~ClusteredLightingState() {
-    release_buffers();
-  }
+  ~ClusteredLightingState() { release_buffers(); }
 
   void release_buffers() {
     if (point_light_buffer != 0) {
@@ -121,23 +117,22 @@ struct ClusteredLightingState {
 
   void ensure_buffers(const ClusterConfig &config) {
     if (point_light_buffer == 0) {
-      point_light_buffer = rl::rlLoadShaderBuffer(
-          sizeof(GpuPointLight) * config.max_point_lights, nullptr,
-          RL_DYNAMIC_DRAW);
+      point_light_buffer = rl::rlLoadShaderBuffer(sizeof(GpuPointLight) *
+                                                      config.max_point_lights,
+                                                  nullptr, RL_DYNAMIC_DRAW);
     }
     if (cluster_buffer == 0) {
-      cluster_buffer = rl::rlLoadShaderBuffer(
-          sizeof(ClusterGpuRecord) * config.cluster_count(), nullptr,
-          RL_DYNAMIC_DRAW);
+      cluster_buffer = rl::rlLoadShaderBuffer(sizeof(ClusterGpuRecord) *
+                                                  config.cluster_count(),
+                                              nullptr, RL_DYNAMIC_DRAW);
     }
     if (light_index_buffer == 0) {
-      light_index_buffer =
-          rl::rlLoadShaderBuffer(sizeof(u32) * config.max_light_indices(),
-                                 nullptr, RL_DYNAMIC_DRAW);
+      light_index_buffer = rl::rlLoadShaderBuffer(
+          sizeof(u32) * config.max_light_indices(), nullptr, RL_DYNAMIC_DRAW);
     }
     if (overflow_buffer == 0) {
-      overflow_buffer = rl::rlLoadShaderBuffer(sizeof(u32), nullptr,
-                                               RL_DYNAMIC_DRAW);
+      overflow_buffer =
+          rl::rlLoadShaderBuffer(sizeof(u32), nullptr, RL_DYNAMIC_DRAW);
     }
   }
 
@@ -151,13 +146,13 @@ struct ClusteredLightingState {
   }
 };
 
-inline float cluster_slice_distance(const ClusterConfig &config, float near_plane,
-                                    float far_plane, bool orthographic,
-                                    i32 slice_index) {
+inline float cluster_slice_distance(const ClusterConfig &config,
+                                    float near_plane, float far_plane,
+                                    bool orthographic, i32 slice_index) {
   float clamped_near = std::max(near_plane, 0.001f);
   float clamped_far = std::max(far_plane, clamped_near + 0.001f);
-  float alpha =
-      static_cast<float>(slice_index) / static_cast<float>(config.slice_count_z);
+  float alpha = static_cast<float>(slice_index) /
+                static_cast<float>(config.slice_count_z);
 
   if (orthographic) {
     return clamped_near + (clamped_far - clamped_near) * alpha;
@@ -184,10 +179,8 @@ inline ClusterGpuRecord build_cluster_record(const ClusterConfig &config,
                                              i32 tile_z) {
   ClusterGpuRecord record{};
 
-  const u32 cluster_index =
-      static_cast<u32>((tile_z * config.tile_count_y + tile_y) *
-                           config.tile_count_x +
-                       tile_x);
+  const u32 cluster_index = static_cast<u32>(
+      (tile_z * config.tile_count_y + tile_y) * config.tile_count_x + tile_x);
   record.meta[0] = cluster_index * config.max_lights_per_cluster;
   record.meta[1] = 0;
   record.meta[2] = 0;
@@ -202,8 +195,8 @@ inline ClusterGpuRecord build_cluster_record(const ClusterConfig &config,
   const float ndc_y1 =
       -1.0f + 2.0f * static_cast<float>(tile_y + 1) / config.tile_count_y;
 
-  const float slice_near =
-      cluster_slice_distance(config, near_plane, far_plane, orthographic, tile_z);
+  const float slice_near = cluster_slice_distance(config, near_plane, far_plane,
+                                                  orthographic, tile_z);
   const float slice_far = cluster_slice_distance(config, near_plane, far_plane,
                                                  orthographic, tile_z + 1);
 

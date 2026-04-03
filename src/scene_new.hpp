@@ -112,9 +112,11 @@ inline void spawn_ground(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
   auto plane_h = meshes->add(mesh::plane(20.0f, 20.0f, 1, 1));
 
   cmd.spawn(Mesh3d{plane_h},
-            // Material3d{StandardMaterial::from_color({80, 160, 80, 255})},
-            Material3d{StandardMaterial::from_texture(
-                textures->add(rl::LoadTexture("res/textures/brick.png")))},
+            // MeshMaterial3d<>{
+            //     StandardMaterial::from_color({80, 160, 80, 255})},
+            MeshMaterial3d<>{
+                StandardMaterial::from_texture(
+                    textures->add(rl::LoadTexture("res/textures/brick.png")))},
             Transform{});
 }
 
@@ -124,8 +126,9 @@ inline void spawn_player(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
   auto cube_h = meshes->add(mesh::cube(1.0f, 1.0f, 1.0f));
 
   cmd.spawn(Mesh3d{cube_h},
-            Material3d{StandardMaterial::from_texture(
-                textures->add(rl::LoadTexture("res/textures/stone.jpg")))},
+            MeshMaterial3d<>{
+                StandardMaterial::from_texture(
+                    textures->add(rl::LoadTexture("res/textures/stone.jpg")))},
             Transform::from_xyz(0.0f, 0.5f, 0.0f), Player{});
 }
 

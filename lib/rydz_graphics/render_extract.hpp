@@ -81,7 +81,7 @@ struct ExtractedLights {
 
 struct ExtractedMesh {
   Handle<rl::Mesh> mesh{};
-  StandardMaterial material{};
+  MaterialDescriptor material{};
   Mat4 world_transform = Mat4::sIdentity();
   float distance_to_camera = 0.0f;
   bool transparent = false;
@@ -116,8 +116,8 @@ inline rl::Vector3 color_to_vec3(rl::Color color) {
   return {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f};
 }
 
-inline bool material_is_transparent(const StandardMaterial &material) {
-  return material.base_color.a < 255;
+inline bool material_is_transparent(const MaterialDescriptor &material) {
+  return material.flags.transparent;
 }
 
 inline void
@@ -175,11 +175,15 @@ extract_lighting_system(Query<DirectionalLight> dir_query,
   }
 }
 
-inline void extract_meshes_system(
-    Query<Mesh3d, GlobalTransform, Material3d, Opt<ViewVisibility>> query,
-    Res<ExtractedView> view, ResMut<ExtractedMeshes> meshes) {
+inline void clear_extracted_meshes_system(ResMut<ExtractedMeshes> meshes) {
   meshes->clear();
+}
 
+template <IsMaterial M>
+inline void extract_meshes_system(
+    Query<Mesh3d, GlobalTransform, MeshMaterial3d<M>, Opt<ViewVisibility>>
+        query,
+    Res<ExtractedView> view, ResMut<ExtractedMeshes> meshes) {
   for (auto [mesh3d, global, material, visibility] : query.iter()) {
     if (!mesh3d || !global || !material || !mesh3d->mesh.is_valid()) {
       continue;
@@ -188,15 +192,18 @@ inline void extract_meshes_system(
       continue;
     }
 
+    MaterialDescriptor descriptor = material->material.describe();
+    const bool transparent = material_is_transparent(descriptor);
+    const bool casts_shadows = descriptor.flags.casts_shadows;
     Vec3 camera_offset = global->translation() - view->camera_view.position;
 
     meshes->items.push_back(ExtractedMesh{
         .mesh = mesh3d->mesh,
-        .material = material->material,
+        .material = std::move(descriptor),
         .world_transform = global->matrix,
         .distance_to_camera = camera_offset.LengthSq(),
-        .transparent = material_is_transparent(material->material),
-        .casts_shadows = !material_is_transparent(material->material),
+        .transparent = transparent,
+        .casts_shadows = casts_shadows,
     });
   }
 }
