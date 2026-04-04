@@ -15,16 +15,14 @@ struct ToonMaterial {
 
   MaterialDescriptor describe() const {
     MaterialDescriptor descriptor;
-    descriptor.shader = {
-        .vertex_path = "res/shaders/toon.vert",
-        .fragment_path = "res/shaders/toon.frag",
-    };
+    descriptor.shader =
+        ShaderSpec::from_files("res/shaders/toon.vert", "res/shaders/toon.frag");
     descriptor.flags.transparent = base_color.a < 255;
     descriptor.flags.casts_shadows = base_color.a == 255;
     descriptor.maps.push_back(
         MaterialMapBinding::color_binding(MATERIAL_MAP_DIFFUSE, base_color));
     descriptor.uniforms.push_back(
-        ShaderUniformValue::float1("u_rim_strength", rim_strength));
+        ShaderUniform::float1("u_rim_strength", rim_strength));
     return descriptor;
   }
 };
@@ -50,7 +48,8 @@ int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "10 - Custom Material", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(RenderPlugin::install<ToonMaterial>)
+      .add_plugin(RenderPlugin::install)
+      .add_plugin(RenderPlugin::register_material<ToonMaterial>)
       .add_systems(ScheduleLabel::Startup, setup)
       .run();
 }

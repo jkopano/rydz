@@ -91,7 +91,7 @@ int main() {
   App app;
   app.add_plugin(window_plugin({1024, 768, "08 - Hierarchy", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
+      .add_plugin(RenderPlugin::install)
       .add_systems(ScheduleLabel::Startup, setup)
       .add_systems(ScheduleLabel::Update, rotate_pivot)
       .run();

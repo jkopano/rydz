@@ -147,6 +147,7 @@ class ICondition {
 public:
   virtual ~ICondition() = default;
   virtual bool is_true(World &world) = 0;
+  virtual SystemAccess access() const = 0;
 };
 
 template <typename F> class FunctionCondition : public ICondition {
@@ -172,6 +173,14 @@ public:
       return evaluate_with_args<Args...>(world, ctx,
                                          std::index_sequence_for<Args...>{});
     });
+  }
+
+  SystemAccess access() const override {
+    SystemAccess acc;
+    function_traits<F>::apply([&]<SystemParameter... Args>() {
+      (SystemParamTraits<bare_t<Args>>::access(acc), ...);
+    });
+    return acc;
   }
 
 private:
@@ -222,7 +231,11 @@ public:
 
   std::string name() const override { return system_->name(); }
 
-  SystemAccess access() const override { return system_->access(); }
+  SystemAccess access() const override {
+    auto acc = condition_->access();
+    acc.merge(system_->access());
+    return acc;
+  }
 };
 
 template <typename F> std::unique_ptr<ICondition> make_condition(F &&func) {
@@ -239,6 +252,7 @@ inline std::unique_ptr<ICondition> run_once() {
       }
       return false;
     }
+    SystemAccess access() const override { return {}; }
   };
   return std::make_unique<RunOnceCondition>();
 }

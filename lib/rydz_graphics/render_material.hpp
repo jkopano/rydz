@@ -24,15 +24,7 @@ struct PbrFallbackTextures {
 
 struct ShaderCache {
   using T = Resource;
-  std::unordered_map<ShaderProgramSpec, rl::Shader> shaders;
-
-  ~ShaderCache() {
-    for (auto &[_, shader] : shaders) {
-      if (shader.id != 0 && shader.id != rl::rlGetShaderIdDefault()) {
-        ::UnloadShader(shader);
-      }
-    }
-  }
+  std::unordered_map<ShaderSpec, ShaderProgram> shaders;
 };
 
 inline bool has_texture(const rl::Texture2D &texture) { return texture.id > 0; }
@@ -113,69 +105,11 @@ inline void apply_pbr_fallback_textures(rl::Material &material) {
   }
 }
 
-inline void initialize_common_shader_locations(rl::Shader &shader) {
-  if (shader.id == 0) {
-    shader.id = rl::rlGetShaderIdDefault();
-    shader.locs = rl::rlGetShaderLocsDefault();
-    return;
-  }
-
-  if (shader.locs == nullptr) {
-    shader.locs = (int *)RL_CALLOC(RL_MAX_SHADER_LOCATIONS, sizeof(int));
-    for (int i = 0; i < RL_MAX_SHADER_LOCATIONS; ++i) {
-      shader.locs[i] = -1;
-    }
-  }
-
-  shader.locs[SHADER_LOC_VERTEX_POSITION] =
-      rl::GetShaderLocationAttrib(shader, "vertexPosition");
-  shader.locs[SHADER_LOC_VERTEX_NORMAL] =
-      rl::GetShaderLocationAttrib(shader, "vertexNormal");
-  shader.locs[SHADER_LOC_VERTEX_TEXCOORD01] =
-      rl::GetShaderLocationAttrib(shader, "vertexTexCoord");
-  shader.locs[SHADER_LOC_VERTEX_TANGENT] =
-      rl::GetShaderLocationAttrib(shader, "vertexTangent");
-  shader.locs[SHADER_LOC_MATRIX_MVP] = rl::GetShaderLocation(shader, "mvp");
-  shader.locs[SHADER_LOC_MATRIX_MODEL] =
-      rl::GetShaderLocation(shader, "matModel");
-  shader.locs[SHADER_LOC_COLOR_DIFFUSE] =
-      rl::GetShaderLocation(shader, "colDiffuse");
-  shader.locs[SHADER_LOC_MAP_DIFFUSE] = rl::GetShaderLocation(shader, "texture0");
-  shader.locs[SHADER_LOC_MAP_METALNESS] =
-      rl::GetShaderLocation(shader, "u_metallic_texture");
-  shader.locs[SHADER_LOC_MAP_NORMAL] =
-      rl::GetShaderLocation(shader, "u_normal_texture");
-  shader.locs[SHADER_LOC_MAP_ROUGHNESS] =
-      rl::GetShaderLocation(shader, "u_roughness_texture");
-  shader.locs[SHADER_LOC_MAP_OCCLUSION] =
-      rl::GetShaderLocation(shader, "u_occlusion_texture");
-  shader.locs[SHADER_LOC_MAP_EMISSION] =
-      rl::GetShaderLocation(shader, "u_emissive_texture");
-  shader.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] =
-      rl::GetShaderLocationAttrib(shader, "instanceTransform");
-}
-
-inline rl::Shader load_shader_program(NonSendMarker,
-                                      const ShaderProgramSpec &spec) {
-  if (spec.vertex_path.empty() || spec.fragment_path.empty()) {
-    rl::Shader shader{};
-    shader.id = rl::rlGetShaderIdDefault();
-    shader.locs = rl::rlGetShaderLocsDefault();
-    return shader;
-  }
-
-  rl::Shader shader =
-      rl::LoadShader(spec.vertex_path.c_str(), spec.fragment_path.c_str());
-  initialize_common_shader_locations(shader);
-  return shader;
-}
-
-inline rl::Shader &resolve_shader(NonSendMarker marker, ShaderCache &cache,
-                                  const ShaderProgramSpec &spec) {
-  auto [it, inserted] =
-      cache.shaders.try_emplace(spec, rl::Shader{});
+inline ShaderProgram &resolve_shader(NonSendMarker, ShaderCache &cache,
+                                     const ShaderSpec &spec) {
+  auto [it, inserted] = cache.shaders.try_emplace(spec);
   if (inserted) {
-    it->second = load_shader_program(marker, spec);
+    it->second = ShaderProgram::load(spec);
   }
   return it->second;
 }
@@ -212,8 +146,8 @@ inline void prepare_material(NonSendMarker marker,
               sizeof(prepared.local_maps));
   prepared.material.maps = prepared.local_maps.data();
 
-  prepared.material.shader = resolve_shader(marker, shader_cache,
-                                            descriptor.shader);
+  ShaderProgram &shader = resolve_shader(marker, shader_cache, descriptor.shader);
+  prepared.material.shader = shader.raw();
 
   for (const auto &binding : descriptor.maps) {
     apply_material_map_binding(prepared.material, binding, texture_assets);
@@ -222,31 +156,6 @@ inline void prepare_material(NonSendMarker marker,
   if (descriptor.shading_model == MaterialShadingModel::ClusteredPbr) {
     apply_pbr_defaults(prepared.material);
     apply_pbr_fallback_textures(prepared.material);
-  }
-}
-
-inline void set_shader_value(NonSendMarker, rl::Shader &shader,
-                             const char *name, const void *value, int type) {
-  int loc = rl::GetShaderLocation(shader, name);
-  if (loc >= 0) {
-    rl::SetShaderValue(shader, loc, value, type);
-  }
-}
-
-inline void set_shader_value_v(NonSendMarker, rl::Shader &shader,
-                               const char *name, const void *value, int type,
-                               int count) {
-  int loc = rl::GetShaderLocation(shader, name);
-  if (loc >= 0) {
-    rl::SetShaderValueV(shader, loc, value, type, count);
-  }
-}
-
-inline void set_shader_matrix(NonSendMarker, rl::Shader &shader,
-                              const char *name, rl::Matrix value) {
-  int loc = rl::GetShaderLocation(shader, name);
-  if (loc >= 0) {
-    rl::SetShaderValueMatrix(shader, loc, value);
   }
 }
 
@@ -266,7 +175,7 @@ inline void bind_clustered_lighting(const ClusteredLightingState &state) {
 }
 
 inline void apply_pbr_shader_uniforms(
-    NonSendMarker marker, rl::Shader &shader, const PreparedMaterial &prepared,
+    NonSendMarker, ShaderProgram &shader, const PreparedMaterial &prepared,
     const ExtractedView &view, const ExtractedLights &lights,
     const ClusterConfig &cluster_config,
     const ClusteredLightingState &cluster_state) {
@@ -310,104 +219,36 @@ inline void apply_pbr_shader_uniforms(
 
   bind_clustered_lighting(cluster_state);
 
-  set_shader_value(marker, shader, "u_metallic_factor", &metallic,
-                   SHADER_UNIFORM_FLOAT);
-  set_shader_value(marker, shader, "u_roughness_factor", &roughness,
-                   SHADER_UNIFORM_FLOAT);
-  set_shader_value(marker, shader, "u_normal_factor", &normal_factor,
-                   SHADER_UNIFORM_FLOAT);
-  set_shader_value(marker, shader, "u_occlusion_factor", &occlusion_factor,
-                   SHADER_UNIFORM_FLOAT);
-  set_shader_value(marker, shader, "u_emissive_factor", &emissive,
-                   SHADER_UNIFORM_VEC3);
-  set_shader_value(marker, shader, "u_color", &tint, SHADER_UNIFORM_VEC4);
-  set_shader_value(marker, shader, "u_camera_pos", &camera_pos,
-                   SHADER_UNIFORM_VEC3);
+  shader.set("u_metallic_factor", metallic);
+  shader.set("u_roughness_factor", roughness);
+  shader.set("u_normal_factor", normal_factor);
+  shader.set("u_occlusion_factor", occlusion_factor);
+  shader.set("u_emissive_factor", emissive);
+  shader.set("u_color", tint);
+  shader.set("u_camera_pos", camera_pos);
 
-  set_shader_value(marker, shader, "u_has_directional", &has_directional,
-                   SHADER_UNIFORM_INT);
-  set_shader_value(marker, shader, "u_dir_light_direction", &dir_dir,
-                   SHADER_UNIFORM_VEC3);
-  set_shader_value(marker, shader, "u_dir_light_intensity", &dir_intensity,
-                   SHADER_UNIFORM_FLOAT);
-  set_shader_value(marker, shader, "u_dir_light_color", &dir_color,
-                   SHADER_UNIFORM_VEC3);
-  set_shader_matrix(marker, shader, "u_view", view_matrix);
-  set_shader_value(marker, shader, "u_cluster_dimensions", cluster_dimensions,
-                   SHADER_UNIFORM_IVEC4);
-  set_shader_value(marker, shader, "u_cluster_screen_size",
-                   &cluster_screen_size, SHADER_UNIFORM_VEC2);
-  set_shader_value(marker, shader, "u_cluster_near_far", &cluster_near_far,
-                   SHADER_UNIFORM_VEC2);
-  set_shader_value(marker, shader, "u_cluster_max_lights",
-                   &cluster_max_lights, SHADER_UNIFORM_INT);
-  set_shader_value(marker, shader, "u_is_orthographic", &is_orthographic,
-                   SHADER_UNIFORM_INT);
-  set_shader_value(marker, shader, "u_alpha_cutoff", &alpha_cutoff,
-                   SHADER_UNIFORM_FLOAT);
+  shader.set("u_has_directional", has_directional);
+  shader.set("u_dir_light_direction", dir_dir);
+  shader.set("u_dir_light_intensity", dir_intensity);
+  shader.set("u_dir_light_color", dir_color);
+  shader.set("u_view", view_matrix);
+  shader.set_ints("u_cluster_dimensions", cluster_dimensions, SHADER_UNIFORM_IVEC4);
+  shader.set("u_cluster_screen_size", cluster_screen_size);
+  shader.set("u_cluster_near_far", cluster_near_far);
+  shader.set("u_cluster_max_lights", cluster_max_lights);
+  shader.set("u_is_orthographic", is_orthographic);
+  shader.set("u_alpha_cutoff", alpha_cutoff);
 }
 
-inline void apply_descriptor_uniforms(NonSendMarker marker, rl::Shader &shader,
+inline void apply_descriptor_uniforms(NonSendMarker, ShaderProgram &shader,
                                       const MaterialDescriptor &descriptor) {
   for (const auto &uniform : descriptor.uniforms) {
-    switch (uniform.type) {
-    case ShaderUniformType::Float:
-      if (uniform.count > 1) {
-        set_shader_value_v(marker, shader, uniform.name.c_str(),
-                           uniform.float_data.data(), SHADER_UNIFORM_FLOAT,
-                           uniform.count);
-      } else {
-        set_shader_value(marker, shader, uniform.name.c_str(),
-                         uniform.float_data.data(), SHADER_UNIFORM_FLOAT);
-      }
-      break;
-    case ShaderUniformType::Vec2:
-      set_shader_value(marker, shader, uniform.name.c_str(),
-                       uniform.float_data.data(), SHADER_UNIFORM_VEC2);
-      break;
-    case ShaderUniformType::Vec3:
-      set_shader_value(marker, shader, uniform.name.c_str(),
-                       uniform.float_data.data(), SHADER_UNIFORM_VEC3);
-      break;
-    case ShaderUniformType::Vec4:
-      set_shader_value(marker, shader, uniform.name.c_str(),
-                       uniform.float_data.data(), SHADER_UNIFORM_VEC4);
-      break;
-    case ShaderUniformType::Int:
-      set_shader_value(marker, shader, uniform.name.c_str(),
-                       uniform.int_data.data(), SHADER_UNIFORM_INT);
-      break;
-    case ShaderUniformType::IVec2:
-      set_shader_value(marker, shader, uniform.name.c_str(),
-                       uniform.int_data.data(), SHADER_UNIFORM_IVEC2);
-      break;
-    case ShaderUniformType::IVec3:
-      set_shader_value(marker, shader, uniform.name.c_str(),
-                       uniform.int_data.data(), SHADER_UNIFORM_IVEC3);
-      break;
-    case ShaderUniformType::IVec4:
-      set_shader_value(marker, shader, uniform.name.c_str(),
-                       uniform.int_data.data(), SHADER_UNIFORM_IVEC4);
-      break;
-    case ShaderUniformType::Mat4: {
-      rl::Matrix matrix = {
-          uniform.float_data[0],  uniform.float_data[1],  uniform.float_data[2],
-          uniform.float_data[3],  uniform.float_data[4],  uniform.float_data[5],
-          uniform.float_data[6],  uniform.float_data[7],  uniform.float_data[8],
-          uniform.float_data[9],  uniform.float_data[10],
-          uniform.float_data[11], uniform.float_data[12],
-          uniform.float_data[13], uniform.float_data[14],
-          uniform.float_data[15],
-      };
-      set_shader_matrix(marker, shader, uniform.name.c_str(), matrix);
-      break;
-    }
-    }
+    shader.apply(uniform);
   }
 }
 
 inline void apply_shader_uniforms(
-    NonSendMarker marker, rl::Shader &shader,
+    NonSendMarker marker, ShaderProgram &shader,
     const MaterialDescriptor &descriptor, const PreparedMaterial &prepared,
     const ExtractedView &view, const ExtractedLights &lights,
     const ClusterConfig &cluster_config,

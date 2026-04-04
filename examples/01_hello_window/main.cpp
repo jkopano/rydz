@@ -4,8 +4,14 @@
 #include "rl.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include <print>
 
 using namespace ecs;
+
+void setup(Cmd cmd) {
+  cmd.spawn(Camera3DComponent::perspective(), ActiveCamera{},
+            ClearColor{{40, 80, 120, 255}}, Transform{});
+}
 
 void hello_system(Res<Time> time) {
   if (static_cast<int>(time->elapsed_seconds) % 2 == 0 &&
@@ -26,8 +32,8 @@ int main() {
   // - render_plugin
   app.add_plugin(window_plugin({800, 600, "01 - Hello Window", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
-      .insert_resource(ClearColor{{40, 80, 120, 255}})
+      .add_plugin(RenderPlugin::install)
+      .add_systems(ScheduleLabel::Startup, setup)
       .add_systems(ScheduleLabel::Update, hello_system)
       .run();
 }

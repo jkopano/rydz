@@ -10,13 +10,7 @@
 using namespace ecs;
 using namespace math;
 
-// enum struct GameState { Menu, Playing, Paused };
-
-struct GameState {
-  struct Menu;
-  struct Playing;
-  struct Paused;
-};
+enum class GameState { Menu, Playing, Paused };
 
 void on_enter_menu(Cmd cmd) { std::println("[STATE] entered: Menu"); }
 void on_enter_playing(Cmd cmd) { std::println("[STATE] entered: Playing"); }
@@ -59,8 +53,8 @@ int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "05 - States (Enter/P/M)", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
-      .add_plugin(input_plugin)
+      .add_plugin(RenderPlugin::install)
+      .add_plugin(Input::install)
       .init_state(GameState::Menu)
       // OnEnter/OnExit - uruchamiane przy odpowiednio Wejściu w stan i Wyjściu
       // z stanu

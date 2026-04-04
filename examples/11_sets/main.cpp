@@ -36,12 +36,12 @@ int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "11 - System Sets", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
-      .add_plugin(input_plugin)
+      .add_plugin(RenderPlugin::install)
+      .add_plugin(Input::install)
 
       // Systemy w setach enum
-      .add_systems(GameSet::Input, group(input_system))
-      .add_systems(GameSet::Logic,
+      .add_systems(GameSet::Input{}, group(input_system))
+      .add_systems(GameSet::Logic{},
                    group(movement_system, collision_system))
 
       // Struct set
@@ -50,7 +50,7 @@ int main() {
       // kolejność
       // input -> logic (potem debug)
       .configure_set(ScheduleLabel::Update,
-                     configure(GameSet::Input, GameSet::Logic).chain())
+                     configure(GameSet::Input{}, GameSet::Logic{}).chain())
       .configure_set(ScheduleLabel::Update,
                      configure<DebugSet>().after(set<GameSet::Logic>()))
 

@@ -32,8 +32,8 @@ inline void hash_combine(std::size_t &seed, std::size_t value) noexcept {
 
 namespace std {
 
-template <> struct hash<ecs::ShaderProgramSpec> {
-  size_t operator()(const ecs::ShaderProgramSpec &k) const noexcept {
+template <> struct hash<ecs::ShaderSpec> {
+  size_t operator()(const ecs::ShaderSpec &k) const noexcept {
     size_t seed = 0;
     ::hash_combine(seed, std::hash<std::string>{}(k.vertex_path));
     ::hash_combine(seed, std::hash<std::string>{}(k.fragment_path));
@@ -41,8 +41,8 @@ template <> struct hash<ecs::ShaderProgramSpec> {
   }
 };
 
-template <> struct hash<ecs::ShaderUniformValue> {
-  size_t operator()(const ecs::ShaderUniformValue &k) const noexcept {
+template <> struct hash<ecs::ShaderUniform> {
+  size_t operator()(const ecs::ShaderUniform &k) const noexcept {
     size_t seed = 0;
     ::hash_combine(seed, std::hash<std::string>{}(k.name));
     ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.type)));
@@ -87,14 +87,14 @@ template <> struct hash<ecs::MaterialFlags> {
 template <> struct hash<ecs::MaterialDescriptor> {
   size_t operator()(const ecs::MaterialDescriptor &k) const noexcept {
     size_t seed = 0;
-    ::hash_combine(seed, std::hash<ecs::ShaderProgramSpec>{}(k.shader));
+    ::hash_combine(seed, std::hash<ecs::ShaderSpec>{}(k.shader));
     ::hash_combine(seed, std::hash<ecs::MaterialFlags>{}(k.flags));
     ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.shading_model)));
     for (const auto &map : k.maps) {
       ::hash_combine(seed, std::hash<ecs::MaterialMapBinding>{}(map));
     }
     for (const auto &uniform : k.uniforms) {
-      ::hash_combine(seed, std::hash<ecs::ShaderUniformValue>{}(uniform));
+      ::hash_combine(seed, std::hash<ecs::ShaderUniform>{}(uniform));
     }
     return seed;
   }

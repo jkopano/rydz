@@ -12,4 +12,4 @@
 using namespace ecs;
 using namespace math;
 
-inline void scene_plugin(App &app) { app.add_plugin(input_plugin); }
+inline void scene_plugin(App &app) { app.add_plugin(Input::install); }

@@ -42,7 +42,6 @@ struct RenderPlugin {
             [](rl::Texture2D &texture) { rl::UnloadTexture(texture); })
         .init_resource<Assets<Scene>>()
         .init_resource<AssetServer>()
-        .init_resource<ClearColor>()
         .init_resource<ExtractedView>()
         .init_resource<ExtractedLights>()
         .init_resource<ExtractedMeshes>()
@@ -126,11 +125,5 @@ struct RenderPlugin {
     register_material<StandardMaterial>(app);
   }
 };
-
-inline void render_plugin(App &app) { RenderPlugin::install(app); }
-
-template <IsMaterial M> inline void render_material_plugin(App &app) {
-  RenderPlugin::register_material<M>(app);
-}
 
 } // namespace ecs

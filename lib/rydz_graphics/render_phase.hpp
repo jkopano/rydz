@@ -141,14 +141,13 @@ struct RenderPhaseSystems {
       });
     }
 
-    std::stable_sort(
-        phase->items.begin(), phase->items.end(),
-        [](const UiPhaseItem &lhs, const UiPhaseItem &rhs) {
-          return lhs.layer < rhs.layer;
-        });
+    std::stable_sort(phase->items.begin(), phase->items.end(),
+                     [](const UiPhaseItem &lhs, const UiPhaseItem &rhs) {
+                       return lhs.layer < rhs.layer;
+                     });
   }
 
-  static void queue_overlay_phase(Res<ExtractedOverlay> overlay,
+  static void queue_overlay_phase(Res<ExtractedUi> overlay,
                                   ResMut<OverlayPhase> phase) {
     queue_ui_phase(overlay, phase);
   }

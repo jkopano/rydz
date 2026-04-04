@@ -324,6 +324,7 @@ private:
         for (usize idx : set_members[cfg.id]) {
           entries_[idx].system = std::make_unique<ConditionedSystem>(
               std::move(entries_[idx].system), cfg.condition);
+          entries_[idx].access = entries_[idx].system->access();
         }
       }
 

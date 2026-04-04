@@ -1,4 +1,5 @@
 #pragma once
+#include "clear_color.hpp"
 #include "light.hpp"
 #include "material3d.hpp"
 #include "math.hpp"
@@ -16,11 +17,6 @@
 
 namespace ecs {
 
-struct ClearColor {
-  using T = Resource;
-  rl::Color color = {30, 30, 40, 255};
-};
-
 struct Texture {
   Handle<rl::Texture2D> handle;
   rl::Color tint = WHITE;
@@ -34,6 +30,7 @@ struct ExtractedView {
       .proj = Mat4::sIdentity(),
       .position = Vec3(10, 10, 10),
   };
+  rl::Color clear_color = ClearColor{}.color;
   const Skybox *active_skybox = nullptr;
   RenderConfig render_config{};
   bool active = false;
@@ -48,6 +45,7 @@ struct ExtractedView {
         .proj = Mat4::sIdentity(),
         .position = Vec3(10, 10, 10),
     };
+    clear_color = ClearColor{}.color;
     active_skybox = nullptr;
     render_config = {};
     active = false;
@@ -109,9 +107,6 @@ struct ExtractedUi {
   void clear() { items.clear(); }
 };
 
-using ExtractedOverlayItem = ExtractedUiItem;
-using ExtractedOverlay = ExtractedUi;
-
 inline rl::Vector3 color_to_vec3(rl::Color color) {
   return {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f};
 }
@@ -119,18 +114,21 @@ inline rl::Vector3 color_to_vec3(rl::Color color) {
 struct RenderExtractSystems {
   static void
   extract_view_system(Query<Camera3DComponent, ActiveCamera, GlobalTransform,
-                            Opt<Skybox>, Opt<RenderConfig>>
+                            Opt<ClearColor>, Opt<Skybox>, Opt<RenderConfig>>
                           cam_query,
                       ResMut<ExtractedView> view) {
     view->reset();
 
-    for (auto [cam_comp, _, cam_gt, skybox, render_config] :
+    for (auto [cam_comp, _, cam_gt, clear_color, skybox, render_config] :
          cam_query.iter()) {
       if (!cam_comp || !cam_gt) {
         continue;
       }
 
       view->camera_view = compute_camera_view(*cam_gt, *cam_comp);
+      if (clear_color) {
+        view->clear_color = clear_color->color;
+      }
       view->active_skybox = skybox;
       view->active = true;
       view->orthographic = cam_comp->is_orthographic();
@@ -225,7 +223,7 @@ struct RenderExtractSystems {
   }
 
   static void extract_overlay_system(Query<Texture, Transform> textures,
-                                     ResMut<ExtractedOverlay> overlay) {
+                                     ResMut<ExtractedUi> overlay) {
     extract_ui_system(textures, overlay);
   }
 

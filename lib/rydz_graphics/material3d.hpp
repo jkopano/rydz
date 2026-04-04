@@ -1,97 +1,12 @@
 #pragma once
 #include "rl.hpp"
+#include "shader.hpp"
 #include "rydz_ecs/asset.hpp"
-#include <array>
 #include <concepts>
-#include <string>
 #include <utility>
 #include <vector>
 
 namespace ecs {
-
-struct ShaderProgramSpec {
-  std::string vertex_path;
-  std::string fragment_path;
-
-  bool operator==(const ShaderProgramSpec &o) const = default;
-};
-
-enum class ShaderUniformType {
-  Float,
-  Vec2,
-  Vec3,
-  Vec4,
-  Int,
-  IVec2,
-  IVec3,
-  IVec4,
-  Mat4,
-};
-
-struct ShaderUniformValue {
-  std::string name;
-  ShaderUniformType type = ShaderUniformType::Float;
-  std::array<float, 16> float_data{};
-  std::array<int, 4> int_data{};
-  int count = 1;
-
-  bool operator==(const ShaderUniformValue &o) const = default;
-
-  static ShaderUniformValue float1(std::string name, f32 value) {
-    ShaderUniformValue uniform;
-    uniform.name = std::move(name);
-    uniform.type = ShaderUniformType::Float;
-    uniform.float_data[0] = value;
-    return uniform;
-  }
-
-  static ShaderUniformValue vec2(std::string name, f32 x, f32 y) {
-    ShaderUniformValue uniform;
-    uniform.name = std::move(name);
-    uniform.type = ShaderUniformType::Vec2;
-    uniform.float_data[0] = x;
-    uniform.float_data[1] = y;
-    return uniform;
-  }
-
-  static ShaderUniformValue vec3(std::string name, f32 x, f32 y, f32 z) {
-    ShaderUniformValue uniform;
-    uniform.name = std::move(name);
-    uniform.type = ShaderUniformType::Vec3;
-    uniform.float_data[0] = x;
-    uniform.float_data[1] = y;
-    uniform.float_data[2] = z;
-    return uniform;
-  }
-
-  static ShaderUniformValue vec4(std::string name, f32 x, f32 y, f32 z, f32 w) {
-    ShaderUniformValue uniform;
-    uniform.name = std::move(name);
-    uniform.type = ShaderUniformType::Vec4;
-    uniform.float_data[0] = x;
-    uniform.float_data[1] = y;
-    uniform.float_data[2] = z;
-    uniform.float_data[3] = w;
-    return uniform;
-  }
-
-  static ShaderUniformValue int1(std::string name, int value) {
-    ShaderUniformValue uniform;
-    uniform.name = std::move(name);
-    uniform.type = ShaderUniformType::Int;
-    uniform.int_data[0] = value;
-    return uniform;
-  }
-
-  static ShaderUniformValue mat4(std::string name,
-                                 const std::array<float, 16> &value) {
-    ShaderUniformValue uniform;
-    uniform.name = std::move(name);
-    uniform.type = ShaderUniformType::Mat4;
-    uniform.float_data = value;
-    return uniform;
-  }
-};
 
 struct MaterialMapBinding {
   MaterialMapIndex map_type = MATERIAL_MAP_DIFFUSE;
@@ -152,9 +67,9 @@ enum class MaterialShadingModel {
 };
 
 struct MaterialDescriptor {
-  ShaderProgramSpec shader;
+  ShaderSpec shader;
   std::vector<MaterialMapBinding> maps;
-  std::vector<ShaderUniformValue> uniforms;
+  std::vector<ShaderUniform> uniforms;
   MaterialFlags flags{};
   MaterialShadingModel shading_model = MaterialShadingModel::Unlit;
 
@@ -188,10 +103,8 @@ struct StandardMaterial {
 
   MaterialDescriptor describe() const {
     MaterialDescriptor descriptor;
-    descriptor.shader = {
-        .vertex_path = "res/shaders/pbr.vert",
-        .fragment_path = "res/shaders/pbr.frag",
-    };
+    descriptor.shader =
+        ShaderSpec::from_files("res/shaders/pbr.vert", "res/shaders/pbr.frag");
     descriptor.flags.transparent = base_color.a < 255;
     descriptor.flags.casts_shadows = base_color.a == 255;
     descriptor.shading_model = MaterialShadingModel::ClusteredPbr;

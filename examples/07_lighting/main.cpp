@@ -17,6 +17,7 @@ struct OrbitLight {
 void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   // kamera
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
+            ClearColor{{15, 15, 25, 255}},
             Transform::from_xyz(0, 8, 15).look_at(Vec3::sZero()));
 
   // podłoga
@@ -81,8 +82,7 @@ int main() {
   App app;
   app.add_plugin(window_plugin({1024, 768, "07 - Lighting", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
-      .insert_resource(ClearColor{{15, 15, 25, 255}})
+      .add_plugin(RenderPlugin::install)
       .add_systems(ScheduleLabel::Startup, setup)
       .add_systems(ScheduleLabel::Update, orbit_system)
       .run();

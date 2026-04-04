@@ -22,7 +22,7 @@ struct RenderExecutionState {
 };
 
 struct RenderPassSystems {
-  static void begin_frame(Res<ClearColor> clear_color, Res<ExtractedView> view,
+  static void begin_frame(Res<ExtractedView> view,
                           ResMut<RenderExecutionState> state,
                           ResMut<ScreenPipelineState> screen_pipeline,
                           NonSendMarker marker) {
@@ -33,14 +33,14 @@ struct RenderPassSystems {
 
     if (!view->active) {
       rl::BeginDrawing();
-      rl::ClearBackground(clear_color->color);
+      rl::ClearBackground(view->clear_color);
       state->backbuffer_active = true;
       return;
     }
 
     screen_pipeline->ensure_target(rl::GetScreenWidth(), rl::GetScreenHeight());
     rl::BeginTextureMode(screen_pipeline->world_target);
-    rl::ClearBackground(clear_color->color);
+    rl::ClearBackground(view->clear_color);
     state->world_target_active = true;
     detail::begin_world_pass(marker, *view);
     state->world_pass_active = true;
@@ -117,6 +117,7 @@ struct RenderPassSystems {
 
   static void run_postprocess_pass(ResMut<RenderExecutionState> state,
                                    Res<ScreenPipelineState> screen_pipeline,
+                                   ResMut<ShaderCache> shader_cache,
                                    Res<PostProcessSettings> settings,
                                    Res<Time> time, NonSendMarker marker) {
     if (state->world_pass_active) {
@@ -140,7 +141,7 @@ struct RenderPassSystems {
     }
 
     detail::draw_postprocess_pass(marker, screen_pipeline->world_target.texture,
-                                  *settings, *time);
+                                  *shader_cache, *settings, *time);
   }
 
   static void run_ui_pass(Res<UiPhase> phase,
@@ -236,51 +237,17 @@ private:
       rl::rlSetBlendMode(RL_BLEND_ALPHA);
     }
 
-    static rl::Shader &postprocess_shader() {
-      static rl::Shader shader = [] {
-        rl::Shader sh = rl::LoadShader("res/shaders/postprocess.vert",
-                                       "res/shaders/postprocess.frag");
-
-        if (sh.locs == nullptr) {
-          sh.locs = (int *)RL_CALLOC(RL_MAX_SHADER_LOCATIONS, sizeof(int));
-          for (int i = 0; i < RL_MAX_SHADER_LOCATIONS; ++i) {
-            sh.locs[i] = -1;
-          }
-        }
-
-        sh.locs[SHADER_LOC_VERTEX_POSITION] =
-            rl::GetShaderLocationAttrib(sh, "vertexPosition");
-        sh.locs[SHADER_LOC_VERTEX_TEXCOORD01] =
-            rl::GetShaderLocationAttrib(sh, "vertexTexCoord");
-        sh.locs[SHADER_LOC_MATRIX_MVP] = rl::GetShaderLocation(sh, "mvp");
-        sh.locs[SHADER_LOC_MAP_DIFFUSE] = rl::GetShaderLocation(sh, "texture0");
-        return sh;
-      }();
-      return shader;
+    static const ShaderSpec &postprocess_shader_spec() {
+      static const ShaderSpec spec = ShaderSpec::from_files(
+          "res/shaders/postprocess.vert", "res/shaders/postprocess.frag");
+      return spec;
     }
 
-    static rl::Shader &depth_prepass_shader() {
-      static rl::Shader shader = [] {
-        rl::Shader sh =
-            rl::LoadShader("res/shaders/depth.vert", "res/shaders/depth.frag");
-
-        if (sh.locs == nullptr) {
-          sh.locs = (int *)RL_CALLOC(RL_MAX_SHADER_LOCATIONS, sizeof(int));
-          for (int i = 0; i < RL_MAX_SHADER_LOCATIONS; ++i) {
-            sh.locs[i] = -1;
-          }
-        }
-
-        sh.locs[SHADER_LOC_VERTEX_POSITION] =
-            rl::GetShaderLocationAttrib(sh, "vertexPosition");
-        sh.locs[SHADER_LOC_MATRIX_MVP] = rl::GetShaderLocation(sh, "mvp");
-        sh.locs[SHADER_LOC_MATRIX_MODEL] =
-            rl::GetShaderLocation(sh, "matModel");
-        sh.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] =
-            rl::GetShaderLocationAttrib(sh, "instanceTransform");
-        return sh;
-      }();
-      return shader;
+    static const ShaderSpec &depth_prepass_shader_spec() {
+      static const ShaderSpec spec =
+          ShaderSpec::from_files("res/shaders/depth.vert",
+                                 "res/shaders/depth.frag");
+      return spec;
     }
 
     static void begin_depth_prepass(NonSendMarker) {
@@ -316,11 +283,12 @@ private:
       PreparedMaterial prepared{};
       prepare_material(marker, batch.key.material, texture_assets, shader_cache,
                        prepared);
-      prepared.material.shader = depth_prepass_shader();
+      ShaderProgram &depth_shader =
+          resolve_shader(marker, shader_cache, depth_prepass_shader_spec());
+      prepared.material.shader = depth_shader.raw();
 
       float alpha_cutoff = 0.1f;
-      set_shader_value(marker, prepared.material.shader, "u_alpha_cutoff",
-                       &alpha_cutoff, SHADER_UNIFORM_FLOAT);
+      depth_shader.set("u_alpha_cutoff", alpha_cutoff);
       draw_batch_instances(*mesh, prepared.material, batch);
     }
 
@@ -447,7 +415,9 @@ private:
       PreparedMaterial prepared{};
       prepare_material(marker, batch.key.material, texture_assets, shader_cache,
                        prepared);
-      apply_shader_uniforms(marker, prepared.material.shader,
+      ShaderProgram &shader =
+          resolve_shader(marker, shader_cache, batch.key.material.shader);
+      apply_shader_uniforms(marker, shader,
                             batch.key.material, prepared, view, lights,
                             cluster_config, cluster_state);
       draw_batch_instances(*mesh, prepared.material, batch);
@@ -468,7 +438,9 @@ private:
       PreparedMaterial prepared{};
       prepare_material(marker, item.material, texture_assets, shader_cache,
                        prepared);
-      apply_shader_uniforms(marker, prepared.material.shader, item.material,
+      ShaderProgram &shader =
+          resolve_shader(marker, shader_cache, item.material.shader);
+      apply_shader_uniforms(marker, shader, item.material,
                             prepared, view, lights, cluster_config,
                             cluster_state);
       rl::DrawMesh(*mesh, prepared.material, to_rl(item.world_transform));
@@ -476,33 +448,26 @@ private:
 
     static void draw_postprocess_pass(NonSendMarker marker,
                                       const rl::Texture2D &source_texture,
+                                      ShaderCache &shader_cache,
                                       const PostProcessSettings &settings,
                                       const Time &time) {
-      rl::Shader &shader = postprocess_shader();
+      ShaderProgram &shader =
+          resolve_shader(marker, shader_cache, postprocess_shader_spec());
       const rl::Vector2 resolution = {
           static_cast<float>(std::max(rl::GetScreenWidth(), 1)),
           static_cast<float>(std::max(rl::GetScreenHeight(), 1)),
       };
       const int enabled = settings.enabled ? 1 : 0;
 
-      set_shader_value(marker, shader, "u_resolution", &resolution,
-                       SHADER_UNIFORM_VEC2);
-      set_shader_value(marker, shader, "u_time", &time.elapsed_seconds,
-                       SHADER_UNIFORM_FLOAT);
-      set_shader_value(marker, shader, "u_enabled", &enabled,
-                       SHADER_UNIFORM_INT);
-      set_shader_value(marker, shader, "u_exposure", &settings.exposure,
-                       SHADER_UNIFORM_FLOAT);
-      set_shader_value(marker, shader, "u_contrast", &settings.contrast,
-                       SHADER_UNIFORM_FLOAT);
-      set_shader_value(marker, shader, "u_saturation", &settings.saturation,
-                       SHADER_UNIFORM_FLOAT);
-      set_shader_value(marker, shader, "u_vignette", &settings.vignette,
-                       SHADER_UNIFORM_FLOAT);
-      set_shader_value(marker, shader, "u_grain", &settings.grain,
-                       SHADER_UNIFORM_FLOAT);
-      rl::SetShaderValueTexture(shader, shader.locs[SHADER_LOC_MAP_DIFFUSE],
-                                source_texture);
+      shader.set("u_resolution", resolution);
+      shader.set("u_time", time.elapsed_seconds);
+      shader.set("u_enabled", enabled);
+      shader.set("u_exposure", settings.exposure);
+      shader.set("u_contrast", settings.contrast);
+      shader.set("u_saturation", settings.saturation);
+      shader.set("u_vignette", settings.vignette);
+      shader.set("u_grain", settings.grain);
+      shader.set_texture(shader.raw().locs[SHADER_LOC_MAP_DIFFUSE], source_texture);
 
       const rl::Rectangle source = {
           0.0f,
@@ -517,10 +482,10 @@ private:
           static_cast<float>(rl::GetScreenHeight()),
       };
 
-      rl::BeginShaderMode(shader);
-      rl::DrawTexturePro(source_texture, source, dest, {0.0f, 0.0f}, 0.0f,
-                         WHITE);
-      rl::EndShaderMode();
+      shader.with_bound([&] {
+        rl::DrawTexturePro(source_texture, source, dest, {0.0f, 0.0f}, 0.0f,
+                           WHITE);
+      });
     }
 
     static float texture_rotation_degrees(const Transform &transform) {
