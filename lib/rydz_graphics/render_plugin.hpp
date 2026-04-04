@@ -49,7 +49,6 @@ struct RenderPlugin {
         .init_resource<ClusterConfig>()
         .init_resource<ClusteredLightingState>()
         .init_resource<ShaderCache>()
-        .init_resource<PostProcessSettings>()
         .init_resource<DebugOverlaySettings>()
         .init_resource<ScreenPipelineState>()
         .init_resource<ShadowPhase>()
@@ -97,30 +96,31 @@ struct RenderPlugin {
                          .chain())
 
         .add_systems(RenderExtractSet::Queue,
-                     group(RenderPhaseSystems::queue_shadow_phase,
-                           RenderPhaseSystems::queue_opaque_phase,
-                           RenderPhaseSystems::queue_transparent_phase,
-                           RenderPhaseSystems::queue_ui_phase)
+                     group(RenderPhaseSystems::Queue::queue_shadow_phase,
+                           RenderPhaseSystems::Queue::queue_opaque_phase,
+                           RenderPhaseSystems::Queue::queue_transparent_phase,
+                           RenderPhaseSystems::Queue::queue_ui_phase)
                          .chain())
 
         .add_systems(RenderExtractSet::Prepare,
-                     RenderPhaseSystems::build_opaque_batches)
+                     RenderPhaseSystems::Prepare::build_opaque_batches)
 
-        .add_systems(RenderPassSet::Setup, RenderPassSystems::begin_frame)
+        .add_systems(RenderPassSet::Setup, RenderPassSystems::Frame::begin_frame)
 
         .add_systems(RenderPassSet::Main,
-                     group(RenderPassSystems::run_shadow_pass,
-                           RenderPassSystems::run_depth_prepass,
-                           RenderPassSystems::run_cluster_build_pass,
-                           RenderPassSystems::run_opaque_pass,
-                           RenderPassSystems::run_transparent_pass)
+                     group(RenderPassSystems::World::run_shadow_pass,
+                           RenderPassSystems::World::run_depth_prepass,
+                           RenderPassSystems::World::run_cluster_build_pass,
+                           RenderPassSystems::World::run_opaque_pass,
+                           RenderPassSystems::World::run_transparent_pass)
                          .chain())
 
         .add_systems(RenderPassSet::PostProcess,
-                     RenderPassSystems::run_postprocess_pass)
+                     RenderPassSystems::PostProcessing::run_postprocess_pass)
 
-        .add_systems(RenderPassSet::Ui, RenderPassSystems::run_ui_pass)
-        .add_systems(RenderPassSet::Cleanup, RenderPassSystems::end_frame);
+        .add_systems(RenderPassSet::Ui, RenderPassSystems::Ui::run_ui_pass)
+        .add_systems(RenderPassSet::Cleanup,
+                     RenderPassSystems::Frame::end_frame);
 
     register_material<StandardMaterial>(app);
   }

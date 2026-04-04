@@ -16,15 +16,15 @@ uniform float u_occlusion_factor;
 uniform vec3 u_emissive_factor;
 
 uniform sampler2D texture0;
-uniform sampler2D u_metallic_texture;
+uniform sampler2D texture1;
 uniform sampler2D u_roughness_texture;
-uniform sampler2D u_normal_texture;
+uniform sampler2D texture2;
 uniform sampler2D u_occlusion_texture;
 uniform sampler2D u_emissive_texture;
 
 uniform vec4 u_color;
 uniform vec3 u_camera_pos;
-uniform mat4 u_view;
+uniform mat4 matView;
 
 uniform vec3 u_dir_light_direction;
 uniform float u_dir_light_intensity;
@@ -135,7 +135,7 @@ vec3 sampleNormal(vec3 N, vec3 T, vec3 B, vec2 uv) {
     return N;
   }
 
-  vec3 tangentNormal = texture(u_normal_texture, uv).xyz * 2.0 - 1.0;
+  vec3 tangentNormal = texture(texture2, uv).xyz * 2.0 - 1.0;
   tangentNormal.xy *= u_normal_factor;
   mat3 TBN = mat3(T, B, N);
   return normalize(TBN * tangentNormal);
@@ -183,7 +183,7 @@ void main() {
 
   float metallic = clamp(u_metallic_factor, 0.0, 1.0);
   float roughness = clamp(u_roughness_factor, 0.045, 1.0);
-  metallic *= texture(u_metallic_texture, TexCoord).r;
+  metallic *= texture(texture1, TexCoord).r;
   roughness *= texture(u_roughness_texture, TexCoord).r;
   metallic = clamp(metallic, 0.0, 1.0);
   roughness = clamp(roughness, 0.045, 1.0);
@@ -207,7 +207,7 @@ void main() {
         normal, viewDir, lightDir, radiance, albedo, metallic, roughness);
   }
 
-  vec3 viewPos = (u_view * vec4(FragPos, 1.0)).xyz;
+  vec3 viewPos = (matView * vec4(FragPos, 1.0)).xyz;
   int clusterIndex = computeClusterIndex(viewPos);
   ClusterRecord cluster = u_clusters[clusterIndex];
   uint pointLightCount = min(cluster.meta.y, uint(max(u_cluster_max_lights, 0)));

@@ -46,8 +46,14 @@ void read_damage(EventReader<DamageEvent> reader) {
 }
 
 void read_score(EventReader<ScoreEvent> reader) {
-  reader.for_each(
-      [](const ScoreEvent &e) { std::println("score: +{}", e.points); });
+  reader.for_each([](auto &e) { std::println("score: +{}", e.points); });
+}
+
+void score_acc(EventReader<ScoreEvent> reader, Local<i32> acc) {
+  reader.for_each([&](auto &e) {
+    *acc += e.points;
+    std::println("score: +{}", *acc);
+  });
 }
 
 int main() {
@@ -60,6 +66,7 @@ int main() {
       .add_event<ScoreEvent>()
       .add_systems(ScheduleLabel::Update, send_events)
       .add_systems(ScheduleLabel::Update, group(read_damage).after(send_events))
-      .add_systems(ScheduleLabel::Update, group(read_score).after(send_events))
+      .add_systems(ScheduleLabel::Update,
+                   group(score_acc, read_score).after(send_events))
       .run();
 }

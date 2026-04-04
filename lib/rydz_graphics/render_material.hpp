@@ -114,6 +114,26 @@ inline ShaderProgram &resolve_shader(NonSendMarker, ShaderCache &cache,
   return it->second;
 }
 
+inline void initialize_custom_map_locations(ShaderProgram &shader) {
+  rl::Shader &raw = shader.raw();
+  if (raw.locs == nullptr) {
+    return;
+  }
+
+  if (raw.locs[SHADER_LOC_MAP_ROUGHNESS] < 0) {
+    raw.locs[SHADER_LOC_MAP_ROUGHNESS] =
+        rl::GetShaderLocation(raw, "u_roughness_texture");
+  }
+  if (raw.locs[SHADER_LOC_MAP_OCCLUSION] < 0) {
+    raw.locs[SHADER_LOC_MAP_OCCLUSION] =
+        rl::GetShaderLocation(raw, "u_occlusion_texture");
+  }
+  if (raw.locs[SHADER_LOC_MAP_EMISSION] < 0) {
+    raw.locs[SHADER_LOC_MAP_EMISSION] =
+        rl::GetShaderLocation(raw, "u_emissive_texture");
+  }
+}
+
 inline void apply_material_map_binding(rl::Material &material,
                                        const MaterialMapBinding &binding,
                                        const Assets<rl::Texture2D> &textures) {
@@ -147,6 +167,7 @@ inline void prepare_material(NonSendMarker marker,
   prepared.material.maps = prepared.local_maps.data();
 
   ShaderProgram &shader = resolve_shader(marker, shader_cache, descriptor.shader);
+  initialize_custom_map_locations(shader);
   prepared.material.shader = shader.raw();
 
   for (const auto &binding : descriptor.maps) {
@@ -231,7 +252,7 @@ inline void apply_pbr_shader_uniforms(
   shader.set("u_dir_light_direction", dir_dir);
   shader.set("u_dir_light_intensity", dir_intensity);
   shader.set("u_dir_light_color", dir_color);
-  shader.set("u_view", view_matrix);
+  shader.set("matView", view_matrix);
   shader.set_ints("u_cluster_dimensions", cluster_dimensions, SHADER_UNIFORM_IVEC4);
   shader.set("u_cluster_screen_size", cluster_screen_size);
   shader.set("u_cluster_near_far", cluster_near_far);

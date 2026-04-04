@@ -1,7 +1,7 @@
 #pragma once
 #include "rl.hpp"
-#include "shader.hpp"
 #include "rydz_ecs/asset.hpp"
+#include "shader.hpp"
 #include <concepts>
 #include <utility>
 #include <vector>
@@ -69,7 +69,7 @@ enum class MaterialShadingModel {
 struct MaterialDescriptor {
   ShaderSpec shader;
   std::vector<MaterialMapBinding> maps;
-  std::vector<ShaderUniform> uniforms;
+  std::vector<Uniform> uniforms;
   MaterialFlags flags{};
   MaterialShadingModel shading_model = MaterialShadingModel::Unlit;
 
@@ -104,7 +104,7 @@ struct StandardMaterial {
   MaterialDescriptor describe() const {
     MaterialDescriptor descriptor;
     descriptor.shader =
-        ShaderSpec::from_files("res/shaders/pbr.vert", "res/shaders/pbr.frag");
+        ShaderSpec::from("res/shaders/pbr.vert", "res/shaders/pbr.frag");
     descriptor.flags.transparent = base_color.a < 255;
     descriptor.flags.casts_shadows = base_color.a == 255;
     descriptor.shading_model = MaterialShadingModel::ClusteredPbr;

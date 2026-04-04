@@ -61,8 +61,8 @@ public:
     rl::rlDisableBackfaceCulling();
     rl::rlDisableDepthMask();
 
-    shader.set("u_view", math::to_rl(view));
-    shader.set("u_projection", math::to_rl(proj));
+    shader.set("matView", math::to_rl(view));
+    shader.set("matProjection", math::to_rl(proj));
 
     rl::rlActiveTextureSlot(0);
     rl::rlEnableTextureCubemap(cubemap_id);
@@ -91,9 +91,8 @@ public:
 private:
   static ShaderProgram &get_skybox_shader() {
     static ShaderProgram shader = [] {
-      ShaderProgram program = ShaderProgram::load(
-          ShaderSpec::from_files("res/shaders/skybox.vert",
-                                 "res/shaders/skybox.frag"));
+      ShaderProgram program = ShaderProgram::load(ShaderSpec::from(
+          "res/shaders/skybox.vert", "res/shaders/skybox.frag"));
       int val = 0;
       program.set("u_skybox", val);
       return program;

@@ -177,7 +177,8 @@ inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Texture2D>> texture
 inline void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(Camera3DComponent::perspective(), ActiveCamera{},
             Transform::from_xyz(8, 6, 8).look_at(Vec3::sZero()),
-            CameraController{} // Skybox::from("res/hdri/skybox")
+            CameraController{}, PostProcessMaterial{DefaultPostProcessMaterial{}}
+            // Skybox::from("res/hdri/skybox")
   );
   rl::DisableCursor();
 }

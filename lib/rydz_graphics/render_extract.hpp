@@ -4,6 +4,7 @@
 #include "material3d.hpp"
 #include "math.hpp"
 #include "mesh3d.hpp"
+#include "postprocess_material.hpp"
 #include "render_config.hpp"
 #include "rl.hpp"
 #include "rydz_camera/camera3d.hpp"
@@ -33,8 +34,10 @@ struct ExtractedView {
   rl::Color clear_color = ClearColor{}.color;
   const Skybox *active_skybox = nullptr;
   RenderConfig render_config{};
+  PostProcessDescriptor postprocess{};
   bool active = false;
   bool has_render_config = false;
+  bool has_postprocess = false;
   bool orthographic = false;
   float near_plane = 0.1f;
   float far_plane = 1000.0f;
@@ -48,8 +51,10 @@ struct ExtractedView {
     clear_color = ClearColor{}.color;
     active_skybox = nullptr;
     render_config = {};
+    postprocess = {};
     active = false;
     has_render_config = false;
+    has_postprocess = false;
     orthographic = false;
     near_plane = 0.1f;
     far_plane = 1000.0f;
@@ -114,12 +119,14 @@ inline rl::Vector3 color_to_vec3(rl::Color color) {
 struct RenderExtractSystems {
   static void
   extract_view_system(Query<Camera3DComponent, ActiveCamera, GlobalTransform,
-                            Opt<ClearColor>, Opt<Skybox>, Opt<RenderConfig>>
+                            Opt<ClearColor>, Opt<Skybox>, Opt<RenderConfig>,
+                            Opt<PostProcessMaterial>>
                           cam_query,
                       ResMut<ExtractedView> view) {
     view->reset();
 
-    for (auto [cam_comp, _, cam_gt, clear_color, skybox, render_config] :
+    for (auto [cam_comp, _, cam_gt, clear_color, skybox, render_config,
+               postprocess] :
          cam_query.iter()) {
       if (!cam_comp || !cam_gt) {
         continue;
@@ -137,6 +144,10 @@ struct RenderExtractSystems {
       if (render_config) {
         view->render_config = *render_config;
         view->has_render_config = true;
+      }
+      if (postprocess) {
+        view->postprocess = postprocess->material;
+        view->has_postprocess = true;
       }
       break;
     }

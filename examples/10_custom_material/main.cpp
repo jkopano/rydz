@@ -16,13 +16,13 @@ struct ToonMaterial {
   MaterialDescriptor describe() const {
     MaterialDescriptor descriptor;
     descriptor.shader =
-        ShaderSpec::from_files("res/shaders/toon.vert", "res/shaders/toon.frag");
+        ShaderSpec::from("res/shaders/toon.vert", "res/shaders/toon.frag");
     descriptor.flags.transparent = base_color.a < 255;
     descriptor.flags.casts_shadows = base_color.a == 255;
     descriptor.maps.push_back(
         MaterialMapBinding::color_binding(MATERIAL_MAP_DIFFUSE, base_color));
     descriptor.uniforms.push_back(
-        ShaderUniform::float1("u_rim_strength", rim_strength));
+        Uniform::float1("u_rim_strength", rim_strength));
     return descriptor;
   }
 };
@@ -38,10 +38,10 @@ void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
 
   cmd.spawn(Mesh3d{sphere}, ToonMat{ToonMaterial{.base_color = ORANGE}},
             Transform::from_xyz(0, 1, 0));
-  cmd.spawn(Mesh3d{floor},
-            MeshMaterial3d<>{
-                StandardMaterial::from_color({220, 220, 220, 255})},
-            Transform{});
+  cmd.spawn(
+      Mesh3d{floor},
+      MeshMaterial3d<>{StandardMaterial::from_color({220, 220, 220, 255})},
+      Transform{});
 }
 
 int main() {

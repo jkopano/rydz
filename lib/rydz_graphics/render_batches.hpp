@@ -41,8 +41,8 @@ template <> struct hash<ecs::ShaderSpec> {
   }
 };
 
-template <> struct hash<ecs::ShaderUniform> {
-  size_t operator()(const ecs::ShaderUniform &k) const noexcept {
+template <> struct hash<ecs::Uniform> {
+  size_t operator()(const ecs::Uniform &k) const noexcept {
     size_t seed = 0;
     ::hash_combine(seed, std::hash<std::string>{}(k.name));
     ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.type)));
@@ -94,7 +94,7 @@ template <> struct hash<ecs::MaterialDescriptor> {
       ::hash_combine(seed, std::hash<ecs::MaterialMapBinding>{}(map));
     }
     for (const auto &uniform : k.uniforms) {
-      ::hash_combine(seed, std::hash<ecs::ShaderUniform>{}(uniform));
+      ::hash_combine(seed, std::hash<ecs::Uniform>{}(uniform));
     }
     return seed;
   }
