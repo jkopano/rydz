@@ -16,9 +16,22 @@ template <typename... Qs> class Query {
   using ItemTuple = typename Decomposed::Items;
   using FilterT = typename Decomposed::FilterList;
 
+  template <typename... Items> struct PreparedState {
+    Tuple<typename WorldQueryTraits<Items>::Fetcher...> fetchers;
+    std::span<const Entity> candidates;
+  };
+
+  template <typename TupleT> struct PreparedStateFor;
+  template <typename... Items> struct PreparedStateFor<Tuple<Items...>> {
+    using type = PreparedState<Items...>;
+  };
+
+  using CachedState = typename PreparedStateFor<ItemTuple>::type;
+
   World *world_;
   Tick last_run_{};
   Tick this_run_{};
+  mutable std::optional<CachedState> cached_state_;
 
 public:
   explicit Query(World &world, Tick last_run, Tick this_run)
@@ -44,6 +57,14 @@ private:
     typename WorldQueryTraits<Q>::Fetcher f;
     f.init(*world_);
     return f;
+  }
+
+  const CachedState &prepared_query() const {
+    if (!cached_state_.has_value()) {
+      cached_state_.emplace(prepare_query(ItemTuple{}));
+    }
+
+    return *cached_state_;
   }
 
   template <typename... Items>
@@ -74,6 +95,16 @@ private:
     return result;
   }
 
+  template <typename... Items>
+  PreparedState<Items...> prepare_query(Tuple<Items...>) const {
+    auto fetchers = std::make_tuple(make_fetcher<Items>()...);
+    auto candidates = find_smallest_entities_group<Items...>(fetchers);
+    return {
+        .fetchers = std::move(fetchers),
+        .candidates = candidates,
+    };
+  }
+
   template <typename... Items, typename Fetchers>
   static auto fetch_all(const Fetchers &fetchers, Entity entity) {
     return std::apply(
@@ -101,13 +132,12 @@ private:
 
   template <typename... Items> auto single_impl(Tuple<Items...>) const {
     using Result = Tuple<typename WorldQueryTraits<Items>::Item...>;
-    auto fetchers = std::make_tuple(make_fetcher<Items>()...);
-    auto candidates = find_smallest_entities_group<Items...>(fetchers);
+    const auto &prepared = prepared_query();
 
     std::optional<Result> result;
-    for (Entity entity : candidates) {
-      auto fetched =
-          try_fetch<Items...>(fetchers, entity, *world_, last_run_, this_run_);
+    for (Entity entity : prepared.candidates) {
+      auto fetched = try_fetch<Items...>(prepared.fetchers, entity, *world_,
+                                         last_run_, this_run_);
       if (!fetched)
         continue;
       if (result.has_value()) {
@@ -124,8 +154,9 @@ private:
   }
 
   template <typename... Items> auto make_iter(Tuple<Items...>) const {
-    auto fetchers = std::make_tuple(make_fetcher<Items>()...);
-    auto candidates = find_smallest_entities_group<Items...>(fetchers);
+    const auto &prepared = prepared_query();
+    auto fetchers = prepared.fetchers;
+    auto candidates = prepared.candidates;
 
     return candidates |
            views::transform([fetchers, world = world_, lr = last_run_,
@@ -138,12 +169,11 @@ private:
 
   template <typename Func, typename... Items>
   void for_each_impl(Func &&func, Tuple<Items...>) const {
-    auto fetchers = std::make_tuple(make_fetcher<Items>()...);
-    auto candidates = find_smallest_entities_group<Items...>(fetchers);
+    const auto &prepared = prepared_query();
 
-    for (Entity entity : candidates) {
-      auto fetched =
-          try_fetch<Items...>(fetchers, entity, *world_, last_run_, this_run_);
+    for (Entity entity : prepared.candidates) {
+      auto fetched = try_fetch<Items...>(prepared.fetchers, entity, *world_,
+                                         last_run_, this_run_);
       if (!fetched)
         continue;
       std::apply(func, *fetched);

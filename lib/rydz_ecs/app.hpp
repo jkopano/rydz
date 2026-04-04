@@ -8,6 +8,7 @@
 #include "state.hpp"
 #include "tracy_plugin.hpp"
 #include "world.hpp"
+#include <cstdio>
 #include <memory>
 #include <optional>
 #include <string>
@@ -41,7 +42,7 @@ class App {
 
   template <typename F> struct PendingSetSystems final : PendingSetSystemsBase {
     SetList sets;
-    bare_t<F> func;
+    decay_t<F> func;
 
     PendingSetSystems(SetList selector, F &&system_fn)
         : sets(std::move(selector)), func(std::forward<F>(system_fn)) {}
@@ -57,6 +58,9 @@ class App {
   bool startup_done_ = false;
   std::unordered_map<SetId, ScheduleLabel> set_schedules_;
   std::vector<std::unique_ptr<PendingSetSystemsBase>> pending_set_systems_;
+#ifndef NDEBUG
+  bool debug_graph_dumped_ = false;
+#endif
 
 public:
   App() {
@@ -208,6 +212,7 @@ public:
 
   void startup() {
     flush_pending_set_systems();
+    debug_dump_schedule_graph_once();
     if (startup_done_)
       return;
     startup_done_ = true;
@@ -222,6 +227,7 @@ public:
 
   void update() {
     flush_pending_set_systems();
+    debug_dump_schedule_graph_once();
     auto *time = world_.get_resource<Time>();
     if (time) {
       time->delta_seconds = rl::GetFrameTime();
@@ -326,6 +332,20 @@ private:
     for (auto &entry : pending) {
       entry->attach(*this);
     }
+  }
+
+  void debug_dump_schedule_graph_once() {
+#ifndef NDEBUG
+    if (debug_graph_dumped_) {
+      return;
+    }
+
+    schedules_.prepare_all();
+    auto dump = schedules_.debug_dump();
+    std::fputs(dump.c_str(), stderr);
+    std::fputc('\n', stderr);
+    debug_graph_dumped_ = true;
+#endif
   }
 
   void apply_commands() {

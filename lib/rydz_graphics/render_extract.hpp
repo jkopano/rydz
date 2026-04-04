@@ -116,119 +116,125 @@ inline rl::Vector3 color_to_vec3(rl::Color color) {
   return {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f};
 }
 
-inline bool material_is_transparent(const MaterialDescriptor &material) {
-  return material.flags.transparent;
-}
+struct RenderExtractSystems {
+  static void
+  extract_view_system(Query<Camera3DComponent, ActiveCamera, GlobalTransform,
+                            Opt<Skybox>, Opt<RenderConfig>>
+                          cam_query,
+                      ResMut<ExtractedView> view) {
+    view->reset();
 
-inline void
-extract_view_system(Query<Camera3DComponent, ActiveCamera, GlobalTransform,
-                          Opt<Skybox>, Opt<RenderConfig>>
-                        cam_query,
-                    ResMut<ExtractedView> view) {
-  view->reset();
+    for (auto [cam_comp, _, cam_gt, skybox, render_config] :
+         cam_query.iter()) {
+      if (!cam_comp || !cam_gt) {
+        continue;
+      }
 
-  for (auto [cam_comp, _, cam_gt, skybox, render_config] : cam_query.iter()) {
-    if (!cam_comp || !cam_gt) {
-      continue;
+      view->camera_view = compute_camera_view(*cam_gt, *cam_comp);
+      view->active_skybox = skybox;
+      view->active = true;
+      view->orthographic = cam_comp->is_orthographic();
+      view->near_plane = cam_comp->near_plane;
+      view->far_plane = cam_comp->far_plane;
+      if (render_config) {
+        view->render_config = *render_config;
+        view->has_render_config = true;
+      }
+      break;
     }
-
-    view->camera_view = compute_camera_view(*cam_gt, *cam_comp);
-    view->active_skybox = skybox;
-    view->active = true;
-    view->orthographic = cam_comp->is_orthographic();
-    view->near_plane = cam_comp->near_plane;
-    view->far_plane = cam_comp->far_plane;
-    if (render_config) {
-      view->render_config = *render_config;
-      view->has_render_config = true;
-    }
-    break;
-  }
-}
-
-inline void
-extract_lighting_system(Query<DirectionalLight> dir_query,
-                        Query<PointLight, GlobalTransform> point_query,
-                        ResMut<ExtractedLights> lights) {
-  lights->reset();
-
-  for (auto [dir] : dir_query.iter()) {
-    if (!dir) {
-      continue;
-    }
-    lights->dir_light = *dir;
-    lights->has_directional = true;
-    break;
   }
 
-  for (auto [point_light, global] : point_query.iter()) {
-    if (!point_light || !global) {
-      continue;
+  static void
+  extract_lighting_system(Query<DirectionalLight> dir_query,
+                          Query<PointLight, GlobalTransform> point_query,
+                          ResMut<ExtractedLights> lights) {
+    lights->reset();
+
+    for (auto [dir] : dir_query.iter()) {
+      if (!dir) {
+        continue;
+      }
+      lights->dir_light = *dir;
+      lights->has_directional = true;
+      break;
     }
 
-    lights->point_lights.push_back(ExtractedPointLight{
-        .position = to_rl(global->translation()),
-        .color = point_light->color,
-        .intensity = point_light->intensity,
-        .range = point_light->range,
-    });
+    for (auto [point_light, global] : point_query.iter()) {
+      if (!point_light || !global) {
+        continue;
+      }
+
+      lights->point_lights.push_back(ExtractedPointLight{
+          .position = to_rl(global->translation()),
+          .color = point_light->color,
+          .intensity = point_light->intensity,
+          .range = point_light->range,
+      });
+    }
   }
-}
 
-inline void clear_extracted_meshes_system(ResMut<ExtractedMeshes> meshes) {
-  meshes->clear();
-}
-
-template <IsMaterial M>
-inline void extract_meshes_system(
-    Query<Mesh3d, GlobalTransform, MeshMaterial3d<M>, Opt<ViewVisibility>>
-        query,
-    Res<ExtractedView> view, ResMut<ExtractedMeshes> meshes) {
-  for (auto [mesh3d, global, material, visibility] : query.iter()) {
-    if (!mesh3d || !global || !material || !mesh3d->mesh.is_valid()) {
-      continue;
-    }
-    if (visibility && !visibility->visible) {
-      continue;
-    }
-
-    MaterialDescriptor descriptor = material->material.describe();
-    const bool transparent = material_is_transparent(descriptor);
-    const bool casts_shadows = descriptor.flags.casts_shadows;
-    Vec3 camera_offset = global->translation() - view->camera_view.position;
-
-    meshes->items.push_back(ExtractedMesh{
-        .mesh = mesh3d->mesh,
-        .material = std::move(descriptor),
-        .world_transform = global->matrix,
-        .distance_to_camera = camera_offset.LengthSq(),
-        .transparent = transparent,
-        .casts_shadows = casts_shadows,
-    });
+  static void clear_extracted_meshes_system(ResMut<ExtractedMeshes> meshes) {
+    meshes->clear();
   }
-}
 
-inline void extract_ui_system(Query<Texture, Transform> textures,
-                              ResMut<ExtractedUi> ui) {
-  ui->clear();
+  template <IsMaterial M>
+  static void extract_meshes_system(
+      Query<Mesh3d, GlobalTransform, MeshMaterial3d<M>, Opt<ViewVisibility>>
+          query,
+      Res<ExtractedView> view, ResMut<ExtractedMeshes> meshes) {
+    for (auto [mesh3d, global, material, visibility] : query.iter()) {
+      if (!mesh3d || !global || !material || !mesh3d->mesh.is_valid()) {
+        continue;
+      }
+      if (visibility && !visibility->visible) {
+        continue;
+      }
 
-  for (auto [texture, transform] : textures.iter()) {
-    if (!texture || !transform || !texture->handle.is_valid()) {
-      continue;
+      MaterialDescriptor descriptor = material->material.describe();
+      const bool transparent = detail::material_is_transparent(descriptor);
+      const bool casts_shadows = descriptor.flags.casts_shadows;
+      Vec3 camera_offset = global->translation() - view->camera_view.position;
+
+      meshes->items.push_back(ExtractedMesh{
+          .mesh = mesh3d->mesh,
+          .material = std::move(descriptor),
+          .world_transform = global->matrix,
+          .distance_to_camera = camera_offset.LengthSq(),
+          .transparent = transparent,
+          .casts_shadows = casts_shadows,
+      });
     }
-
-    ui->items.push_back(ExtractedUiItem{
-        .texture = texture->handle,
-        .transform = *transform,
-        .tint = texture->tint,
-        .layer = texture->layer,
-    });
   }
-}
 
-inline void extract_overlay_system(Query<Texture, Transform> textures,
-                                   ResMut<ExtractedOverlay> overlay) {
-  extract_ui_system(textures, overlay);
-}
+  static void extract_ui_system(Query<Texture, Transform> textures,
+                                ResMut<ExtractedUi> ui) {
+    ui->clear();
+
+    for (auto [texture, transform] : textures.iter()) {
+      if (!texture || !transform || !texture->handle.is_valid()) {
+        continue;
+      }
+
+      ui->items.push_back(ExtractedUiItem{
+          .texture = texture->handle,
+          .transform = *transform,
+          .tint = texture->tint,
+          .layer = texture->layer,
+      });
+    }
+  }
+
+  static void extract_overlay_system(Query<Texture, Transform> textures,
+                                     ResMut<ExtractedOverlay> overlay) {
+    extract_ui_system(textures, overlay);
+  }
+
+private:
+  struct detail {
+    static bool material_is_transparent(const MaterialDescriptor &material) {
+      return material.flags.transparent;
+    }
+  };
+};
 
 } // namespace ecs

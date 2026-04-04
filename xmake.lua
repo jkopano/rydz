@@ -61,6 +61,8 @@ set_warnings("all", "extra")
 
 if is_plat("windows") then
 	add_defines("NOMINMAX", "_CRT_SECURE_NO_WARNINGS")
+else
+	add_ldflags("-rdynamic")
 end
 
 local function is_msvc_like()

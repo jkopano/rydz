@@ -50,8 +50,7 @@ int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "10 - Custom Material", 60}))
       .add_plugin(time_plugin)
-      .add_plugin(render_plugin)
-      .add_plugin(render_material_plugin<ToonMaterial>)
+      .add_plugin(RenderPlugin::install<ToonMaterial>)
       .add_systems(ScheduleLabel::Startup, setup)
       .run();
 }

@@ -29,9 +29,10 @@ enum class RenderPassSet {
 
 struct RenderPlugin {
   template <IsMaterial M> static void register_material(App &app) {
-    app.add_systems(RenderExtractSet::Extract,
-                    group(extract_meshes_system<M>)
-                        .after(clear_extracted_meshes_system));
+    app.add_systems(
+        RenderExtractSet::Extract,
+        group(RenderExtractSystems::extract_meshes_system<M>)
+            .after(RenderExtractSystems::clear_extracted_meshes_system));
   }
 
   static void install(App &app) {
@@ -68,20 +69,20 @@ struct RenderPlugin {
       }
     });
 
-    app.configure_set(
-           ScheduleLabel::ExtractRender,
-           configure(RenderExtractSet::Extract, RenderExtractSet::Queue,
-                     RenderExtractSet::Prepare)
-               .chain())
-        .configure_set(
-            ScheduleLabel::Render,
-            configure(RenderPassSet::Setup, RenderPassSet::Main,
-                      RenderPassSet::PostProcess, RenderPassSet::Ui,
-                      RenderPassSet::Cleanup)
-                .chain());
+    app.configure_set(ScheduleLabel::ExtractRender,
+                      configure(RenderExtractSet::Extract,
+                                RenderExtractSet::Queue,
+                                RenderExtractSet::Prepare)
+                          .chain())
+        .configure_set(ScheduleLabel::Render,
+                       configure(RenderPassSet::Setup, RenderPassSet::Main,
+                                 RenderPassSet::PostProcess, RenderPassSet::Ui,
+                                 RenderPassSet::Cleanup)
+                           .chain());
 
     app.add_systems(ScheduleLabel::First,
                     SceneRuntimeSystems::cleanup_orphan_scene_entities_system)
+
         .add_systems(ScheduleLabel::PreUpdate,
                      SceneRuntimeSystems::sync_scene_roots_system)
 
@@ -90,8 +91,10 @@ struct RenderPlugin {
                            compute_mesh_bounds_system, frustum_cull_system))
 
         .add_systems(RenderExtractSet::Extract,
-                     group(clear_extracted_meshes_system, extract_view_system,
-                           extract_lighting_system, extract_ui_system)
+                     group(RenderExtractSystems::clear_extracted_meshes_system,
+                           RenderExtractSystems::extract_view_system,
+                           RenderExtractSystems::extract_lighting_system,
+                           RenderExtractSystems::extract_ui_system)
                          .chain())
 
         .add_systems(RenderExtractSet::Queue,
@@ -102,10 +105,9 @@ struct RenderPlugin {
                          .chain())
 
         .add_systems(RenderExtractSet::Prepare,
-                     group(RenderPhaseSystems::build_opaque_batches))
+                     RenderPhaseSystems::build_opaque_batches)
 
-        .add_systems(RenderPassSet::Setup,
-                     group(RenderPassSystems::begin_frame))
+        .add_systems(RenderPassSet::Setup, RenderPassSystems::begin_frame)
 
         .add_systems(RenderPassSet::Main,
                      group(RenderPassSystems::run_shadow_pass,
@@ -114,11 +116,12 @@ struct RenderPlugin {
                            RenderPassSystems::run_opaque_pass,
                            RenderPassSystems::run_transparent_pass)
                          .chain())
+
         .add_systems(RenderPassSet::PostProcess,
-                     group(RenderPassSystems::run_postprocess_pass))
-        .add_systems(RenderPassSet::Ui, group(RenderPassSystems::run_ui_pass))
-        .add_systems(RenderPassSet::Cleanup,
-                     group(RenderPassSystems::end_frame));
+                     RenderPassSystems::run_postprocess_pass)
+
+        .add_systems(RenderPassSet::Ui, RenderPassSystems::run_ui_pass)
+        .add_systems(RenderPassSet::Cleanup, RenderPassSystems::end_frame);
 
     register_material<StandardMaterial>(app);
   }
