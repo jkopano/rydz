@@ -41,6 +41,12 @@ struct SystemAccess {
   void set_exclusive() { exclusive = true; }
   void set_main_thread_only() { main_thread_only = true; }
 
+  bool has_data_access() const {
+    return !components_read.empty() || !components_write.empty() ||
+           !resources_read.empty() || !resources_write.empty() ||
+           !archetype_required.empty() || !archetype_excluded.empty();
+  }
+
   bool is_empty() const {
     return components_read.empty() && components_write.empty() &&
            resources_read.empty() && resources_write.empty() && !exclusive;

@@ -125,13 +125,15 @@ inline void frustum_cull_system(
     Query<Camera3DComponent, GlobalTransform, With<ActiveCamera>> cam_query,
     Query<Entity, MeshBounds, GlobalTransform, Opt<ComputedVisibility>>
         mesh_query,
-    Cmd cmd) {
+    Res<Window> window, Cmd cmd) {
   auto cam_result = cam_query.single();
   if (!cam_result)
     return;
   auto [cam_comp, cam_gt] = *cam_result;
+  const float aspect = compute_camera_aspect_ratio(
+      static_cast<float>(window->width), static_cast<float>(window->height));
 
-  CameraView cam_view = compute_camera_view(*cam_gt, *cam_comp);
+  CameraView cam_view = compute_camera_view(*cam_gt, *cam_comp, aspect);
   Mat4 view = cam_view.view;
   Mat4 proj = cam_view.proj;
   Mat4 vp = proj * view;

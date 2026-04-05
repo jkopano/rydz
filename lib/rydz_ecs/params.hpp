@@ -122,7 +122,10 @@ struct SystemParamTraits<NonSendMarker>
     : DefaultSystemParamState<NonSendMarker> {
   using Item = NonSendMarker;
 
-  static void access(SystemAccess &acc) { acc.set_main_thread_only(); }
+  static void access(SystemAccess &acc) {
+    acc.set_exclusive();
+    acc.set_main_thread_only();
+  }
 
   static Item retrieve(World &, const SystemContext &) { return {}; }
   static bool available(const World &) { return true; }

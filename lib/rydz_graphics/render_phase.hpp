@@ -123,11 +123,11 @@ struct RenderPhaseSystems {
         });
       }
 
-      std::sort(phase->items.begin(), phase->items.end(),
-                [](const TransparentPhaseItem &lhs,
-                   const TransparentPhaseItem &rhs) {
-                  return lhs.sort_key > rhs.sort_key;
-                });
+      std::sort(
+          phase->items.begin(), phase->items.end(),
+          [](const TransparentPhaseItem &lhs, const TransparentPhaseItem &rhs) {
+            return lhs.sort_key > rhs.sort_key;
+          });
     }
 
     static void queue_ui_phase(Res<ExtractedUi> ui, ResMut<UiPhase> phase) {
@@ -157,8 +157,9 @@ struct RenderPhaseSystems {
   struct Prepare {
     static void build_opaque_batches(ResMut<OpaquePhase> phase,
                                      ResMut<Assets<rl::Mesh>> mesh_assets,
-                                     NonSendMarker marker) {
-      detail::build_opaque_batches(*phase, *mesh_assets, marker);
+                                     /*NonSendMarker,*/
+                                     ecs::World & /*world*/) {
+      detail::build_opaque_batches(*phase, *mesh_assets, {});
     }
 
   private:

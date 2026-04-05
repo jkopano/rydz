@@ -176,10 +176,10 @@ private:
     ((SystemParamTraits<bare_t<Args>>::access(per_param[i]), ++i), ...);
 
     for (std::size_t a = 0; a < per_param.size(); ++a) {
-      if (per_param[a].is_empty())
+      if (!per_param[a].has_data_access())
         continue;
       for (std::size_t b = a + 1; b < per_param.size(); ++b) {
-        if (per_param[b].is_empty())
+        if (!per_param[b].has_data_access())
           continue;
         if (!per_param[a].is_compatible(per_param[b]) &&
             !per_param[a].is_archetype_disjoint(per_param[b])) {

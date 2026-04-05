@@ -441,9 +441,6 @@ private:
     const auto &a = entries_[i];
     const auto &b = entries_[j];
 
-    if (a.access.main_thread_only != b.access.main_thread_only)
-      return true;
-
     if (a.access.exclusive || b.access.exclusive ||
         !a.access.is_compatible(b.access))
       return true;
@@ -518,18 +515,35 @@ private:
 
   void run_parallel_step(const ParallelStep &step, World &world) {
     for (const auto &batch : step.batches) {
-      if (entries_[batch.start].access.main_thread_only) {
+      tf::Taskflow taskflow;
+      bool has_worker_tasks = false;
+
+      for (usize i : range(batch.start, batch.end)) {
+        if (entries_[i].access.main_thread_only) {
+          continue;
+        }
+
+        has_worker_tasks = true;
+        taskflow.emplace([this, i, &world] { run_entry(i, world); });
+      }
+
+      if (!has_worker_tasks) {
         for (usize i : range(batch.start, batch.end)) {
           run_entry(i, world);
         }
         continue;
       }
 
-      tf::Taskflow taskflow;
+      auto future = global_executor().run(taskflow);
+
       for (usize i : range(batch.start, batch.end)) {
-        taskflow.emplace([this, i, &world] { run_entry(i, world); });
+        if (!entries_[i].access.main_thread_only) {
+          continue;
+        }
+        run_entry(i, world);
       }
-      global_executor().run(taskflow).wait();
+
+      future.wait();
     }
   }
 

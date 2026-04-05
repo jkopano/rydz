@@ -122,8 +122,10 @@ struct RenderExtractSystems {
                             Opt<ClearColor>, Opt<Skybox>, Opt<RenderConfig>,
                             Opt<PostProcessMaterial>>
                           cam_query,
-                      ResMut<ExtractedView> view) {
+                      Res<Window> window, ResMut<ExtractedView> view) {
     view->reset();
+    const float aspect = compute_camera_aspect_ratio(
+        static_cast<float>(window->width), static_cast<float>(window->height));
 
     for (auto [cam_comp, _, cam_gt, clear_color, skybox, render_config,
                postprocess] :
@@ -132,7 +134,7 @@ struct RenderExtractSystems {
         continue;
       }
 
-      view->camera_view = compute_camera_view(*cam_gt, *cam_comp);
+      view->camera_view = compute_camera_view(*cam_gt, *cam_comp, aspect);
       if (clear_color) {
         view->clear_color = clear_color->color;
       }

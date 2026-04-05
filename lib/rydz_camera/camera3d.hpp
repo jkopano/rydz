@@ -66,9 +66,8 @@ struct CameraView {
   Vec3 position;
 };
 
-inline float compute_camera_aspect_ratio() {
-  float aspect = static_cast<float>(rl::GetScreenWidth()) /
-                 static_cast<float>(std::max(rl::GetScreenHeight(), 1));
+inline float compute_camera_aspect_ratio(float width, float height) {
+  float aspect = width / std::max(height, 1.0f);
   return std::max(aspect, 0.0001f);
 }
 
@@ -87,22 +86,24 @@ inline Mat4 compute_camera_projection(const Camera3DComponent &comp,
 }
 
 inline CameraView compute_camera_view(Vec3 position, Vec3 forward, Vec3 up,
-                                      const Camera3DComponent &comp) {
-  float aspect = compute_camera_aspect_ratio();
-
+                                      const Camera3DComponent &comp,
+                                      float aspect) {
   Mat4 view = Mat4::sLookAt(position, position + forward, up);
   Mat4 proj = compute_camera_projection(comp, aspect);
   return {view, proj, position};
 }
 
 inline CameraView compute_camera_view(const Transform &t,
-                                      const Camera3DComponent &comp) {
-  return compute_camera_view(t.translation, t.forward(), t.up(), comp);
+                                      const Camera3DComponent &comp,
+                                      float aspect) {
+  return compute_camera_view(t.translation, t.forward(), t.up(), comp, aspect);
 }
 
 inline CameraView compute_camera_view(const GlobalTransform &t,
-                                      const Camera3DComponent &comp) {
-  return compute_camera_view(t.translation(), t.forward(), t.up(), comp);
+                                      const Camera3DComponent &comp,
+                                      float aspect) {
+  return compute_camera_view(t.translation(), t.forward(), t.up(), comp,
+                             aspect);
 }
 
 } // namespace ecs
