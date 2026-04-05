@@ -2,6 +2,7 @@
 #include "command.hpp"
 #include "core/time.hpp"
 #include "event.hpp"
+#include "message.hpp"
 #include "plugin.hpp"
 #include "rl.hpp"
 #include "schedule.hpp"
@@ -65,6 +66,7 @@ class App {
 public:
   App() {
     world_.insert_resource(CommandQueues{});
+    world_.insert_resource(ObserverRegistry{});
     world_.insert_resource(Time{});
   }
 
@@ -199,10 +201,22 @@ public:
     return *this;
   }
 
+  template <IsMessage E> App &add_message() {
+    if (!world_.has_resource<Messages<E>>()) {
+      world_.insert_resource(Messages<E>{});
+      schedules_.entry(ScheduleLabel::First)
+          .add_system_fn(message_update_system<E>);
+    }
+    return *this;
+  }
+
   template <IsEvent E> App &add_event() {
-    world_.insert_resource(Events<E>{});
-    schedules_.entry(ScheduleLabel::First)
-        .add_system_fn(event_update_system<E>);
+    world_.add_event<E>();
+    return *this;
+  }
+
+  template <typename F> App &add_observer(F &&func) {
+    world_.add_observer(std::forward<F>(func));
     return *this;
   }
 

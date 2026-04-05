@@ -107,7 +107,7 @@ inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
 
 inline void some_shit(Query<CameraState> q) {
   if (auto x = q.single(); x) {
-    auto [state] = *x;
+    auto state = *x;
 
     std::visit(over{[&](const FreeLook &fl) {
                       // std::print("Kamera w trybie FreeLook\n");

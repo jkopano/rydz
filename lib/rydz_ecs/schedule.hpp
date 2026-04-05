@@ -92,7 +92,6 @@ class Schedule {
   };
 
   struct ParallelStep {
-    tf::Taskflow taskflow;
     std::vector<ParallelBatch> batches;
   };
 
@@ -161,11 +160,8 @@ public:
 
     if (!world.multithreaded()) {
       for (auto &entry : entries_) {
-#ifdef TRACY_ENABLE
-        const auto sys_name = entry.system->name();
-        ZoneScopedTransient(sys_name.c_str());
-#endif
-        entry.system->run(world);
+        run_entry(static_cast<usize>(std::distance(entries_.data(), &entry)),
+                  world);
       }
       return;
     }
@@ -173,15 +169,10 @@ public:
     for (auto &step : steps_) {
       if (auto *s = std::get_if<InlineStep>(&step)) {
         for (usize i : range(s->start, s->end)) {
-#ifdef TRACY_ENABLE
-          const auto sys_name = entries_[i].system->name();
-          ZoneScopedTransient(sys_name.c_str());
-#endif
-          entries_[i].system->run(world);
+          run_entry(i, world);
         }
       } else {
-        auto &tf = std::get<ParallelStep>(step).taskflow;
-        global_executor().run(tf).wait();
+        run_parallel_step(std::get<ParallelStep>(step), world);
       }
     }
   }
@@ -423,30 +414,35 @@ private:
   }
 
   void build_execution_steps() {
-    auto chunks =
-        entries_ |
-        std::views::chunk_by([](const SystemEntry &a, const SystemEntry &b) {
-          return a.access.main_thread_only == b.access.main_thread_only;
-        });
+    usize start = 0;
+    while (start < entries_.size()) {
+      if (entries_[start].access.exclusive) {
+        steps_.emplace_back(InlineStep{start, start + 1});
+        ++start;
+        continue;
+      }
 
-    for (auto chunk : chunks) {
-      usize start =
-          static_cast<usize>(std::distance(entries_.data(), &chunk.front()));
-      usize end = start + chunk.size();
-      bool is_inline =
-          chunk.front().access.main_thread_only || chunk.size() == 1;
+      usize end = start + 1;
+      while (end < entries_.size() && !entries_[end].access.exclusive) {
+        ++end;
+      }
 
-      if (is_inline) {
+      if (end - start == 1) {
         steps_.emplace_back(InlineStep{start, end});
       } else {
         steps_.emplace_back(build_parallel_step(start, end));
       }
+
+      start = end;
     }
   }
 
   bool systems_conflict(usize i, usize j) const {
     const auto &a = entries_[i];
     const auto &b = entries_[j];
+
+    if (a.access.main_thread_only != b.access.main_thread_only)
+      return true;
 
     if (a.access.exclusive || b.access.exclusive ||
         !a.access.is_compatible(b.access))
@@ -500,8 +496,6 @@ private:
   }
 
   ExecutionStep build_parallel_step(usize start, usize end) {
-    using Tasks = std::vector<tf::Task>;
-
     auto batches = batch_compatible_systems(start, end);
     reorder_entries_by_batches(start, batches);
 
@@ -512,34 +506,39 @@ private:
 
     ParallelStep step;
     usize batch_start = start;
-    Tasks prev_tasks;
 
     for (const auto &batch : batches) {
-      Tasks curr_tasks;
       usize batch_end = batch_start + batch.size();
       step.batches.push_back({batch_start, batch_end});
-
-      for (usize i = batch_start; i < batch_end; ++i) {
-        auto task = step.taskflow.emplace([this, i] {
-#ifdef TRACY_ENABLE
-          const auto sys_name = entries_[i].system->name();
-          ZoneScopedTransient(sys_name.c_str());
-#endif
-          entries_[i].system->run(*current_world_);
-        });
-
-        for (auto &prev : prev_tasks) {
-          prev.precede(task);
-        }
-
-        curr_tasks.push_back(task);
-      }
-
-      prev_tasks = std::move(curr_tasks);
       batch_start = batch_end;
     }
 
     return step;
+  }
+
+  void run_parallel_step(const ParallelStep &step, World &world) {
+    for (const auto &batch : step.batches) {
+      if (entries_[batch.start].access.main_thread_only) {
+        for (usize i : range(batch.start, batch.end)) {
+          run_entry(i, world);
+        }
+        continue;
+      }
+
+      tf::Taskflow taskflow;
+      for (usize i : range(batch.start, batch.end)) {
+        taskflow.emplace([this, i, &world] { run_entry(i, world); });
+      }
+      global_executor().run(taskflow).wait();
+    }
+  }
+
+  void run_entry(usize index, World &world) {
+#ifdef TRACY_ENABLE
+    const auto sys_name = entries_[index].system->name();
+    ZoneScopedTransient(sys_name.c_str());
+#endif
+    entries_[index].system->run(world);
   }
 
   static bool have_ordering_dependency(const SystemEntry &a,
@@ -651,6 +650,13 @@ private:
         const auto &batch = parallel.batches[batch_index];
         usize slot = 0;
         for (usize i : range(batch.start, batch.end)) {
+          if (entries_[i].access.main_thread_only) {
+            placements[i] = DebugPlacement{
+                step_index, "main_thread(batch=" + std::to_string(batch_index) +
+                                ")"};
+            continue;
+          }
+
           placements[i] = DebugPlacement{
               step_index, "worker_pool(batch=" + std::to_string(batch_index) +
                               ", slot=" + std::to_string(slot) + ")"};

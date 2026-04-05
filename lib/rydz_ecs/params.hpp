@@ -1,7 +1,7 @@
 #pragma once
 #include "access.hpp"
-#include "event.hpp"
 #include "fwd.hpp"
+#include "message.hpp"
 #include "world.hpp"
 #include <concepts>
 #include <stdexcept>
@@ -39,29 +39,29 @@ template <typename T> struct ResMut {
   const T *operator->() const { return ptr; }
 };
 
-template <typename E> class EventWriter {
-  Events<E> *events_;
+template <typename E> class MessageWriter {
+  Messages<E> *messages_;
 
 public:
-  explicit EventWriter(Events<E> *events) : events_(events) {}
+  explicit MessageWriter(Messages<E> *messages) : messages_(messages) {}
 
-  void send(const E &event) { events_->send(event); }
-  void send(E &&event) { events_->send(std::move(event)); }
+  void send(const E &message) { messages_->send(message); }
+  void send(E &&message) { messages_->send(std::move(message)); }
 };
 
-template <typename E> class EventReader {
-  Events<E> *events_;
+template <typename E> class MessageReader {
+  Messages<E> *messages_;
   usize reader_id_;
 
 public:
-  explicit EventReader(Events<E> *events)
-      : events_(events), reader_id_(events->register_reader()) {}
+  explicit MessageReader(Messages<E> *messages)
+      : messages_(messages), reader_id_(messages->register_reader()) {}
 
   template <typename Func> void for_each(Func &&func) {
-    events_->read(reader_id_, std::forward<Func>(func));
+    messages_->read(reader_id_, std::forward<Func>(func));
   }
 
-  bool is_empty() const { return !events_->has_unread(reader_id_); }
+  bool is_empty() const { return !messages_->has_unread(reader_id_); }
 };
 
 template <typename P> struct DefaultSystemParamState {
@@ -129,41 +129,45 @@ struct SystemParamTraits<NonSendMarker>
 };
 
 template <typename E>
-struct SystemParamTraits<EventWriter<E>>
-    : DefaultSystemParamState<EventWriter<E>> {
-  using Item = EventWriter<E>;
+struct SystemParamTraits<MessageWriter<E>>
+    : DefaultSystemParamState<MessageWriter<E>> {
+  using Item = MessageWriter<E>;
 
   static Item retrieve(World &world, const SystemContext &) {
-    auto *events = world.get_resource<Events<E>>();
-    if (!events)
-      throw std::runtime_error("Events resource not found");
-    return EventWriter<E>(events);
+    auto *messages = world.get_resource<Messages<E>>();
+    if (!messages)
+      throw std::runtime_error("Messages resource not found");
+    return MessageWriter<E>(messages);
   }
 
   static bool available(const World &world) {
-    return world.has_resource<Events<E>>();
+    return world.has_resource<Messages<E>>();
   }
 
-  static void access(SystemAccess &acc) { acc.add_resource_write<Events<E>>(); }
+  static void access(SystemAccess &acc) {
+    acc.add_resource_write<Messages<E>>();
+  }
 };
 
 template <typename E>
-struct SystemParamTraits<EventReader<E>>
-    : DefaultSystemParamState<EventReader<E>> {
-  using Item = EventReader<E>;
+struct SystemParamTraits<MessageReader<E>>
+    : DefaultSystemParamState<MessageReader<E>> {
+  using Item = MessageReader<E>;
 
   static Item retrieve(World &world, const SystemContext &) {
-    auto *events = world.get_resource<Events<E>>();
-    if (!events)
-      throw std::runtime_error("Events resource not found");
-    return EventReader<E>(events);
+    auto *messages = world.get_resource<Messages<E>>();
+    if (!messages)
+      throw std::runtime_error("Messages resource not found");
+    return MessageReader<E>(messages);
   }
 
   static bool available(const World &world) {
-    return world.has_resource<Events<E>>();
+    return world.has_resource<Messages<E>>();
   }
 
-  static void access(SystemAccess &acc) { acc.add_resource_read<Events<E>>(); }
+  static void access(SystemAccess &acc) {
+    acc.add_resource_read<Messages<E>>();
+  }
 };
 
 template <typename T> struct SystemParamTraits<Local<T>> {
@@ -184,8 +188,8 @@ template <typename T> struct SystemParamTraits<Local<T>> {
   static void access(SystemAccess &) {}
 };
 
-template <typename E> void event_update_system(ResMut<Events<E>> events) {
-  events->update();
+template <typename E> void message_update_system(ResMut<Messages<E>> messages) {
+  messages->update();
 }
 
 } // namespace ecs

@@ -194,7 +194,7 @@ local examples = {
 	"01_hello_window",
 	"02_ecs_basics",
 	"03_input",
-	"04_events",
+	"04_messages",
 	"05_states",
 	"06_rendering",
 	"07_lighting",
@@ -202,6 +202,7 @@ local examples = {
 	"09_spawn_despawn",
 	"10_custom_material",
 	"11_sets",
+	"12_observers",
 }
 
 for _, name in ipairs(examples) do
