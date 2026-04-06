@@ -31,6 +31,7 @@ struct brushFace {
     Vector3 v1;
     Vector3 v2;
     Vector3 v3;
+    std::string texturePath;
 };
 
 rl::Mesh createPlaneMesh(brushFace face);
@@ -50,18 +51,23 @@ inline void load_level(Cmd cmd, ResMut<Assets<rl::Model>> models,
     //Spawn each face
     for (auto& face : brushFaces)
     {
-        //rl::TraceLog(LOG_DEBUG, "lOADING NEW FACE");
-        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.y) + " Z: " + std::to_string(face.v0.z)).c_str());
-        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v1.x) + " Y: " + std::to_string(face.v1.y) + " Z: " + std::to_string(face.v1.z)).c_str());
-        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v2.x) + " Y: " + std::to_string(face.v2.y) + " Z: " + std::to_string(face.v2.z)).c_str());
-        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v3.x) + " Y: " + std::to_string(face.v3.y) + " Z: " + std::to_string(face.v3.z)).c_str());
+        //rl::TraceLog(LOG_DEBUG, "RENDERING NEW FACE");
+        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.z) + " Z: " + std::to_string(face.v0.y)).c_str());
+        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v1.x) + " Y: " + std::to_string(face.v1.z) + " Z: " + std::to_string(face.v1.y)).c_str());
+        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v2.x) + " Y: " + std::to_string(face.v2.z) + " Z: " + std::to_string(face.v2.y)).c_str());
+        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v3.x) + " Y: " + std::to_string(face.v3.z) + " Z: " + std::to_string(face.v3.y)).c_str());
         rl::Mesh cube_mesh = createPlaneMesh(face);
         rl::Model plane_model = rl::LoadModelFromMesh(cube_mesh);
         auto plane_h = models->add(std::move(plane_model));
 
+        std::ifstream f(("res/textures/" + face.texturePath + ".png").c_str());
+        if(!f.good())
+        {
+            face.texturePath = "empty";
+        }
         cmd.spawn(Model3d{ plane_h },
             Material3d{ StandardMaterial::from_texture(
-                textures->add(rl::LoadTexture("res/textures/texture_04_2.png"))) },
+                textures->add(rl::LoadTexture(("res/textures/" + face.texturePath + ".png").c_str())))},
 
             Transform{ });
         //Transform{ (JPH::Vec3) { 5.0f, 0.0f, 10.0f } }
@@ -80,6 +86,7 @@ inline void load_level(Cmd cmd, ResMut<Assets<rl::Model>> models,
 
 }
 
+
 std::vector<brushFace> parseVertices(const std::string& filename) {
     std::vector<brushFace> allFaces;
     std::ifstream file(filename);
@@ -91,8 +98,33 @@ std::vector<brushFace> parseVertices(const std::string& filename) {
 
     std::string line;
     std::vector<Vector3> tempVertices;
+    std::string lastFoundTexture = "";
 
     while (std::getline(file, line)) {
+       
+        size_t matPos = line.find("\"material\"");
+        if (matPos != std::string::npos) {
+            size_t firstQuote = line.find("\"", matPos + 10);
+            size_t lastQuote = line.find("\"", firstQuote + 1);
+
+            if (firstQuote != std::string::npos && lastQuote != std::string::npos) {
+                std::string fullPath = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+
+                //lastFoundTexture = "empty";
+                size_t lastSlash = fullPath.find_last_of("/\\");
+                if (lastSlash != std::string::npos) {
+                    lastFoundTexture = fullPath.substr(lastSlash + 1);
+                }
+                else {
+                    lastFoundTexture = fullPath;
+                }
+
+                if (!allFaces.empty() && allFaces.back().texturePath.empty()) {
+                    allFaces.back().texturePath = lastFoundTexture;
+                }
+            }
+        }
+
         size_t vPos = line.find("\"v\"");
         if (vPos != std::string::npos) {
             size_t firstQuote = line.find("\"", vPos + 3);
@@ -105,25 +137,29 @@ std::vector<brushFace> parseVertices(const std::string& filename) {
                 Vector3 v;
                 if (ss >> v.x >> v.z >> v.y) {
                     tempVertices.push_back(v);
-                    rl::TraceLog(LOG_DEBUG, std::to_string(v.x).c_str());
                 }
             }
         }
 
-        // Read 4 vertices, then assign them to a face
         if (tempVertices.size() == 4) {
             brushFace face;
             face.v0 = tempVertices[0];
             face.v1 = tempVertices[1];
             face.v2 = tempVertices[2];
             face.v3 = tempVertices[3];
-            rl::TraceLog(LOG_DEBUG, "lOADING NEW FACE");
-            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.y) + " Z: " + std::to_string(face.v0.z)).c_str());
-            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v1.x) + " Y: " + std::to_string(face.v1.y) + " Z: " + std::to_string(face.v1.z)).c_str());
-            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v2.x) + " Y: " + std::to_string(face.v2.y) + " Z: " + std::to_string(face.v2.z)).c_str());
-            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v3.x) + " Y: " + std::to_string(face.v3.y) + " Z: " + std::to_string(face.v3.z)).c_str());
+
+            rl::TraceLog(LOG_DEBUG, (("TEXTURE TO APPLY: " + lastFoundTexture).c_str()));
+            //face.texturePath = lastFoundTexture;
+
+            rl::TraceLog(LOG_DEBUG, "LOADING NEW FACE");
+            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.z) + " Z: " + std::to_string(face.v0.y)).c_str());
+            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v1.x) + " Y: " + std::to_string(face.v1.z) + " Z: " + std::to_string(face.v1.y)).c_str());
+            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v2.x) + " Y: " + std::to_string(face.v2.z) + " Z: " + std::to_string(face.v2.y)).c_str());
+            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v3.x) + " Y: " + std::to_string(face.v3.z) + " Z: " + std::to_string(face.v3.y)).c_str());
             allFaces.push_back(face);
+
             tempVertices.clear();
+            lastFoundTexture = "";
         }
     }
 
