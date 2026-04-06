@@ -1,6 +1,22 @@
 #pragma once
 
-enum Direction { Row, Column };
+#include "math.hpp"
+#include "rl.hpp"
+#include <string>
+
+namespace rydz::ui {
+
+struct UiNode {
+  int z_index = 0;
+};
+
+struct ComputedUiNode {
+  math::Vec2 pos;
+  math::Vec2 size;
+  math::Vec2 content_size;
+};
+
+enum struct Direction { Row, Column };
 enum struct Align { Start, Center, End };
 enum struct Justify { Start, Center, End };
 enum struct SizeKind { Auto, Px };
@@ -26,15 +42,27 @@ struct UiRect {
 // Flex - flexbox layout
 // grid - grid css layout
 // None - hide the node
-enum Display { Flex, Grid, None };
+enum struct Display { Flex, Grid, None };
 
 struct Style {
   Direction direction = Direction::Row;
   Align align = Align::Start;
   Justify justify = Justify::Start;
-  UiRect padding;
-  UiRect margin;
+  UiRect padding{};
+  UiRect margin{};
   Display display = Display::Flex;
   float gap = 0.0;
   Size2 size = {{SizeKind::Auto, 0.0}, {SizeKind::Auto, 0.0}};
 };
+
+struct Panel {
+  rl::Color background_color = rl::Color{WHITE};
+};
+
+struct Label {
+  std::string text = "";
+  float font_size = 16.0;
+  rl::Color color = rl::Color{BLACK};
+};
+
+} // namespace rydz::ui
