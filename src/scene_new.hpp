@@ -1,6 +1,7 @@
 #pragma once
 #include "math.hpp"
 #include "rl.hpp"
+#include "rydz_levelLoader/rydz_levelLoader.hpp"
 #include "rydz_camera/rydz_camera.hpp"
 #include "rydz_console/console.hpp"
 #include "rydz_console/scripting.hpp"
@@ -146,8 +147,9 @@ inline void scene_plugin(App &app) {
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
   app.add_systems(ScheduleLabel::Startup, setup_lighting);
-  app.add_systems(ScheduleLabel::Startup, spawn_ground);
+  //app.add_systems(ScheduleLabel::Startup, spawn_ground);
   app.add_systems(ScheduleLabel::Startup, spawn_player);
+  app.add_systems(ScheduleLabel::Startup, load_level);
 
   app.add_systems(ScheduleLabel::Update, player_movement_system);
   app.add_systems(ScheduleLabel::Update, update_isometric_camera_target_system);
