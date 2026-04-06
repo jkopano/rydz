@@ -66,9 +66,6 @@ struct UiPhase {
   void clear() { items.clear(); }
 };
 
-using OverlayPhaseItem = UiPhaseItem;
-using OverlayPhase = UiPhase;
-
 struct RenderPhaseSystems {
   struct Queue {
     static void queue_shadow_phase(Res<ExtractedMeshes> meshes,
@@ -149,7 +146,7 @@ struct RenderPhaseSystems {
     }
 
     static void queue_overlay_phase(Res<ExtractedUi> overlay,
-                                    ResMut<OverlayPhase> phase) {
+                                    ResMut<UiPhase> phase) {
       queue_ui_phase(overlay, phase);
     }
   };
@@ -157,8 +154,7 @@ struct RenderPhaseSystems {
   struct Prepare {
     static void build_opaque_batches(ResMut<OpaquePhase> phase,
                                      ResMut<Assets<rl::Mesh>> mesh_assets,
-                                     /*NonSendMarker,*/
-                                     ecs::World & /*world*/) {
+                                     NonSendMarker) {
       detail::build_opaque_batches(*phase, *mesh_assets, {});
     }
 
