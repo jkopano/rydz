@@ -2,7 +2,7 @@ versioninfo
 {
 	"editorversion" "400"
 	"editorbuild" "8864"
-	"mapversion" "30"
+	"mapversion" "32"
 	"formatversion" "100"
 	"prefab" "0"
 }
@@ -72,9 +72,9 @@ bgimages_plus
 world
 {
 	"id" "1"
-	"mapversion" "30"
+	"mapversion" "32"
 	"classname" "worldspawn"
-	
+	"detailmaterial" "detail/detailsprites"
 	"detailvbsp" "detail.vbsp"
 	"maxpropscreenwidth" "-1"
 	"skyname" "sky_day01_01"
@@ -328,7 +328,7 @@ world
 				"v" "8 -8 8"
 				"v" "-8 -8 8"
 			}
-			"material" "DEV/BRICK"
+			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 -1 0 0] 0.25"
 			"rotation" "0"
@@ -446,9 +446,9 @@ world
 				"v" "21.1716 -8 8"
 				"v" "9.85786 3.31371 8"
 			}
-			"material" "DEV/BRICK"
-			"uaxis" "[0.707107 -0.707107 0 0] 0.25"
-			"vaxis" "[-0.707107 -0.707107 0 0] 0.25"
+			"material" "RYDZ/MEASURE"
+			"uaxis" "[0.707107 -0.707107 0 -296.154] 0.015625"
+			"vaxis" "[-0.707107 -0.707107 0 336.302] 0.00390626"
 			"rotation" "0"
 			"lightmapscale" "16"
 			"smoothing_groups" "0"
@@ -564,9 +564,9 @@ world
 				"v" "-6.98223 12.2727 8"
 				"v" "-1.55366 2.87015 8"
 			}
-			"material" "DEV/BRICK"
-			"uaxis" "[0.866025 0.5 0 0] 0.25"
-			"vaxis" "[0.5 -0.866025 0 0] 0.25"
+			"material" "RYDZ/MEASURE"
+			"uaxis" "[0.866025 0.5 0 1001.07] 0.00390625"
+			"vaxis" "[0.5 -0.866025 0 307.701] 0.0106027"
 			"rotation" "0"
 			"lightmapscale" "16"
 			"smoothing_groups" "0"
@@ -679,12 +679,12 @@ world
 			{
 				"v" "-13.2937 -9.17157 8"
 				"v" "-5.21287 -1.09074 8"
-				"v" "-4.0001 -5.53482 8"
+				"v" "-4 -5.53482 8"
 				"v" "-10.4653 -12 8"
 			}
-			"material" "DEV/BRICK"
-			"uaxis" "[0.7071 -0.7071 0 -36.3409] 0.25"
-			"vaxis" "[-0.7071 -0.7071 0 -31.5414] 0.25"
+			"material" "RYDZ/MEASURE"
+			"uaxis" "[0.7071 -0.7071 0 746.173] 0.00390628"
+			"vaxis" "[-0.7071 -0.7071 0 -399.395] 0.0111601"
 			"rotation" "0"
 			"lightmapscale" "16"
 			"smoothing_groups" "0"
@@ -698,7 +698,7 @@ world
 				"v" "-5.21287 -1.09074 -4"
 				"v" "-13.2937 -9.17157 -4"
 				"v" "-10.4653 -12 -4"
-				"v" "-4.0001 -5.53482 -4"
+				"v" "-4 -5.53482 -4"
 			}
 			"material" "DEV/BRICK"
 			"uaxis" "[0.707107 -0.707107 0 0] 0.25"
@@ -731,10 +731,10 @@ world
 			"plane" "(-4.0003 -5.53502 -4) (-10.4653 -12 -4) (-10.4653 -12 8)"
 			vertices_plus
 			{
-				"v" "-4.0003 -5.53502 -4"
+				"v" "-4 -5.53502 -4"
 				"v" "-10.4653 -12 -4"
 				"v" "-10.4653 -12 8"
-				"v" "-4.0003 -5.53502 8"
+				"v" "-4 -5.53502 8"
 			}
 			"material" "DEV/BRICK"
 			"uaxis" "[0.707107 0.707107 0 0] 0.25"
@@ -768,7 +768,7 @@ world
 			vertices_plus
 			{
 				"v" "-5.21258 -1.09045 -4"
-				"v" "-4.00001 -5.53473 -4"
+				"v" "-4 -5.53473 -4"
 				"v" "-4 -5.53472 8"
 				"v" "-5.21327 -1.09114 8"
 			}

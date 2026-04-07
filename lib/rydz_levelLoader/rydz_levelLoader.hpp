@@ -39,7 +39,7 @@ std::vector<brushFace> parseVertices(const std::string& filename);
 
 
 
-inline void load_level(Cmd cmd, ResMut<Assets<rl::Model>> models,
+inline void load_level(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
     ResMut<Assets<rl::Texture2D>> textures,
     NonSendMarker) {
 
@@ -56,17 +56,22 @@ inline void load_level(Cmd cmd, ResMut<Assets<rl::Model>> models,
         //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v1.x) + " Y: " + std::to_string(face.v1.z) + " Z: " + std::to_string(face.v1.y)).c_str());
         //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v2.x) + " Y: " + std::to_string(face.v2.z) + " Z: " + std::to_string(face.v2.y)).c_str());
         //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v3.x) + " Y: " + std::to_string(face.v3.z) + " Z: " + std::to_string(face.v3.y)).c_str());
+
+        //OLD MODEL LOADING
+        //rl::Mesh cube_mesh = createPlaneMesh(face);
+        //rl::Model plane_model = rl::LoadModelFromMesh(cube_mesh);
+        //auto plane_h = models->add(std::move(plane_model));
+
         rl::Mesh cube_mesh = createPlaneMesh(face);
-        rl::Model plane_model = rl::LoadModelFromMesh(cube_mesh);
-        auto plane_h = models->add(std::move(plane_model));
+        auto plane_h = meshes->add(cube_mesh);
 
         std::ifstream f(("res/textures/" + face.texturePath + ".png").c_str());
         if(!f.good())
         {
             face.texturePath = "empty";
         }
-        cmd.spawn(Model3d{ plane_h },
-            Material3d{ StandardMaterial::from_texture(
+        cmd.spawn(Mesh3d{ plane_h },
+            MeshMaterial3d{ StandardMaterial::from_texture(
                 textures->add(rl::LoadTexture(("res/textures/" + face.texturePath + ".png").c_str())))},
 
             Transform{ });
@@ -180,10 +185,10 @@ rl::Mesh createPlaneMesh(brushFace face) {
 
     // Vertices definition
     Vector3* vertices = (Vector3*)RL_MALLOC(vertexCount * sizeof(Vector3));
-    vertices[0] = (Vector3){ face.v0 };
-    vertices[1] = (Vector3){ face.v1 };
-    vertices[2] = (Vector3){ face.v2 };
-    vertices[3] = (Vector3){ face.v3 };
+    vertices[0] =  face.v0;
+    vertices[1] =  face.v1;
+    vertices[2] =  face.v2;
+    vertices[3] =  face.v3;
     vertices[4] = vertices[0];
     vertices[5] = vertices[2];
 
@@ -194,10 +199,10 @@ rl::Mesh createPlaneMesh(brushFace face) {
 
     // TexCoords definition
     Vector2* texcoords = (Vector2*)RL_MALLOC(vertexCount * sizeof(Vector2));
-    texcoords[0] = (Vector2){ -1.0f, 1.0f };
-    texcoords[1] = (Vector2){ 1.0f, 1.0f };
-    texcoords[2] = (Vector2){ 1.0f, -1.0f };
-    texcoords[3] = (Vector2){ -1.0f, -1.0f };
+    texcoords[0] = { -1.0f, 1.0f };
+    texcoords[1] = { 1.0f, 1.0f };
+    texcoords[2] = { 1.0f, -1.0f };
+    texcoords[3] = { -1.0f, -1.0f };
     texcoords[4] = texcoords[0];
     texcoords[5] = texcoords[2];
 
