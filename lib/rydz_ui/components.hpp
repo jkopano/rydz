@@ -2,9 +2,29 @@
 
 #include "math.hpp"
 #include "rl.hpp"
+#include "rydz_ecs/asset.hpp"
+#include "rydz_ecs/entity.hpp"
+#include "rydz_ecs/fwd.hpp"
 #include <string>
+#include <unordered_map>
 
 namespace rydz::ui {
+
+struct UiRoot {
+  using T = ecs::Resource;
+  ecs::Entity root;
+};
+
+// for tests
+struct UiWhiteTexture {
+  using T = ecs::Resource;
+  ecs::Handle<rl::Texture2D> handle;
+};
+
+struct UiTextCache {
+  using T = ecs::Resource;
+  std::unordered_map<std::string, ecs::Handle<rl::Texture2D>> items;
+};
 
 struct UiNode {
   int z_index = 0;
@@ -64,5 +84,13 @@ struct Label {
   float font_size = 16.0;
   rl::Color color = rl::Color{BLACK};
 };
+
+inline std::string make_label_cache_key(const Label &label) {
+  return label.text + "|" + std::to_string(label.font_size) + "|" +
+         std::to_string(label.color.r) + "," +
+         std::to_string(label.color.g) + "," +
+         std::to_string(label.color.b) + "," +
+         std::to_string(label.color.a);
+}
 
 } // namespace rydz::ui

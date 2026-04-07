@@ -84,6 +84,8 @@ using ::UploadMesh;
 
 // ---- Textures / Images ----
 using ::GenImageColor;
+using ::ImageText;
+using ::ImageTextEx;
 using ::ImageFormat;
 using ::LoadImage;
 using ::LoadTexture;
