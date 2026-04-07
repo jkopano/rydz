@@ -49,7 +49,7 @@ if tracy_enabled then
 end
 
 if is_plat("windows") then
-	add_defines("NOMINMAX", "_CRT_SECURE_NO_WARNINGS")
+	add_defines("NOMINMAX", "_CRT_SECURE_NO_WARNINGS", "_ENABLE_EXTENDED_ALIGNED_STORAGE")
 	add_requires("luajit v2.1")
 elseif is_plat("linux") then
 	add_requires("luajit v2.1")
