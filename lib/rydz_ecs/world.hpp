@@ -32,6 +32,10 @@ private:
     }
   }
 
+  void despawn_immediate(Entity entity);
+  ObserverRegistry &ensure_observer_registry();
+  const ObserverRegistry *observer_registry() const;
+
 public:
   World() = default;
 
@@ -69,12 +73,19 @@ public:
 
   Entity spawn() { return entities.create(); }
 
-  void despawn(Entity entity) {
-    for (auto &[_, storage] : storages_) {
-      storage->remove(entity);
-    }
-    entities.destroy(entity);
-  }
+  void despawn(Entity entity);
+
+  template <typename E>
+    requires IsEvent<bare_t<E>>
+  void add_event();
+
+  template <typename F> Entity add_observer(F &&func);
+
+  template <typename F> Entity add_observer(Entity target, F &&func);
+
+  template <typename E>
+    requires IsEvent<bare_t<E>>
+  void trigger(E &&event);
 
   template <typename T> auto &ensure_storage_exist() {
     using TargetStorage = storage_t<T>;
@@ -189,3 +200,5 @@ std::vector<Entity> spawn_batch(World &world, R &&_range) {
 }
 
 } // namespace ecs
+
+#include "event.hpp"

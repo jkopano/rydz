@@ -8,7 +8,9 @@ namespace ecs {
 
 struct Bundle {};
 struct Component {};
+struct Message {};
 struct Event {};
+struct EntityEvent {};
 struct Resource {};
 struct Set {};
 
@@ -40,6 +42,7 @@ template <typename... Qs> class Query;
 
 class ISystem;
 struct NonSendMarker;
+template <typename T> struct Local;
 template <typename T> struct Res;
 template <typename T> struct ResMut;
 template <typename P> struct SystemParamTraits;
@@ -48,10 +51,14 @@ class CommandQueue;
 class CommandQueues;
 class Cmd;
 class EntityCommands;
+class ObserverRegistry;
 
-template <typename E> class Events;
-template <typename E> class EventWriter;
-template <typename E> class EventReader;
+template <typename E> class Messages;
+template <typename E> class MessageWriter;
+template <typename E> class MessageReader;
+template <typename E> struct On;
+
+struct ObservedBy;
 
 class ICondition;
 

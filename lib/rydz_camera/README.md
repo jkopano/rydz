@@ -40,9 +40,12 @@ Add to Update schedule to drive camera movement.
 ## Example
 
 ```cpp
-inline void setup_scene(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
+inline void setup_scene(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   // Spawn player entity
-  cmd.spawn(Model3d{...}, Transform::from_xyz(0, 0.5f, 0), Player{});
+  auto cube = meshes->add(mesh::cube(1.0f, 1.0f, 1.0f));
+  cmd.spawn(Mesh3d{cube},
+            MeshMaterial3d<>{StandardMaterial::from_color(WHITE)},
+            Transform::from_xyz(0, 0.5f, 0), Player{});
   
   // Spawn isometric camera following origin with offset
   setup_isometric_camera(cmd, Vec3::sZero(), Vec3(10, 10, 10), 20.0f);
@@ -64,4 +67,3 @@ inline void update_camera(Query<Mut<IsometricCamera>> cam_query,
 - Original `Camera3DComponent` in rydz_graphics/camera3d.hpp is untouched
 - System uses orthographic projection (configurable height)
 - Smooth follow uses Lerp with framerate-independent delta time
-
