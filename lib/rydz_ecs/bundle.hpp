@@ -26,8 +26,18 @@ concept IsBundle = requires { typename T::T; } &&
                    std::is_same_v<typename type_tag_of<T>::type, Bundle>;
 
 template <typename T>
+concept IsMessage = requires { typename T::T; } &&
+                    std::is_same_v<typename type_tag_of<T>::type, Message>;
+
+template <typename T>
+concept IsEntityEvent = requires { typename T::T; } &&
+                        std::is_same_v<typename type_tag_of<T>::type,
+                                       EntityEvent>;
+
+template <typename T>
 concept IsEvent =
-    requires { typename T::T; } && std::is_same_v<typename T::T, Event>;
+    requires { typename T::T; } &&
+    (std::is_same_v<typename type_tag_of<T>::type, Event> || IsEntityEvent<T>);
 
 template <typename T>
 concept Spawnable = IsComponent<bare_t<T>> || IsBundle<bare_t<T>>;

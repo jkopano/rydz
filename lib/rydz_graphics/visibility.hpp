@@ -1,6 +1,6 @@
 #pragma once
-#include "rydz_ecs/entity.hpp"
 #include "rydz_ecs/core/hierarchy.hpp"
+#include "rydz_ecs/entity.hpp"
 #include "rydz_ecs/world.hpp"
 #include <functional>
 #include <unordered_map>

@@ -15,7 +15,7 @@ struct Lifetime {
   f32 remaining = 3.0f;
 };
 
-void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             Transform::from_xyz(0, 15, 20).look_at(Vec3::sZero()));
 
@@ -26,30 +26,33 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   });
 
   // podłoga
-  auto floor_h = models->add(rl::LoadModelFromMesh(mesh::plane(30, 30)));
-  cmd.spawn(Model3d{floor_h},
-            Material3d{StandardMaterial::from_color(DARKGRAY)}, Transform{});
+  auto floor_h = meshes->add(mesh::plane(30, 30));
+  cmd.spawn(Mesh3d{floor_h},
+            MeshMaterial3d<>{StandardMaterial::from_color(DARKGRAY)},
+            Transform{});
 }
 
 // spawn_batch
 // korzystasz jak musisz dużo rzeczy wyspawnic, powinno być szybsze(na razie nie
 // jest xd)
-void batch_spawn(Cmd cmd, ResMut<Assets<rl::Model>> models, Res<Input> input,
+void batch_spawn(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, Res<Input> input,
                  NonSendMarker) {
   if (!input->key_pressed(KEY_SPACE))
     return;
 
-  auto sphere_h = models->add(rl::LoadModelFromMesh(mesh::sphere(0.3f)));
+  auto sphere_h = meshes->add(mesh::sphere(0.3f));
 
   // budujemy wektor tupli — spawn_batch przyjmuje range
-  std::vector<Tuple<BulletTag, Lifetime, Model3d, Material3d, Transform>> batch;
+  std::vector<Tuple<BulletTag, Lifetime, Mesh3d, MeshMaterial3d<>, Transform>>
+      batch;
 
   for (i32 x = -3; x <= 3; ++x) {
     for (i32 z = -3; z <= 3; ++z) {
-      batch.emplace_back(BulletTag{}, Lifetime{3.0f}, Model3d{sphere_h},
-                         Material3d{StandardMaterial::from_color(rl::Color{
-                             static_cast<u8>(100 + x * 20),
-                             static_cast<u8>(100 + z * 20), 200, 255})},
+      batch.emplace_back(BulletTag{}, Lifetime{3.0f}, Mesh3d{sphere_h},
+                         MeshMaterial3d<>{StandardMaterial::from_color(
+                             rl::Color{static_cast<u8>(100 + x * 20),
+                                       static_cast<u8>(100 + z * 20), 200,
+                                       255})},
                          Transform::from_xyz(x * 1.5f, 5.0f, z * 1.5f));
     }
   }

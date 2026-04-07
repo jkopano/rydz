@@ -1,74 +1,194 @@
 #include <gtest/gtest.h>
 
-#include "rydz_ecs/event.hpp"
-#include "rydz_ecs/world.hpp"
+#include "rydz_ecs/rydz_ecs.hpp"
 
 using namespace ecs;
 
-// ============================================================
-// Event tests (mirrors event_test.rs)
-// ============================================================
+namespace {
 
-struct MyEvent {
+struct MyMessage {
+  using T = Message;
   int value;
-  bool operator==(const MyEvent &o) const { return value == o.value; }
+  bool operator==(const MyMessage &o) const { return value == o.value; }
 };
 
-TEST(EventTest, DoubleBufferedEvents) {
-  Events<MyEvent> events;
-  auto reader_a = events.register_reader();
-  auto reader_b = events.register_reader();
+struct PingEvent {
+  using T = Event;
+  int value;
+};
 
-  // --- Frame 1: send events ---
-  events.send(MyEvent{1});
-  events.send(MyEvent{2});
+struct HitEvent {
+  using T = EntityEvent;
+  Entity target;
+  int amount;
+};
 
-  std::vector<MyEvent> received_a, received_b;
-  events.read(reader_a, [&](const MyEvent &e) { received_a.push_back(e); });
-  events.read(reader_b, [&](const MyEvent &e) { received_b.push_back(e); });
+struct Counter {
+  using T = Resource;
+  int value = 0;
+};
+
+struct Health {
+  int value;
+};
+
+struct Marker {};
+
+} // namespace
+
+TEST(EventTest, DoubleBufferedMessages) {
+  Messages<MyMessage> messages;
+  auto reader_a = messages.register_reader();
+  auto reader_b = messages.register_reader();
+
+  messages.send(MyMessage{1});
+  messages.send(MyMessage{2});
+
+  std::vector<MyMessage> received_a, received_b;
+  messages.read(reader_a, [&](const MyMessage &message) {
+    received_a.push_back(message);
+  });
+  messages.read(reader_b, [&](const MyMessage &message) {
+    received_b.push_back(message);
+  });
 
   ASSERT_EQ(received_a.size(), 2u);
-  EXPECT_EQ(received_a[0], (MyEvent{1}));
-  EXPECT_EQ(received_a[1], (MyEvent{2}));
+  EXPECT_EQ(received_a[0], (MyMessage{1}));
+  EXPECT_EQ(received_a[1], (MyMessage{2}));
 
   ASSERT_EQ(received_b.size(), 2u);
-  EXPECT_EQ(received_b[0], (MyEvent{1}));
-  EXPECT_EQ(received_b[1], (MyEvent{2}));
+  EXPECT_EQ(received_b[0], (MyMessage{1}));
+  EXPECT_EQ(received_b[1], (MyMessage{2}));
 
-  events.update(); // rotate
+  messages.update();
 
-  // --- Frame 2: read again (should get nothing new) ---
   size_t prev_a = received_a.size();
-  events.read(reader_a, [&](const MyEvent &e) { received_a.push_back(e); });
-  EXPECT_EQ(received_a.size(), prev_a); // no new events
+  messages.read(reader_a, [&](const MyMessage &message) {
+    received_a.push_back(message);
+  });
+  EXPECT_EQ(received_a.size(), prev_a);
 
-  events.update(); // rotate again
+  messages.update();
 
-  // --- Frame 3: events from frame 1 should now be gone ---
   size_t prev_b = received_b.size();
-  events.read(reader_b, [&](const MyEvent &e) { received_b.push_back(e); });
-  EXPECT_EQ(received_b.size(), prev_b); // still nothing new
+  messages.read(reader_b, [&](const MyMessage &message) {
+    received_b.push_back(message);
+  });
+  EXPECT_EQ(received_b.size(), prev_b);
 }
 
-TEST(EventTest, EventWriterReader) {
+TEST(EventTest, MessageWriterReader) {
   World world;
-  world.insert_resource(Events<MyEvent>{});
+  world.insert_resource(Messages<MyMessage>{});
 
-  // Create reader BEFORE writing — reader tracks from registration point
-  auto *events = world.get_resource<Events<MyEvent>>();
-  EventReader<MyEvent> reader(events);
+  auto *messages = world.get_resource<Messages<MyMessage>>();
+  MessageReader<MyMessage> reader(messages);
 
-  // Writer
   {
-    EventWriter<MyEvent> writer(events);
-    writer.send(MyEvent{10});
-    writer.send(MyEvent{20});
+    MessageWriter<MyMessage> writer(messages);
+    writer.send(MyMessage{10});
+    writer.send(MyMessage{20});
   }
 
-  // Reader should see events sent after registration
-  std::vector<MyEvent> received;
-  reader.for_each([&](const MyEvent &e) { received.push_back(e); });
+  std::vector<MyMessage> received;
+  reader.for_each([&](const MyMessage &message) { received.push_back(message); });
   ASSERT_EQ(received.size(), 2u);
-  EXPECT_EQ(received[0], (MyEvent{10}));
-  EXPECT_EQ(received[1], (MyEvent{20}));
+  EXPECT_EQ(received[0], (MyMessage{10}));
+  EXPECT_EQ(received[1], (MyMessage{20}));
+}
+
+TEST(EventTest, AppAddObserverTriggersReactiveEvent) {
+  App app;
+  app.insert_resource(Counter{});
+  app.add_event<PingEvent>().add_observer(
+      [](On<PingEvent> event, ResMut<Counter> counter) {
+        counter->value += event->value;
+      });
+
+  app.world().trigger(PingEvent{7});
+
+  auto *counter = app.world().get_resource<Counter>();
+  ASSERT_NE(counter, nullptr);
+  EXPECT_EQ(counter->value, 7);
+}
+
+TEST(EventTest, ReactiveObserverCanUseCmd) {
+  World world;
+  world.insert_resource(CommandQueues{});
+  world.add_event<PingEvent>();
+  world.add_observer([](On<PingEvent>, Cmd cmd) { cmd.spawn(Marker{}); });
+
+  world.trigger(PingEvent{1});
+
+  auto *queues = world.get_resource<CommandQueues>();
+  ASSERT_NE(queues, nullptr);
+  queues->apply(world);
+
+  auto *markers = world.get_storage<Marker>();
+  ASSERT_NE(markers, nullptr);
+  EXPECT_EQ(markers->size(), 1u);
+}
+
+TEST(EventTest, EntityEventTriggersGlobalAndEntityObservers) {
+  World world;
+  world.insert_resource(CommandQueues{});
+  world.insert_resource(Counter{});
+  world.add_event<HitEvent>();
+
+  Entity target = world.spawn();
+  world.insert_component(target, Health{100});
+
+  world.add_observer([](On<HitEvent> event, ResMut<Counter> counter) {
+    counter->value += event->amount;
+  });
+
+  {
+    auto *queues = world.get_resource<CommandQueues>();
+    ASSERT_NE(queues, nullptr);
+
+    Cmd cmd(queues, &world.entities);
+    cmd.entity(target).observe(
+        [](On<HitEvent> event, Query<Entity, Mut<Health>> query) {
+          query.each([&](Entity entity, Mut<Health> health) {
+            if (entity == event->target) {
+              health->value -= event->amount;
+            }
+          });
+        });
+    cmd.trigger(HitEvent{target, 5});
+  }
+
+  auto *queues = world.get_resource<CommandQueues>();
+  ASSERT_NE(queues, nullptr);
+  queues->apply(world);
+
+  auto *counter = world.get_resource<Counter>();
+  ASSERT_NE(counter, nullptr);
+  EXPECT_EQ(counter->value, 5);
+
+  auto *health = world.get_component<Health>(target);
+  ASSERT_NE(health, nullptr);
+  EXPECT_EQ(health->value, 95);
+
+  auto *observed_by = world.get_component<ObservedBy>(target);
+  ASSERT_NE(observed_by, nullptr);
+  EXPECT_EQ(observed_by->observers.size(), 1u);
+}
+
+TEST(EventTest, DespawningObservedEntityCleansUpObservers) {
+  World world;
+  world.add_event<HitEvent>();
+
+  Entity target = world.spawn();
+  Entity observer = world.add_observer(target, [](On<HitEvent>) {});
+
+  auto *observed_by = world.get_component<ObservedBy>(target);
+  ASSERT_NE(observed_by, nullptr);
+  ASSERT_EQ(observed_by->observers.size(), 1u);
+  EXPECT_EQ(observed_by->observers.front(), observer);
+
+  world.despawn(target);
+
+  EXPECT_FALSE(world.entities.is_alive(target));
+  EXPECT_FALSE(world.entities.is_alive(observer));
 }

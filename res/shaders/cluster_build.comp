@@ -1,0 +1,67 @@
+#version 430
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct GpuPointLight {
+  vec4 position_range;
+  vec4 color_intensity;
+};
+
+struct ClusterRecord {
+  vec4 min_bounds;
+  vec4 max_bounds;
+  uvec4 meta;
+};
+
+layout(std430, binding = 0) readonly buffer PointLightBuffer {
+  GpuPointLight u_point_lights[];
+};
+
+layout(std430, binding = 1) buffer ClusterBuffer {
+  ClusterRecord u_clusters[];
+};
+
+layout(std430, binding = 2) buffer ClusterIndexBuffer {
+  uint u_cluster_light_indices[];
+};
+
+layout(std430, binding = 3) buffer OverflowBuffer {
+  uint u_overflow_counter;
+};
+
+uniform uint u_point_light_count;
+uniform uint u_cluster_count;
+uniform uint u_max_lights_per_cluster;
+uniform mat4 u_view;
+
+bool sphereIntersectsAabb(vec3 center, float radius, vec3 aabbMin, vec3 aabbMax) {
+  vec3 closest = clamp(center, aabbMin, aabbMax);
+  vec3 delta = center - closest;
+  return dot(delta, delta) <= radius * radius;
+}
+
+void main() {
+  uint lightIndex = gl_GlobalInvocationID.x;
+  if (lightIndex >= u_point_light_count) {
+    return;
+  }
+
+  vec4 worldPosition = vec4(u_point_lights[lightIndex].position_range.xyz, 1.0);
+  vec3 viewPosition = (u_view * worldPosition).xyz;
+  float radius = u_point_lights[lightIndex].position_range.w;
+
+  for (uint clusterIndex = 0u; clusterIndex < u_cluster_count; ++clusterIndex) {
+    ClusterRecord cluster = u_clusters[clusterIndex];
+    if (!sphereIntersectsAabb(viewPosition, radius, cluster.min_bounds.xyz,
+                              cluster.max_bounds.xyz)) {
+      continue;
+    }
+
+    uint slot = atomicAdd(u_clusters[clusterIndex].meta.y, 1u);
+    if (slot < u_max_lights_per_cluster) {
+      u_cluster_light_indices[u_clusters[clusterIndex].meta.x + slot] = lightIndex;
+    } else {
+      atomicAdd(u_overflow_counter, 1u);
+    }
+  }
+}
