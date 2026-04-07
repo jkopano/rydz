@@ -7,8 +7,8 @@ layout(location = 3) in vec3 instance_position;
 layout(location = 4) in vec3 instance_scale;
 layout(location = 5) in vec4 instance_rotation;
 
-uniform mat4 u_view;
-uniform mat4 u_projection;
+uniform mat4 matView;
+uniform mat4 matProjection;
 
 out vec3 FragPos;
 out vec3 Normal;
@@ -40,5 +40,5 @@ void main() {
   FragPos = world_pos.xyz;
   Normal = mat3(transpose(inverse(model))) * normal;
   TexCoord = texcoord;
-  gl_Position = u_projection * u_view * world_pos;
+  gl_Position = matProjection * matView * world_pos;
 }

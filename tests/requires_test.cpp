@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 
 using namespace ecs;
@@ -52,4 +53,19 @@ TEST(RequiresTest, RecursiveRequirements) {
     EXPECT_TRUE(world.has_component<CompWithReq>(e));
     EXPECT_TRUE(world.has_component<CompA>(e));
     EXPECT_TRUE(world.has_component<CompB>(e));
+}
+
+TEST(RequiresTest, CameraAutomaticallyInsertsDefaultClearColor) {
+    World world;
+    Entity e = world.spawn();
+
+    world.insert_component(e, Camera3DComponent::perspective());
+
+    auto *clear_color = world.get_component<ClearColor>(e);
+    ASSERT_NE(clear_color, nullptr);
+    EXPECT_TRUE(world.has_component<RenderConfig>(e));
+    EXPECT_EQ(clear_color->color.r, 30);
+    EXPECT_EQ(clear_color->color.g, 30);
+    EXPECT_EQ(clear_color->color.b, 40);
+    EXPECT_EQ(clear_color->color.a, 255);
 }

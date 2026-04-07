@@ -1,5 +1,6 @@
 // 06 - Rendering
-// Pokazuje: mesh::cube/sphere/cylinder, Model3d, Material3d, Transform3D,
+// Pokazuje: mesh::cube/sphere/cylinder, Mesh3d,
+//           MeshMaterial3d<>, Transform3D,
 //           Skybox, Assets, AssetServer (GLTF), Textures
 #include "math.hpp"
 #include "rl.hpp"
@@ -14,7 +15,7 @@ struct RotateTag {};
 
 // NonSendMarker musi być gdy funkcja musi być odpalona na głównym wątku
 // (inną opcją jest dodanie do funkcji World world)
-void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   // kamera ze skyboxem — Skybox ładuje 6 tekstur z folderu (kinda słabe do
   // poprawy) (right/left/top/bottom/front/back.jpg) Skybox na razie musi być w
   // kamerze, chyba dobre rozwiązanie, ale do ugadania
@@ -23,35 +24,33 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
             Skybox::from("res/hdri/skybox"));
 
   // cube - czerwona
-  auto cube = rl::LoadModelFromMesh(mesh::cube(2, 2, 2));
-  auto cube_h = models->add(std::move(cube));
-  cmd.spawn(Model3d{cube_h}, Material3d{StandardMaterial::from_color(RED)},
+  auto cube_h = meshes->add(mesh::cube(2, 2, 2));
+  cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d<>{StandardMaterial::from_color(RED)},
             ecs::Transform::from_xyz(-4, 1, 0), RotateTag{});
 
   // kula - zielona
-  auto sphere = rl::LoadModelFromMesh(mesh::sphere(1.0f));
-  auto sphere_h = models->add(std::move(sphere));
-  cmd.spawn(Model3d{sphere_h}, Material3d{StandardMaterial::from_color(GREEN)},
-            ecs::Transform::from_xyz(0, 1, 0));
+  auto sphere_h = meshes->add(mesh::sphere(1.0f));
+  cmd.spawn(
+      Mesh3d{sphere_h}, MeshMaterial3d<>{StandardMaterial::from_color(GREEN)},
+      ecs::Transform::from_xyz(0, 1, 0));
 
   // cylinder - niebieski
-  auto cyl = rl::LoadModelFromMesh(mesh::cylinder(0.8f, 2.0f));
-  auto cyl_h = models->add(std::move(cyl));
-  cmd.spawn(Model3d{cyl_h}, Material3d{StandardMaterial::from_color(BLUE)},
+  auto cyl_h = meshes->add(mesh::cylinder(0.8f, 2.0f));
+  cmd.spawn(Mesh3d{cyl_h},
+            MeshMaterial3d<>{StandardMaterial::from_color(BLUE)},
             ecs::Transform::from_xyz(4, 1, 0));
 
   // floor
-  auto floor = rl::LoadModelFromMesh(mesh::plane(20, 20));
-  auto floor_h = models->add(std::move(floor));
-  cmd.spawn(Model3d{floor_h},
-            Material3d{StandardMaterial::from_color(DARKGRAY)},
+  auto floor_h = meshes->add(mesh::plane(20, 20));
+  cmd.spawn(Mesh3d{floor_h},
+            MeshMaterial3d<>{StandardMaterial::from_color(DARKGRAY)},
             ecs::Transform::from_xyz(0, 0, 0));
 
   // torus
-  auto torus = rl::LoadModelFromMesh(mesh::torus(1.0f, 0.3f));
-  auto torus_h = models->add(std::move(torus));
-  cmd.spawn(Model3d{torus_h}, Material3d{StandardMaterial::from_color(PURPLE)},
-            ecs::Transform::from_xyz(0, 3, -4), RotateTag{});
+  auto torus_h = meshes->add(mesh::torus(1.0f, 0.3f));
+  cmd.spawn(
+      Mesh3d{torus_h}, MeshMaterial3d<>{StandardMaterial::from_color(PURPLE)},
+      ecs::Transform::from_xyz(0, 3, -4), RotateTag{});
 
   // światło żeby coś było widać
   cmd.spawn(DirectionalLight{
@@ -63,17 +62,17 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
 
 // Asset Server - ładowanie modeli GLTF z plików
 void load_gltf_model(Cmd cmd, Res<AssetServer> asset_server) {
-  // load() zwraca Handle<Model> od razu — model ładuje się w tle
+  // load() zwraca Handle<Scene> od razu — scena ładuje się w tle
   // jak plik nie istnieje to nic się nie renderuje ale bez crasha
-  auto model_handle = asset_server->load<rl::Model>("res/models/old_house.glb");
+  auto model_handle = asset_server->load<Scene>("res/models/old_house.glb");
 
-  cmd.spawn(Model3d{model_handle},
+  cmd.spawn(SceneRoot{model_handle},
             ecs::Transform{.translation = Vec3(8, 0, 0),
                            .scale = Vec3::sReplicate(0.02f)});
 }
 
 // ładowanie tekstur i nakładanie na materiał
-void load_textured_cube(Cmd cmd, ResMut<Assets<rl::Model>> models,
+void load_textured_cube(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
                         ResMut<Assets<rl::Texture2D>> textures, NonSendMarker) {
   // ładowanko tekstury można też przez AssetServer
   auto tex_handle = textures->add(rl::LoadTexture("res/textures/stone.jpg"));
@@ -81,10 +80,9 @@ void load_textured_cube(Cmd cmd, ResMut<Assets<rl::Model>> models,
   // materiał z teksturą
   auto mat = StandardMaterial::from_texture(tex_handle);
 
-  auto cube = rl::LoadModelFromMesh(mesh::cube(2, 2, 2));
-  auto cube_h = models->add(std::move(cube));
+  auto cube_h = meshes->add(mesh::cube(2, 2, 2));
 
-  cmd.spawn(Model3d{cube_h}, Material3d{mat},
+  cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d<>{mat},
             ecs::Transform::from_xyz(-8, 1, 0), RotateTag{});
 }
 

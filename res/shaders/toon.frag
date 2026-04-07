@@ -4,6 +4,7 @@ in vec3 FragPos;
 in vec3 Normal;
 
 uniform vec4 colDiffuse;
+uniform float u_rim_strength;
 
 out vec4 finalColor;
 
@@ -25,7 +26,7 @@ void main() {
   vec3 viewDir = normalize(-FragPos);
   float rim = 1.0 - max(dot(norm, viewDir), 0.0);
   rim = smoothstep(0.55, 0.7, rim);
-  color += vec3(0.15) * rim;
+  color += vec3(u_rim_strength) * rim;
 
   finalColor = vec4(color, colDiffuse.a);
 }

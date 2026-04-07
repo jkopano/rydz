@@ -11,6 +11,7 @@
 // Sprawdzamy, czy nie jesteśmy na MSVC przed dołączeniem nagłówka
 #if !defined(_MSC_VER)
 #include <cxxabi.h>
+#include <dlfcn.h>
 #endif
 
 namespace ecs {
@@ -42,7 +43,16 @@ template <typename Fn> std::string system_name_of(Fn &&fn) {
   using D = decay_t<Fn>;
   if constexpr (std::is_pointer_v<D> &&
                 std::is_function_v<std::remove_pointer_t<D>>) {
+#if defined(_MSC_VER)
     return std::to_string(reinterpret_cast<std::uintptr_t>(fn));
+#else
+    Dl_info info{};
+    if (dladdr(reinterpret_cast<const void *>(fn), &info) != 0 &&
+        info.dli_sname) {
+      return demangle(info.dli_sname);
+    }
+    return std::to_string(reinterpret_cast<std::uintptr_t>(fn));
+#endif
   } else {
     return demangle(typeid(D).name());
   }

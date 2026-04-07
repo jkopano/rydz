@@ -18,6 +18,8 @@ using ::Mesh;
 using ::Model;
 using ::Quaternion;
 using ::Rectangle;
+using ::RenderTexture;
+using ::RenderTexture2D;
 using ::Shader;
 using ::Sound;
 using ::Texture2D;
@@ -27,16 +29,23 @@ using ::Vector4;
 
 // ---- Core: Window / Drawing ----
 using ::BeginDrawing;
+using ::BeginShaderMode;
+using ::BeginTextureMode;
 using ::ClearBackground;
 using ::CloseWindow;
 using ::DrawFPS;
 using ::EndDrawing;
+using ::EndShaderMode;
+using ::EndTextureMode;
 using ::GetFrameTime;
 using ::InitWindow;
 using ::IsWindowReady;
+using ::LoadFileText;
 using ::SetTargetFPS;
+using ::SetShaderValueTexture;
 using ::SetTraceLogLevel;
 using ::TraceLog;
+using ::UnloadFileText;
 using ::WindowShouldClose;
 
 // ---- Input ----
@@ -75,11 +84,17 @@ using ::UploadMesh;
 
 // ---- Textures / Images ----
 using ::GenImageColor;
+using ::ImageText;
+using ::ImageTextEx;
 using ::ImageFormat;
 using ::LoadImage;
 using ::LoadTexture;
 using ::LoadTextureFromImage;
+using ::LoadRenderTexture;
+using ::SetTextureFilter;
+using ::SetTextureWrap;
 using ::UnloadImage;
+using ::UnloadRenderTexture;
 using ::UnloadTexture;
 
 // ---- Audio ----
@@ -92,13 +107,19 @@ using ::LoadGltfScene;
 using ::GetShaderLocation;
 using ::GetShaderLocationAttrib;
 using ::LoadShader;
+using ::LoadShaderFromMemory;
 using ::SetShaderValue;
 using ::SetShaderValueMatrix;
 using ::SetShaderValueV;
 
 // ---- rlgl functions ----
 using ::rlActiveTextureSlot;
+using ::rlBindShaderBuffer;
+using ::rlColorMask;
+using ::rlCompileShader;
+using ::rlComputeShaderDispatch;
 using ::rlDisableBackfaceCulling;
+using ::rlDisableColorBlend;
 using ::rlDisableDepthMask;
 using ::rlDisableDepthTest;
 using ::rlDisableShader;
@@ -107,6 +128,7 @@ using ::rlDisableVertexArray;
 using ::rlDisableWireMode;
 using ::rlDrawVertexArray;
 using ::rlEnableBackfaceCulling;
+using ::rlEnableColorBlend;
 using ::rlEnableDepthMask;
 using ::rlEnableDepthTest;
 using ::rlEnableShader;
@@ -117,16 +139,26 @@ using ::rlEnableWireMode;
 using ::rlGetShaderIdDefault;
 using ::rlGetShaderLocsDefault;
 using ::rlGetTextureIdDefault;
+using ::rlLoadComputeShaderProgram;
+using ::rlLoadShaderBuffer;
 using ::rlLoadTextureCubemap;
-using ::rlSetUniformMatrices;
 using ::rlLoadVertexArray;
 using ::rlLoadVertexBuffer;
+using ::rlReadShaderBuffer;
 using ::rlSetBlendMode;
 using ::rlSetCullFace;
+using ::rlSetShader;
+using ::rlSetUniform;
+using ::rlSetUniformMatrix;
+using ::rlSetUniformMatrices;
+using ::rlSetUniformSampler;
 using ::rlSetVertexAttribute;
+using ::rlUnloadShaderBuffer;
+using ::rlUnloadShaderProgram;
 using ::rlUnloadTexture;
 using ::rlUnloadVertexArray;
 using ::rlUnloadVertexBuffer;
+using ::rlUpdateShaderBuffer;
 
 // ---- rlgl: Matrix / Batch ----
 using ::rlDrawRenderBatchActive;

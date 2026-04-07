@@ -209,3 +209,37 @@ TEST(QueryTest, OptionalComponent) {
   EXPECT_EQ(results[2].first, 5);
   EXPECT_TRUE(results[2].second); // e3 has Velocity
 }
+
+TEST(QueryTest, ReusesPreparedStateAcrossCalls) {
+  World world;
+  auto e1 = world.spawn();
+  auto e2 = world.spawn();
+
+  world.insert_component(e1, Position{1, 2});
+  world.insert_component(e1, Velocity{10, 20});
+  world.insert_component(e2, Position{3, 4});
+
+  Query<Position, Opt<Velocity>> query(world, Tick{0}, world.read_change_tick());
+
+  std::vector<std::pair<int, bool>> first_pass;
+  query.each([&](const Position *pos, const Velocity *vel) {
+    first_pass.push_back({pos->x, vel != nullptr});
+  });
+
+  std::vector<std::pair<int, bool>> iter_pass;
+  for (auto [pos, vel] : query.iter()) {
+    iter_pass.push_back({pos->x, vel != nullptr});
+  }
+
+  std::vector<std::pair<int, bool>> second_pass;
+  query.each([&](const Position *pos, const Velocity *vel) {
+    second_pass.push_back({pos->x, vel != nullptr});
+  });
+
+  std::sort(first_pass.begin(), first_pass.end());
+  std::sort(iter_pass.begin(), iter_pass.end());
+  std::sort(second_pass.begin(), second_pass.end());
+
+  EXPECT_EQ(first_pass, iter_pass);
+  EXPECT_EQ(first_pass, second_pass);
+}

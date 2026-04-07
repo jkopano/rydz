@@ -12,6 +12,7 @@
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
+#include "rydz_ui/ui_plugin.hpp"
 #include <algorithm>
 #include <print>
 
@@ -89,7 +90,7 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
 }
 
 inline void setup_lighting(Cmd cmd, NonSendMarker,
-                           ResMut<Assets<rl::Model>> models) {
+                           ResMut<Assets<rl::Mesh>> meshes) {
   cmd.spawn(AmbientLight{
       .color = {60, 60, 70, 255},
       .intensity = 0.35f,
@@ -105,42 +106,70 @@ inline void setup_lighting(Cmd cmd, NonSendMarker,
       PointLight{.color = {0, 255, 0, 255}, .intensity = 90.f, .range = 600.0f},
       Transform::from_xyz(0.0f, 3.0f, 0.0f)
 
-      // Model3d{models->add(rl::LoadModelFromMesh(mesh::cube(0.5f, 0.5f,
+      // Mesh3d{meshes->add(mesh::cube(0.5f, 0.5f,
       // 0.5f)))}
   );
 }
 
-inline void spawn_ground(Cmd cmd, ResMut<Assets<rl::Model>> models,
+inline void spawn_ground(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
                          ResMut<Assets<rl::Texture2D>> textures,
                          NonSendMarker) {
-  rl::Mesh plane_mesh = mesh::plane(20.0f, 20.0f, 1, 1);
-  rl::Model plane_model = rl::LoadModelFromMesh(plane_mesh);
-  auto plane_h = models->add(std::move(plane_model));
+  auto plane_h = meshes->add(mesh::plane(20.0f, 20.0f, 1, 1));
 
-  cmd.spawn(Model3d{plane_h},
-            // Material3d{StandardMaterial::from_color({80, 160, 80, 255})},
-            Material3d{StandardMaterial::from_texture(
+  cmd.spawn(Mesh3d{plane_h},
+            // MeshMaterial3d<>{
+            //     StandardMaterial::from_color({80, 160, 80, 255})},
+            MeshMaterial3d<>{StandardMaterial::from_texture(
                 textures->add(rl::LoadTexture("res/textures/brick.png")))},
             Transform{});
 }
 
-inline void spawn_player(Cmd cmd, ResMut<Assets<rl::Model>> models,
+inline void spawn_player(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
                          ResMut<Assets<rl::Texture2D>> textures,
                          NonSendMarker) {
-  rl::Mesh cube_mesh = mesh::cube(1.0f, 1.0f, 1.0f);
-  rl::Model cube_model = rl::LoadModelFromMesh(cube_mesh);
-  auto cube_h = models->add(std::move(cube_model));
+  auto cube_h = meshes->add(mesh::cube(1.0f, 1.0f, 1.0f));
 
-  cmd.spawn(Model3d{cube_h},
-            Material3d{StandardMaterial::from_texture(
+  cmd.spawn(Mesh3d{cube_h},
+            MeshMaterial3d<>{StandardMaterial::from_texture(
                 textures->add(rl::LoadTexture("res/textures/stone.jpg")))},
             Transform::from_xyz(0.0f, 0.5f, 0.0f), Player{});
+}
+
+// UI
+void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
+  if (!root.ptr) {
+    return;
+  }
+
+  cmd.entity(root->root)
+      .insert(rydz::ui::Style{
+          .direction = rydz::ui::Direction::Row,
+          .align = rydz::ui::Align::Start,
+          .justify = rydz::ui::Justify::End,
+          .padding = rydz::ui::UiRect{10, 10, 10, 10},
+      });
+
+  Entity panel = cmd.spawn(rydz::ui::UiNode{},
+                           rydz::ui::Panel{rl::Color{200, 60, 60, 255}},
+                           rydz::ui::Style{
+                               .direction = rydz::ui::Direction::Column,
+                               .padding = rydz::ui::UiRect{10, 10, 10, 10},
+                               .size = {rydz::ui::SizeValue::px(300.0f),
+                                        rydz::ui::SizeValue::px(120.0f)},
+                           },
+                           Parent{root->root})
+                     .id();
+
+  cmd.spawn(rydz::ui::UiNode{},
+            rydz::ui::Label{.text = "Hello UI", .font_size = 18.0f},
+            rydz::ui::Style{}, Parent{panel});
 }
 
 // ── Plugin ───────────────────────────────────────────────────────────────────
 
 inline void scene_plugin(App &app) {
   app.add_plugin(Input::install);
+  app.add_plugin(UiPlugin::install);
   app.add_plugin(system_multithreading({true}));
   app.add_plugin(engine::scripting_plugin);
   app.add_plugin(engine::console_plugin);
@@ -150,6 +179,8 @@ inline void scene_plugin(App &app) {
   //app.add_systems(ScheduleLabel::Startup, spawn_ground);
   app.add_systems(ScheduleLabel::Startup, spawn_player);
   app.add_systems(ScheduleLabel::Startup, load_level);
+
+  app.add_systems(ScheduleLabel::Startup, setup_ui);
 
   app.add_systems(ScheduleLabel::Update, player_movement_system);
   app.add_systems(ScheduleLabel::Update, update_isometric_camera_target_system);
