@@ -173,6 +173,7 @@ inline void scene_plugin(App &app) {
   app.add_plugin(system_multithreading({true}));
   app.add_plugin(engine::scripting_plugin);
   app.add_plugin(engine::console_plugin);
+  app.add_plugin(camera_plugin);;
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
   app.add_systems(ScheduleLabel::Startup, setup_lighting);
@@ -184,7 +185,7 @@ inline void scene_plugin(App &app) {
 
   app.add_systems(ScheduleLabel::Update, player_movement_system);
   app.add_systems(ScheduleLabel::Update, update_isometric_camera_target_system);
-  app.add_systems(ScheduleLabel::Update, isometric_camera_system);
+  //app.add_systems(ScheduleLabel::Update, isometric_camera_system);
 
   app.add_systems(ecs::RenderPassSet::Cleanup,ecs::group(engine::ConsoleRenderSystem).before(ecs::RenderPassSystems::Frame::end_frame)
   );
