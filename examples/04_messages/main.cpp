@@ -4,6 +4,7 @@
 #include "rl.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include "rydz_platform/rydz_platform.hpp"
 #include <print>
 
 using namespace ecs;
@@ -62,6 +63,7 @@ void score_acc(MessageReader<ScoreMessage> reader, Local<i32> acc) {
 int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "04 - Messages", 60}))
+      .add_plugin(rydz_platform::RayPlugin::install({}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)

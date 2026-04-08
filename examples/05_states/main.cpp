@@ -2,9 +2,11 @@
 // Pokazuje: init_state, in_state, NextState, OnEnter, OnExit, OnTransition
 
 #include "math.hpp"
+#include "rl.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
+#include "rydz_platform/rydz_platform.hpp"
 #include <print>
 
 using namespace ecs;
@@ -52,6 +54,7 @@ void menu_logic() {}
 int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "05 - States (Enter/P/M)", 60}))
+      .add_plugin(rydz_platform::RayPlugin::install({}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)

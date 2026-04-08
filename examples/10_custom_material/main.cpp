@@ -5,6 +5,7 @@
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
+#include "rydz_platform/rydz_platform.hpp"
 
 using namespace ecs;
 using namespace math;
@@ -47,6 +48,7 @@ void setup(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes, NonSendMarker) {
 int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "10 - Custom Material", 60}))
+      .add_plugin(rydz_platform::RayPlugin::install({}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_plugin(RenderPlugin::register_material<ToonMaterial>)

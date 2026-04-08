@@ -7,6 +7,7 @@
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
+#include "rydz_platform/rydz_platform.hpp"
 
 using namespace ecs;
 using namespace math;
@@ -100,6 +101,7 @@ void rotate_system(Query<Mut<Transform>, With<RotateTag>> query,
 int main() {
   App app;
   app.add_plugin(window_plugin({1024, 768, "06 - Rendering", 60}))
+      .add_plugin(rydz_platform::RayPlugin::install({}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_systems(ScheduleLabel::Startup, setup)

@@ -4,6 +4,7 @@
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
+#include "rydz_platform/rydz_platform.hpp"
 #include <print>
 #include <vector>
 
@@ -86,6 +87,7 @@ int main() {
   App app;
   app.add_plugin(
          window_plugin({1024, 768, "09 - Spawn/Despawn (SPACE/F/X)", 60}))
+      .add_plugin(rydz_platform::RayPlugin::install({}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)

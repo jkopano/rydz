@@ -1,6 +1,5 @@
 #pragma once
 #include "math.hpp"
-#include "rl.hpp"
 #include "rydz_ecs/requires.hpp"
 #include "rydz_graphics/clear_color.hpp"
 #include "rydz_graphics/render_config.hpp"

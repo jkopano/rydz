@@ -6,6 +6,7 @@
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
+#include "rydz_platform/rydz_platform.hpp"
 #include <print>
 
 using namespace ecs;
@@ -66,6 +67,7 @@ void print_mouse(Res<Input> input) {
 int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "03 - Input", 60}))
+      .add_plugin(rydz_platform::RayPlugin::install({}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)

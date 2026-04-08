@@ -4,7 +4,7 @@
 #include "params.hpp"
 #include "query_traits.hpp"
 #include "query_types.hpp"
-#include "rl.hpp"
+#include <cstdio>
 #include <optional>
 #include <tuple>
 #include <utility>
@@ -174,14 +174,14 @@ private:
       if (!fetched)
         continue;
       if (result) {
-        rl::TraceLog(LOG_INFO, "Query::single() found more than one match");
+        std::fputs("Query::single() found more than one match\n", stderr);
         return Result{std::nullopt};
       }
       result = flatten_result(*fetched);
     }
 
     if (!result)
-      rl::TraceLog(LOG_DEBUG, "Query::single() found no matches");
+      std::fputs("Query::single() found no matches\n", stderr);
 
     return result;
   }

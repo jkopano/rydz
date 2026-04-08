@@ -10,6 +10,7 @@
 #include "rydz_ecs/storage.hpp"
 #include "rydz_ecs/system.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include "rydz_platform/rydz_platform.hpp"
 #include <print>
 
 using namespace ecs;
@@ -134,6 +135,7 @@ void bind_lua_commands(World &world) {
 int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "02 - ECS BAZA", 60}))
+      .add_plugin(rydz_platform::RayPlugin::install({}))
       // możemy to zrobić tutaj albo w systemach
       .insert_resource(EnemyCount{0})
       .add_plugin(time_plugin)

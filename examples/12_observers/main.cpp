@@ -4,6 +4,7 @@
 #include "rl.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include "rydz_platform/rydz_platform.hpp"
 #include <print>
 
 using namespace ecs;
@@ -56,6 +57,7 @@ void trigger_events(Cmd cmd, Res<Input> input,
 int main() {
   App app;
   app.add_plugin(window_plugin({800, 600, "12 - Observers", 60}))
+      .add_plugin(rydz_platform::RayPlugin::install({}))
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)
       .add_event<LogEvent>()

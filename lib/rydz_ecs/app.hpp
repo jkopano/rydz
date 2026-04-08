@@ -4,12 +4,12 @@
 #include "event.hpp"
 #include "message.hpp"
 #include "plugin.hpp"
-#include "rl.hpp"
 #include "schedule.hpp"
 #include "state.hpp"
 #include "tracy_plugin.hpp"
 #include "world.hpp"
 #include <cstdio>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -17,6 +17,8 @@
 #include <vector>
 
 namespace ecs {
+
+class App;
 
 struct Window {
   using T = ecs::Resource;
@@ -27,12 +29,12 @@ struct Window {
   u32 target_fps = 60;
 
 public:
-  static void update(ecs::ResMut<Window> window, ecs::NonSendMarker) {
-    window->height = rl::GetScreenHeight();
-    window->width = rl::GetScreenWidth();
-  }
-
   static auto install(Window config);
+};
+
+struct AppRunner {
+  using T = Resource;
+  std::function<void(App &)> run;
 };
 
 class App {
@@ -239,12 +241,12 @@ public:
     apply_commands();
   }
 
-  void update() {
+  void update(float delta_seconds = 0.0f) {
     flush_pending_set_systems();
     debug_dump_schedule_graph_once();
     auto *time = world_.get_resource<Time>();
     if (time) {
-      time->delta_seconds = rl::GetFrameTime();
+      time->delta_seconds = delta_seconds;
       time->elapsed_seconds += time->delta_seconds;
       time->frame_count++;
     }
@@ -270,29 +272,12 @@ public:
   }
 
   void run() {
-    auto *config = world_.get_resource<Window>();
-    if (config) {
-      rl::InitWindow(config->width, config->height, config->title.c_str());
-      rl::SetTargetFPS(config->target_fps);
-    } else {
-      rl::InitWindow(800, 600, "ECS App");
-      rl::SetTargetFPS(60);
-    }
-    if (!rl::IsWindowReady()) {
-      rl::TraceLog(LOG_ERROR, "InitWindow failed; aborting run loop.");
+    auto *runner = world_.get_resource<AppRunner>();
+    if (!runner || !runner->run) {
+      std::fputs("App::run() called without an AppRunner resource.\n", stderr);
       return;
     }
-
-    startup();
-
-    while (!rl::WindowShouldClose()) {
-      update();
-      FrameMark;
-    }
-
-    world_.resources.clear();
-
-    rl::CloseWindow();
+    runner->run(*this);
   }
 
 private:
@@ -375,7 +360,6 @@ inline void time_plugin(App &app) { app.init_resource<Time>(); }
 
 inline auto Window::install(Window config) {
   return [config = std::move(config)](ecs::App &app) {
-    app.add_systems(ScheduleLabel::Update, Window::update);
     app.insert_resource(config);
   };
 }
