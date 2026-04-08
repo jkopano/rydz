@@ -2,6 +2,7 @@
 #pragma once
 #include "rl.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/core/input.hpp"
 #include "scripting.hpp"
 #include <sstream>
 #include <string>
@@ -47,6 +48,7 @@ struct ConsoleState {
 };
 
 inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
+                                ecs::ResMut<ecs::Input> engine_input,
                                 ecs::ResMut<LuaResource> lua) {
   std::vector<i32> pressed_chars;
   for (i32 key = GetCharPressed(); key > 0; key = GetCharPressed()) {
@@ -67,6 +69,9 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
       console->current_input.clear();
     }
   }
+
+  engine_input->blocked_by_ui = console->is_open;
+
   if (!console->is_open)
     return;
 
