@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "rydz_ecs/app.hpp"
 #include "rydz_ecs/condition.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/system.hpp"
@@ -47,14 +48,13 @@ TEST(SystemSetTest, SetBeforeEnforcesOrder) {
   world.insert_resource(Log{});
 
   Schedule schedule;
-  schedule.add_system_fn(
-      std::move(group(sys_collision).in_set(set(PhysicsSet::Collision))));
-  schedule.add_system_fn(
-      std::move(group(sys_movement).in_set(set(PhysicsSet::Movement))));
+  schedule.add_system_fn(PhysicsSet::Collision, group(sys_collision));
+  schedule.add_system_fn(PhysicsSet::Movement, group(sys_movement));
 
   // Movement before Collision
   schedule.add_set_config(
       configure(PhysicsSet::Movement).before(set(PhysicsSet::Collision)).take());
+  schedule.add_set_config(configure(PhysicsSet::Collision).take());
 
   schedule.run(world);
 
@@ -69,14 +69,13 @@ TEST(SystemSetTest, SetAfterEnforcesOrder) {
   world.insert_resource(Log{});
 
   Schedule schedule;
-  schedule.add_system_fn(
-      std::move(group(sys_render).in_set(set(GameSet::Render))));
-  schedule.add_system_fn(
-      std::move(group(sys_logic).in_set(set(GameSet::Logic))));
+  schedule.add_system_fn(GameSet::Render, group(sys_render));
+  schedule.add_system_fn(GameSet::Logic, group(sys_logic));
 
   // Render after Logic
   schedule.add_set_config(
       configure(GameSet::Render).after(set(GameSet::Logic)).take());
+  schedule.add_set_config(configure(GameSet::Logic).take());
 
   schedule.run(world);
 
@@ -96,18 +95,16 @@ TEST(SystemSetTest, AllSystemsInSetRunBeforeOtherSet) {
 
   Schedule schedule;
   // Two systems in Input set
-  schedule.add_system_fn(
-      std::move(group(sys_input).in_set(set(GameSet::Input))));
-  schedule.add_system_fn(
-      std::move(group(sys_movement).in_set(set(GameSet::Input))));
+  schedule.add_system_fn(GameSet::Input, group(sys_input));
+  schedule.add_system_fn(GameSet::Input, group(sys_movement));
 
   // One system in Logic set
-  schedule.add_system_fn(
-      std::move(group(sys_logic).in_set(set(GameSet::Logic))));
+  schedule.add_system_fn(GameSet::Logic, group(sys_logic));
 
   // Input before Logic
   schedule.add_set_config(
       configure(GameSet::Input).before(set(GameSet::Logic)).take());
+  schedule.add_set_config(configure(GameSet::Logic).take());
 
   schedule.run(world);
 
@@ -127,14 +124,13 @@ TEST(SystemSetTest, StructBasedSet) {
   world.insert_resource(Log{});
 
   Schedule schedule;
-  schedule.add_system_fn(
-      std::move(group(sys_audio).in_set(set<AudioSet>())));
-  schedule.add_system_fn(
-      std::move(group(sys_render).in_set(set(GameSet::Render))));
+  schedule.add_system_fn(AudioSet{}, group(sys_audio));
+  schedule.add_system_fn(GameSet::Render, group(sys_render));
 
   // AudioSet after Render
   schedule.add_set_config(
       configure<AudioSet>().after(set(GameSet::Render)).take());
+  schedule.add_set_config(configure(GameSet::Render).take());
 
   schedule.run(world);
 
@@ -154,10 +150,8 @@ TEST(SystemSetTest, SetRunIfConditionTrue) {
   world.insert_resource(Log{});
 
   Schedule schedule;
-  schedule.add_system_fn(
-      std::move(group(sys_movement).in_set(set(PhysicsSet::Movement))));
-  schedule.add_system_fn(
-      std::move(group(sys_collision).in_set(set(PhysicsSet::Movement))));
+  schedule.add_system_fn(PhysicsSet::Movement, group(sys_movement));
+  schedule.add_system_fn(PhysicsSet::Movement, group(sys_collision));
 
   schedule.add_set_config(
       configure(PhysicsSet::Movement)
@@ -176,10 +170,8 @@ TEST(SystemSetTest, SetRunIfConditionFalse) {
   world.insert_resource(Log{});
 
   Schedule schedule;
-  schedule.add_system_fn(
-      std::move(group(sys_movement).in_set(set(PhysicsSet::Movement))));
-  schedule.add_system_fn(
-      std::move(group(sys_collision).in_set(set(PhysicsSet::Movement))));
+  schedule.add_system_fn(PhysicsSet::Movement, group(sys_movement));
+  schedule.add_system_fn(PhysicsSet::Movement, group(sys_collision));
 
   schedule.add_set_config(
       configure(PhysicsSet::Movement)
@@ -201,18 +193,16 @@ TEST(SystemSetTest, ChainedSetOrdering) {
   world.insert_resource(Log{});
 
   Schedule schedule;
-  schedule.add_system_fn(
-      std::move(group(sys_render).in_set(set(GameSet::Render))));
-  schedule.add_system_fn(
-      std::move(group(sys_logic).in_set(set(GameSet::Logic))));
-  schedule.add_system_fn(
-      std::move(group(sys_input).in_set(set(GameSet::Input))));
+  schedule.add_system_fn(GameSet::Render, group(sys_render));
+  schedule.add_system_fn(GameSet::Logic, group(sys_logic));
+  schedule.add_system_fn(GameSet::Input, group(sys_input));
 
   // Input -> Logic -> Render
   schedule.add_set_config(
       configure(GameSet::Input).before(set(GameSet::Logic)).take());
   schedule.add_set_config(
       configure(GameSet::Logic).before(set(GameSet::Render)).take());
+  schedule.add_set_config(configure(GameSet::Render).take());
 
   schedule.run(world);
 
@@ -233,15 +223,15 @@ TEST(SystemSetTest, SystemInMultipleSets) {
 
   Schedule schedule;
   // sys_logic is in both GameSet::Logic and PhysicsSet::Movement
-  schedule.add_system_fn(std::move(group(sys_logic)
-                                       .in_set(set(GameSet::Logic))
-                                       .in_set(set(PhysicsSet::Movement))));
-  schedule.add_system_fn(
-      std::move(group(sys_input).in_set(set(GameSet::Input))));
+  schedule.add_system_fn(sets(set(GameSet::Logic), set(PhysicsSet::Movement)),
+                         group(sys_logic));
+  schedule.add_system_fn(GameSet::Input, group(sys_input));
 
   // Input before Logic
   schedule.add_set_config(
       configure(GameSet::Input).before(set(GameSet::Logic)).take());
+  schedule.add_set_config(configure(GameSet::Logic).take());
+  schedule.add_set_config(configure(PhysicsSet::Movement).take());
 
   schedule.run(world);
 
@@ -261,8 +251,7 @@ TEST(SystemSetTest, SystemsWithoutSetsUnaffected) {
   world.insert_resource(Counter{0});
 
   Schedule schedule;
-  schedule.add_system_fn(
-      std::move(group(sys_movement).in_set(set(PhysicsSet::Movement))));
+  schedule.add_system_fn(PhysicsSet::Movement, group(sys_movement));
   // sys without any set
   schedule.add_system_fn([](ResMut<Counter> c) { c->value = 42; });
 
@@ -277,4 +266,80 @@ TEST(SystemSetTest, SystemsWithoutSetsUnaffected) {
   EXPECT_EQ(world.get_resource<Counter>()->value, 42);
   auto &entries = world.get_resource<Log>()->entries;
   EXPECT_EQ(entries.size(), 0u);
+}
+
+TEST(SystemSetTest, MissingSetConfigurationThrowsOnRun) {
+  World world;
+  world.insert_resource(Log{});
+
+  Schedule schedule;
+  schedule.add_system_fn(GameSet::Input, group(sys_input));
+
+  EXPECT_THROW(schedule.run(world), std::runtime_error);
+}
+
+TEST(SystemSetTest, AppRoutesSetSystemsToConfiguredSchedule) {
+  App app;
+  app.insert_resource(Log{});
+
+  app.configure_set(ScheduleLabel::Startup, configure(GameSet::Input))
+      .add_systems(GameSet::Input, group(sys_input));
+
+  app.startup();
+
+  auto &entries = app.world().get_resource<Log>()->entries;
+  ASSERT_EQ(entries.size(), 1u);
+  EXPECT_EQ(entries[0], "input");
+}
+
+TEST(SystemSetTest, AppAllowsConfigureAfterAddUntilRun) {
+  App app;
+  app.insert_resource(Log{});
+
+  app.add_systems(GameSet::Input, group(sys_input));
+  app.configure_set(ScheduleLabel::Startup, configure(GameSet::Input));
+
+  app.startup();
+
+  auto &entries = app.world().get_resource<Log>()->entries;
+  ASSERT_EQ(entries.size(), 1u);
+  EXPECT_EQ(entries[0], "input");
+}
+
+TEST(SystemSetTest, AppMissingSetConfigurationThrowsOnRun) {
+  App app;
+  app.insert_resource(Log{});
+
+  app.add_systems(GameSet::Input, group(sys_input));
+
+  EXPECT_THROW(app.startup(), std::runtime_error);
+}
+
+TEST(SystemSetTest, AppRejectsConflictingSetSchedules) {
+  App app;
+
+  app.configure_set(ScheduleLabel::Startup, configure(GameSet::Input));
+  EXPECT_THROW(
+      app.configure_set(ScheduleLabel::Update, configure(GameSet::Input)),
+      std::runtime_error);
+}
+
+TEST(SystemSetTest, ConfigureChainOrdersSetsSequentially) {
+  App app;
+  app.insert_resource(Log{});
+
+  app.configure_set(
+         ScheduleLabel::Startup,
+         configure(GameSet::Input, GameSet::Logic, GameSet::Render).chain())
+      .add_systems(GameSet::Render, group(sys_render))
+      .add_systems(GameSet::Logic, group(sys_logic))
+      .add_systems(GameSet::Input, group(sys_input));
+
+  app.startup();
+
+  auto &entries = app.world().get_resource<Log>()->entries;
+  ASSERT_EQ(entries.size(), 3u);
+  EXPECT_EQ(entries[0], "input");
+  EXPECT_EQ(entries[1], "logic");
+  EXPECT_EQ(entries[2], "render");
 }

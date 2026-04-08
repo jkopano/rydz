@@ -9,6 +9,10 @@
 
 namespace engine {
 
+inline bool is_console_toggle_char(i32 codepoint) {
+  return codepoint == '`' || codepoint == '~';
+}
+
 struct ConsoleState {
   using T = ecs::Resource;
   bool is_open = false;
@@ -44,7 +48,20 @@ struct ConsoleState {
 
 inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
                                 ecs::ResMut<LuaResource> lua) {
-  if (IsKeyPressed(KEY_GRAVE)) {
+  std::vector<i32> pressed_chars;
+  for (i32 key = GetCharPressed(); key > 0; key = GetCharPressed()) {
+    pressed_chars.push_back(key);
+  }
+
+  bool toggle_requested = IsKeyPressed(KEY_GRAVE) || IsKeyPressed(KEY_F1);
+  for (i32 codepoint : pressed_chars) {
+    if (is_console_toggle_char(codepoint)) {
+      toggle_requested = true;
+      break;
+    }
+  }
+
+  if (toggle_requested) {
     console->is_open = !console->is_open;
     if (console->is_open) {
       console->current_input.clear();
@@ -70,11 +87,9 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
   if (console->scroll_offset > max_scroll)
     console->scroll_offset = max_scroll;
 
-  i32 key = GetCharPressed();
-  while (key > 0) {
-    if (key >= 32 && key <= 125 && key != '`' && key != '~')
-      console->current_input += (char)key;
-    key = GetCharPressed();
+  for (i32 key : pressed_chars) {
+    if (key >= 32 && key <= 125 && !is_console_toggle_char(key))
+      console->current_input += static_cast<char>(key);
   }
 
   if (rl::IsKeyPressed(KEY_BACKSPACE) && !console->current_input.empty()) {
@@ -155,6 +170,6 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
 inline void console_plugin(ecs::App &app) {
   app.init_resource<ConsoleState>();
   app.add_systems(ecs::ScheduleLabel::Update, ConsoleUpdateSystem);
-  app.add_systems(ecs::ScheduleLabel::Render, ConsoleRenderSystem);
+  //app.add_systems(ecs::ScheduleLabel::Render, ConsoleRenderSystem);
 }
 } // namespace engine

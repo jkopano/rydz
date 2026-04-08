@@ -12,15 +12,16 @@ using namespace math;
 struct PivotTag {};
 struct ArmTag {};
 
-void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   // kamera
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             Transform::from_xyz(0, 8, 15).look_at(Vec3::sZero()));
 
   // podłoga
-  auto floor_h = models->add(rl::LoadModelFromMesh(mesh::plane(20, 20)));
-  cmd.spawn(Model3d{floor_h},
-            Material3d{StandardMaterial::from_color(DARKGRAY)}, Transform{});
+  auto floor_h = meshes->add(mesh::plane(20, 20));
+  cmd.spawn(Mesh3d{floor_h},
+            MeshMaterial3d<>{StandardMaterial::from_color(DARKGRAY)},
+            Transform{});
 
   // światło
   cmd.spawn(DirectionalLight{
@@ -30,21 +31,24 @@ void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
   });
 
   // parent
-  auto cube_h = models->add(rl::LoadModelFromMesh(mesh::cube(1, 1, 1)));
-  auto pivot = cmd.spawn(Model3d{cube_h},
-                         Material3d{StandardMaterial::from_color(YELLOW)},
-                         Transform::from_xyz(0, 2, 0), PivotTag{});
+  auto cube_h = meshes->add(mesh::cube(1, 1, 1));
+  auto pivot =
+      cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d<>{StandardMaterial::from_color(
+                                   YELLOW)},
+                Transform::from_xyz(0, 2, 0), PivotTag{});
 
   // child
-  auto arm_h = models->add(rl::LoadModelFromMesh(mesh::cube(3, 0.4f, 0.4f)));
+  auto arm_h = meshes->add(mesh::cube(3, 0.4f, 0.4f));
   auto arm =
-      cmd.spawn(Model3d{arm_h}, Material3d{StandardMaterial::from_color(RED)},
+      cmd.spawn(Mesh3d{arm_h}, MeshMaterial3d<>{StandardMaterial::from_color(
+                                  RED)},
                 Transform::from_xyz(2.0f, 0, 0), // offset od pivota
                 Parent{pivot.id()}, ArmTag{});
 
   // child of child
-  auto tip_h = models->add(rl::LoadModelFromMesh(mesh::sphere(0.4f)));
-  cmd.spawn(Model3d{tip_h}, Material3d{StandardMaterial::from_color(BLUE)},
+  auto tip_h = meshes->add(mesh::sphere(0.4f));
+  cmd.spawn(Mesh3d{tip_h},
+            MeshMaterial3d<>{StandardMaterial::from_color(BLUE)},
             Transform::from_xyz(1.8f, 0, 0), // offset od ramienia
             Parent{arm.id()});
 
@@ -85,7 +89,7 @@ void rotate_pivot(Query<Mut<Transform>, PivotTag> query, Res<Time> time) {
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({1024, 768, "08 - Hierarchy", 60}))
+  app.add_plugin(Window::install({1024, 768, "08 - Hierarchy", 60}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_systems(ScheduleLabel::Startup, setup)

@@ -1,6 +1,7 @@
 #pragma once
 #include "math.hpp"
 #include "rl.hpp"
+#include "rydz_ecs/core/input.hpp"
 #include "rydz_ecs/fwd.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_ecs/storage.hpp"
@@ -12,4 +13,4 @@
 using namespace ecs;
 using namespace math;
 
-inline void scene_plugin(App &app) { app.add_plugin(input_plugin); }
+inline void scene_plugin(App &app) { app.add_plugin(Input::install); }

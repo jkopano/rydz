@@ -1,6 +1,7 @@
 // 11 - System Sets
 // Sety grupują systemy i dają możliwość wspólnego orderingu/warunki
 
+#include "rydz_ecs/core/input.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include <print>
@@ -34,26 +35,23 @@ void debug_overlay() { std::println("[Debug] frame"); }
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({800, 600, "11 - System Sets", 60}))
+  app.add_plugin(Window::install({800, 600, "11 - System Sets", 60}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_plugin(input_plugin)
+      .add_plugin(Input::install)
 
       // Systemy w setach enum
-      .add_systems(ScheduleLabel::Update,
-                   group(input_system).in_set(set<GameSet::Input>()))
-      .add_systems(ScheduleLabel::Update,
-                   group(movement_system, collision_system)
-                       .in_set(set<GameSet::Logic>()))
+      .add_systems(GameSet::Input{}, group(input_system))
+      .add_systems(GameSet::Logic{},
+                   group(movement_system, collision_system))
 
       // Struct set
-      .add_systems(ScheduleLabel::Update,
-                   group(debug_overlay).in_set(set<DebugSet>()))
+      .add_systems(DebugSet{}, group(debug_overlay))
 
       // kolejność
       // input -> logic (potem debug)
       .configure_set(ScheduleLabel::Update,
-                     configure<GameSet::Input>().before(set<GameSet::Logic>()))
+                     configure(GameSet::Input{}, GameSet::Logic{}).chain())
       .configure_set(ScheduleLabel::Update,
                      configure<DebugSet>().after(set<GameSet::Logic>()))
 

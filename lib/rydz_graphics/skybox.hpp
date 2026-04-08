@@ -1,6 +1,7 @@
 #pragma once
 #include "math.hpp"
 #include "rl.hpp"
+#include "shader.hpp"
 #include <cstring>
 #include <string>
 
@@ -28,7 +29,6 @@ public:
   };
 
   unsigned int cubemap_id = 0;
-  rl::Shader shader = {};
   unsigned int vao = 0;
   unsigned int vbo = 0;
   bool loaded = false;
@@ -37,8 +37,6 @@ public:
 
   static Skybox from(Config cfg) {
     Skybox skybox{};
-    skybox.shader = get_skybox_shader();
-
     const std::string paths[6] = {cfg.right,  cfg.left,  cfg.top,
                                   cfg.bottom, cfg.front, cfg.back};
 
@@ -54,30 +52,28 @@ public:
   }
 
   void draw(math::Mat4 view, math::Mat4 proj) const {
-    if (!loaded)
+    if (!loaded) {
       return;
+    }
+
+    ShaderProgram &shader = get_skybox_shader();
 
     rl::rlDisableBackfaceCulling();
     rl::rlDisableDepthMask();
 
-    rl::rlEnableShader(shader.id);
-
-    int view_loc = rl::GetShaderLocation(shader, "u_view");
-    int proj_loc = rl::GetShaderLocation(shader, "u_projection");
-
-    rl::SetShaderValueMatrix(shader, view_loc, math::to_rl(view));
-    rl::SetShaderValueMatrix(shader, proj_loc, math::to_rl(proj));
+    shader.set("matView", math::to_rl(view));
+    shader.set("matProjection", math::to_rl(proj));
 
     rl::rlActiveTextureSlot(0);
     rl::rlEnableTextureCubemap(cubemap_id);
 
-    rl::rlEnableVertexArray(vao);
-    rl::rlDrawVertexArray(0, 36);
-    rl::rlDisableVertexArray();
+    shader.with_enabled([&] {
+      rl::rlEnableVertexArray(vao);
+      rl::rlDrawVertexArray(0, 36);
+      rl::rlDisableVertexArray();
+    });
 
     rl::rlDisableTextureCubemap();
-    rl::rlDisableShader();
-
     rl::rlEnableDepthMask();
     rl::rlEnableBackfaceCulling();
   }
@@ -93,17 +89,15 @@ public:
   }
 
 private:
-  static rl::Shader get_skybox_shader() {
-    static rl::Shader s = {};
-    static bool init = false;
-    if (!init) {
-      s = rl::LoadShader("res/shaders/skybox.vert", "res/shaders/skybox.frag");
-      int skybox_loc = rl::GetShaderLocation(s, "u_skybox");
+  static ShaderProgram &get_skybox_shader() {
+    static ShaderProgram shader = [] {
+      ShaderProgram program = ShaderProgram::load(ShaderSpec::from(
+          "res/shaders/skybox.vert", "res/shaders/skybox.frag"));
       int val = 0;
-      rl::SetShaderValue(s, skybox_loc, &val, SHADER_UNIFORM_INT);
-      init = true;
-    }
-    return s;
+      program.set("u_skybox", val);
+      return program;
+    }();
+    return shader;
   }
 
   void create_cube_vao() {

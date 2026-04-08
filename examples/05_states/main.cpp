@@ -2,6 +2,7 @@
 // Pokazuje: init_state, in_state, NextState, OnEnter, OnExit, OnTransition
 
 #include "math.hpp"
+#include "rydz_ecs/core/input.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
@@ -57,10 +58,10 @@ void menu_logic() {}
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({800, 600, "05 - States (Enter/P/M)", 60}))
+  app.add_plugin(Window::install({800, 600, "05 - States (Enter/P/M)", 60}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_plugin(input_plugin)
+      .add_plugin(Input::install)
       .init_state(GameState::Menu)
       // OnEnter/OnExit - uruchamiane przy odpowiednio Wejściu w stan i Wyjściu
       // z stanu

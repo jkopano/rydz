@@ -19,6 +19,7 @@
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
 #include "rydz_graphics/transform.hpp"
+#include "rydz_console/command_api.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -79,5 +80,31 @@ struct IsometricCameraBundle {
             .target = target, .offset = offset, .follow_speed = follow_speed}};
   }
 };
+
+inline void camera_plugin(App& app) {
+    app.add_systems(ScheduleLabel::Update, isometric_camera_system);
+
+    app.add_systems(ScheduleLabel::Startup, [](World& world) {
+
+        engine::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
+            return [zoom_level](Query<Mut<Camera3DComponent>> query) {
+                for (auto [cam] : query.iter()) {
+                    if (cam->is_orthographic()) {
+                        cam->orthographic_height = zoom_level;
+                    }
+                }
+                };
+            });
+
+        engine::BindCommand<float>::to(world, "set_cam_speed", [](float speed) {
+            return [speed](Query<Mut<IsometricCamera>> query) {
+                for (auto [iso_cam] : query.iter()) {
+                    iso_cam->follow_speed = speed;
+                }
+                };
+            });
+
+        });
+}
 
 } // namespace ecs

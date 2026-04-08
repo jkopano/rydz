@@ -12,6 +12,7 @@
 
 namespace math {
 
+using Vec2 = Vector2;
 using Vec3 = JPH::Vec3;
 using Vec4 = JPH::Vec4;
 using Mat4 = JPH::Mat44;

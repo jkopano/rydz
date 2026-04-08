@@ -38,10 +38,11 @@ private:
   std::unique_ptr<std::mutex> mutex_ = std::make_unique<std::mutex>();
   u32 next_id_ = 0;
   std::vector<std::pair<u32, u32>> free_list_;
+  std::unordered_set<Entity> reserved_;
   std::unordered_set<Entity> active_;
 
 public:
-  Entity create() {
+  Entity reserve() {
     std::lock_guard lock(*mutex_);
 
     Entity e;
@@ -53,23 +54,52 @@ public:
       e = Entity::from_raw(idx, gen);
     }
 
+    reserved_.insert(e);
+    return e;
+  }
+
+  Entity create() {
+    Entity e = reserve();
+    std::lock_guard lock(*mutex_);
+    reserved_.erase(e);
     active_.insert(e);
     return e;
   }
 
+  void activate(Entity entity) {
+    std::lock_guard lock(*mutex_);
+    if (!reserved_.erase(entity)) {
+      return;
+    }
+    active_.insert(entity);
+  }
+
   void destroy(Entity entity) {
+    std::lock_guard lock(*mutex_);
+    if (reserved_.erase(entity)) {
+      free_list_.push_back({entity.index(), entity.generation() + 1});
+      return;
+    }
+
     if (active_.erase(entity)) {
       free_list_.push_back({entity.index(), entity.generation() + 1});
     }
   }
 
   std::vector<Entity> entities() const {
+    std::lock_guard lock(*mutex_);
     return {active_.begin(), active_.end()};
   }
 
-  bool is_alive(Entity entity) const { return active_.contains(entity); }
+  bool is_alive(Entity entity) const {
+    std::lock_guard lock(*mutex_);
+    return active_.contains(entity);
+  }
 
-  size_t count() const { return active_.size(); }
+  size_t count() const {
+    std::lock_guard lock(*mutex_);
+    return active_.size();
+  }
 };
 
 } // namespace ecs

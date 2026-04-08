@@ -1,13 +1,30 @@
 #pragma once
 #include "fwd.hpp"
 #include "system.hpp"
+#include <algorithm>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <typeindex>
 #include <vector>
 
 namespace ecs {
+
+namespace detail {
+
+template <typename T, typename = void>
+struct is_set_marker : std::bool_constant<std::is_base_of_v<Set, bare_t<T>>> {};
+
+template <typename T>
+struct is_set_marker<T, std::void_t<typename bare_t<T>::T>>
+    : std::bool_constant<std::is_same_v<typename bare_t<T>::T, Set> ||
+                         std::is_base_of_v<Set, bare_t<T>>> {};
+
+template <typename T>
+inline constexpr bool is_set_marker_v = is_set_marker<T>::value;
+
+} // namespace detail
 
 struct SetId {
   std::type_index type;
@@ -20,6 +37,11 @@ struct SetId {
   }
 };
 
+inline std::string set_name(const SetId &id) {
+  auto name = demangle(id.type.name());
+  return name + "(" + std::to_string(id.value) + ")";
+}
+
 template <typename E>
   requires std::is_enum_v<E>
 SetId set(E value) {
@@ -27,10 +49,14 @@ SetId set(E value) {
 }
 
 template <typename S>
-  requires std::is_same_v<typename S::T, Set> || std::is_base_of<Set, S>::value
+  requires detail::is_set_marker_v<S>
 SetId set() {
   return SetId{typeid(S), 0};
 }
+
+struct SetList {
+  std::vector<SetId> ids;
+};
 
 } // namespace ecs
 
@@ -48,6 +74,69 @@ template <typename H> H AbslHashValue(H h, const SetId &s) {
   return H::combine(std::move(h), s.type.hash_code(), s.value);
 }
 
+namespace detail {
+
+template <typename T>
+struct is_set_argument : std::bool_constant<std::is_enum_v<bare_t<T>>> {};
+template <> struct is_set_argument<SetId> : std::true_type {};
+template <typename T>
+  requires is_set_marker_v<T>
+struct is_set_argument<T> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_set_argument_v = is_set_argument<bare_t<T>>::value;
+
+inline SetId to_set_id(SetId id) { return id; }
+
+template <typename E>
+  requires std::is_enum_v<bare_t<E>>
+SetId to_set_id(E value) {
+  return set(value);
+}
+
+template <typename S>
+  requires is_set_marker_v<S>
+SetId to_set_id(S &&) {
+  return set<bare_t<S>>();
+}
+
+inline std::vector<SetId> to_set_ids(SetId id) { return {id}; }
+
+inline std::vector<SetId> to_set_ids(SetList ids) { return std::move(ids.ids); }
+
+inline std::string set_names(const std::vector<SetId> &ids) {
+  std::string result;
+  for (usize i = 0; i < ids.size(); ++i) {
+    if (i != 0) {
+      result += ", ";
+    }
+    result += set_name(ids[i]);
+  }
+  return result;
+}
+
+template <typename... Args>
+std::vector<SetId> make_set_ids(Args &&...args) {
+  std::vector<SetId> ids;
+  ids.reserve(sizeof...(Args));
+  (ids.push_back(to_set_id(std::forward<Args>(args))), ...);
+  return ids;
+}
+
+inline void ensure_unique_sets(const std::vector<SetId> &ids,
+                               const std::string &context) {
+  for (usize i = 0; i < ids.size(); ++i) {
+    for (usize j = i + 1; j < ids.size(); ++j) {
+      if (ids[i] == ids[j]) {
+        throw std::runtime_error(context + ": duplicate set '" +
+                                 set_name(ids[i]) + "'");
+      }
+    }
+  }
+}
+
+} // namespace detail
+
 struct SystemOrdering {
   std::vector<std::string> after;
   std::vector<std::string> before;
@@ -58,19 +147,70 @@ class ICondition {
 public:
   virtual ~ICondition() = default;
   virtual bool is_true(World &world) = 0;
+  virtual SystemAccess access() const = 0;
 };
 
 template <typename F> class FunctionCondition : public ICondition {
   F func_;
+  using ParamTuple = typename function_traits<F>::args_tuple;
+
+  template <typename TupleT> struct ParamStateTuple;
+  template <typename... Args> struct ParamStateTuple<Tuple<Args...>> {
+    using type = Tuple<typename SystemParamTraits<bare_t<Args>>::State...>;
+  };
+
+  typename ParamStateTuple<ParamTuple>::type param_states_{};
+  World *state_world_ = nullptr;
 
 public:
   explicit FunctionCondition(F func) : func_(std::move(func)) {}
 
   bool is_true(World &world) override {
+    ensure_param_states(world);
+
     SystemContext ctx{Tick{0}, world.read_change_tick()};
     return function_traits<F>::apply([&]<SystemParameter... Args>() {
-      return func_(SystemParamTraits<bare_t<Args>>::retrieve(world, ctx)...);
+      return evaluate_with_args<Args...>(world, ctx,
+                                         std::index_sequence_for<Args...>{});
     });
+  }
+
+  SystemAccess access() const override {
+    SystemAccess acc;
+    function_traits<F>::apply([&]<SystemParameter... Args>() {
+      (SystemParamTraits<bare_t<Args>>::access(acc), ...);
+    });
+    return acc;
+  }
+
+private:
+  void ensure_param_states(World &world) {
+    if (state_world_ == &world)
+      return;
+
+    function_traits<F>::apply([&]<SystemParameter... Args>() {
+      param_states_ = Tuple<typename SystemParamTraits<bare_t<Args>>::State...>{
+          SystemParamTraits<bare_t<Args>>::init_state(world)...};
+    });
+    state_world_ = &world;
+  }
+
+  template <SystemParameter Arg>
+  static decltype(auto)
+  retrieve_param(World &world, const SystemContext &ctx,
+                 typename SystemParamTraits<bare_t<Arg>>::State &state) {
+    if constexpr (HasStatefulParamRetrieve<Arg>) {
+      return SystemParamTraits<bare_t<Arg>>::retrieve(world, ctx, state);
+    } else {
+      return SystemParamTraits<bare_t<Arg>>::retrieve(world, ctx);
+    }
+  }
+
+  template <SystemParameter... Args, std::size_t... I>
+  bool evaluate_with_args(World &world, const SystemContext &ctx,
+                          std::index_sequence<I...>) {
+    return func_(
+        retrieve_param<Args>(world, ctx, std::get<I>(param_states_))...);
   }
 };
 
@@ -91,7 +231,11 @@ public:
 
   std::string name() const override { return system_->name(); }
 
-  SystemAccess access() const override { return system_->access(); }
+  SystemAccess access() const override {
+    auto acc = condition_->access();
+    acc.merge(system_->access());
+    return acc;
+  }
 };
 
 template <typename F> std::unique_ptr<ICondition> make_condition(F &&func) {
@@ -108,6 +252,7 @@ inline std::unique_ptr<ICondition> run_once() {
       }
       return false;
     }
+    SystemAccess access() const override { return {}; }
   };
   return std::make_unique<RunOnceCondition>();
 }
@@ -144,11 +289,6 @@ public:
 
   template <typename Fn> SystemDescriptor &&before(Fn &&fn) && {
     ordering_.before.push_back(system_name_of(std::forward<Fn>(fn)));
-    return std::move(*this);
-  }
-
-  SystemDescriptor &&in_set(SetId id) && {
-    ordering_.in_sets.push_back(id);
     return std::move(*this);
   }
 
@@ -203,11 +343,6 @@ public:
 
   template <typename Fn> SystemGroupDescriptor &&before(Fn &&fn) && {
     ordering_.before.push_back(system_name_of(std::forward<Fn>(fn)));
-    return std::move(*this);
-  }
-
-  SystemGroupDescriptor &&in_set(SetId id) && {
-    ordering_.in_sets.push_back(id);
     return std::move(*this);
   }
 
@@ -270,6 +405,8 @@ class SetConfigDescriptor {
 public:
   explicit SetConfigDescriptor(SetId id) : config_{id, {}, {}, nullptr} {}
 
+  const SetId &id() const { return config_.id; }
+
   SetConfigDescriptor &&before(SetId id) && {
     config_.before.push_back(id);
     return std::move(*this);
@@ -293,6 +430,42 @@ public:
   SetConfig take() { return std::move(config_); }
 };
 
+class ChainedSetConfigDescriptor {
+  std::vector<SetId> ids_;
+  bool chained_ = false;
+
+public:
+  explicit ChainedSetConfigDescriptor(std::vector<SetId> ids)
+      : ids_(std::move(ids)) {}
+
+  const std::vector<SetId> &ids() const { return ids_; }
+
+  ChainedSetConfigDescriptor &&chain() && {
+    chained_ = true;
+    return std::move(*this);
+  }
+
+  std::vector<SetConfig> take() {
+    if (!chained_) {
+      throw std::runtime_error("configure(...) with multiple sets requires "
+                               ".chain()");
+    }
+
+    detail::ensure_unique_sets(ids_, "configure(...).chain()");
+
+    std::vector<SetConfig> configs;
+    configs.reserve(ids_.size());
+    for (usize i = 0; i < ids_.size(); ++i) {
+      SetConfig config{ids_[i], {}, {}, nullptr};
+      if (i + 1 < ids_.size()) {
+        config.before.push_back(ids_[i + 1]);
+      }
+      configs.push_back(std::move(config));
+    }
+    return configs;
+  }
+};
+
 template <typename E>
   requires std::is_enum_v<E>
 SetConfigDescriptor configure(E value) {
@@ -303,6 +476,25 @@ template <typename S>
   requires std::is_same_v<typename S::T, Set> || std::is_base_of<Set, S>::value
 SetConfigDescriptor configure() {
   return SetConfigDescriptor(set<S>());
+}
+
+template <typename A, typename B, typename... Rest>
+  requires(detail::is_set_argument_v<A> && detail::is_set_argument_v<B> &&
+           (... && detail::is_set_argument_v<Rest>))
+ChainedSetConfigDescriptor configure(A &&a, B &&b, Rest &&...rest) {
+  return ChainedSetConfigDescriptor(
+      detail::make_set_ids(std::forward<A>(a), std::forward<B>(b),
+                           std::forward<Rest>(rest)...));
+}
+
+template <typename A, typename B, typename... Rest>
+  requires(detail::is_set_argument_v<A> && detail::is_set_argument_v<B> &&
+           (... && detail::is_set_argument_v<Rest>))
+SetList sets(A &&a, B &&b, Rest &&...rest) {
+  auto ids = detail::make_set_ids(std::forward<A>(a), std::forward<B>(b),
+                                  std::forward<Rest>(rest)...);
+  detail::ensure_unique_sets(ids, "sets(...)");
+  return SetList{std::move(ids)};
 }
 
 } // namespace ecs

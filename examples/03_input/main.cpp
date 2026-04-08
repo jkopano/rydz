@@ -3,6 +3,7 @@
 
 #include "math.hpp"
 #include "rl.hpp"
+#include "rydz_ecs/core/input.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
@@ -15,17 +16,16 @@ struct Player {
   f32 speed = 200.0f;
 };
 
-void setup(Cmd cmd, ResMut<Assets<rl::Model>> models, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
   // kamera (transformy by trzeba rozwinąć kiedyś tam)
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             Transform::from_xyz(0, 30, 0).look_at(Vec3::sZero()));
 
   // ładowanko mesha
-  auto cube_mesh = mesh::cube(1, 1, 1);
-  auto cube_model = rl::LoadModelFromMesh(cube_mesh);
+  auto cube_mesh = meshes->add(mesh::cube(1, 1, 1));
 
   cmd.spawn(Player{20.0f}, Transform::from_xyz(0, 0.5f, 0),
-            Model3d{models->add(cube_model)});
+            Mesh3d{cube_mesh});
 }
 
 void player_movement(Query<Mut<Transform>, Player> query, Res<Input> input,
@@ -66,10 +66,10 @@ void print_mouse(Res<Input> input) {
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({800, 600, "03 - Input", 60}))
+  app.add_plugin(Window::install({800, 600, "03 - Input", 60}))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_plugin(input_plugin)
+      .add_plugin(Input::install)
       .add_systems(ScheduleLabel::Startup, setup)
       .add_systems(ScheduleLabel::Update, player_movement)
       .add_systems(ScheduleLabel::Update, print_mouse)
