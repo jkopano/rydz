@@ -28,18 +28,15 @@ enum class RenderPassSet {
 };
 
 struct RenderPlugin {
-  template <IsMaterial M> static void register_material(App &app) {
-    app.add_systems(
-        RenderExtractSet::Extract,
-        group(RenderExtractSystems::extract_meshes_system<M>)
-            .after(RenderExtractSystems::clear_extracted_meshes_system));
+  template <MaterialValue M> static void register_material(App &) {
   }
 
   static void install(App &app) {
-    app.init_resource<Assets<rydz_gl::Mesh>>(
-           [](rydz_gl::Mesh &mesh) { rydz_gl::unload_mesh(mesh); })
-        .init_resource<Assets<rydz_gl::Texture>>(
-            [](rydz_gl::Texture &texture) { rydz_gl::unload_texture(texture); })
+    app.init_resource<Assets<Mesh>>(
+           [](Mesh &mesh) { rydz_gl::unload_mesh(mesh); })
+        .init_resource<Assets<Texture>>(
+            [](Texture &texture) { rydz_gl::unload_texture(texture); })
+        .init_resource<Assets<Material>>()
         .init_resource<Assets<Scene>>()
         .init_resource<AssetServer>()
         .init_resource<ExtractedView>()
@@ -92,7 +89,8 @@ struct RenderPlugin {
                      group(RenderExtractSystems::clear_extracted_meshes_system,
                            RenderExtractSystems::extract_view_system,
                            RenderExtractSystems::extract_lighting_system,
-                           RenderExtractSystems::extract_ui_system)
+                           RenderExtractSystems::extract_ui_system,
+                           RenderExtractSystems::extract_meshes_system)
                          .chain())
 
         .add_systems(RenderExtractSet::Queue,
@@ -122,7 +120,6 @@ struct RenderPlugin {
         .add_systems(RenderPassSet::Cleanup,
                      RenderPassSystems::Frame::end_frame);
 
-    register_material<StandardMaterial>(app);
   }
 };
 

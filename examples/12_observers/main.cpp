@@ -56,8 +56,9 @@ void trigger_events(Cmd cmd, Res<Input> input,
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({800, 600, "12 - Observers", 60}))
-      .add_plugin(rydz_platform::RayPlugin::install({}))
+  app.add_plugin(rydz_platform::RayPlugin::install({
+          .window = {800, 600, "12 - Observers", 60},
+      }))
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)
       .add_event<LogEvent>()

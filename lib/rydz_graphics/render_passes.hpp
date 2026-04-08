@@ -84,8 +84,8 @@ struct RenderPassSystems {
 
     static void run_depth_prepass(Res<RenderExecutionState> state,
                                   Res<OpaquePhase> phase,
-                                  Res<Assets<rydz_gl::Mesh>> mesh_assets,
-                                  Res<Assets<rydz_gl::Texture>> texture_assets,
+                                  Res<Assets<Mesh>> mesh_assets,
+                                  Res<Assets<Texture>> texture_assets,
                                   ResMut<ShaderCache> shader_cache,
                                   Res<ExtractedView> view,
                                   NonSendMarker marker) {
@@ -115,8 +115,8 @@ struct RenderPassSystems {
 
     static void run_opaque_pass(
         Res<RenderExecutionState> state, Res<OpaquePhase> phase,
-        Res<Assets<rydz_gl::Mesh>> mesh_assets,
-        Res<Assets<rydz_gl::Texture>> texture_assets,
+        Res<Assets<Mesh>> mesh_assets,
+        Res<Assets<Texture>> texture_assets,
         ResMut<ShaderCache> shader_cache, Res<ExtractedView> view,
         Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
         Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
@@ -133,8 +133,8 @@ struct RenderPassSystems {
 
     static void run_transparent_pass(
         Res<RenderExecutionState> state, Res<TransparentPhase> phase,
-        Res<Assets<rydz_gl::Mesh>> mesh_assets,
-        Res<Assets<rydz_gl::Texture>> texture_assets,
+        Res<Assets<Mesh>> mesh_assets,
+        Res<Assets<Texture>> texture_assets,
         ResMut<ShaderCache> shader_cache, Res<ExtractedView> view,
         Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
         Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
@@ -180,8 +180,8 @@ struct RenderPassSystems {
     }
 
     static void draw_depth_batch(NonSendMarker marker, const OpaqueBatch &batch,
-                                 const Assets<rydz_gl::Mesh> &mesh_assets,
-                                 const Assets<rydz_gl::Texture> &texture_assets,
+                                 const Assets<Mesh> &mesh_assets,
+                                 const Assets<Texture> &texture_assets,
                                  ShaderCache &shader_cache) {
       const auto *mesh = mesh_assets.get(batch.key.mesh);
       if (!mesh) {
@@ -309,8 +309,8 @@ struct RenderPassSystems {
 
     static void draw_opaque_batch(NonSendMarker marker,
                                   const OpaqueBatch &batch,
-                                  const Assets<rydz_gl::Mesh> &mesh_assets,
-                                  const Assets<rydz_gl::Texture> &texture_assets,
+                                  const Assets<Mesh> &mesh_assets,
+                                  const Assets<Texture> &texture_assets,
                                   ShaderCache &shader_cache,
                                   const ExtractedView &view,
                                   const ExtractedLights &lights,
@@ -333,8 +333,8 @@ struct RenderPassSystems {
 
     static void draw_transparent_item(
         NonSendMarker marker, const TransparentPhaseItem &item,
-        const Assets<rydz_gl::Mesh> &mesh_assets,
-        const Assets<rydz_gl::Texture> &texture_assets,
+        const Assets<Mesh> &mesh_assets,
+        const Assets<Texture> &texture_assets,
         ShaderCache &shader_cache, const ExtractedView &view,
         const ExtractedLights &lights, const ClusterConfig &cluster_config,
         const ClusteredLightingState &cluster_state) {
@@ -465,7 +465,7 @@ struct RenderPassSystems {
 
   struct Ui {
     static void run_ui_pass(Res<UiPhase> phase,
-                            Res<Assets<rydz_gl::Texture>> texture_assets,
+                            Res<Assets<Texture>> texture_assets,
                             ResMut<RenderExecutionState> state,
                             NonSendMarker) {
       if (!state->backbuffer_active) {
@@ -482,15 +482,16 @@ struct RenderPassSystems {
         rydz_gl::Vec2 position = {item.transform.translation.GetX(),
                                   item.transform.translation.GetY()};
         rydz_gl::Rectangle source = {
-            0, 0, static_cast<float>(texture->width),
-            static_cast<float>(texture->height)};
+            0, 0, static_cast<float>(texture->value.width),
+            static_cast<float>(texture->value.height)};
         rydz_gl::Rectangle dest = {position.x, position.y,
-                                   texture->width * item.transform.scale.GetX(),
-                                   texture->height *
+                                   texture->value.width *
+                                       item.transform.scale.GetX(),
+                                   texture->value.height *
                                        item.transform.scale.GetY()};
         rydz_gl::Vec2 origin = {0, 0};
 
-        rydz_gl::draw_texture_pro(*texture, source, dest, origin,
+        rydz_gl::draw_texture_pro(texture->value, source, dest, origin,
                                   texture_rotation_degrees(item.transform),
                                   item.tint);
       }

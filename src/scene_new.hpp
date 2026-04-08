@@ -85,7 +85,7 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
 }
 
 inline void setup_lighting(Cmd cmd, NonSendMarker,
-                           ResMut<Assets<rydz_gl::Mesh>> meshes) {
+                           ResMut<Assets<ecs::Mesh>> meshes) {
   cmd.spawn(AmbientLight{
       .color = {60, 60, 70, 255},
       .intensity = 0.35f,
@@ -106,27 +106,28 @@ inline void setup_lighting(Cmd cmd, NonSendMarker,
   );
 }
 
-inline void spawn_ground(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes,
-                         ResMut<Assets<rydz_gl::Texture>> textures,
+inline void spawn_ground(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
+                         ResMut<Assets<ecs::Texture>> textures,
+                         ResMut<Assets<ecs::Material>> materials,
                          NonSendMarker) {
   auto plane_h = meshes->add(mesh::plane(20.0f, 20.0f, 1, 1));
+  auto plane_mat = materials->add(StandardMaterial::from_texture(
+      textures->add(rydz_gl::load_texture("res/textures/brick.png"))));
 
   cmd.spawn(Mesh3d{plane_h},
-            // MeshMaterial3d<>{
-            //     StandardMaterial::from_color({80, 160, 80, 255})},
-            MeshMaterial3d<>{StandardMaterial::from_texture(textures->add(
-                rydz_gl::load_texture("res/textures/brick.png")))},
+            MeshMaterial3d{plane_mat},
             Transform{});
 }
 
-inline void spawn_player(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes,
-                         ResMut<Assets<rydz_gl::Texture>> textures,
+inline void spawn_player(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
+                         ResMut<Assets<ecs::Texture>> textures,
+                         ResMut<Assets<ecs::Material>> materials,
                          NonSendMarker) {
   auto cube_h = meshes->add(mesh::cube(1.0f, 1.0f, 1.0f));
+  auto cube_mat = materials->add(StandardMaterial::from_texture(
+      textures->add(rydz_gl::load_texture("res/textures/stone.jpg"))));
 
-  cmd.spawn(Mesh3d{cube_h},
-            MeshMaterial3d<>{StandardMaterial::from_texture(textures->add(
-                rydz_gl::load_texture("res/textures/stone.jpg")))},
+  cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d{cube_mat},
             Transform::from_xyz(0.0f, 0.5f, 0.0f), Player{});
 }
 

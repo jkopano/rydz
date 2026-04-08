@@ -9,7 +9,7 @@
 namespace ecs {
 
 struct ShadowPhaseItem {
-  Handle<rydz_gl::Mesh> mesh{};
+  Handle<Mesh> mesh{};
   Mat4 world_transform = Mat4::sIdentity();
   float distance_to_camera = 0.0f;
 };
@@ -22,7 +22,7 @@ struct ShadowPhase {
 };
 
 struct OpaquePhaseItem {
-  Handle<rydz_gl::Mesh> mesh{};
+  Handle<Mesh> mesh{};
   MaterialDescriptor material{};
   Mat4 world_transform = Mat4::sIdentity();
   float distance_to_camera = 0.0f;
@@ -40,7 +40,7 @@ struct OpaquePhase {
 };
 
 struct TransparentPhaseItem {
-  Handle<rydz_gl::Mesh> mesh{};
+  Handle<Mesh> mesh{};
   MaterialDescriptor material{};
   Mat4 world_transform = Mat4::sIdentity();
   float sort_key = 0.0f;
@@ -54,9 +54,9 @@ struct TransparentPhase {
 };
 
 struct UiPhaseItem {
-  Handle<rydz_gl::Texture> texture{};
+  Handle<Texture> texture{};
   Transform transform{};
-  rydz_gl::Color tint = rydz_gl::kWhite;
+  Color tint = kWhite;
   i32 layer = 0;
 };
 
@@ -154,7 +154,7 @@ struct RenderPhaseSystems {
 
   struct Prepare {
     static void build_opaque_batches(ResMut<OpaquePhase> phase,
-                                     ResMut<Assets<rydz_gl::Mesh>> mesh_assets,
+                                     ResMut<Assets<Mesh>> mesh_assets,
                                      NonSendMarker) {
       detail::build_opaque_batches(*phase, *mesh_assets, {});
     }
@@ -162,7 +162,7 @@ struct RenderPhaseSystems {
   private:
     struct detail {
       static void build_opaque_batches(OpaquePhase &phase,
-                                       Assets<rydz_gl::Mesh> &mesh_assets,
+                                       Assets<Mesh> &mesh_assets,
                                        NonSendMarker) {
         phase.batches.clear();
         std::unordered_map<RenderBatchKey, usize> batch_index;

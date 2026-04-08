@@ -75,9 +75,9 @@ inline Transform transform_from_matrix(const Mat4 &matrix) {
   return transform;
 }
 
-inline Handle<rydz_gl::Texture> transfer_texture(
-    Assets<rydz_gl::Texture> &textures, const rydz_gl::Texture &texture,
-    std::unordered_map<unsigned int, Handle<rydz_gl::Texture>> &texture_cache) {
+inline Handle<Texture> transfer_texture(
+    Assets<Texture> &textures, const rydz_gl::Texture &texture,
+    std::unordered_map<unsigned int, Handle<Texture>> &texture_cache) {
   if (!rydz_gl::has_texture(texture)) {
     return {};
   }
@@ -93,44 +93,47 @@ inline Handle<rydz_gl::Texture> transfer_texture(
 }
 
 inline SceneMaterial material_from_backend_material(
-    const rydz_gl::Material &material, Assets<rydz_gl::Texture> &textures,
-    std::unordered_map<unsigned int, Handle<rydz_gl::Texture>> &texture_cache,
+    const rydz_gl::Material &material, Assets<Texture> &textures,
+    Assets<Material> &materials,
+    std::unordered_map<unsigned int, Handle<Texture>> &texture_cache,
     const std::string &name = {}) {
   SceneMaterial scene_material;
   scene_material.name = name;
+  StandardMaterial material_value;
 
   if (material.maps) {
-    scene_material.material.base_color =
-        material.maps[rydz_gl::MATERIAL_MAP_DIFFUSE].color;
-    scene_material.material.emissive_color =
+    material_value.base_color = material.maps[rydz_gl::MATERIAL_MAP_DIFFUSE].color;
+    material_value.emissive_color =
         material.maps[rydz_gl::MATERIAL_MAP_EMISSION].color;
-    scene_material.material.texture = transfer_texture(
+    material_value.texture = transfer_texture(
         textures, material.maps[rydz_gl::MATERIAL_MAP_DIFFUSE].texture,
         texture_cache);
-    scene_material.material.normal_map = transfer_texture(
+    material_value.normal_map = transfer_texture(
         textures, material.maps[rydz_gl::MATERIAL_MAP_NORMAL].texture,
         texture_cache);
-    scene_material.material.metallic_map = transfer_texture(
+    material_value.metallic_map = transfer_texture(
         textures, material.maps[rydz_gl::MATERIAL_MAP_METALNESS].texture,
         texture_cache);
-    scene_material.material.roughness_map = transfer_texture(
+    material_value.roughness_map = transfer_texture(
         textures, material.maps[rydz_gl::MATERIAL_MAP_ROUGHNESS].texture,
         texture_cache);
-    scene_material.material.occlusion_map = transfer_texture(
+    material_value.occlusion_map = transfer_texture(
         textures, material.maps[rydz_gl::MATERIAL_MAP_OCCLUSION].texture,
         texture_cache);
-    scene_material.material.emissive_map = transfer_texture(
+    material_value.emissive_map = transfer_texture(
         textures, material.maps[rydz_gl::MATERIAL_MAP_EMISSION].texture,
         texture_cache);
-    scene_material.material.metallic =
+    material_value.metallic =
         material.maps[rydz_gl::MATERIAL_MAP_METALNESS].value;
-    scene_material.material.roughness =
+    material_value.roughness =
         material.maps[rydz_gl::MATERIAL_MAP_ROUGHNESS].value;
-    scene_material.material.normal_scale =
+    material_value.normal_scale =
         material.maps[rydz_gl::MATERIAL_MAP_NORMAL].value;
-    scene_material.material.occlusion_strength =
+    material_value.occlusion_strength =
         material.maps[rydz_gl::MATERIAL_MAP_OCCLUSION].value;
   }
+
+  scene_material.material = materials.add(material_value);
 
   return scene_material;
 }
@@ -156,9 +159,10 @@ public:
     std::string file_path = detail::strip_gltf_fragment(path_with_fragment);
 
     auto *scene_assets = world.get_resource<Assets<Scene>>();
-    auto *mesh_assets = world.get_resource<Assets<rydz_gl::Mesh>>();
-    auto *texture_assets = world.get_resource<Assets<rydz_gl::Texture>>();
-    if (!scene_assets || !mesh_assets || !texture_assets) {
+    auto *mesh_assets = world.get_resource<Assets<Mesh>>();
+    auto *texture_assets = world.get_resource<Assets<Texture>>();
+    auto *material_assets = world.get_resource<Assets<Material>>();
+    if (!scene_assets || !mesh_assets || !texture_assets || !material_assets) {
       return;
     }
 
@@ -185,7 +189,7 @@ public:
     Scene scene;
     scene.nodes.resize(data->nodes_count);
 
-    std::unordered_map<unsigned int, Handle<rydz_gl::Texture>> texture_cache;
+    std::unordered_map<unsigned int, Handle<Texture>> texture_cache;
     const usize material_count =
         static_cast<usize>(std::max(model.materialCount, 1));
     scene.materials.reserve(material_count);
@@ -197,16 +201,20 @@ public:
       }
       if (model.materials && i < model.materialCount) {
         scene.materials.push_back(detail::material_from_backend_material(
-            model.materials[i], *texture_assets, texture_cache, material_name));
+            model.materials[i], *texture_assets, *material_assets, texture_cache,
+            material_name));
       } else {
         SceneMaterial material;
         material.name = std::move(material_name);
+        material.material = material_assets->add(StandardMaterial{});
         scene.materials.push_back(std::move(material));
       }
     }
 
     if (scene.materials.empty()) {
-      scene.materials.push_back(SceneMaterial{});
+      SceneMaterial material;
+      material.material = material_assets->add(StandardMaterial{});
+      scene.materials.push_back(std::move(material));
     }
 
     std::vector<std::vector<ScenePrimitive>> node_primitives(data->nodes_count);
@@ -229,8 +237,8 @@ public:
           break;
         }
 
-        Handle<rydz_gl::Mesh> mesh_handle =
-            mesh_assets->add(model.meshes[model_mesh_index]);
+        Handle<Mesh> mesh_handle =
+            mesh_assets->add(Mesh{model.meshes[model_mesh_index]});
         model.meshes[model_mesh_index] = rydz_gl::Mesh{};
 
         usize material_index = 0;

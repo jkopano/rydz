@@ -101,8 +101,8 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform>> query,
 
 inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
   cmd.spawn(MapTag{}, CameraState{FreeLook{}},
-            SceneRoot{asset_server->load<Scene>("res/models/sponza.glb")},
-            Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}});
+            SceneRoot{asset_server->load<Scene>("res/models/sun.glb")},
+            Transform{.scale = Vec3{0.1f, .1f, .1f}});
 }
 
 inline void some_shit(Query<CameraState> q) {
@@ -122,15 +122,14 @@ inline void some_shit(Query<CameraState> q) {
   }
 }
 
-inline void spawn_some_texture(Cmd cmd,
-                               ResMut<Assets<rydz_gl::Texture>> textures,
+inline void spawn_some_texture(Cmd cmd, ResMut<Assets<ecs::Texture>> textures,
                                NonSendMarker) {
-  auto stone_tex = textures->add(rydz_gl::load_texture("res/textures/stone.jpg"));
-  cmd.spawn(ecs::Texture{stone_tex},
-            Transform{
-                .translation = Vec3(10.0f, 10.0f, 0.0f),
-                .scale = Vec3::sReplicate(1.0f),
-            });
+  auto stone_tex =
+      textures->add(rydz_gl::load_texture("res/textures/stone.jpg"));
+  cmd.spawn(ecs::Sprite{stone_tex}, Transform{
+                                        .translation = Vec3(10.0f, 10.0f, 0.0f),
+                                        .scale = Vec3::sReplicate(1.0f),
+                                    });
 }
 
 struct LightsSpawned {
@@ -139,8 +138,9 @@ struct LightsSpawned {
 };
 
 inline void spawn_lights_on_input(Cmd cmd,
-                                  ResMut<Assets<rydz_gl::Texture>> textures,
-                                  ResMut<Assets<rydz_gl::Mesh>> meshes,
+                                  ResMut<Assets<ecs::Texture>> textures,
+                                  ResMut<Assets<ecs::Mesh>> meshes,
+                                  ResMut<Assets<ecs::Material>> materials,
                                   ResMut<LightsSpawned> lights,
                                   Res<Input> input, NonSendMarker) {
   if (lights->done || !input->key_pressed(KEY_L))
@@ -152,7 +152,9 @@ inline void spawn_lights_on_input(Cmd cmd,
       .intensity = 0.5f,
   });
 
-  auto stone_tex = textures->add(rydz_gl::load_texture("res/textures/stone.jpg"));
+  auto stone_tex =
+      textures->add(rydz_gl::load_texture("res/textures/stone.jpg"));
+  auto stone_mat = materials->add(StandardMaterial::from_texture(stone_tex));
 
   auto cube_h = meshes->add(mesh::cube());
 
@@ -164,8 +166,7 @@ inline void spawn_lights_on_input(Cmd cmd,
 
   auto cube_h2 = meshes->add(mesh::cube());
 
-  cmd.spawn(Mesh3d{cube_h2},
-            MeshMaterial3d<>{StandardMaterial::from_texture(stone_tex)},
+  cmd.spawn(Mesh3d{cube_h2}, MeshMaterial3d{stone_mat},
             Transform::from_xyz(50.0f, 50.0f, 0.0f));
 
   cmd.spawn(PointLight{.color = {75, 75, 255, 255},
@@ -179,7 +180,8 @@ inline void spawn_lights_on_input(Cmd cmd,
 inline void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(Camera3DComponent::perspective(), ActiveCamera{},
             Transform::from_xyz(8, 6, 8).look_at(Vec3::sZero()),
-            CameraController{}, PostProcessMaterial{DefaultPostProcessMaterial{}}
+            CameraController{},
+            PostProcessMaterial{DefaultPostProcessMaterial{}}
             // Skybox::from("res/hdri/skybox")
   );
   rl::DisableCursor();

@@ -31,8 +31,9 @@ int main() {
   // - window_plugin (jest o tyle różny że to funkcja zwracająca funkcje)
   // - input_plugin
   // - render_plugin
-  app.add_plugin(window_plugin({800, 600, "01 - Hello Window", 60}))
-      .add_plugin(rydz_platform::RayPlugin::install({}))
+  app.add_plugin(rydz_platform::RayPlugin::install({
+          .window = {800, 600, "01 - Hello Window", 60},
+      }))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_systems(ScheduleLabel::Startup, setup)

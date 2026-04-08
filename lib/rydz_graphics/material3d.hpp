@@ -1,9 +1,11 @@
 #pragma once
 
 #include "rydz_ecs/asset.hpp"
-#include "shader.hpp"
-#include "rydz_gl/core.hpp"
+#include "rydz_graphics/assets.hpp"
+#include "rydz_graphics/shader.hpp"
+#include "rydz_graphics/types.hpp"
 #include <concepts>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -11,8 +13,8 @@ namespace ecs {
 
 struct MaterialMapBinding {
   rydz_gl::MaterialMapIndex map_type = rydz_gl::MATERIAL_MAP_DIFFUSE;
-  Handle<rydz_gl::Texture> texture{};
-  rydz_gl::Color color = rydz_gl::kWhite;
+  Handle<Texture> texture{};
+  Color color = kWhite;
   f32 value = 0.0f;
   bool has_texture = false;
   bool has_color = false;
@@ -28,7 +30,7 @@ struct MaterialMapBinding {
 
   static MaterialMapBinding
   texture_binding(rydz_gl::MaterialMapIndex map_type,
-                  Handle<rydz_gl::Texture> texture) {
+                  Handle<Texture> texture) {
     return MaterialMapBinding{
         .map_type = map_type,
         .texture = texture,
@@ -37,7 +39,7 @@ struct MaterialMapBinding {
   }
 
   static MaterialMapBinding color_binding(rydz_gl::MaterialMapIndex map_type,
-                                          rydz_gl::Color color) {
+                                          Color color) {
     return MaterialMapBinding{
         .map_type = map_type,
         .color = color,
@@ -79,29 +81,40 @@ struct MaterialDescriptor {
 };
 
 template <typename M>
-concept IsMaterial = requires(const M &m) {
+concept MaterialValue = requires(const M &m) {
   { m.describe() } -> std::same_as<MaterialDescriptor>;
 };
 
+struct Material {
+  MaterialDescriptor descriptor{};
+
+  Material() = default;
+  explicit Material(MaterialDescriptor descriptor)
+      : descriptor(std::move(descriptor)) {}
+  template <MaterialValue M>
+    requires(!std::same_as<std::remove_cvref_t<M>, Material>)
+  Material(const M &material) : descriptor(material.describe()) {}
+};
+
 struct StandardMaterial {
-  rydz_gl::Color base_color = rydz_gl::kWhite;
-  Handle<rydz_gl::Texture> texture{};
-  Handle<rydz_gl::Texture> normal_map{};
-  Handle<rydz_gl::Texture> metallic_map{};
-  Handle<rydz_gl::Texture> roughness_map{};
-  Handle<rydz_gl::Texture> occlusion_map{};
-  Handle<rydz_gl::Texture> emissive_map{};
-  rydz_gl::Color emissive_color = {0, 0, 0, 0};
+  Color base_color = kWhite;
+  Handle<Texture> texture{};
+  Handle<Texture> normal_map{};
+  Handle<Texture> metallic_map{};
+  Handle<Texture> roughness_map{};
+  Handle<Texture> occlusion_map{};
+  Handle<Texture> emissive_map{};
+  Color emissive_color = {0, 0, 0, 0};
   f32 metallic = -1.0f;
   f32 roughness = -1.0f;
   f32 normal_scale = -1.0f;
   f32 occlusion_strength = -1.0f;
 
-  static StandardMaterial from_color(rydz_gl::Color c) {
+  static StandardMaterial from_color(Color c) {
     return {.base_color = c};
   }
-  static StandardMaterial from_texture(Handle<rydz_gl::Texture> tex,
-                                       rydz_gl::Color tint = rydz_gl::kWhite) {
+  static StandardMaterial from_texture(Handle<Texture> tex,
+                                       Color tint = kWhite) {
     return {.base_color = tint, .texture = tex};
   }
 
@@ -166,16 +179,13 @@ struct StandardMaterial {
   }
 };
 
-static_assert(IsMaterial<StandardMaterial>);
+static_assert(MaterialValue<StandardMaterial>);
 
-template <IsMaterial M = StandardMaterial> struct MeshMaterial3d {
-  M material;
+struct MeshMaterial3d {
+  Handle<Material> material{};
 
   MeshMaterial3d() = default;
-  explicit MeshMaterial3d(M m) : material(std::move(m)) {}
-  explicit MeshMaterial3d(rydz_gl::Color c)
-    requires std::constructible_from<M, rydz_gl::Color>
-      : material{c} {}
+  explicit MeshMaterial3d(Handle<Material> material) : material(material) {}
 };
 
 } // namespace ecs

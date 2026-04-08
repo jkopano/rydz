@@ -11,7 +11,7 @@ using namespace ecs;
 using namespace math;
 
 struct ToonMaterial {
-  rl::Color base_color = WHITE;
+  ecs::Color base_color = kWhite;
   float rim_strength = 0.15f;
 
   MaterialDescriptor describe() const {
@@ -28,30 +28,29 @@ struct ToonMaterial {
   }
 };
 
-using ToonMat = MeshMaterial3d<ToonMaterial>;
-
-void setup(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
+           ResMut<Assets<ecs::Material>> materials, NonSendMarker) {
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             Transform::from_xyz(0, 3, 6).look_at(Vec3::sZero()));
 
   auto sphere = meshes->add(mesh::sphere(1.0f));
   auto floor = meshes->add(mesh::plane(8.0f, 8.0f));
+  auto toon = materials->add(ToonMaterial{.base_color = kOrange});
+  auto floor_mat =
+      materials->add(StandardMaterial::from_color({220, 220, 220, 255}));
 
-  cmd.spawn(Mesh3d{sphere}, ToonMat{ToonMaterial{.base_color = ORANGE}},
+  cmd.spawn(Mesh3d{sphere}, MeshMaterial3d{toon},
             Transform::from_xyz(0, 1, 0));
-  cmd.spawn(
-      Mesh3d{floor},
-      MeshMaterial3d<>{StandardMaterial::from_color({220, 220, 220, 255})},
-      Transform{});
+  cmd.spawn(Mesh3d{floor}, MeshMaterial3d{floor_mat}, Transform{});
 }
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({800, 600, "10 - Custom Material", 60}))
-      .add_plugin(rydz_platform::RayPlugin::install({}))
+  app.add_plugin(rydz_platform::RayPlugin::install({
+          .window = {800, 600, "10 - Custom Material", 60},
+      }))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_plugin(RenderPlugin::register_material<ToonMaterial>)
       .add_systems(ScheduleLabel::Startup, setup)
       .run();
 }

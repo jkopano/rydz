@@ -16,7 +16,8 @@ struct RotateTag {};
 
 // NonSendMarker musi być gdy funkcja musi być odpalona na głównym wątku
 // (inną opcją jest dodanie do funkcji World world)
-void setup(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
+           ResMut<Assets<ecs::Material>> materials, NonSendMarker) {
   // kamera ze skyboxem — Skybox ładuje 6 tekstur z folderu (kinda słabe do
   // poprawy) (right/left/top/bottom/front/back.jpg) Skybox na razie musi być w
   // kamerze, chyba dobre rozwiązanie, ale do ugadania
@@ -26,36 +27,38 @@ void setup(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes, NonSendMarker) {
 
   // cube - czerwona
   auto cube_h = meshes->add(mesh::cube(2, 2, 2));
-  cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d<>{StandardMaterial::from_color(RED)},
+  auto cube_mat = materials->add(StandardMaterial::from_color(kRed));
+  cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d{cube_mat},
             ecs::Transform::from_xyz(-4, 1, 0), RotateTag{});
 
   // kula - zielona
   auto sphere_h = meshes->add(mesh::sphere(1.0f));
+  auto sphere_mat = materials->add(StandardMaterial::from_color(kGreen));
   cmd.spawn(
-      Mesh3d{sphere_h}, MeshMaterial3d<>{StandardMaterial::from_color(GREEN)},
+      Mesh3d{sphere_h}, MeshMaterial3d{sphere_mat},
       ecs::Transform::from_xyz(0, 1, 0));
 
   // cylinder - niebieski
   auto cyl_h = meshes->add(mesh::cylinder(0.8f, 2.0f));
-  cmd.spawn(Mesh3d{cyl_h},
-            MeshMaterial3d<>{StandardMaterial::from_color(BLUE)},
+  auto cyl_mat = materials->add(StandardMaterial::from_color(kBlue));
+  cmd.spawn(Mesh3d{cyl_h}, MeshMaterial3d{cyl_mat},
             ecs::Transform::from_xyz(4, 1, 0));
 
   // floor
   auto floor_h = meshes->add(mesh::plane(20, 20));
-  cmd.spawn(Mesh3d{floor_h},
-            MeshMaterial3d<>{StandardMaterial::from_color(DARKGRAY)},
+  auto floor_mat = materials->add(StandardMaterial::from_color(kDarkGray));
+  cmd.spawn(Mesh3d{floor_h}, MeshMaterial3d{floor_mat},
             ecs::Transform::from_xyz(0, 0, 0));
 
   // torus
   auto torus_h = meshes->add(mesh::torus(1.0f, 0.3f));
-  cmd.spawn(
-      Mesh3d{torus_h}, MeshMaterial3d<>{StandardMaterial::from_color(PURPLE)},
-      ecs::Transform::from_xyz(0, 3, -4), RotateTag{});
+  auto torus_mat = materials->add(StandardMaterial::from_color(kPurple));
+  cmd.spawn(Mesh3d{torus_h}, MeshMaterial3d{torus_mat},
+            ecs::Transform::from_xyz(0, 3, -4), RotateTag{});
 
   // światło żeby coś było widać
   cmd.spawn(DirectionalLight{
-      .color = WHITE,
+      .color = kWhite,
       .direction = Vec3(-0.3f, -1.0f, -0.5f),
       .intensity = 0.5f,
   });
@@ -73,18 +76,19 @@ void load_gltf_model(Cmd cmd, Res<AssetServer> asset_server) {
 }
 
 // ładowanie tekstur i nakładanie na materiał
-void load_textured_cube(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes,
-                        ResMut<Assets<rydz_gl::Texture>> textures,
+void load_textured_cube(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
+                        ResMut<Assets<ecs::Texture>> textures,
+                        ResMut<Assets<ecs::Material>> materials,
                         NonSendMarker) {
   // ładowanko tekstury można też przez AssetServer
   auto tex_handle = textures->add(rydz_gl::load_texture("res/textures/stone.jpg"));
 
   // materiał z teksturą
-  auto mat = StandardMaterial::from_texture(tex_handle);
+  auto mat = materials->add(StandardMaterial::from_texture(tex_handle));
 
   auto cube_h = meshes->add(mesh::cube(2, 2, 2));
 
-  cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d<>{mat},
+  cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d{mat},
             ecs::Transform::from_xyz(-8, 1, 0), RotateTag{});
 }
 
@@ -93,15 +97,16 @@ void rotate_system(Query<Mut<Transform>, With<RotateTag>> query,
                    Res<Time> time) {
   for (auto [t] : query.iter()) {
     f32 angle = time->delta_seconds * 1.0f;
-    Quat rot = Quat::sRotation(Vec3(0, 1, 0), angle);
+    Quat rot = Quat::sEulerAngles(Vec3(0, angle, 0));
     t->rotation = rot * t->rotation;
   }
 }
 
 int main() {
   App app;
-  app.add_plugin(window_plugin({1024, 768, "06 - Rendering", 60}))
-      .add_plugin(rydz_platform::RayPlugin::install({}))
+  app.add_plugin(rydz_platform::RayPlugin::install({
+          .window = {1024, 768, "06 - Rendering", 60},
+      }))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_systems(ScheduleLabel::Startup, setup)

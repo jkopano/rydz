@@ -1,5 +1,6 @@
 #pragma once
 
+#include "assets.hpp"
 #include "material3d.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_gl/core.hpp"
@@ -10,7 +11,7 @@
 namespace ecs {
 
 struct RenderBatchKey {
-  Handle<rydz_gl::Mesh> mesh{};
+  Handle<Mesh> mesh{};
   MaterialDescriptor material;
 
   bool operator==(const RenderBatchKey &o) const {

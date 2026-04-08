@@ -148,7 +148,7 @@ inline void initialize_custom_map_locations(ShaderProgram &shader) {
 
 inline void apply_material_map_binding(rydz_gl::Material &material,
                                        const MaterialMapBinding &binding,
-                                       const Assets<rydz_gl::Texture> &textures) {
+                                       const Assets<Texture> &textures) {
   if (binding.map_type < 0 || binding.map_type >= 12) {
     return;
   }
@@ -169,7 +169,7 @@ inline void apply_material_map_binding(rydz_gl::Material &material,
 
 inline void prepare_material(NonSendMarker marker,
                              const MaterialDescriptor &descriptor,
-                             const Assets<rydz_gl::Texture> &texture_assets,
+                             const Assets<Texture> &texture_assets,
                              ShaderCache &shader_cache,
                              PreparedMaterial &prepared) {
   const auto &src_mat = fallback_material(marker);

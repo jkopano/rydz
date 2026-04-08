@@ -111,7 +111,7 @@ struct MeshBounds {
 
 inline void compute_mesh_bounds_system(
     Query<Entity, Mesh3d, Without<MeshBounds>> query,
-    Res<Assets<rydz_gl::Mesh>> mesh_assets, Cmd cmd) {
+    Res<Assets<Mesh>> mesh_assets, Cmd cmd) {
   for (auto [e, mesh3d] : query.iter()) {
     const auto *mesh = mesh_assets->get(mesh3d->mesh);
     if (!mesh || rydz_gl::mesh_vertex_count(*mesh) <= 0 ||

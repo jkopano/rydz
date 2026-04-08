@@ -187,7 +187,7 @@ private:
     }
 
     static void ensure_mesh(World &world, Entity entity,
-                            Handle<rydz_gl::Mesh> mesh) {
+                            Handle<Mesh> mesh) {
       if (auto *existing = world.get_component<Mesh3d>(entity)) {
         existing->mesh = mesh;
       } else {
@@ -196,11 +196,11 @@ private:
     }
 
     static void ensure_material(World &world, Entity entity,
-                                const StandardMaterial &material) {
-      if (auto *existing = world.get_component<MeshMaterial3d<>>(entity)) {
+                                Handle<Material> material) {
+      if (auto *existing = world.get_component<MeshMaterial3d>(entity)) {
         existing->material = material;
       } else {
-        world.insert_component(entity, MeshMaterial3d<>{material});
+        world.insert_component(entity, MeshMaterial3d{material});
       }
     }
 
