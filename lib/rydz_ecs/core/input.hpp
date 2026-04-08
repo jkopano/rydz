@@ -20,37 +20,15 @@ struct Input {
   }
 
   using T = Resource;
-  bool blocked_by_ui = false;
-
-  bool key_down(KeyCode key) const {
-      if (blocked_by_ui) return false;
-      return keys_down_.contains(key);
-  }
-
-  bool key_pressed(KeyCode key) const {
-      if (blocked_by_ui) return false;
-      return keys_pressed_.contains(key);
-  }
-
-  bool key_released(KeyCode key) const {
-      if (blocked_by_ui) return false;
-      return keys_released_.contains(key);
-  }
+  bool key_down(KeyCode key) const { return keys_down_.contains(key); }
+  bool key_pressed(KeyCode key) const { return keys_pressed_.contains(key); }
+  bool key_released(KeyCode key) const { return keys_released_.contains(key); }
 
   Vector2 mouse_delta() const {
-      if (blocked_by_ui) return Vector2{ 0.0f, 0.0f };
-      return Vector2{ mouse_.delta_x, mouse_.delta_y };
+    return Vector2{mouse_.delta_x, mouse_.delta_y};
   }
-
-  f32 mouse_delta_x() const {
-      if (blocked_by_ui) return 0.0f;
-      return mouse_.delta_x;
-  }
-
-  f32 mouse_delta_y() const {
-      if (blocked_by_ui) return 0.0f;
-      return mouse_.delta_y;
-  }
+  f32 mouse_delta_x() const { return mouse_.delta_x; }
+  f32 mouse_delta_y() const { return mouse_.delta_y; }
 
 public:
   void clear_frame() {

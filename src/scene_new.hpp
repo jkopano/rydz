@@ -26,12 +26,18 @@ struct Player {
   f32 move_speed = 8.0f;
 };
 
+
 // Isometric camera offset from the player
 static const float kCamOffX = 10.0f;
 static const float kCamOffY = 10.0f;
 static const float kCamOffZ = 10.0f;
 
 // ── Systems ──────────────────────────────────────────────────────────────────
+
+//Run condition - Only run gameplay systems when console is closed
+inline bool is_gameplay_active(Res<engine::ConsoleState> console) {
+    return !console->is_open;
+}
 
 // Move the player using WSAD relative to the isometric view direction
 inline void player_movement_system(Query<Mut<Transform>, Player> query,
@@ -183,9 +189,9 @@ inline void scene_plugin(App &app) {
 
   app.add_systems(ScheduleLabel::Startup, setup_ui);
 
-  app.add_systems(ScheduleLabel::Update, player_movement_system);
-  app.add_systems(ScheduleLabel::Update, update_isometric_camera_target_system);
-  //app.add_systems(ScheduleLabel::Update, isometric_camera_system);
+  app.add_systems(ScheduleLabel::Update,
+    ecs::group(player_movement_system, update_isometric_camera_target_system).run_if(is_gameplay_active) 
+  );
 
   app.add_systems(ecs::RenderPassSet::Cleanup,ecs::group(engine::ConsoleRenderSystem).before(ecs::RenderPassSystems::Frame::end_frame)
   );
