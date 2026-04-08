@@ -1,4 +1,5 @@
 #pragma once
+
 #include "math.hpp"
 #include "mesh3d.hpp"
 #include "rydz_ecs/asset.hpp"
@@ -16,7 +17,7 @@ struct SceneMaterial {
 };
 
 struct ScenePrimitive {
-  Handle<rl::Mesh> mesh;
+  Handle<rydz_gl::Mesh> mesh;
   usize material_index = 0;
   i32 skin_index = -1;
   Transform local_transform{};

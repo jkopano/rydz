@@ -1,4 +1,5 @@
 #pragma once
+#include "math.hpp"
 #include "rydz_ecs/app.hpp"
 #include "types.hpp"
 #include <unordered_set>
@@ -24,8 +25,8 @@ struct Input {
   bool key_pressed(KeyCode key) const { return keys_pressed_.contains(key); }
   bool key_released(KeyCode key) const { return keys_released_.contains(key); }
 
-  Vector2 mouse_delta() const {
-    return Vector2{mouse_.delta_x, mouse_.delta_y};
+  math::Vec2 mouse_delta() const {
+    return math::Vec2{mouse_.delta_x, mouse_.delta_y};
   }
   f32 mouse_delta_x() const { return mouse_.delta_x; }
   f32 mouse_delta_y() const { return mouse_.delta_y; }

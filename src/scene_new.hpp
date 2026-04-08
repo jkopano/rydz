@@ -85,7 +85,7 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
 }
 
 inline void setup_lighting(Cmd cmd, NonSendMarker,
-                           ResMut<Assets<rl::Mesh>> meshes) {
+                           ResMut<Assets<rydz_gl::Mesh>> meshes) {
   cmd.spawn(AmbientLight{
       .color = {60, 60, 70, 255},
       .intensity = 0.35f,
@@ -106,36 +106,34 @@ inline void setup_lighting(Cmd cmd, NonSendMarker,
   );
 }
 
-inline void spawn_ground(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
-                         ResMut<Assets<rl::Texture2D>> textures,
+inline void spawn_ground(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes,
+                         ResMut<Assets<rydz_gl::Texture>> textures,
                          NonSendMarker) {
   auto plane_h = meshes->add(mesh::plane(20.0f, 20.0f, 1, 1));
 
   cmd.spawn(Mesh3d{plane_h},
             // MeshMaterial3d<>{
             //     StandardMaterial::from_color({80, 160, 80, 255})},
-            MeshMaterial3d<>{
-                StandardMaterial::from_texture(
-                    textures->add(rl::LoadTexture("res/textures/brick.png")))},
+            MeshMaterial3d<>{StandardMaterial::from_texture(textures->add(
+                rydz_gl::load_texture("res/textures/brick.png")))},
             Transform{});
 }
 
-inline void spawn_player(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
-                         ResMut<Assets<rl::Texture2D>> textures,
+inline void spawn_player(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes,
+                         ResMut<Assets<rydz_gl::Texture>> textures,
                          NonSendMarker) {
   auto cube_h = meshes->add(mesh::cube(1.0f, 1.0f, 1.0f));
 
   cmd.spawn(Mesh3d{cube_h},
-            MeshMaterial3d<>{
-                StandardMaterial::from_texture(
-                    textures->add(rl::LoadTexture("res/textures/stone.jpg")))},
+            MeshMaterial3d<>{StandardMaterial::from_texture(textures->add(
+                rydz_gl::load_texture("res/textures/stone.jpg")))},
             Transform::from_xyz(0.0f, 0.5f, 0.0f), Player{});
 }
 
 // ── Plugin ───────────────────────────────────────────────────────────────────
 
 inline void scene_plugin(App &app) {
-  app.add_plugin(input_plugin);
+  app.add_plugin(Input::install);
   app.add_plugin(system_multithreading({true}));
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);

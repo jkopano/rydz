@@ -33,16 +33,16 @@ struct RenderPassSystems {
       state->scene_active = view->active;
 
       if (!view->active) {
-        rl::BeginDrawing();
-        rl::ClearBackground(view->clear_color);
+        rydz_gl::begin_drawing();
+        rydz_gl::clear_background(view->clear_color);
         state->backbuffer_active = true;
         return;
       }
 
-      screen_pipeline->ensure_target(rl::GetScreenWidth(),
-                                     rl::GetScreenHeight());
-      rl::BeginTextureMode(screen_pipeline->world_target);
-      rl::ClearBackground(view->clear_color);
+      screen_pipeline->ensure_target(rydz_gl::screen_width(),
+                                     rydz_gl::screen_height());
+      rydz_gl::begin_texture_mode(screen_pipeline->world_target);
+      rydz_gl::clear_background(view->clear_color);
       state->world_target_active = true;
       World::begin_world_pass(marker, *view);
       state->world_pass_active = true;
@@ -57,22 +57,22 @@ struct RenderPassSystems {
       }
 
       if (state->world_target_active) {
-        rl::EndTextureMode();
+        rydz_gl::end_texture_mode();
         state->world_target_active = false;
       }
 
       if (!state->backbuffer_active) {
-        rl::BeginDrawing();
+        rydz_gl::begin_drawing();
         state->backbuffer_active = true;
       }
 
       if (debug_settings->draw_fps) {
-        rl::DrawFPS(static_cast<int>(debug_settings->fps_position.x),
-                    static_cast<int>(debug_settings->fps_position.y));
+        rydz_gl::draw_fps(static_cast<int>(debug_settings->fps_position.x),
+                          static_cast<int>(debug_settings->fps_position.y));
       }
 
       if (state->backbuffer_active) {
-        rl::EndDrawing();
+        rydz_gl::end_drawing();
         state->backbuffer_active = false;
       }
     }
@@ -84,8 +84,8 @@ struct RenderPassSystems {
 
     static void run_depth_prepass(Res<RenderExecutionState> state,
                                   Res<OpaquePhase> phase,
-                                  Res<Assets<rl::Mesh>> mesh_assets,
-                                  Res<Assets<rl::Texture2D>> texture_assets,
+                                  Res<Assets<rydz_gl::Mesh>> mesh_assets,
+                                  Res<Assets<rydz_gl::Texture>> texture_assets,
                                   ResMut<ShaderCache> shader_cache,
                                   Res<ExtractedView> view,
                                   NonSendMarker marker) {
@@ -115,8 +115,8 @@ struct RenderPassSystems {
 
     static void run_opaque_pass(
         Res<RenderExecutionState> state, Res<OpaquePhase> phase,
-        Res<Assets<rl::Mesh>> mesh_assets,
-        Res<Assets<rl::Texture2D>> texture_assets,
+        Res<Assets<rydz_gl::Mesh>> mesh_assets,
+        Res<Assets<rydz_gl::Texture>> texture_assets,
         ResMut<ShaderCache> shader_cache, Res<ExtractedView> view,
         Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
         Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
@@ -133,8 +133,8 @@ struct RenderPassSystems {
 
     static void run_transparent_pass(
         Res<RenderExecutionState> state, Res<TransparentPhase> phase,
-        Res<Assets<rl::Mesh>> mesh_assets,
-        Res<Assets<rl::Texture2D>> texture_assets,
+        Res<Assets<rydz_gl::Mesh>> mesh_assets,
+        Res<Assets<rydz_gl::Texture>> texture_assets,
         ResMut<ShaderCache> shader_cache, Res<ExtractedView> view,
         Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
         Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
@@ -150,37 +150,17 @@ struct RenderPassSystems {
     }
 
     static void begin_world_pass(NonSendMarker, const ExtractedView &view) {
-      rl::rlDrawRenderBatchActive();
-      rl::rlMatrixMode(RL_PROJECTION);
-      rl::rlPushMatrix();
-      rl::rlLoadIdentity();
-      rl::rlSetMatrixProjection(to_rl(view.camera_view.proj));
-      rl::rlMatrixMode(RL_MODELVIEW);
-      rl::rlLoadIdentity();
-      rl::rlSetMatrixModelview(to_rl(view.camera_view.view));
-      RenderConfig::restore_defaults();
-
-      if (view.has_render_config) {
-        view.render_config.apply();
-      }
+      const RenderConfig *config =
+          view.has_render_config ? &view.render_config : nullptr;
+      rydz_gl::begin_world_pass(view.camera_view.view, view.camera_view.proj,
+                                config);
 
       if (view.active_skybox && view.active_skybox->loaded) {
         view.active_skybox->draw(view.camera_view.view, view.camera_view.proj);
       }
     }
 
-    static void end_world_pass(NonSendMarker) {
-      rl::rlDrawRenderBatchActive();
-      rl::rlMatrixMode(RL_PROJECTION);
-      rl::rlPopMatrix();
-      rl::rlMatrixMode(RL_MODELVIEW);
-      rl::rlLoadIdentity();
-      rl::rlDisableDepthTest();
-      rl::rlEnableDepthMask();
-      rl::rlDisableBackfaceCulling();
-      rl::rlDisableWireMode();
-      rl::rlSetBlendMode(RL_BLEND_ALPHA);
-    }
+    static void end_world_pass(NonSendMarker) { rydz_gl::end_world_pass(); }
 
   private:
     static const ShaderSpec &depth_prepass_shader_spec() {
@@ -190,31 +170,20 @@ struct RenderPassSystems {
     }
 
     static void begin_depth_prepass(NonSendMarker) {
-      rl::rlDrawRenderBatchActive();
-      rl::rlColorMask(false, false, false, false);
-      rl::rlDisableColorBlend();
-      rl::rlEnableDepthTest();
-      rl::rlEnableDepthMask();
-      rl::rlEnableBackfaceCulling();
-      rl::rlSetCullFace(RL_CULL_FACE_BACK);
+      rydz_gl::begin_depth_prepass();
     }
 
     static void end_depth_prepass(NonSendMarker, const ExtractedView &view) {
-      rl::rlDrawRenderBatchActive();
-      rl::rlColorMask(true, true, true, true);
-      rl::rlEnableColorBlend();
-      if (view.has_render_config) {
-        view.render_config.apply();
-      } else {
-        RenderConfig::restore_defaults();
-      }
+      const RenderConfig *config =
+          view.has_render_config ? &view.render_config : nullptr;
+      rydz_gl::end_depth_prepass(config);
     }
 
     static void draw_depth_batch(NonSendMarker marker, const OpaqueBatch &batch,
-                                 const Assets<rl::Mesh> &mesh_assets,
-                                 const Assets<rl::Texture2D> &texture_assets,
+                                 const Assets<rydz_gl::Mesh> &mesh_assets,
+                                 const Assets<rydz_gl::Texture> &texture_assets,
                                  ShaderCache &shader_cache) {
-      const rl::Mesh *mesh = mesh_assets.get(batch.key.mesh);
+      const auto *mesh = mesh_assets.get(batch.key.mesh);
       if (!mesh) {
         return;
       }
@@ -244,8 +213,8 @@ struct RenderPassSystems {
           std::min(lights.point_lights.size(),
                    static_cast<usize>(config.max_point_lights));
       if (lights.point_lights.size() > point_light_count) {
-        rl::TraceLog(
-            LOG_WARNING,
+        rydz_gl::trace_log(
+            rydz_gl::LOG_WARNING,
             "Forward+: dropping %d point lights beyond configured cap",
             static_cast<int>(lights.point_lights.size() - point_light_count));
       }
@@ -253,8 +222,8 @@ struct RenderPassSystems {
       for (usize i = 0; i < point_light_count; ++i) {
         const auto &light = lights.point_lights[i];
         state.point_lights_cpu.push_back(GpuPointLight{
-            .position_range = {light.position.x, light.position.y,
-                               light.position.z, light.range},
+            .position_range = {light.position.GetX(), light.position.GetY(),
+                               light.position.GetZ(), light.range},
             .color_intensity = {light.color.r / 255.0f, light.color.g / 255.0f,
                                 light.color.b / 255.0f, light.intensity},
         });
@@ -266,7 +235,7 @@ struct RenderPassSystems {
           for (i32 x = 0; x < config.tile_count_x; ++x) {
             const u32 cluster_index = static_cast<u32>(
                 (z * config.tile_count_y + y) * config.tile_count_x + x);
-            state.clusters_cpu[cluster_index] = build_cluster_record(
+            state.clusters_cpu[cluster_index] = rydz_gl::build_cluster_record(
                 config, inverse_projection, view.orthographic, view.near_plane,
                 view.far_plane, x, y, z);
           }
@@ -283,7 +252,7 @@ struct RenderPassSystems {
             view.camera_view.view * Vec3(light.position_range.x,
                                          light.position_range.y,
                                          light.position_range.z);
-        const rl::Vector3 view_position = to_rl(view_position_math);
+        const auto view_position = rydz_gl::to_vector3(view_position_math);
 
         for (u32 cluster_index = 0;
              cluster_index < static_cast<u32>(state.clusters_cpu.size());
@@ -306,30 +275,31 @@ struct RenderPassSystems {
       }
 
       if (!state.point_lights_cpu.empty()) {
-        rl::rlUpdateShaderBuffer(
+        rydz_gl::update_shader_buffer(
             state.point_light_buffer, state.point_lights_cpu.data(),
             static_cast<unsigned int>(state.point_lights_cpu.size() *
                                       sizeof(GpuPointLight)),
             0);
       }
-      rl::rlUpdateShaderBuffer(
+      rydz_gl::update_shader_buffer(
           state.cluster_buffer, state.clusters_cpu.data(),
           static_cast<unsigned int>(state.clusters_cpu.size() *
                                     sizeof(ClusterGpuRecord)),
           0);
-      rl::rlUpdateShaderBuffer(
+      rydz_gl::update_shader_buffer(
           state.light_index_buffer, state.light_indices_cpu.data(),
           static_cast<unsigned int>(state.light_indices_cpu.size() *
                                     sizeof(u32)),
           0);
-      rl::rlUpdateShaderBuffer(state.overflow_buffer, &overflow_count,
-                               sizeof(overflow_count), 0);
+      rydz_gl::update_shader_buffer(state.overflow_buffer, &overflow_count,
+                                    sizeof(overflow_count), 0);
 
       if (overflow_count > 0) {
         if (last_reported_overflow != overflow_count) {
-          rl::TraceLog(LOG_WARNING,
-                       "Forward+: cluster light list overflowed %u writes",
-                       overflow_count);
+          rydz_gl::trace_log(
+              rydz_gl::LOG_WARNING,
+              "Forward+: cluster light list overflowed %u writes",
+              overflow_count);
           last_reported_overflow = overflow_count;
         }
       } else {
@@ -339,14 +309,14 @@ struct RenderPassSystems {
 
     static void draw_opaque_batch(NonSendMarker marker,
                                   const OpaqueBatch &batch,
-                                  const Assets<rl::Mesh> &mesh_assets,
-                                  const Assets<rl::Texture2D> &texture_assets,
+                                  const Assets<rydz_gl::Mesh> &mesh_assets,
+                                  const Assets<rydz_gl::Texture> &texture_assets,
                                   ShaderCache &shader_cache,
                                   const ExtractedView &view,
                                   const ExtractedLights &lights,
                                   const ClusterConfig &cluster_config,
                                   const ClusteredLightingState &cluster_state) {
-      const rl::Mesh *mesh = mesh_assets.get(batch.key.mesh);
+      const auto *mesh = mesh_assets.get(batch.key.mesh);
       if (!mesh) {
         return;
       }
@@ -363,12 +333,12 @@ struct RenderPassSystems {
 
     static void draw_transparent_item(
         NonSendMarker marker, const TransparentPhaseItem &item,
-        const Assets<rl::Mesh> &mesh_assets,
-        const Assets<rl::Texture2D> &texture_assets, ShaderCache &shader_cache,
-        const ExtractedView &view, const ExtractedLights &lights,
-        const ClusterConfig &cluster_config,
+        const Assets<rydz_gl::Mesh> &mesh_assets,
+        const Assets<rydz_gl::Texture> &texture_assets,
+        ShaderCache &shader_cache, const ExtractedView &view,
+        const ExtractedLights &lights, const ClusterConfig &cluster_config,
         const ClusteredLightingState &cluster_state) {
-      const rl::Mesh *mesh = mesh_assets.get(item.mesh);
+      const auto *mesh = mesh_assets.get(item.mesh);
       if (!mesh) {
         return;
       }
@@ -380,10 +350,10 @@ struct RenderPassSystems {
           resolve_shader(marker, shader_cache, item.material.shader);
       apply_shader_uniforms(marker, shader, item.material, prepared, view,
                             lights, cluster_config, cluster_state);
-      rl::DrawMesh(*mesh, prepared.material, to_rl(item.world_transform));
+      rydz_gl::draw_mesh(*mesh, prepared.material, item.world_transform);
     }
 
-    static bool sphere_intersects_cluster(const rl::Vector3 &center,
+    static bool sphere_intersects_cluster(const rydz_gl::Vec3 &center,
                                           float radius,
                                           const ClusterGpuRecord &cluster) {
       const float closest_x =
@@ -411,13 +381,13 @@ struct RenderPassSystems {
       }
 
       if (state->world_target_active) {
-        rl::EndTextureMode();
+        rydz_gl::end_texture_mode();
         state->world_target_active = false;
       }
 
       if (!state->backbuffer_active) {
-        rl::BeginDrawing();
-        rl::ClearBackground(BLACK);
+        rydz_gl::begin_drawing();
+        rydz_gl::clear_background(rydz_gl::kBlack);
         state->backbuffer_active = true;
       }
 
@@ -425,13 +395,14 @@ struct RenderPassSystems {
         return;
       }
 
-      draw_postprocess_pass(marker, screen_pipeline->world_target.texture,
-                            *shader_cache, *view, *time);
+      draw_postprocess_pass(
+          marker, rydz_gl::render_target_texture(screen_pipeline->world_target),
+          *shader_cache, *view, *time);
     }
 
   private:
-    static rl::Rectangle postprocess_source_rect(
-        const rl::Texture2D &texture) {
+    static rydz_gl::Rectangle
+    postprocess_source_rect(const rydz_gl::Texture &texture) {
       return {
           0.0f,
           0.0f,
@@ -440,28 +411,29 @@ struct RenderPassSystems {
       };
     }
 
-    static rl::Rectangle postprocess_dest_rect() {
+    static rydz_gl::Rectangle postprocess_dest_rect() {
       return {
           0.0f,
           0.0f,
-          static_cast<float>(rl::GetScreenWidth()),
-          static_cast<float>(rl::GetScreenHeight()),
+          static_cast<float>(rydz_gl::screen_width()),
+          static_cast<float>(rydz_gl::screen_height()),
       };
     }
 
     static void draw_world_target_to_screen(
-        const rl::Texture2D &source_texture) {
-      rl::DrawTexturePro(source_texture,
-                         postprocess_source_rect(source_texture),
-                         postprocess_dest_rect(), {0.0f, 0.0f}, 0.0f, WHITE);
+        const rydz_gl::Texture &source_texture) {
+      rydz_gl::draw_texture_pro(source_texture,
+                                postprocess_source_rect(source_texture),
+                                postprocess_dest_rect(), {0.0f, 0.0f}, 0.0f,
+                                rydz_gl::kWhite);
     }
 
     static void apply_postprocess_uniforms(ShaderProgram &shader,
                                            const PostProcessDescriptor &effect,
                                            const Time &time) {
-      const rl::Vector2 resolution = {
-          static_cast<float>(std::max(rl::GetScreenWidth(), 1)),
-          static_cast<float>(std::max(rl::GetScreenHeight(), 1)),
+      const rydz_gl::Vec2 resolution = {
+          static_cast<float>(std::max(rydz_gl::screen_width(), 1)),
+          static_cast<float>(std::max(rydz_gl::screen_height(), 1)),
       };
       shader.set("u_resolution", resolution);
       shader.set("u_time", time.elapsed_seconds);
@@ -472,7 +444,7 @@ struct RenderPassSystems {
     }
 
     static void draw_postprocess_pass(NonSendMarker marker,
-                                      const rl::Texture2D &source_texture,
+                                      const rydz_gl::Texture &source_texture,
                                       ShaderCache &shader_cache,
                                       const ExtractedView &view,
                                       const Time &time) {
@@ -484,8 +456,8 @@ struct RenderPassSystems {
       ShaderProgram &shader =
           resolve_shader(marker, shader_cache, view.postprocess.shader);
       apply_postprocess_uniforms(shader, view.postprocess, time);
-      shader.set_texture(shader.raw().locs[SHADER_LOC_MAP_DIFFUSE],
-                         source_texture);
+      shader.set_texture(
+          shader.raw().locs[rydz_gl::SHADER_LOC_MAP_DIFFUSE], source_texture);
 
       shader.with_bound([&] { draw_world_target_to_screen(source_texture); });
     }
@@ -493,31 +465,34 @@ struct RenderPassSystems {
 
   struct Ui {
     static void run_ui_pass(Res<UiPhase> phase,
-                            Res<Assets<rl::Texture2D>> texture_assets,
+                            Res<Assets<rydz_gl::Texture>> texture_assets,
                             ResMut<RenderExecutionState> state,
                             NonSendMarker) {
       if (!state->backbuffer_active) {
-        rl::BeginDrawing();
+        rydz_gl::begin_drawing();
         state->backbuffer_active = true;
       }
 
       for (const auto &item : phase->items) {
-        const rl::Texture2D *texture = texture_assets->get(item.texture);
+        const auto *texture = texture_assets->get(item.texture);
         if (!texture) {
           continue;
         }
 
-        rl::Vector2 position = {item.transform.translation.GetX(),
-                                item.transform.translation.GetY()};
-        rl::Rectangle source = {0, 0, static_cast<float>(texture->width),
-                                static_cast<float>(texture->height)};
-        rl::Rectangle dest = {position.x, position.y,
-                              texture->width * item.transform.scale.GetX(),
-                              texture->height * item.transform.scale.GetY()};
-        rl::Vector2 origin = {0, 0};
+        rydz_gl::Vec2 position = {item.transform.translation.GetX(),
+                                  item.transform.translation.GetY()};
+        rydz_gl::Rectangle source = {
+            0, 0, static_cast<float>(texture->width),
+            static_cast<float>(texture->height)};
+        rydz_gl::Rectangle dest = {position.x, position.y,
+                                   texture->width * item.transform.scale.GetX(),
+                                   texture->height *
+                                       item.transform.scale.GetY()};
+        rydz_gl::Vec2 origin = {0, 0};
 
-        rl::DrawTexturePro(*texture, source, dest, origin,
-                           texture_rotation_degrees(item.transform), item.tint);
+        rydz_gl::draw_texture_pro(*texture, source, dest, origin,
+                                  texture_rotation_degrees(item.transform),
+                                  item.tint);
       }
     }
 

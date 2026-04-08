@@ -1,7 +1,7 @@
 #pragma once
 
-#include "rl.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_gl/resources.hpp"
 #include <algorithm>
 
 namespace ecs {
@@ -21,13 +21,13 @@ struct DebugOverlaySettings {
   using T = Resource;
 
   bool draw_fps = true;
-  rl::Vector2 fps_position = {10.0f, 10.0f};
+  rydz_gl::Vec2 fps_position = {10.0f, 10.0f};
 };
 
 struct ScreenPipelineState {
   using T = Resource;
 
-  rl::RenderTexture2D world_target{};
+  rydz_gl::RenderTarget world_target{};
   int width = 0;
   int height = 0;
 
@@ -38,7 +38,7 @@ struct ScreenPipelineState {
   ScreenPipelineState(ScreenPipelineState &&other) noexcept
       : world_target(other.world_target), width(other.width),
         height(other.height) {
-    other.world_target = {};
+    other.world_target = rydz_gl::RenderTarget{};
     other.width = 0;
     other.height = 0;
   }
@@ -52,7 +52,7 @@ struct ScreenPipelineState {
     world_target = other.world_target;
     width = other.width;
     height = other.height;
-    other.world_target = {};
+    other.world_target = rydz_gl::RenderTarget{};
     other.width = 0;
     other.height = 0;
     return *this;
@@ -60,7 +60,7 @@ struct ScreenPipelineState {
 
   ~ScreenPipelineState() { unload(); }
 
-  bool ready() const { return world_target.id != 0; }
+  bool ready() const { return rydz_gl::render_target_ready(world_target); }
 
   void ensure_target(int target_width, int target_height) {
     target_width = std::max(target_width, 1);
@@ -71,19 +71,20 @@ struct ScreenPipelineState {
     }
 
     unload();
-    world_target = rl::LoadRenderTexture(target_width, target_height);
+    world_target = rydz_gl::load_render_target(target_width, target_height);
     width = target_width;
     height = target_height;
 
-    if (world_target.texture.id != 0) {
-      rl::SetTextureFilter(world_target.texture, TEXTURE_FILTER_BILINEAR);
+    if (rydz_gl::render_target_texture(world_target).id != 0) {
+      rydz_gl::set_texture_filter(rydz_gl::render_target_texture(world_target),
+                                  rydz_gl::TEXTURE_FILTER_BILINEAR);
     }
   }
 
   void unload() {
     if (world_target.id != 0) {
-      rl::UnloadRenderTexture(world_target);
-      world_target = {};
+      rydz_gl::unload_render_target(world_target);
+      world_target = rydz_gl::RenderTarget{};
     }
     width = 0;
     height = 0;

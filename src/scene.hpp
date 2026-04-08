@@ -80,7 +80,7 @@ camera_controller_system(Query<Mut<Transform>, CameraController> query,
 inline void
 camera_mouse_system(Query<Mut<CameraController>, Mut<Transform>> query,
                     Res<Input> input) {
-  Vector2 m = input->mouse_delta();
+  Vec2 m = input->mouse_delta();
 
   for (auto [ctrl, t] : query.iter()) {
     if (!ctrl->enabled || (m.x == 0 && m.y == 0))
@@ -122,9 +122,10 @@ inline void some_shit(Query<CameraState> q) {
   }
 }
 
-inline void spawn_some_texture(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
+inline void spawn_some_texture(Cmd cmd,
+                               ResMut<Assets<rydz_gl::Texture>> textures,
                                NonSendMarker) {
-  auto stone_tex = textures->add(rl::LoadTexture("res/textures/stone.jpg"));
+  auto stone_tex = textures->add(rydz_gl::load_texture("res/textures/stone.jpg"));
   cmd.spawn(ecs::Texture{stone_tex},
             Transform{
                 .translation = Vec3(10.0f, 10.0f, 0.0f),
@@ -137,8 +138,9 @@ struct LightsSpawned {
   bool done = false;
 };
 
-inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Texture2D>> textures,
-                                  ResMut<Assets<rl::Mesh>> meshes,
+inline void spawn_lights_on_input(Cmd cmd,
+                                  ResMut<Assets<rydz_gl::Texture>> textures,
+                                  ResMut<Assets<rydz_gl::Mesh>> meshes,
                                   ResMut<LightsSpawned> lights,
                                   Res<Input> input, NonSendMarker) {
   if (lights->done || !input->key_pressed(KEY_L))
@@ -150,7 +152,7 @@ inline void spawn_lights_on_input(Cmd cmd, ResMut<Assets<rl::Texture2D>> texture
       .intensity = 0.5f,
   });
 
-  auto stone_tex = textures->add(rl::LoadTexture("res/textures/stone.jpg"));
+  auto stone_tex = textures->add(rydz_gl::load_texture("res/textures/stone.jpg"));
 
   auto cube_h = meshes->add(mesh::cube());
 

@@ -1,13 +1,13 @@
 #pragma once
 
-#include "rl.hpp"
 #include "rydz_ecs/fwd.hpp"
+#include "rydz_gl/core.hpp"
 
 namespace ecs {
 
 struct ClearColor {
   using T = Component;
-  rl::Color color = {30, 30, 40, 255};
+  rydz_gl::Color color = {30, 30, 40, 255};
 };
 
 } // namespace ecs

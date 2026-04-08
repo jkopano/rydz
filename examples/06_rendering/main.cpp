@@ -15,7 +15,7 @@ struct RotateTag {};
 
 // NonSendMarker musi być gdy funkcja musi być odpalona na głównym wątku
 // (inną opcją jest dodanie do funkcji World world)
-void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes, NonSendMarker) {
   // kamera ze skyboxem — Skybox ładuje 6 tekstur z folderu (kinda słabe do
   // poprawy) (right/left/top/bottom/front/back.jpg) Skybox na razie musi być w
   // kamerze, chyba dobre rozwiązanie, ale do ugadania
@@ -72,10 +72,11 @@ void load_gltf_model(Cmd cmd, Res<AssetServer> asset_server) {
 }
 
 // ładowanie tekstur i nakładanie na materiał
-void load_textured_cube(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
-                        ResMut<Assets<rl::Texture2D>> textures, NonSendMarker) {
+void load_textured_cube(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes,
+                        ResMut<Assets<rydz_gl::Texture>> textures,
+                        NonSendMarker) {
   // ładowanko tekstury można też przez AssetServer
-  auto tex_handle = textures->add(rl::LoadTexture("res/textures/stone.jpg"));
+  auto tex_handle = textures->add(rydz_gl::load_texture("res/textures/stone.jpg"));
 
   // materiał z teksturą
   auto mat = StandardMaterial::from_texture(tex_handle);

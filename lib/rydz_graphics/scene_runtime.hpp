@@ -187,7 +187,7 @@ private:
     }
 
     static void ensure_mesh(World &world, Entity entity,
-                            Handle<rl::Mesh> mesh) {
+                            Handle<rydz_gl::Mesh> mesh) {
       if (auto *existing = world.get_component<Mesh3d>(entity)) {
         existing->mesh = mesh;
       } else {

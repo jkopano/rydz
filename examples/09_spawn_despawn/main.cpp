@@ -15,7 +15,7 @@ struct Lifetime {
   f32 remaining = 3.0f;
 };
 
-void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes, NonSendMarker) {
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             Transform::from_xyz(0, 15, 20).look_at(Vec3::sZero()));
 
@@ -35,7 +35,7 @@ void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
 // spawn_batch
 // korzystasz jak musisz dużo rzeczy wyspawnic, powinno być szybsze(na razie nie
 // jest xd)
-void batch_spawn(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, Res<Input> input,
+void batch_spawn(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes, Res<Input> input,
                  NonSendMarker) {
   if (!input->key_pressed(KEY_SPACE))
     return;

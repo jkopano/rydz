@@ -1,13 +1,13 @@
 #pragma once
-#include "rl.hpp"
+
 #include "rydz_ecs/asset.hpp"
+#include "rydz_gl/resources.hpp"
 #include "rydz_graphics/scene_graph.hpp"
 #include "rydz_graphics/transform.hpp"
 #include <algorithm>
 #include <array>
 #include <external/cgltf.h>
 #include <functional>
-#include <raymath.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -42,45 +42,43 @@ inline Transform transform_from_cgltf_node(const cgltf_node &node) {
   }
 
   if (node.has_matrix) {
-    rl::Matrix matrix = {
+    rydz_gl::Matrix matrix = {
         node.matrix[0],  node.matrix[1],  node.matrix[2],  node.matrix[3],
         node.matrix[4],  node.matrix[5],  node.matrix[6],  node.matrix[7],
         node.matrix[8],  node.matrix[9],  node.matrix[10], node.matrix[11],
         node.matrix[12], node.matrix[13], node.matrix[14], node.matrix[15],
     };
 
-    rl::Vector3 translation{};
-    rl::Quaternion rotation{};
-    rl::Vector3 scale{};
-    MatrixDecompose(matrix, &translation, &rotation, &scale);
+    Vec3 translation = Vec3::sZero();
+    Quat rotation = Quat::sIdentity();
+    Vec3 scale = Vec3::sReplicate(1.0f);
+    rydz_gl::decompose_matrix(matrix, translation, rotation, scale);
 
-    transform.translation = Vec3(translation.x, translation.y, translation.z);
-    transform.rotation = Quat(rotation.x, rotation.y, rotation.z, rotation.w);
-    transform.scale = Vec3(scale.x, scale.y, scale.z);
+    transform.translation = translation;
+    transform.rotation = rotation;
+    transform.scale = scale;
   }
 
   return transform;
 }
 
 inline Transform transform_from_matrix(const Mat4 &matrix) {
-  rl::Vector3 translation{};
-  rl::Quaternion rotation{};
-  rl::Vector3 scale{};
-  MatrixDecompose(math::to_rl(matrix), &translation, &rotation, &scale);
+  Vec3 translation = Vec3::sZero();
+  Quat rotation = Quat::sIdentity();
+  Vec3 scale = Vec3::sReplicate(1.0f);
+  rydz_gl::decompose_matrix(matrix, translation, rotation, scale);
 
   Transform transform;
-  transform.translation = Vec3(translation.x, translation.y, translation.z);
-  transform.rotation = Quat(rotation.x, rotation.y, rotation.z, rotation.w);
-  transform.scale = Vec3(scale.x, scale.y, scale.z);
+  transform.translation = translation;
+  transform.rotation = rotation;
+  transform.scale = scale;
   return transform;
 }
 
-inline bool has_texture(const rl::Texture2D &texture) { return texture.id > 0; }
-
-inline Handle<rl::Texture2D> transfer_texture(
-    Assets<rl::Texture2D> &textures, const rl::Texture2D &texture,
-    std::unordered_map<unsigned int, Handle<rl::Texture2D>> &texture_cache) {
-  if (!has_texture(texture)) {
+inline Handle<rydz_gl::Texture> transfer_texture(
+    Assets<rydz_gl::Texture> &textures, const rydz_gl::Texture &texture,
+    std::unordered_map<unsigned int, Handle<rydz_gl::Texture>> &texture_cache) {
+  if (!rydz_gl::has_texture(texture)) {
     return {};
   }
 
@@ -94,38 +92,44 @@ inline Handle<rl::Texture2D> transfer_texture(
   return handle;
 }
 
-inline SceneMaterial material_from_rl_material(
-    const rl::Material &material, Assets<rl::Texture2D> &textures,
-    std::unordered_map<unsigned int, Handle<rl::Texture2D>> &texture_cache,
+inline SceneMaterial material_from_backend_material(
+    const rydz_gl::Material &material, Assets<rydz_gl::Texture> &textures,
+    std::unordered_map<unsigned int, Handle<rydz_gl::Texture>> &texture_cache,
     const std::string &name = {}) {
   SceneMaterial scene_material;
   scene_material.name = name;
 
   if (material.maps) {
     scene_material.material.base_color =
-        material.maps[MATERIAL_MAP_DIFFUSE].color;
+        material.maps[rydz_gl::MATERIAL_MAP_DIFFUSE].color;
     scene_material.material.emissive_color =
-        material.maps[MATERIAL_MAP_EMISSION].color;
+        material.maps[rydz_gl::MATERIAL_MAP_EMISSION].color;
     scene_material.material.texture = transfer_texture(
-        textures, material.maps[MATERIAL_MAP_DIFFUSE].texture, texture_cache);
+        textures, material.maps[rydz_gl::MATERIAL_MAP_DIFFUSE].texture,
+        texture_cache);
     scene_material.material.normal_map = transfer_texture(
-        textures, material.maps[MATERIAL_MAP_NORMAL].texture, texture_cache);
+        textures, material.maps[rydz_gl::MATERIAL_MAP_NORMAL].texture,
+        texture_cache);
     scene_material.material.metallic_map = transfer_texture(
-        textures, material.maps[MATERIAL_MAP_METALNESS].texture, texture_cache);
+        textures, material.maps[rydz_gl::MATERIAL_MAP_METALNESS].texture,
+        texture_cache);
     scene_material.material.roughness_map = transfer_texture(
-        textures, material.maps[MATERIAL_MAP_ROUGHNESS].texture, texture_cache);
+        textures, material.maps[rydz_gl::MATERIAL_MAP_ROUGHNESS].texture,
+        texture_cache);
     scene_material.material.occlusion_map = transfer_texture(
-        textures, material.maps[MATERIAL_MAP_OCCLUSION].texture, texture_cache);
+        textures, material.maps[rydz_gl::MATERIAL_MAP_OCCLUSION].texture,
+        texture_cache);
     scene_material.material.emissive_map = transfer_texture(
-        textures, material.maps[MATERIAL_MAP_EMISSION].texture, texture_cache);
+        textures, material.maps[rydz_gl::MATERIAL_MAP_EMISSION].texture,
+        texture_cache);
     scene_material.material.metallic =
-        material.maps[MATERIAL_MAP_METALNESS].value;
+        material.maps[rydz_gl::MATERIAL_MAP_METALNESS].value;
     scene_material.material.roughness =
-        material.maps[MATERIAL_MAP_ROUGHNESS].value;
+        material.maps[rydz_gl::MATERIAL_MAP_ROUGHNESS].value;
     scene_material.material.normal_scale =
-        material.maps[MATERIAL_MAP_NORMAL].value;
+        material.maps[rydz_gl::MATERIAL_MAP_NORMAL].value;
     scene_material.material.occlusion_strength =
-        material.maps[MATERIAL_MAP_OCCLUSION].value;
+        material.maps[rydz_gl::MATERIAL_MAP_OCCLUSION].value;
   }
 
   return scene_material;
@@ -152,13 +156,13 @@ public:
     std::string file_path = detail::strip_gltf_fragment(path_with_fragment);
 
     auto *scene_assets = world.get_resource<Assets<Scene>>();
-    auto *mesh_assets = world.get_resource<Assets<rl::Mesh>>();
-    auto *texture_assets = world.get_resource<Assets<rl::Texture2D>>();
+    auto *mesh_assets = world.get_resource<Assets<rydz_gl::Mesh>>();
+    auto *texture_assets = world.get_resource<Assets<rydz_gl::Texture>>();
     if (!scene_assets || !mesh_assets || !texture_assets) {
       return;
     }
 
-    rl::Model model = rl::LoadModel(file_path.c_str());
+    auto model = rydz_gl::load_model(file_path);
     if (model.meshCount <= 0 || model.meshes == nullptr) {
       return;
     }
@@ -167,21 +171,21 @@ public:
     cgltf_data *data = nullptr;
     if (cgltf_parse_file(&options, file_path.c_str(), &data) !=
         cgltf_result_success) {
-      rl::UnloadModel(model);
+      rydz_gl::unload_model(model);
       return;
     }
 
     if (cgltf_load_buffers(&options, data, file_path.c_str()) !=
         cgltf_result_success) {
       cgltf_free(data);
-      rl::UnloadModel(model);
+      rydz_gl::unload_model(model);
       return;
     }
 
     Scene scene;
     scene.nodes.resize(data->nodes_count);
 
-    std::unordered_map<unsigned int, Handle<rl::Texture2D>> texture_cache;
+    std::unordered_map<unsigned int, Handle<rydz_gl::Texture>> texture_cache;
     const usize material_count =
         static_cast<usize>(std::max(model.materialCount, 1));
     scene.materials.reserve(material_count);
@@ -192,7 +196,7 @@ public:
         material_name = data->materials[i - 1].name;
       }
       if (model.materials && i < model.materialCount) {
-        scene.materials.push_back(detail::material_from_rl_material(
+        scene.materials.push_back(detail::material_from_backend_material(
             model.materials[i], *texture_assets, texture_cache, material_name));
       } else {
         SceneMaterial material;
@@ -225,9 +229,9 @@ public:
           break;
         }
 
-        Handle<rl::Mesh> mesh_handle =
+        Handle<rydz_gl::Mesh> mesh_handle =
             mesh_assets->add(model.meshes[model_mesh_index]);
-        model.meshes[model_mesh_index] = rl::Mesh{};
+        model.meshes[model_mesh_index] = rydz_gl::Mesh{};
 
         usize material_index = 0;
         if (model.meshMaterial && model_mesh_index < model.meshCount &&
@@ -379,7 +383,7 @@ public:
     scene_assets->set(Handle<Scene>{handle_id}, std::move(scene));
 
     cgltf_free(data);
-    rl::UnloadModel(model);
+    rydz_gl::unload_model(model);
   }
 };
 

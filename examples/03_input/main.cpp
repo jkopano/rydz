@@ -15,7 +15,7 @@ struct Player {
   f32 speed = 200.0f;
 };
 
-void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes, NonSendMarker) {
   // kamera (transformy by trzeba rozwinąć kiedyś tam)
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             Transform::from_xyz(0, 30, 0).look_at(Vec3::sZero()));
@@ -57,7 +57,7 @@ void player_movement(Query<Mut<Transform>, Player> query, Res<Input> input,
 }
 
 void print_mouse(Res<Input> input) {
-  Vector2 md = input->mouse_delta();
+  Vec2 md = input->mouse_delta();
   if (md.x != 0 || md.y != 0) {
     std::println("mouse delta: ({:.1f}, {:.1f})", md.x, md.y);
   }

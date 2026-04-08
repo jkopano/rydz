@@ -14,7 +14,7 @@ struct OrbitLight {
   f32 phase;
 };
 
-void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes, NonSendMarker) {
   // kamera
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             ClearColor{{15, 15, 25, 255}},

@@ -1,4 +1,5 @@
 #pragma once
+
 #include "clear_color.hpp"
 #include "light.hpp"
 #include "material3d.hpp"
@@ -6,9 +7,9 @@
 #include "mesh3d.hpp"
 #include "postprocess_material.hpp"
 #include "render_config.hpp"
-#include "rl.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_gl/core.hpp"
 #include "rydz_graphics/frustum.hpp"
 #include "skybox.hpp"
 #include "transform.hpp"
@@ -19,8 +20,8 @@
 namespace ecs {
 
 struct Texture {
-  Handle<rl::Texture2D> handle;
-  rl::Color tint = WHITE;
+  Handle<rydz_gl::Texture> handle;
+  rydz_gl::Color tint = rydz_gl::kWhite;
   i32 layer = 0;
 };
 
@@ -31,7 +32,7 @@ struct ExtractedView {
       .proj = Mat4::sIdentity(),
       .position = Vec3(10, 10, 10),
   };
-  rl::Color clear_color = ClearColor{}.color;
+  rydz_gl::Color clear_color = ClearColor{}.color;
   const Skybox *active_skybox = nullptr;
   RenderConfig render_config{};
   PostProcessDescriptor postprocess{};
@@ -62,8 +63,8 @@ struct ExtractedView {
 };
 
 struct ExtractedPointLight {
-  rl::Vector3 position = {0, 0, 0};
-  rl::Color color = WHITE;
+  Vec3 position = Vec3::sZero();
+  rydz_gl::Color color = rydz_gl::kWhite;
   float intensity = 0.0f;
   float range = 0.0f;
 };
@@ -83,7 +84,7 @@ struct ExtractedLights {
 };
 
 struct ExtractedMesh {
-  Handle<rl::Mesh> mesh{};
+  Handle<rydz_gl::Mesh> mesh{};
   MaterialDescriptor material{};
   Mat4 world_transform = Mat4::sIdentity();
   float distance_to_camera = 0.0f;
@@ -99,9 +100,9 @@ struct ExtractedMeshes {
 };
 
 struct ExtractedUiItem {
-  Handle<rl::Texture2D> texture{};
+  Handle<rydz_gl::Texture> texture{};
   Transform transform{};
-  rl::Color tint = WHITE;
+  rydz_gl::Color tint = rydz_gl::kWhite;
   i32 layer = 0;
 };
 
@@ -112,8 +113,8 @@ struct ExtractedUi {
   void clear() { items.clear(); }
 };
 
-inline rl::Vector3 color_to_vec3(rl::Color color) {
-  return {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f};
+inline rydz_gl::Vec3 color_to_vec3(rydz_gl::Color color) {
+  return rydz_gl::color_to_vec3(color);
 }
 
 struct RenderExtractSystems {
@@ -176,7 +177,7 @@ struct RenderExtractSystems {
       }
 
       lights->point_lights.push_back(ExtractedPointLight{
-          .position = to_rl(global->translation()),
+          .position = global->translation(),
           .color = point_light->color,
           .intensity = point_light->intensity,
           .range = point_light->range,

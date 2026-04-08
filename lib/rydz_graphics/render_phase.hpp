@@ -1,4 +1,5 @@
 #pragma once
+
 #include "render_extract.hpp"
 #include "render_material.hpp"
 #include <algorithm>
@@ -8,7 +9,7 @@
 namespace ecs {
 
 struct ShadowPhaseItem {
-  Handle<rl::Mesh> mesh{};
+  Handle<rydz_gl::Mesh> mesh{};
   Mat4 world_transform = Mat4::sIdentity();
   float distance_to_camera = 0.0f;
 };
@@ -21,7 +22,7 @@ struct ShadowPhase {
 };
 
 struct OpaquePhaseItem {
-  Handle<rl::Mesh> mesh{};
+  Handle<rydz_gl::Mesh> mesh{};
   MaterialDescriptor material{};
   Mat4 world_transform = Mat4::sIdentity();
   float distance_to_camera = 0.0f;
@@ -39,7 +40,7 @@ struct OpaquePhase {
 };
 
 struct TransparentPhaseItem {
-  Handle<rl::Mesh> mesh{};
+  Handle<rydz_gl::Mesh> mesh{};
   MaterialDescriptor material{};
   Mat4 world_transform = Mat4::sIdentity();
   float sort_key = 0.0f;
@@ -53,9 +54,9 @@ struct TransparentPhase {
 };
 
 struct UiPhaseItem {
-  Handle<rl::Texture2D> texture{};
+  Handle<rydz_gl::Texture> texture{};
   Transform transform{};
-  rl::Color tint = WHITE;
+  rydz_gl::Color tint = rydz_gl::kWhite;
   i32 layer = 0;
 };
 
@@ -153,7 +154,7 @@ struct RenderPhaseSystems {
 
   struct Prepare {
     static void build_opaque_batches(ResMut<OpaquePhase> phase,
-                                     ResMut<Assets<rl::Mesh>> mesh_assets,
+                                     ResMut<Assets<rydz_gl::Mesh>> mesh_assets,
                                      NonSendMarker) {
       detail::build_opaque_batches(*phase, *mesh_assets, {});
     }
@@ -161,19 +162,20 @@ struct RenderPhaseSystems {
   private:
     struct detail {
       static void build_opaque_batches(OpaquePhase &phase,
-                                       Assets<rl::Mesh> &mesh_assets,
+                                       Assets<rydz_gl::Mesh> &mesh_assets,
                                        NonSendMarker) {
         phase.batches.clear();
         std::unordered_map<RenderBatchKey, usize> batch_index;
 
         for (const auto &item : phase.items) {
-          rl::Mesh *mesh = mesh_assets.get(item.mesh);
-          if (!mesh || mesh->vertexCount <= 0 || mesh->vertices == nullptr) {
+          auto *mesh = mesh_assets.get(item.mesh);
+          if (!mesh || rydz_gl::mesh_vertex_count(*mesh) <= 0 ||
+              rydz_gl::mesh_vertices(*mesh) == nullptr) {
             continue;
           }
 
-          if (mesh->vaoId == 0) {
-            rl::UploadMesh(mesh, false);
+          if (!rydz_gl::mesh_uploaded(*mesh)) {
+            rydz_gl::upload_mesh(*mesh, false);
           }
 
           RenderBatchKey key{};
@@ -185,14 +187,14 @@ struct RenderPhaseSystems {
             usize batch_slot = phase.batches.size();
             OpaqueBatch batch{};
             batch.key = key;
-            batch.transforms.push_back(to_rl(item.world_transform));
+            batch.transforms.push_back(rydz_gl::to_matrix(item.world_transform));
             phase.batches.push_back(std::move(batch));
             batch_index.emplace(phase.batches.back().key, batch_slot);
             continue;
           }
 
           phase.batches[it->second].transforms.push_back(
-              to_rl(item.world_transform));
+              rydz_gl::to_matrix(item.world_transform));
         }
       }
     };

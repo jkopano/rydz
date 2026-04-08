@@ -12,7 +12,7 @@ using namespace math;
 struct PivotTag {};
 struct ArmTag {};
 
-void setup(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
+void setup(Cmd cmd, ResMut<Assets<rydz_gl::Mesh>> meshes, NonSendMarker) {
   // kamera
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             Transform::from_xyz(0, 8, 15).look_at(Vec3::sZero()));

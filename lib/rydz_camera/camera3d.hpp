@@ -1,6 +1,5 @@
 #pragma once
 #include "math.hpp"
-#include "raymath.h"
 #include "rl.hpp"
 #include "rydz_ecs/requires.hpp"
 #include "rydz_graphics/clear_color.hpp"
@@ -77,8 +76,8 @@ inline Mat4 compute_camera_projection(const Camera3DComponent &comp,
     float height = std::max(comp.orthographic_height, 0.0001f);
     float half_height = height * 0.5f;
     float half_width = half_height * aspect;
-    return from_rl(::MatrixOrtho(-half_width, half_width, -half_height,
-                                 half_height, comp.near_plane, comp.far_plane));
+    return Mat4::sOrthographic(-half_width, half_width, -half_height,
+                               half_height, comp.near_plane, comp.far_plane);
   }
 
   float fov_rad = comp.perspective_fov_y_deg * DEG2RAD;

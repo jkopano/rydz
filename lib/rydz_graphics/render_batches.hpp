@@ -1,7 +1,8 @@
 #pragma once
+
 #include "material3d.hpp"
-#include "rl.hpp"
 #include "rydz_ecs/asset.hpp"
+#include "rydz_gl/core.hpp"
 #include <cstdint>
 #include <functional>
 #include <vector>
@@ -9,7 +10,7 @@
 namespace ecs {
 
 struct RenderBatchKey {
-  Handle<rl::Mesh> mesh{};
+  Handle<rydz_gl::Mesh> mesh{};
   MaterialDescriptor material;
 
   bool operator==(const RenderBatchKey &o) const {
@@ -19,7 +20,7 @@ struct RenderBatchKey {
 
 struct OpaqueBatch {
   RenderBatchKey key;
-  std::vector<rl::Matrix> transforms;
+  std::vector<rydz_gl::Matrix> transforms;
 };
 
 } // namespace ecs

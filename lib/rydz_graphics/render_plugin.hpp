@@ -1,10 +1,10 @@
 #pragma once
+
 #include "clustered_lighting.hpp"
 #include "frustum.hpp"
 #include "render_extract.hpp"
 #include "render_passes.hpp"
 #include "render_phase.hpp"
-#include "rl.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/asset_loaders.hpp"
@@ -36,10 +36,10 @@ struct RenderPlugin {
   }
 
   static void install(App &app) {
-    app.init_resource<Assets<rl::Mesh>>(
-           [](rl::Mesh &mesh) { rl::UnloadMesh(mesh); })
-        .init_resource<Assets<rl::Texture2D>>(
-            [](rl::Texture2D &texture) { rl::UnloadTexture(texture); })
+    app.init_resource<Assets<rydz_gl::Mesh>>(
+           [](rydz_gl::Mesh &mesh) { rydz_gl::unload_mesh(mesh); })
+        .init_resource<Assets<rydz_gl::Texture>>(
+            [](rydz_gl::Texture &texture) { rydz_gl::unload_texture(texture); })
         .init_resource<Assets<Scene>>()
         .init_resource<AssetServer>()
         .init_resource<ExtractedView>()
