@@ -4,6 +4,7 @@
 #include <any>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <cassert>
 #include <concepts>
 #include <cstddef>

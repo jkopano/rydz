@@ -13,6 +13,8 @@ if is_plat("windows") then
 	set_toolchains("clang-cl")
 elseif is_plat("linux") then
 	set_toolchains("clang")
+	add_cxflags("-stdlib=libc++")
+    add_ldflags("-stdlib=libc++")
 end
 
 -- helpers
