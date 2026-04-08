@@ -92,7 +92,7 @@ update_isometric_camera_target_system(Query<Mut<IsometricCamera>> cam_query,
 
 inline void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(IsometricCameraBundle::setup(
-      Vec3::sZero(), Vec3(kCamOffX, kCamOffY, kCamOffZ), 20.0f, 12.0f));
+      Vec3::sZero(), Vec3(kCamOffX, kCamOffY, kCamOffZ), 80.0f, 12.0f));
 }
 
 inline void setup_lighting(Cmd cmd, NonSendMarker,
@@ -115,6 +115,13 @@ inline void setup_lighting(Cmd cmd, NonSendMarker,
       // Mesh3d{meshes->add(mesh::cube(0.5f, 0.5f,
       // 0.5f)))}
   );
+}
+
+void spawn_model(Cmd cmd, Res<AssetServer> server) {
+    //auto model_handle = server->load<Scene>("res/models/old_house.glb");
+
+    cmd.spawn(SceneRoot{ server->load<Scene>("res/models/old_house.glb") },
+        ecs::Transform{ });
 }
 
 inline void spawn_ground(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
@@ -185,7 +192,11 @@ inline void scene_plugin(App &app) {
   app.add_systems(ScheduleLabel::Startup, setup_lighting);
   //app.add_systems(ScheduleLabel::Startup, spawn_ground);
   app.add_systems(ScheduleLabel::Startup, spawn_player);
-  app.add_systems(ScheduleLabel::Startup, load_level);
+  //app.add_systems(ScheduleLabel::Startup, load_level);
+  //app.add_systems(ScheduleLabel::Startup, setupScene);
+  app.add_systems(ScheduleLabel::Startup, load_gltf_model);
+  app.add_systems(ScheduleLabel::Update,
+      group(spawn_model).run_if(run_once()));
 
   app.add_systems(ScheduleLabel::Startup, setup_ui);
 
