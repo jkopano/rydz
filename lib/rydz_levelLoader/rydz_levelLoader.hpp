@@ -36,6 +36,11 @@ namespace ecs {
         std::string texturePath;
     };
 
+    struct entity_prop_static {
+        Vec3 position = { 0,0,0 };
+        std::string modelPath = "models/sun.glb";
+    };
+
     rl::Mesh createPlaneMesh(brushFace face);
     std::vector<brushFace> parseVertices(const std::string& filename);
 
@@ -93,6 +98,82 @@ namespace ecs {
 
     }
 
+    // Function to extract content between double quotes
+    std::string extractValue(const std::string& line) {
+        size_t first = line.find('"');
+        size_t second = line.find('"', first + 1);
+        size_t third = line.find('"', second + 1);
+        size_t fourth = line.find('"', third + 1);
+
+        // We want the content of the second quoted string (the value)
+        if (third != std::string::npos && fourth != std::string::npos) {
+            return line.substr(third + 1, fourth - third - 1);
+        }
+        return "";
+    }
+
+    // Function to extract the key (the first quoted string)
+    std::string extractKey(const std::string& line) {
+        size_t first = line.find('"');
+        size_t second = line.find('"', first + 1);
+        if (first != std::string::npos && second != std::string::npos) {
+            return line.substr(first + 1, second - first - 1);
+        }
+        return "";
+    }
+
+    std::vector<entity_prop_static> parseMapForProps(const std::string& filePath) {
+        std::ifstream file(filePath);
+        std::vector<entity_prop_static> props;
+        std::string line;
+
+        while (std::getline(file, line)) {
+            if (line.find('{') != std::string::npos) {
+                entity_prop_static currentProp;
+                bool isTargetEntity = false;
+                bool insideBrush = false;
+
+                std::string originStr;
+
+                while (std::getline(file, line) && line.find('}') == std::string::npos) {
+                    // Skip brush blocks within entities
+                    if (line.find('{') != std::string::npos) {
+                        insideBrush = true;
+                        continue;
+                    }
+                    if (insideBrush) {
+                        if (line.find('}') != std::string::npos) insideBrush = false;
+                        continue;
+                    }
+
+                    std::string key = extractKey(line);
+                    std::string value = extractValue(line);
+
+                    if (key == "classname" && value == "prop_static") {
+                        isTargetEntity = true;
+                    }
+                    else if (key == "origin") {
+                        originStr = value; // Store the full "x y z" string
+                    }
+                    else if (key == "modelpath") {
+                        currentProp.modelPath = value;
+                    }
+                }
+
+                if (isTargetEntity) {
+                    // Now parse the full origin string into the Vec3
+                    std::stringstream ss(originStr);
+                    float x;
+                    float y;
+                    float z;
+                    ss >> x >> y >> z;
+                    currentProp.position = { x,z,-y};
+                    props.push_back(currentProp);
+                }
+            }
+        }
+        return props;
+    }
 
     std::vector<brushFace> parseVertices(const std::string& filename) {
         std::vector<brushFace> allFaces;
@@ -174,22 +255,34 @@ namespace ecs {
         return allFaces;
     }
 
-    // Asset Server - ³adowanie modeli GLTF z plików
-    void load_obj_model(Cmd cmd, Res<AssetServer> asset_server, NonSendMarker) {
-        // load() zwraca Handle<Scene> od razu — scena ³aduje siê w tle
-        // jak plik nie istnieje to nic siê nie renderuje ale bez crasha
-        auto model_handle = asset_server->load<Scene>("res/models/old_house.glb");
+    void spawn_model(Cmd cmd, Res<AssetServer> server) {
+        //auto model_handle = server->load<Scene>("res/models/old_house.glb");
+        cmd.spawn(SceneRoot{ server->load<Scene>("res/levels/testLevel.glb") },
+            ecs::Transform{ .scale = {1.0f, 1.0f, 1.0f} });
 
-        cmd.spawn(SceneRoot{ model_handle },
-            ecs::Transform{ .translation = Vec3(0, -10.0f, 0),
-                           .scale = Vec3::sReplicate(1.0f) });
+        
+
     }
 
-    void load_gltf_model(Cmd cmd, Res<AssetServer> asset_server, NonSendMarker) {
-        auto model_handle = asset_server->load<Scene>("res/models/old_house.glb");
+    void spawn_entity_models(Cmd cmd, Res<AssetServer> server) {
+        //auto model_handle = server->load<Scene>("res/models/old_house.glb");
+        //entity_prop_static testProp;
+        //testProp.modelPath = "sun.glb";
+        //testProp.position = { 0.0f, 0.0f, 0.0f };
 
-        cmd.spawn(SceneRoot{ model_handle },
-            ecs::Transform{ });
+
+
+        std::vector<entity_prop_static> props_static = parseMapForProps("res/levels/testLevel.map");
+
+        for (auto& prop_static : props_static)
+        {
+            cmd.spawn(SceneRoot{ server->load<Scene>("res/" + prop_static.modelPath) },
+                ecs::Transform{ .translation = prop_static.position,
+                                    .scale = {1.0f, 1.0f, 1.0f}
+                });
+        }
+
+
     }
 
     // NonSendMarker musi byæ gdy funkcja musi byæ odpalona na g³ównym w¹tku
@@ -197,40 +290,10 @@ namespace ecs {
     void setupScene(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
 
         // cube - czerwona
-        auto cube_h = meshes->add(mesh::cube(2, 2, 2));
+        auto cube_h = meshes->add(mesh::cube(16, 5, 16));
         cmd.spawn(Mesh3d{ cube_h }, MeshMaterial3d<>{StandardMaterial::from_color(RED)},
-            ecs::Transform::from_xyz(-4, 1, 0), RotateTag{});
+            ecs::Transform::from_xyz(-24, -20, -24), RotateTag{});
 
-        // kula - zielona
-        auto sphere_h = meshes->add(mesh::sphere(1.0f));
-        cmd.spawn(
-            Mesh3d{ sphere_h }, MeshMaterial3d<>{StandardMaterial::from_color(GREEN)},
-            ecs::Transform::from_xyz(0, 1, 0));
-
-        // cylinder - niebieski
-        auto cyl_h = meshes->add(mesh::cylinder(0.8f, 2.0f));
-        cmd.spawn(Mesh3d{ cyl_h },
-            MeshMaterial3d<>{StandardMaterial::from_color(BLUE)},
-            ecs::Transform::from_xyz(4, 1, 0));
-
-        // floor
-        auto floor_h = meshes->add(mesh::plane(20, 20));
-        cmd.spawn(Mesh3d{ floor_h },
-            MeshMaterial3d<>{StandardMaterial::from_color(DARKGRAY)},
-            ecs::Transform::from_xyz(0, 0, 0));
-
-        // torus
-        auto torus_h = meshes->add(mesh::torus(1.0f, 0.3f));
-        cmd.spawn(
-            Mesh3d{ torus_h }, MeshMaterial3d<>{StandardMaterial::from_color(PURPLE)},
-            ecs::Transform::from_xyz(25, 3, -4), RotateTag{});
-
-        // œwiat³o ¿eby coœ by³o widaæ
-        cmd.spawn(DirectionalLight{
-            .color = RED,
-            .direction = Vec3(-0.3f, -1.0f, -0.5f),
-            .intensity = 0.5f,
-            });
     }
 
     //TODO:
