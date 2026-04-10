@@ -7,6 +7,7 @@
 #include "rydz_ecs/bundle.hpp"
 #include "storage.hpp"
 #include "ticks.hpp"
+#include <atomic>
 #include <cassert>
 #include <memory>
 #include <ranges>
@@ -23,6 +24,7 @@ public:
 private:
   std::unordered_map<std::type_index, std::unique_ptr<IStorage>> storages_;
   Tick change_tick_{1};
+  std::atomic<u64> schedule_run_id_{0};
   bool multithreaded_ = true;
 
   template <typename R> void insert_if_missing(Entity entity) {
@@ -43,6 +45,12 @@ public:
   void set_multithreaded(bool v) { multithreaded_ = v; }
 
   Tick read_change_tick() const { return change_tick_; }
+  u64 read_schedule_run_id() const {
+    return schedule_run_id_.load(std::memory_order_relaxed);
+  }
+  u64 begin_schedule_run() {
+    return schedule_run_id_.fetch_add(1, std::memory_order_relaxed) + 1;
+  }
   Tick increment_change_tick() {
     change_tick_.value++;
     return change_tick_;

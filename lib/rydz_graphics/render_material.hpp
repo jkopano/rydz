@@ -276,6 +276,9 @@ inline void apply_shader_uniforms(
     const ExtractedView &view, const ExtractedLights &lights,
     const ClusterConfig &cluster_config,
     const ClusteredLightingState &cluster_state) {
+  shader.set("u_alpha_cutoff", 0.1f);
+  shader.set("u_use_instancing", 0);
+
   if (descriptor.shading_model == MaterialShadingModel::ClusteredPbr) {
     apply_pbr_shader_uniforms(marker, shader, prepared, view, lights,
                               cluster_config, cluster_state);
@@ -303,19 +306,36 @@ inline bool can_draw_instanced(rydz_gl::Material &material,
          0;
 }
 
-inline void draw_batch_instances(const rydz_gl::Mesh &mesh,
+inline void draw_batch_instances(ShaderProgram &shader,
+                                 const rydz_gl::Mesh &mesh,
                                  rydz_gl::Material &material,
                                  const OpaqueBatch &batch) {
   if (can_draw_instanced(material, mesh)) {
+    shader.set("u_use_instancing", 1);
     rydz_gl::draw_mesh_instanced(
         mesh, material, batch.transforms.data(),
         static_cast<i32>(batch.transforms.size()));
     return;
   }
 
+  shader.set("u_use_instancing", 0);
   for (const auto &transform : batch.transforms) {
     rydz_gl::draw_mesh(mesh, material, transform);
   }
+}
+
+inline void draw_single_instance(ShaderProgram &shader,
+                                 const rydz_gl::Mesh &mesh,
+                                 rydz_gl::Material &material,
+                                 const rydz_gl::Matrix &transform) {
+  if (can_draw_instanced(material, mesh)) {
+    shader.set("u_use_instancing", 1);
+    rydz_gl::draw_mesh_instanced(mesh, material, &transform, 1);
+    return;
+  }
+
+  shader.set("u_use_instancing", 0);
+  rydz_gl::draw_mesh(mesh, material, transform);
 }
 
 } // namespace ecs

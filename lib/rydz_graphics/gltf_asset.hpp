@@ -43,10 +43,10 @@ inline Transform transform_from_cgltf_node(const cgltf_node &node) {
 
   if (node.has_matrix) {
     rydz_gl::Matrix matrix = {
-        node.matrix[0],  node.matrix[1],  node.matrix[2],  node.matrix[3],
-        node.matrix[4],  node.matrix[5],  node.matrix[6],  node.matrix[7],
-        node.matrix[8],  node.matrix[9],  node.matrix[10], node.matrix[11],
-        node.matrix[12], node.matrix[13], node.matrix[14], node.matrix[15],
+        node.matrix[0],  node.matrix[4],  node.matrix[8],  node.matrix[12],
+        node.matrix[1],  node.matrix[5],  node.matrix[9],  node.matrix[13],
+        node.matrix[2],  node.matrix[6],  node.matrix[10], node.matrix[14],
+        node.matrix[3],  node.matrix[7],  node.matrix[11], node.matrix[15],
     };
 
     Vec3 translation = Vec3::sZero();
@@ -75,6 +75,42 @@ inline Transform transform_from_matrix(const Mat4 &matrix) {
   return transform;
 }
 
+inline void apply_gltf_material_properties(MaterialDescriptor &descriptor,
+                                           const cgltf_material *material) {
+  if (!material) {
+    return;
+  }
+
+  if (material->unlit) {
+    descriptor.shader =
+        ShaderSpec::from("res/shaders/basic.vert", "res/shaders/basic.frag");
+    descriptor.shading_model = MaterialShadingModel::Unlit;
+  }
+
+  descriptor.flags.double_sided = material->double_sided;
+
+  switch (material->alpha_mode) {
+  case cgltf_alpha_mode_blend:
+    descriptor.flags.transparent = true;
+    descriptor.flags.casts_shadows = false;
+    descriptor.uniforms.push_back(Uniform::float1("u_alpha_cutoff", 0.001f));
+    break;
+  case cgltf_alpha_mode_mask:
+    descriptor.flags.transparent = false;
+    descriptor.flags.casts_shadows = true;
+    descriptor.uniforms.push_back(
+        Uniform::float1("u_alpha_cutoff",
+                        material->alpha_cutoff > 0.0f ? material->alpha_cutoff
+                                                      : 0.5f));
+    break;
+  case cgltf_alpha_mode_opaque:
+  default:
+    descriptor.flags.transparent = false;
+    descriptor.flags.casts_shadows = true;
+    break;
+  }
+}
+
 inline Handle<Texture> transfer_texture(
     Assets<Texture> &textures, const rydz_gl::Texture &texture,
     std::unordered_map<unsigned int, Handle<Texture>> &texture_cache) {
@@ -96,7 +132,8 @@ inline SceneMaterial material_from_backend_material(
     const rydz_gl::Material &material, Assets<Texture> &textures,
     Assets<Material> &materials,
     std::unordered_map<unsigned int, Handle<Texture>> &texture_cache,
-    const std::string &name = {}) {
+    const std::string &name = {},
+    const cgltf_material *gltf_material = nullptr) {
   SceneMaterial scene_material;
   scene_material.name = name;
   StandardMaterial material_value;
@@ -133,7 +170,9 @@ inline SceneMaterial material_from_backend_material(
         material.maps[rydz_gl::MATERIAL_MAP_OCCLUSION].value;
   }
 
-  scene_material.material = materials.add(material_value);
+  MaterialDescriptor descriptor = material_value.describe();
+  apply_gltf_material_properties(descriptor, gltf_material);
+  scene_material.material = materials.add(Material{std::move(descriptor)});
 
   return scene_material;
 }
@@ -195,14 +234,18 @@ public:
     scene.materials.reserve(material_count);
     for (int i = 0; i < static_cast<int>(material_count); ++i) {
       std::string material_name;
+      const cgltf_material *gltf_material = nullptr;
       if (i > 0 && static_cast<usize>(i - 1) < data->materials_count &&
           data->materials[i - 1].name) {
         material_name = data->materials[i - 1].name;
       }
+      if (i > 0 && static_cast<usize>(i - 1) < data->materials_count) {
+        gltf_material = &data->materials[i - 1];
+      }
       if (model.materials && i < model.materialCount) {
         scene.materials.push_back(detail::material_from_backend_material(
             model.materials[i], *texture_assets, *material_assets, texture_cache,
-            material_name));
+            material_name, gltf_material));
       } else {
         SceneMaterial material;
         material.name = std::move(material_name);

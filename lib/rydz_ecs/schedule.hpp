@@ -157,6 +157,7 @@ public:
 
     current_world_ = &world;
     prepare();
+    world.begin_schedule_run();
 
     if (!world.multithreaded()) {
       for (auto &entry : entries_) {

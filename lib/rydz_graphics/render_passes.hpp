@@ -142,11 +142,13 @@ struct RenderPassSystems {
         return;
       }
 
+      rydz_gl::disable_depth_mask();
       for (const auto &item : phase->items) {
         draw_transparent_item(marker, item, *mesh_assets, *texture_assets,
                               *shader_cache, *view, *lights, *cluster_config,
                               *cluster_state);
       }
+      rydz_gl::enable_depth_mask();
     }
 
     static void begin_world_pass(NonSendMarker, const ExtractedView &view) {
@@ -163,6 +165,16 @@ struct RenderPassSystems {
     static void end_world_pass(NonSendMarker) { rydz_gl::end_world_pass(); }
 
   private:
+    static void apply_material_cull_mode(const MaterialDescriptor &material) {
+      if (material.flags.double_sided) {
+        rydz_gl::disable_backface_culling();
+        return;
+      }
+
+      rydz_gl::enable_backface_culling();
+      rydz_gl::set_cull_face(RL_CULL_FACE_BACK);
+    }
+
     static const ShaderSpec &depth_prepass_shader_spec() {
       static const ShaderSpec spec =
           ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth.frag");
@@ -197,7 +209,9 @@ struct RenderPassSystems {
 
       float alpha_cutoff = 0.1f;
       depth_shader.set("u_alpha_cutoff", alpha_cutoff);
-      draw_batch_instances(*mesh, prepared.material, batch);
+      apply_descriptor_uniforms(marker, depth_shader, batch.key.material);
+      apply_material_cull_mode(batch.key.material);
+      draw_batch_instances(depth_shader, *mesh, prepared.material, batch);
     }
 
     static void build_cluster_buffers(NonSendMarker, const ExtractedView &view,
@@ -328,7 +342,8 @@ struct RenderPassSystems {
           resolve_shader(marker, shader_cache, batch.key.material.shader);
       apply_shader_uniforms(marker, shader, batch.key.material, prepared, view,
                             lights, cluster_config, cluster_state);
-      draw_batch_instances(*mesh, prepared.material, batch);
+      apply_material_cull_mode(batch.key.material);
+      draw_batch_instances(shader, *mesh, prepared.material, batch);
     }
 
     static void draw_transparent_item(
@@ -350,7 +365,9 @@ struct RenderPassSystems {
           resolve_shader(marker, shader_cache, item.material.shader);
       apply_shader_uniforms(marker, shader, item.material, prepared, view,
                             lights, cluster_config, cluster_state);
-      rydz_gl::draw_mesh(*mesh, prepared.material, item.world_transform);
+      apply_material_cull_mode(item.material);
+      draw_single_instance(shader, *mesh, prepared.material,
+                           rydz_gl::to_matrix(item.world_transform));
     }
 
     static bool sphere_intersects_cluster(const rydz_gl::Vec3 &center,

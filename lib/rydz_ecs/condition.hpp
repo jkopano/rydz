@@ -3,6 +3,7 @@
 #include "system.hpp"
 #include <algorithm>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -214,17 +215,64 @@ private:
   }
 };
 
+class SharedConditionGate {
+  std::shared_ptr<ICondition> condition_;
+  usize member_count_;
+  mutable std::mutex mutex_;
+  u64 active_run_id_ = 0;
+  usize remaining_members_ = 0;
+  bool cached_result_ = false;
+
+public:
+  SharedConditionGate(std::shared_ptr<ICondition> condition, usize member_count)
+      : condition_(std::move(condition)), member_count_(member_count) {}
+
+  bool is_true(World &world) {
+    std::lock_guard lock(mutex_);
+
+    const u64 run_id = world.read_schedule_run_id();
+    if (run_id != active_run_id_ || remaining_members_ == 0) {
+      cached_result_ = condition_->is_true(world);
+      active_run_id_ = run_id;
+      remaining_members_ = member_count_;
+    }
+
+    if (remaining_members_ > 0) {
+      remaining_members_--;
+    }
+
+    return cached_result_;
+  }
+
+  SystemAccess access() const { return condition_->access(); }
+};
+
 class ConditionedSystem : public ISystem {
   std::unique_ptr<ISystem> system_;
   std::shared_ptr<ICondition> condition_;
+  std::shared_ptr<SharedConditionGate> shared_condition_;
 
 public:
+  ConditionedSystem(std::unique_ptr<ISystem> system,
+                    std::unique_ptr<ICondition> condition)
+      : system_(std::move(system)),
+        condition_(std::shared_ptr<ICondition>(std::move(condition))) {}
+
   ConditionedSystem(std::unique_ptr<ISystem> system,
                     std::shared_ptr<ICondition> condition)
       : system_(std::move(system)), condition_(std::move(condition)) {}
 
+  ConditionedSystem(std::unique_ptr<ISystem> system,
+                    std::shared_ptr<SharedConditionGate> shared_condition)
+      : system_(std::move(system)),
+        shared_condition_(std::move(shared_condition)) {}
+
   void run(World &world) override {
-    if (condition_->is_true(world)) {
+    const bool should_run =
+        shared_condition_ ? shared_condition_->is_true(world)
+                          : condition_->is_true(world);
+
+    if (should_run) {
       system_->run(world);
     }
   }
@@ -232,7 +280,8 @@ public:
   std::string name() const override { return system_->name(); }
 
   SystemAccess access() const override {
-    auto acc = condition_->access();
+    auto acc =
+        shared_condition_ ? shared_condition_->access() : condition_->access();
     acc.merge(system_->access());
     return acc;
   }
@@ -355,6 +404,11 @@ public:
     std::vector<GroupSystemEntry> result;
 
     std::shared_ptr<ICondition> shared_cond = std::move(condition_);
+    std::shared_ptr<SharedConditionGate> shared_gate;
+    if (shared_cond) {
+      shared_gate =
+          std::make_shared<SharedConditionGate>(shared_cond, systems_.size());
+    }
 
     std::string prev_name;
     for (auto &sys : systems_) {
@@ -365,8 +419,10 @@ public:
 
       prev_name = sys->name();
 
-      if (shared_cond)
-        sys = std::make_unique<ConditionedSystem>(std::move(sys), shared_cond);
+      if (shared_gate) {
+        sys =
+            std::make_unique<ConditionedSystem>(std::move(sys), shared_gate);
+      }
 
       result.push_back({std::move(sys), std::move(entry_ordering)});
     }

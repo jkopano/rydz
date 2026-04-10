@@ -477,6 +477,7 @@ app.add_systems(ScheduleLabel::Update,
 ```
 
 Warunek to funkcja o takiej samej sygnaturze jak system (może przyjmować `Res`, `ResMut` itd.), zwracająca `bool`.
+Dla grup wielosystemowych warunek jest oceniany raz na przebieg grupy w schedule; jeśli zwróci `true`, uruchamiane są wszystkie systemy z grupy.
 
 ---
 

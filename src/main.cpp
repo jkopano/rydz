@@ -1,7 +1,7 @@
 #define RLGL_ENABLE_OPENGL_DEBUG_CONTEXT 0
 #include "rydz_platform/rydz_platform.hpp"
-#include "scene_new.hpp"
-// #include "scene.hpp"
+// #include "scene_new.hpp"
+#include "scene.hpp"
 
 int main() {
   App app;
