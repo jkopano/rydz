@@ -147,6 +147,21 @@ end
 add_tracy()
 set_pcxxheader("lib/pch.hpp")
 
+target("modules")
+set_kind("binary")
+set_default(false)
+set_rundir("$(projectdir)")
+add_files("lib/rydz_**/*.cpp")
+add_headerfiles("lib/rydz_**/*.hpp")
+add_deps("raylib")
+add_packages("taskflow", "joltphysics", "sol2", "glaze")
+if is_plat("windows") then
+	add_packages("luajit")
+elseif is_plat("linux") then
+	add_packages("luajit")
+end
+
+
 target("tests")
 set_kind("binary")
 set_default(false)
