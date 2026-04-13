@@ -94,8 +94,8 @@ int main() {
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)
-      .add_systems(ScheduleLabel::Startup, setup)
-      .add_systems(ScheduleLabel::Update,
+      .add_systems(Startup, setup)
+      .add_systems(Update,
                    group(batch_spawn, lifetime_system, gravity_system))
       .run();
 }

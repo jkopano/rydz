@@ -36,7 +36,7 @@ int main() {
       }))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_systems(ScheduleLabel::Startup, setup)
-      .add_systems(ScheduleLabel::Update, hello_system)
+      .add_systems(Startup, setup)
+      .add_systems(Update, hello_system)
       .run();
 }

@@ -57,14 +57,14 @@ int main() {
 
       // kolejność
       // input -> logic (potem debug)
-      .configure_set(ScheduleLabel::Update,
+      .configure_set(Update,
                      configure(GameSet::Input{}, GameSet::Logic{}).chain())
-      .configure_set(ScheduleLabel::Update,
+      .configure_set(Update,
                      configure<DebugSet>().after(set<GameSet::Logic>()))
 
       // Set z warunkiem — debug tylko gdy trzymasz D (btw as you can see, nwm
       // czy to było wczesniej w examplu, można lambdy wrzucać jako systemy)
-      .configure_set(ScheduleLabel::Update,
+      .configure_set(Update,
                      configure<DebugSet>().run_if([](Res<Input> input) {
                        return input->key_down(KEY_D);
                      }))

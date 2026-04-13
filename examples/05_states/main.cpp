@@ -69,10 +69,10 @@ int main() {
       // OnTransition - uruchamiane przy każdej zmianie stanu
       .add_systems(OnTransition<GameState>{}, on_any_transition)
       // Systemy z warunkiem in_state
-      .add_systems(ScheduleLabel::Update, state_input)
-      .add_systems(ScheduleLabel::Update,
+      .add_systems(Update, state_input)
+      .add_systems(Update,
                    group(game_logic).run_if(in_state(GameState::Playing)))
-      .add_systems(ScheduleLabel::Update,
+      .add_systems(Update,
                    group(menu_logic).run_if(in_state(GameState::Menu)))
       .run();
 }

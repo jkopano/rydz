@@ -11,7 +11,7 @@ Isometric camera system for top-down games and RPGs. Single header, ~70 lines.
 setup_isometric_camera(cmd, target, offset);
 
 // In your app plugin:
-app.add_systems(ScheduleLabel::Update, isometric_camera_system);
+app.add_systems(Update, isometric_camera_system);
 ```
 
 ## API

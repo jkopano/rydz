@@ -143,23 +143,23 @@ int main() {
       .add_plugin(RenderPlugin::install)
       .add_plugin(engine::scripting_plugin)
       .add_plugin(engine::console_plugin)
-      .add_systems(ScheduleLabel::Startup, bind_lua_commands)
+      .add_systems(Startup, bind_lua_commands)
       // Update - wypisujemy stan co sekundę (patrz % 2 != 0)
-      .add_systems(ScheduleLabel::Update, group(print_enemies))
+      .add_systems(Update, group(print_enemies))
       // to samo co wyzej ale run_if(run_once()) powoduje że ten system
       // odpali się tylko raz w Update
-      .add_systems(ScheduleLabel::Update,
+      .add_systems(Update,
                    group(print_enemies).run_if(run_once()))
 
       // chain/after/before
       // chain() wymusza kolejność w grupie
       // bez chain() systemy w grupie mogą się odpalić w dowolnej kolejności
-      .add_systems(ScheduleLabel::Update, group(move_enemies))
+      .add_systems(Update, group(move_enemies))
 
       // after/before
       // print_enemies odpala się po move_enemies
       // można było też napisać ...apply_damage).chain().before(print_enemies)
-      .add_systems(ScheduleLabel::Update,
+      .add_systems(Update,
                    group(print_enemies).after(move_enemies))
       .run();
 }

@@ -89,7 +89,7 @@ int main() {
       }))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_systems(ScheduleLabel::Startup, setup)
-      .add_systems(ScheduleLabel::Update, orbit_system)
+      .add_systems(Startup, setup)
+      .add_systems(Update, orbit_system)
       .run();
 }

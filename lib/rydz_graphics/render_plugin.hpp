@@ -69,30 +69,30 @@ struct RenderPlugin {
     register_slot<HasCamera>(app, make_has_camera_slot_provider());
     register_slot<HasPBR>(app, make_has_pbr_slot_provider());
 
-    app.add_systems(ScheduleLabel::First, [](World &world) {
+    app.add_systems(First, [](World &world) {
       if (auto *server = world.get_resource<AssetServer>()) {
         server->update(world);
       }
     });
 
-    app.configure_set(ScheduleLabel::ExtractRender,
+    app.configure_set(ExtractRender,
                       configure(RenderExtractSet::Extract,
                                 RenderExtractSet::Queue,
                                 RenderExtractSet::Prepare)
                           .chain())
-        .configure_set(ScheduleLabel::Render,
+        .configure_set(Render,
                        configure(RenderPassSet::Setup, RenderPassSet::Main,
                                  RenderPassSet::PostProcess, RenderPassSet::Ui,
                                  RenderPassSet::Cleanup)
                            .chain());
 
-    app.add_systems(ScheduleLabel::First,
+    app.add_systems(First,
                     SceneRuntimeSystems::cleanup_orphan_scene_entities_system)
 
-        .add_systems(ScheduleLabel::PreUpdate,
+        .add_systems(PreUpdate,
                      SceneRuntimeSystems::sync_scene_roots_system)
 
-        .add_systems(ScheduleLabel::PostUpdate,
+        .add_systems(PostUpdate,
                      group(propagate_transforms, compute_visibility,
                            compute_mesh_bounds_system, frustum_cull_system))
 

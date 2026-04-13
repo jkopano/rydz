@@ -98,7 +98,7 @@ int main() {
       }))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_systems(ScheduleLabel::Startup, setup)
-      .add_systems(ScheduleLabel::Update, rotate_pivot)
+      .add_systems(Startup, setup)
+      .add_systems(Update, rotate_pivot)
       .run();
 }

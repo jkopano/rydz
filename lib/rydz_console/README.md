@@ -41,7 +41,7 @@ int main() {
        .add_plugin(engine::console_plugin)
 
        // 2. Dodaj system rejestrujący Twoje komendy na starcie gry
-       .add_systems(ecs::ScheduleLabel::Startup, bind_lua_commands)
+       .add_systems(ecs::Startup, bind_lua_commands)
 
        .run();
 }

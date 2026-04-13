@@ -45,12 +45,12 @@ TEST(EventTest, DoubleBufferedMessages) {
   messages.send(MyMessage{2});
 
   std::vector<MyMessage> received_a, received_b;
-  messages.read(reader_a, [&](const MyMessage &message) {
+  for (const auto &message : messages.iter(reader_a)) {
     received_a.push_back(message);
-  });
-  messages.read(reader_b, [&](const MyMessage &message) {
+  }
+  for (const auto &message : messages.iter(reader_b)) {
     received_b.push_back(message);
-  });
+  }
 
   ASSERT_EQ(received_a.size(), 2u);
   EXPECT_EQ(received_a[0], (MyMessage{1}));
@@ -63,17 +63,17 @@ TEST(EventTest, DoubleBufferedMessages) {
   messages.update();
 
   size_t prev_a = received_a.size();
-  messages.read(reader_a, [&](const MyMessage &message) {
+  for (const auto &message : messages.iter(reader_a)) {
     received_a.push_back(message);
-  });
+  }
   EXPECT_EQ(received_a.size(), prev_a);
 
   messages.update();
 
   size_t prev_b = received_b.size();
-  messages.read(reader_b, [&](const MyMessage &message) {
+  for (const auto &message : messages.iter(reader_b)) {
     received_b.push_back(message);
-  });
+  }
   EXPECT_EQ(received_b.size(), prev_b);
 }
 
@@ -91,7 +91,9 @@ TEST(EventTest, MessageWriterReader) {
   }
 
   std::vector<MyMessage> received;
-  reader.for_each([&](const MyMessage &message) { received.push_back(message); });
+  for (const auto &message : reader.iter()) {
+    received.push_back(message);
+  }
   ASSERT_EQ(received.size(), 2u);
   EXPECT_EQ(received[0], (MyMessage{10}));
   EXPECT_EQ(received[1], (MyMessage{20}));

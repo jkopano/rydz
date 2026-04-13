@@ -12,6 +12,39 @@ struct MessageId {
   usize id = 0;
 };
 
+template <typename E> class MessageRange {
+  std::vector<const E *> messages_;
+
+public:
+  explicit MessageRange(std::vector<const E *> messages)
+      : messages_(std::move(messages)) {}
+
+  class iterator {
+    typename std::vector<const E *>::const_iterator it_;
+
+  public:
+    explicit iterator(typename std::vector<const E *>::const_iterator it)
+        : it_(it) {}
+
+    const E &operator*() const { return **it_; }
+    const E *operator->() const { return *it_; }
+
+    iterator &operator++() {
+      ++it_;
+      return *this;
+    }
+
+    bool operator==(const iterator &other) const { return it_ == other.it_; }
+    bool operator!=(const iterator &other) const { return it_ != other.it_; }
+  };
+
+  iterator begin() const { return iterator{messages_.begin()}; }
+  iterator end() const { return iterator{messages_.end()}; }
+
+  bool empty() const { return messages_.empty(); }
+  usize size() const { return messages_.size(); }
+};
+
 template <typename E> class Messages {
 public:
   using T = Resource;
@@ -70,22 +103,25 @@ public:
     return id;
   }
 
-  template <typename Func> void read(usize reader_id, Func &&func) {
+  MessageRange<E> iter(usize reader_id) {
     auto &cursor = reader_cursors_[reader_id];
     usize start_id = cursor.id;
+    std::vector<const E *> unread;
+    unread.reserve(total_count());
 
     for (auto &[message, id] : buffers_.prev) {
       if (id.id >= start_id) {
-        func(message);
+        unread.push_back(&message);
       }
     }
     for (auto &[message, id] : buffers_.current) {
       if (id.id >= start_id) {
-        func(message);
+        unread.push_back(&message);
       }
     }
 
     cursor.id = message_count_;
+    return MessageRange<E>{std::move(unread)};
   }
 
   bool has_unread(usize reader_id) const {

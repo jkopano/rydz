@@ -154,7 +154,7 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
 
 inline void console_plugin(ecs::App &app) {
   app.init_resource<ConsoleState>();
-  app.add_systems(ecs::ScheduleLabel::Update, ConsoleUpdateSystem);
-  app.add_systems(ecs::ScheduleLabel::Render, ConsoleRenderSystem);
+  app.add_systems(ecs::Update, ConsoleUpdateSystem);
+  app.add_systems(ecs::Render, ConsoleRenderSystem);
 }
 } // namespace engine

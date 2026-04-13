@@ -109,10 +109,10 @@ int main() {
       }))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_systems(ScheduleLabel::Startup, setup)
-      .add_systems(ScheduleLabel::Startup, load_textured_cube)
-      .add_systems(ScheduleLabel::Update,
+      .add_systems(Startup, setup)
+      .add_systems(Startup, load_textured_cube)
+      .add_systems(Update,
                    group(load_gltf_model).run_if(run_once()))
-      .add_systems(ScheduleLabel::Update, rotate_system)
+      .add_systems(Update, rotate_system)
       .run();
 }

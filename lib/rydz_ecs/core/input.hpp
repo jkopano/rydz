@@ -18,7 +18,7 @@ struct MouseState {
 struct Input {
   static void install(App &app) {
     app.insert_resource(Input{});
-    app.add_systems(ScheduleLabel::First, input_polling_system);
+    app.add_systems(First, input_polling_system);
   }
 
   using T = Resource;

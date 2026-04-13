@@ -196,14 +196,14 @@ inline void scene_plugin(App &app) {
   app.add_plugin(system_multithreading({true}));
   app.insert_resource(LightsSpawned{});
 
-  app.add_systems(ScheduleLabel::Startup, setup_camera);
-  app.add_systems(ScheduleLabel::Startup, spawn_some_texture);
-  app.add_systems(ScheduleLabel::Update,
+  app.add_systems(Startup, setup_camera);
+  app.add_systems(Startup, spawn_some_texture);
+  app.add_systems(Update,
                   group(spawn_map, spawn_model).run_if(run_once()));
 
-  app.add_systems(ScheduleLabel::Update, camera_controller_system);
-  app.add_systems(ScheduleLabel::Update, camera_mouse_system);
-  app.add_systems(ScheduleLabel::Update, some_shit);
+  app.add_systems(Update, camera_controller_system);
+  app.add_systems(Update, camera_mouse_system);
+  app.add_systems(Update, some_shit);
 
-  app.add_systems(ScheduleLabel::Update, spawn_lights_on_input);
+  app.add_systems(Update, spawn_lights_on_input);
 }

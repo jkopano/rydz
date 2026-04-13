@@ -75,8 +75,8 @@ int main() {
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)
-      .add_systems(ScheduleLabel::Startup, setup)
-      .add_systems(ScheduleLabel::Update, player_movement)
-      .add_systems(ScheduleLabel::Update, print_mouse)
+      .add_systems(Startup, setup)
+      .add_systems(Update, player_movement)
+      .add_systems(Update, print_mouse)
       .run();
 }

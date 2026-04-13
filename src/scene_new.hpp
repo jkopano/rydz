@@ -137,12 +137,12 @@ inline void scene_plugin(App &app) {
   app.add_plugin(Input::install);
   app.add_plugin(system_multithreading({true}));
 
-  app.add_systems(ScheduleLabel::Startup, setup_camera);
-  app.add_systems(ScheduleLabel::Startup, setup_lighting);
-  app.add_systems(ScheduleLabel::Startup, spawn_ground);
-  app.add_systems(ScheduleLabel::Startup, spawn_player);
+  app.add_systems(Startup, setup_camera);
+  app.add_systems(Startup, setup_lighting);
+  app.add_systems(Startup, spawn_ground);
+  app.add_systems(Startup, spawn_player);
 
-  app.add_systems(ScheduleLabel::Update, player_movement_system);
-  app.add_systems(ScheduleLabel::Update, update_isometric_camera_target_system);
-  app.add_systems(ScheduleLabel::Update, isometric_camera_system);
+  app.add_systems(Update, player_movement_system);
+  app.add_systems(Update, update_isometric_camera_target_system);
+  app.add_systems(Update, isometric_camera_system);
 }

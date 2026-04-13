@@ -72,7 +72,7 @@ int main() {
         std::println("global observer: {} damage for entity {}", event->amount,
                      event->target.index());
       })
-      .add_systems(ScheduleLabel::Startup, setup)
-      .add_systems(ScheduleLabel::Update, trigger_events)
+      .add_systems(Startup, setup)
+      .add_systems(Update, trigger_events)
       .run();
 }

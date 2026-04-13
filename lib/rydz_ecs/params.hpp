@@ -57,9 +57,7 @@ public:
   explicit MessageReader(Messages<E> *messages)
       : messages_(messages), reader_id_(messages->register_reader()) {}
 
-  template <typename Func> void for_each(Func &&func) {
-    messages_->read(reader_id_, std::forward<Func>(func));
-  }
+  auto iter() { return messages_->iter(reader_id_); }
 
   bool is_empty() const { return !messages_->has_unread(reader_id_); }
 };
