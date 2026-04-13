@@ -2,23 +2,58 @@
 #pragma once
 
 #include "rydz_ecs/rydz_ecs.hpp"
-#include <sol/sol.hpp>
 #include <iostream>
+
+//wylaczenie name manglingu dla C
+extern "C" {
+	#include "lua.h"
+	#include "lualib.h"
+	#include "lauxlib.h"
+}
 
 namespace engine {
 
 	struct LuaResource {
 		using T = ecs::Resource;
-		sol::state vm;
+		lua_State* vm = nullptr;
+
+		LuaResource() {
+			vm = luaL_newstate();
+			if (!vm) std::cerr << "Nie można utworzyć wirtualnej maszyny Lua" << "\n";
+			luaL_openlibs(vm);
+		}
+
+		~LuaResource() {
+			if (vm) {
+				lua_close(vm);
+			}
+			vm = nullptr;
+		}
+
+		LuaResource(const LuaResource&) = delete;
+		LuaResource& operator=(const LuaResource&) = delete;
+
+		LuaResource(LuaResource&& other) noexcept : vm(other.vm) {
+			other.vm = nullptr;
+		}
+
+		LuaResource& operator=(LuaResource&& other) noexcept {
+			if (this != &other) {
+				if (vm) {
+					lua_close(vm);
+				}
+				vm = other.vm;
+				other.vm = nullptr;
+			}
+			return *this;
+		}
 	};
 
 	inline void scripting_plugin(ecs::App& app)
 	{
 		if (!app.world().has_resource<LuaResource>())
 		{
-			LuaResource lua_res;
-			lua_res.vm.open_libraries(sol::lib::base, sol::lib::math, sol::lib::string, sol::lib::table);
-			app.insert_resource(std::move(lua_res));
+			app.insert_resource(LuaResource{});
 		}
 	}
 

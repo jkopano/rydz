@@ -29,7 +29,8 @@ local function is_msvc_like()
 	return tc == "msvc" or tc == "clang-cl"
 end
 
-local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
+-- local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
+local tracy_enabled = false
 local function add_tracy()
 	if tracy_enabled then
 		add_packages("tracy")
@@ -43,7 +44,6 @@ set_warnings("all", "extra")
 
 -- common dependencies
 add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze")
-add_requires("sol2 v3.3.0", { configs = { includes_lua = false, lua_version = "5.1" } })
 
 if tracy_enabled then
 	add_requires("tracy")
@@ -138,7 +138,7 @@ set_default(true)
 set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
-add_packages("taskflow", "joltphysics", "sol2", "glaze")
+add_packages("taskflow", "joltphysics", "glaze")
 if is_plat("windows") then
 	add_packages("luajit")
 elseif is_plat("linux") then
@@ -154,7 +154,7 @@ set_rundir("$(projectdir)")
 add_files("lib/rydz_**/*.cpp")
 add_headerfiles("lib/rydz_**/*.hpp")
 add_deps("raylib")
-add_packages("taskflow", "joltphysics", "sol2", "glaze")
+add_packages("taskflow", "joltphysics", "glaze")
 if is_plat("windows") then
 	add_packages("luajit")
 elseif is_plat("linux") then
@@ -198,7 +198,7 @@ for _, name in ipairs(examples) do
 	set_rundir("$(projectdir)")
 	add_files("examples/" .. name .. "/main.cpp")
 	add_deps("raylib")
-	add_packages("taskflow", "joltphysics", "sol2", "glaze")
+	add_packages("taskflow", "joltphysics", "glaze")
 	if is_plat("windows") then
 		add_packages("luajit")
 	elseif is_plat("linux") then
