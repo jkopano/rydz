@@ -16,7 +16,7 @@ enum class CameraProjection3D {
 };
 
 struct Camera3DComponent {
-  using Required = Requires<rydz_gl::RenderConfig, ClearColor>;
+  using Required = Requires<gl::RenderConfig, ClearColor>;
   CameraProjection3D projection = CameraProjection3D::Perspective;
   float perspective_fov_y_deg = 45.0f;
   float orthographic_height = 10.0f;

@@ -5,7 +5,7 @@
 #include <cstring>
 #include <string>
 
-namespace rydz_gl {
+namespace gl {
 
 class Skybox {
 public:
@@ -160,4 +160,4 @@ private:
   }
 };
 
-} // namespace rydz_gl
+} // namespace gl

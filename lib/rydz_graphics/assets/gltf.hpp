@@ -42,7 +42,7 @@ inline Transform transform_from_cgltf_node(const cgltf_node &node) {
   }
 
   if (node.has_matrix) {
-    rydz_gl::Matrix matrix = {
+    gl::Matrix matrix = {
         node.matrix[0], node.matrix[4], node.matrix[8],  node.matrix[12],
         node.matrix[1], node.matrix[5], node.matrix[9],  node.matrix[13],
         node.matrix[2], node.matrix[6], node.matrix[10], node.matrix[14],
@@ -52,7 +52,7 @@ inline Transform transform_from_cgltf_node(const cgltf_node &node) {
     Vec3 translation = Vec3::sZero();
     Quat rotation = Quat::sIdentity();
     Vec3 scale = Vec3::sReplicate(1.0F);
-    rydz_gl::decompose_matrix(matrix, translation, rotation, scale);
+    gl::decompose_matrix(matrix, translation, rotation, scale);
 
     transform.translation = translation;
     transform.rotation = rotation;
@@ -66,7 +66,7 @@ inline Transform transform_from_matrix(const Mat4 &matrix) {
   Vec3 translation = Vec3::sZero();
   Quat rotation = Quat::sIdentity();
   Vec3 scale = Vec3::sReplicate(1.0F);
-  rydz_gl::decompose_matrix(matrix, translation, rotation, scale);
+  gl::decompose_matrix(matrix, translation, rotation, scale);
 
   Transform transform;
   transform.translation = translation;
@@ -114,9 +114,9 @@ inline void apply_gltf_material_properties(CompiledMaterial &material_desc,
 }
 
 inline Handle<Texture> transfer_texture(
-    Assets<Texture> &textures, const rydz_gl::Texture &texture,
+    Assets<Texture> &textures, const gl::Texture &texture,
     std::unordered_map<unsigned int, Handle<Texture>> &texture_cache) {
-  if (!rydz_gl::has_texture(texture)) {
+  if (!gl::has_texture(texture)) {
     return {};
   }
 
@@ -131,7 +131,7 @@ inline Handle<Texture> transfer_texture(
 }
 
 inline SceneMaterial material_from_backend_material(
-    const rydz_gl::Material &material, Assets<Texture> &textures,
+    const gl::Material &material, Assets<Texture> &textures,
     Assets<Material> &materials,
     std::unordered_map<unsigned int, Handle<Texture>> &texture_cache,
     const std::string &name = {},
@@ -142,35 +142,35 @@ inline SceneMaterial material_from_backend_material(
 
   if (material.maps != nullptr) {
     material_value.base_color =
-        material.maps[rydz_gl::MATERIAL_MAP_DIFFUSE].color;
+        material.maps[gl::MATERIAL_MAP_DIFFUSE].color;
     material_value.emissive_color =
-        material.maps[rydz_gl::MATERIAL_MAP_EMISSION].color;
+        material.maps[gl::MATERIAL_MAP_EMISSION].color;
     material_value.texture = transfer_texture(
-        textures, material.maps[rydz_gl::MATERIAL_MAP_DIFFUSE].texture,
+        textures, material.maps[gl::MATERIAL_MAP_DIFFUSE].texture,
         texture_cache);
     material_value.normal_map = transfer_texture(
-        textures, material.maps[rydz_gl::MATERIAL_MAP_NORMAL].texture,
+        textures, material.maps[gl::MATERIAL_MAP_NORMAL].texture,
         texture_cache);
     material_value.metallic_map = transfer_texture(
-        textures, material.maps[rydz_gl::MATERIAL_MAP_METALNESS].texture,
+        textures, material.maps[gl::MATERIAL_MAP_METALNESS].texture,
         texture_cache);
     material_value.roughness_map = transfer_texture(
-        textures, material.maps[rydz_gl::MATERIAL_MAP_ROUGHNESS].texture,
+        textures, material.maps[gl::MATERIAL_MAP_ROUGHNESS].texture,
         texture_cache);
     material_value.occlusion_map = transfer_texture(
-        textures, material.maps[rydz_gl::MATERIAL_MAP_OCCLUSION].texture,
+        textures, material.maps[gl::MATERIAL_MAP_OCCLUSION].texture,
         texture_cache);
     material_value.emissive_map = transfer_texture(
-        textures, material.maps[rydz_gl::MATERIAL_MAP_EMISSION].texture,
+        textures, material.maps[gl::MATERIAL_MAP_EMISSION].texture,
         texture_cache);
     material_value.metallic =
-        material.maps[rydz_gl::MATERIAL_MAP_METALNESS].value;
+        material.maps[gl::MATERIAL_MAP_METALNESS].value;
     material_value.roughness =
-        material.maps[rydz_gl::MATERIAL_MAP_ROUGHNESS].value;
+        material.maps[gl::MATERIAL_MAP_ROUGHNESS].value;
     material_value.normal_scale =
-        material.maps[rydz_gl::MATERIAL_MAP_NORMAL].value;
+        material.maps[gl::MATERIAL_MAP_NORMAL].value;
     material_value.occlusion_strength =
-        material.maps[rydz_gl::MATERIAL_MAP_OCCLUSION].value;
+        material.maps[gl::MATERIAL_MAP_OCCLUSION].value;
   }
 
   CompiledMaterial compiled = Material{material_value}.compiled;
@@ -209,7 +209,7 @@ public:
       return;
     }
 
-    auto model = rydz_gl::load_model(file_path);
+    auto model = gl::load_model(file_path);
     if (model.meshCount <= 0 || model.meshes == nullptr) {
       return;
     }
@@ -218,14 +218,14 @@ public:
     cgltf_data *data = nullptr;
     if (cgltf_parse_file(&options, file_path.c_str(), &data) !=
         cgltf_result_success) {
-      rydz_gl::unload_model(model);
+      gl::unload_model(model);
       return;
     }
 
     if (cgltf_load_buffers(&options, data, file_path.c_str()) !=
         cgltf_result_success) {
       cgltf_free(data);
-      rydz_gl::unload_model(model);
+      gl::unload_model(model);
       return;
     }
 
@@ -286,7 +286,7 @@ public:
 
         Handle<Mesh> mesh_handle =
             mesh_assets->add(Mesh{model.meshes[model_mesh_index]});
-        model.meshes[model_mesh_index] = rydz_gl::Mesh{};
+        model.meshes[model_mesh_index] = gl::Mesh{};
 
         usize material_index = 0;
         if (model.meshMaterial && model_mesh_index < model.meshCount &&
@@ -438,7 +438,7 @@ public:
     scene_assets->set(Handle<Scene>{handle_id}, std::move(scene));
 
     cgltf_free(data);
-    rydz_gl::unload_model(model);
+    gl::unload_model(model);
   }
 };
 

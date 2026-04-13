@@ -41,9 +41,9 @@ struct RenderPlugin {
 
   static void install(App &app) {
     app.init_resource<Assets<Mesh>>(
-           [](Mesh &mesh) { rydz_gl::unload_mesh(mesh); })
+           [](Mesh &mesh) { gl::unload_mesh(mesh); })
         .init_resource<Assets<Texture>>(
-            [](Texture &texture) { rydz_gl::unload_texture(texture); })
+            [](Texture &texture) { gl::unload_texture(texture); })
         .init_resource<Assets<Material>>()
         .init_resource<Assets<Scene>>()
         .init_resource<AssetServer>()
@@ -112,7 +112,9 @@ struct RenderPlugin {
                          .chain())
 
         .add_systems(RenderExtractSet::Prepare,
-                     RenderPhaseSystems::Prepare::build_opaque_batches)
+                     group(RenderPhaseSystems::Prepare::build_opaque_batches,
+                           RenderPhaseSystems::Prepare::build_transparent_batches)
+                         .chain())
 
         .add_systems(RenderPassSet::Setup, RenderPassSystems::Frame::begin_frame)
 

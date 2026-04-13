@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-namespace rydz_gl {
+namespace gl {
 
 struct ClusterConfig {
   using T = ecs::Resource;
@@ -265,4 +265,4 @@ build_cluster_record(const ClusterConfig &config,
   return record;
 }
 
-} // namespace rydz_gl
+} // namespace gl

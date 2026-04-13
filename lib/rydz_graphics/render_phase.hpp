@@ -49,8 +49,12 @@ struct TransparentPhaseItem {
 struct TransparentPhase {
   using T = Resource;
   std::vector<TransparentPhaseItem> items;
+  std::vector<TransparentBatch> batches;
 
-  void clear() { items.clear(); }
+  void clear() {
+    items.clear();
+    batches.clear();
+  }
 };
 
 struct UiPhaseItem {
@@ -159,8 +163,29 @@ struct RenderPhaseSystems {
       detail::build_opaque_batches(*phase, *mesh_assets, {});
     }
 
+    static void build_transparent_batches(ResMut<TransparentPhase> phase,
+                                          ResMut<Assets<Mesh>> mesh_assets,
+                                          NonSendMarker) {
+      detail::build_transparent_batches(*phase, *mesh_assets, {});
+    }
+
   private:
     struct detail {
+      static bool prepare_mesh(const Handle<Mesh> &handle,
+                               Assets<Mesh> &mesh_assets) {
+        auto *mesh = mesh_assets.get(handle);
+        if (!mesh || gl::mesh_vertex_count(*mesh) <= 0 ||
+            gl::mesh_vertices(*mesh) == nullptr) {
+          return false;
+        }
+
+        if (!gl::mesh_uploaded(*mesh)) {
+          gl::upload_mesh(*mesh, false);
+        }
+
+        return true;
+      }
+
       static void build_opaque_batches(OpaquePhase &phase,
                                        Assets<Mesh> &mesh_assets,
                                        NonSendMarker) {
@@ -168,14 +193,8 @@ struct RenderPhaseSystems {
         std::unordered_map<RenderBatchKey, usize> batch_index;
 
         for (const auto &item : phase.items) {
-          auto *mesh = mesh_assets.get(item.mesh);
-          if (!mesh || rydz_gl::mesh_vertex_count(*mesh) <= 0 ||
-              rydz_gl::mesh_vertices(*mesh) == nullptr) {
+          if (!prepare_mesh(item.mesh, mesh_assets)) {
             continue;
-          }
-
-          if (!rydz_gl::mesh_uploaded(*mesh)) {
-            rydz_gl::upload_mesh(*mesh, false);
           }
 
           RenderBatchKey key{};
@@ -187,14 +206,41 @@ struct RenderPhaseSystems {
             usize batch_slot = phase.batches.size();
             OpaqueBatch batch{};
             batch.key = key;
-            batch.transforms.push_back(rydz_gl::to_matrix(item.world_transform));
+            batch.transforms.push_back(gl::to_matrix(item.world_transform));
             phase.batches.push_back(std::move(batch));
             batch_index.emplace(phase.batches.back().key, batch_slot);
             continue;
           }
 
           phase.batches[it->second].transforms.push_back(
-              rydz_gl::to_matrix(item.world_transform));
+              gl::to_matrix(item.world_transform));
+        }
+      }
+
+      static void build_transparent_batches(TransparentPhase &phase,
+                                            Assets<Mesh> &mesh_assets,
+                                            NonSendMarker) {
+        phase.batches.clear();
+
+        for (const auto &item : phase.items) {
+          if (!prepare_mesh(item.mesh, mesh_assets)) {
+            continue;
+          }
+
+          RenderBatchKey key{};
+          key.mesh = item.mesh;
+          key.material = item.material;
+
+          if (phase.batches.empty() || !(phase.batches.back().key == key)) {
+            TransparentBatch batch{};
+            batch.key = key;
+            batch.transforms.push_back(gl::to_matrix(item.world_transform));
+            phase.batches.push_back(std::move(batch));
+            continue;
+          }
+
+          phase.batches.back().transforms.push_back(
+              gl::to_matrix(item.world_transform));
         }
       }
     };

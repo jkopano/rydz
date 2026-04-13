@@ -130,7 +130,7 @@ inline void some_shit(Query<CameraState> q) {
 inline void spawn_some_texture(Cmd cmd, ResMut<Assets<ecs::Texture>> textures,
                                NonSendMarker) {
   auto stone_tex =
-      textures->add(rydz_gl::load_texture("res/textures/stone.jpg"));
+      textures->add(gl::load_texture("res/textures/stone.jpg"));
   cmd.spawn(ecs::Sprite{stone_tex}, Transform{
                                         .translation = Vec3(10.0f, 10.0f, 0.0f),
                                         .scale = Vec3::sReplicate(1.0f),
@@ -158,7 +158,7 @@ inline void spawn_lights_on_input(Cmd cmd,
   });
 
   auto stone_tex =
-      textures->add(rydz_gl::load_texture("res/textures/stone.jpg"));
+      textures->add(gl::load_texture("res/textures/stone.jpg"));
   auto stone_mat = materials->add(StandardMaterial::from_texture(stone_tex));
 
   auto cube_h = meshes->add(mesh::cube());

@@ -112,7 +112,7 @@ inline void spawn_ground(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
                          NonSendMarker) {
   auto plane_h = meshes->add(mesh::plane(20.0f, 20.0f, 1, 1));
   auto plane_mat = materials->add(StandardMaterial::from_texture(
-      textures->add(rydz_gl::load_texture("res/textures/brick.png"))));
+      textures->add(gl::load_texture("res/textures/brick.png"))));
 
   cmd.spawn(Mesh3d{plane_h},
             MeshMaterial3d{plane_mat},
@@ -125,7 +125,7 @@ inline void spawn_player(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
                          NonSendMarker) {
   auto cube_h = meshes->add(mesh::cube(1.0f, 1.0f, 1.0f));
   auto cube_mat = materials->add(StandardMaterial::from_texture(
-      textures->add(rydz_gl::load_texture("res/textures/stone.jpg"))));
+      textures->add(gl::load_texture("res/textures/stone.jpg"))));
 
   cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d{cube_mat},
             Transform::from_xyz(0.0f, 0.5f, 0.0f), Player{});

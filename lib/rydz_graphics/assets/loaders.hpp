@@ -24,7 +24,7 @@ struct TextureLoader : public AssetLoader<TextureLoader, Texture> {
     auto path = std::any_cast<std::string>(std::move(asset));
     auto *assets = world.get_resource<Assets<Texture>>();
     if (assets) {
-      auto texture = rydz_gl::load_texture(path);
+      auto texture = gl::load_texture(path);
       assets->set(Handle<Texture>{handle_id}, Texture{texture});
     }
   }
@@ -50,7 +50,7 @@ struct SoundLoader : public AssetLoader<SoundLoader, Sound> {
                          std::any /*asset*/) override {
     auto *assets = world.get_resource<Assets<Sound>>();
     if (assets) {
-      auto sound = rydz_gl::load_sound(path_);
+      auto sound = gl::load_sound(path_);
       assets->set(Handle<Sound>{handle_id}, Sound{sound});
     }
   }

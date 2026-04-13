@@ -33,8 +33,8 @@ struct ExtractedView {
       .position = Vec3(10, 10, 10),
   };
   Color clear_color = ClearColor{}.color;
-  const Skybox *active_skybox = nullptr;
-  rydz_gl::RenderConfig render_config{};
+  const gl::Skybox *active_skybox = nullptr;
+  gl::RenderConfig render_config{};
   PostProcessDescriptor postprocess{};
   bool active = false;
   bool has_render_config = false;
@@ -116,7 +116,7 @@ struct ExtractedUi {
 struct RenderExtractSystems {
   static void extract_view_system(
       Query<Camera3DComponent, ActiveCamera, GlobalTransform, Opt<ClearColor>,
-            Opt<Skybox>, Opt<rydz_gl::RenderConfig>, Opt<PostProcessMaterial>>
+            Opt<Skybox>, Opt<gl::RenderConfig>, Opt<PostProcessMaterial>>
           cam_query,
       Res<Window> window, ResMut<ExtractedView> view) {
     view->reset();

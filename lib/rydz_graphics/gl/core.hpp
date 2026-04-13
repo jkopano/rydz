@@ -7,7 +7,7 @@
 #include <raymath.h>
 #include <type_traits>
 
-namespace rydz_gl {
+namespace gl {
 
 using Color = rl::Color;
 using Vec2 = rl::Vector2;
@@ -537,4 +537,4 @@ inline void Model::unload() {
   }
 }
 
-} // namespace rydz_gl
+} // namespace gl

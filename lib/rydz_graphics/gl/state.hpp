@@ -3,7 +3,7 @@
 #include "rydz_graphics/gl/core.hpp"
 #include <algorithm>
 
-namespace rydz_gl {
+namespace gl {
 
 enum class DepthFunc {
   Always,
@@ -267,4 +267,4 @@ inline void draw_mesh_instanced(const Mesh &mesh, Material &material,
   mesh.draw_instanced(material, transforms, count);
 }
 
-} // namespace rydz_gl
+} // namespace gl

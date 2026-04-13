@@ -4,6 +4,6 @@
 
 namespace ecs {
 
-using Skybox = rydz_gl::Skybox;
+using Skybox = gl::Skybox;
 
 } // namespace ecs

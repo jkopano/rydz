@@ -10,7 +10,7 @@ template <typename C>
 concept IComputeShader = requires {
   { C::vertex_source() } -> std::convertible_to<const char *>;
   { C::fragment_source() } -> std::convertible_to<const char *>;
-  { C::shader() } -> std::convertible_to<const rydz_gl::Shader *>;
+  { C::shader() } -> std::convertible_to<const gl::Shader *>;
 };
 
 template <IComputeShader C> class ICompute {

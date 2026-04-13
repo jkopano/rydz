@@ -25,7 +25,7 @@
 namespace ecs {
 
 struct MaterialMapBinding {
-  rydz_gl::MaterialMapIndex map_type = rydz_gl::MATERIAL_MAP_DIFFUSE;
+  gl::MaterialMapIndex map_type = gl::MATERIAL_MAP_DIFFUSE;
   Handle<Texture> texture{};
   Color color = kWhite;
   f32 value = 0.0f;
@@ -41,7 +41,7 @@ struct MaterialMapBinding {
            has_value == o.has_value;
   }
 
-  static MaterialMapBinding texture_binding(rydz_gl::MaterialMapIndex map_type,
+  static MaterialMapBinding texture_binding(gl::MaterialMapIndex map_type,
                                             Handle<Texture> texture) {
     return MaterialMapBinding{
         .map_type = map_type,
@@ -50,7 +50,7 @@ struct MaterialMapBinding {
     };
   }
 
-  static MaterialMapBinding color_binding(rydz_gl::MaterialMapIndex map_type,
+  static MaterialMapBinding color_binding(gl::MaterialMapIndex map_type,
                                           Color color) {
     return MaterialMapBinding{
         .map_type = map_type,
@@ -59,7 +59,7 @@ struct MaterialMapBinding {
     };
   }
 
-  static MaterialMapBinding value_binding(rydz_gl::MaterialMapIndex map_type,
+  static MaterialMapBinding value_binding(gl::MaterialMapIndex map_type,
                                           f32 value) {
     return MaterialMapBinding{
         .map_type = map_type,
@@ -130,13 +130,13 @@ public:
     return *this;
   }
 
-  MaterialBuilder &texture(rydz_gl::MaterialMapIndex map_type,
+  MaterialBuilder &texture(gl::MaterialMapIndex map_type,
                            Handle<Texture> texture) {
     maps_.push_back(MaterialMapBinding::texture_binding(map_type, texture));
     return *this;
   }
 
-  MaterialBuilder &color(rydz_gl::MaterialMapIndex map_type,
+  MaterialBuilder &color(gl::MaterialMapIndex map_type,
                          Color color_value) {
     maps_.push_back(MaterialMapBinding::color_binding(map_type, color_value));
     return *this;
@@ -385,7 +385,7 @@ inline bool compiled_material_has_slot(const CompiledMaterial &compiled,
 
 inline const MaterialMapBinding *
 find_last_map_binding(const CompiledMaterial &compiled,
-                      rydz_gl::MaterialMapIndex map_type, auto predicate) {
+                      gl::MaterialMapIndex map_type, auto predicate) {
   for (auto it = compiled.maps.rbegin(); it != compiled.maps.rend(); ++it) {
     if (it->map_type == map_type && predicate(*it)) {
       return &*it;
@@ -398,7 +398,7 @@ inline void normalize_pbr_compiled_material(CompiledMaterial &compiled) {
   if (!compiled.has_uniform_named("u_metallic_factor")) {
     float metallic = 0.0f;
     if (const auto *binding = find_last_map_binding(
-            compiled, rydz_gl::MATERIAL_MAP_METALNESS,
+            compiled, gl::MATERIAL_MAP_METALNESS,
             [](const auto &item) { return item.has_value; })) {
       metallic = binding->value;
     }
@@ -408,10 +408,10 @@ inline void normalize_pbr_compiled_material(CompiledMaterial &compiled) {
   if (!compiled.has_uniform_named("u_roughness_factor")) {
     float roughness = 0.0f;
     const auto *value_binding =
-        find_last_map_binding(compiled, rydz_gl::MATERIAL_MAP_ROUGHNESS,
+        find_last_map_binding(compiled, gl::MATERIAL_MAP_ROUGHNESS,
                               [](const auto &item) { return item.has_value; });
     const auto *texture_binding = find_last_map_binding(
-        compiled, rydz_gl::MATERIAL_MAP_ROUGHNESS,
+        compiled, gl::MATERIAL_MAP_ROUGHNESS,
         [](const auto &item) { return item.has_texture; });
     if (value_binding) {
       roughness = value_binding->value;
@@ -424,7 +424,7 @@ inline void normalize_pbr_compiled_material(CompiledMaterial &compiled) {
   if (!compiled.has_uniform_named("u_normal_factor")) {
     float normal = 1.0f;
     if (const auto *binding = find_last_map_binding(
-            compiled, rydz_gl::MATERIAL_MAP_NORMAL,
+            compiled, gl::MATERIAL_MAP_NORMAL,
             [](const auto &item) { return item.has_value; })) {
       normal = binding->value > 0.0f ? binding->value : 1.0f;
     }
@@ -434,7 +434,7 @@ inline void normalize_pbr_compiled_material(CompiledMaterial &compiled) {
   if (!compiled.has_uniform_named("u_occlusion_factor")) {
     float occlusion = 1.0f;
     if (const auto *binding = find_last_map_binding(
-            compiled, rydz_gl::MATERIAL_MAP_OCCLUSION,
+            compiled, gl::MATERIAL_MAP_OCCLUSION,
             [](const auto &item) { return item.has_value; })) {
       occlusion = binding->value > 0.0f ? binding->value : 1.0f;
     }
@@ -446,7 +446,7 @@ inline void normalize_pbr_compiled_material(CompiledMaterial &compiled) {
     float ey = 0.0f;
     float ez = 0.0f;
     if (const auto *binding = find_last_map_binding(
-            compiled, rydz_gl::MATERIAL_MAP_EMISSION,
+            compiled, gl::MATERIAL_MAP_EMISSION,
             [](const auto &item) { return item.has_color; })) {
       auto emissive = color_to_vec3(binding->color);
       ex = emissive.x;
@@ -537,24 +537,24 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
   float alpha_cutoff() const { return 0.1f; }
 
   void bind(MaterialBuilder &builder) const {
-    builder.color(rydz_gl::MATERIAL_MAP_DIFFUSE, base_color);
+    builder.color(gl::MATERIAL_MAP_DIFFUSE, base_color);
     if (texture.is_valid()) {
-      builder.texture(rydz_gl::MATERIAL_MAP_DIFFUSE, texture);
+      builder.texture(gl::MATERIAL_MAP_DIFFUSE, texture);
     }
     if (normal_map.is_valid()) {
-      builder.texture(rydz_gl::MATERIAL_MAP_NORMAL, normal_map);
+      builder.texture(gl::MATERIAL_MAP_NORMAL, normal_map);
     }
     if (metallic_map.is_valid()) {
-      builder.texture(rydz_gl::MATERIAL_MAP_METALNESS, metallic_map);
+      builder.texture(gl::MATERIAL_MAP_METALNESS, metallic_map);
     }
     if (roughness_map.is_valid()) {
-      builder.texture(rydz_gl::MATERIAL_MAP_ROUGHNESS, roughness_map);
+      builder.texture(gl::MATERIAL_MAP_ROUGHNESS, roughness_map);
     }
     if (occlusion_map.is_valid()) {
-      builder.texture(rydz_gl::MATERIAL_MAP_OCCLUSION, occlusion_map);
+      builder.texture(gl::MATERIAL_MAP_OCCLUSION, occlusion_map);
     }
     if (emissive_map.is_valid()) {
-      builder.texture(rydz_gl::MATERIAL_MAP_EMISSION, emissive_map);
+      builder.texture(gl::MATERIAL_MAP_EMISSION, emissive_map);
     }
 
     if (metallic >= 0.0f) {

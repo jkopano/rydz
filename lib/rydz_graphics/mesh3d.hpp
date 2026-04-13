@@ -21,18 +21,18 @@ namespace mesh {
 
 inline void ensure_uploaded(Mesh &mesh) {
   mesh.value.gen_tangents();
-  rydz_gl::upload_mesh(mesh.value, false);
+  gl::upload_mesh(mesh.value, false);
 }
 
 inline Mesh cube(float width = 1, float height = 1, float length = 1) {
-  auto mesh = rydz_gl::gen_cube(width, height, length);
+  auto mesh = gl::gen_cube(width, height, length);
   Mesh asset{mesh};
   ensure_uploaded(asset);
   return asset;
 }
 
 inline Mesh sphere(float radius = 0.5f, int rings = 16, int slices = 16) {
-  auto mesh = rydz_gl::gen_sphere(radius, rings, slices);
+  auto mesh = gl::gen_sphere(radius, rings, slices);
   Mesh asset{mesh};
   ensure_uploaded(asset);
   return asset;
@@ -40,14 +40,14 @@ inline Mesh sphere(float radius = 0.5f, int rings = 16, int slices = 16) {
 
 inline Mesh plane(float width = 10, float length = 10, int res_x = 1,
                   int res_z = 1) {
-  auto mesh = rydz_gl::gen_plane(width, length, res_x, res_z);
+  auto mesh = gl::gen_plane(width, length, res_x, res_z);
   Mesh asset{mesh};
   ensure_uploaded(asset);
   return asset;
 }
 
 inline Mesh cylinder(float radius = 0.5f, float height = 1, int slices = 16) {
-  auto mesh = rydz_gl::gen_cylinder(radius, height, slices);
+  auto mesh = gl::gen_cylinder(radius, height, slices);
   Mesh asset{mesh};
   ensure_uploaded(asset);
   return asset;
@@ -55,14 +55,14 @@ inline Mesh cylinder(float radius = 0.5f, float height = 1, int slices = 16) {
 
 inline Mesh torus(float radius = 0.5f, float size = 0.2f, int rad_seg = 16,
                   int sides = 16) {
-  auto mesh = rydz_gl::gen_torus(radius, size, rad_seg, sides);
+  auto mesh = gl::gen_torus(radius, size, rad_seg, sides);
   Mesh asset{mesh};
   ensure_uploaded(asset);
   return asset;
 }
 
 inline Mesh hemisphere(float radius = 0.5f, int rings = 16, int slices = 16) {
-  auto mesh = rydz_gl::gen_hemisphere(radius, rings, slices);
+  auto mesh = gl::gen_hemisphere(radius, rings, slices);
   Mesh asset{mesh};
   ensure_uploaded(asset);
   return asset;
@@ -70,7 +70,7 @@ inline Mesh hemisphere(float radius = 0.5f, int rings = 16, int slices = 16) {
 
 inline Mesh knot(float radius = 0.5f, float size = 0.2f, int rad_seg = 16,
                  int sides = 16) {
-  auto mesh = rydz_gl::gen_knot(radius, size, rad_seg, sides);
+  auto mesh = gl::gen_knot(radius, size, rad_seg, sides);
   Mesh asset{mesh};
   ensure_uploaded(asset);
   return asset;

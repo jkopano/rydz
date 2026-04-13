@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <utility>
 
-namespace rydz_gl {
+namespace gl {
 
 struct ShaderSpec {
   std::string vertex_path;
@@ -372,11 +372,11 @@ inline int shader_location_attrib(const Shader &shader, const char *name) {
   return rl::GetShaderLocationAttrib(shader, name);
 }
 
-} // namespace rydz_gl
+} // namespace gl
 
 namespace std {
-template <> struct hash<rydz_gl::ShaderSpec> {
-  size_t operator()(const rydz_gl::ShaderSpec &k) const noexcept {
+template <> struct hash<gl::ShaderSpec> {
+  size_t operator()(const gl::ShaderSpec &k) const noexcept {
     size_t seed = 0;
     rydz::hash_combine(seed, std::hash<std::string>{}(k.vertex_path));
     rydz::hash_combine(seed, std::hash<std::string>{}(k.fragment_path));
@@ -384,8 +384,8 @@ template <> struct hash<rydz_gl::ShaderSpec> {
   }
 };
 
-template <> struct hash<rydz_gl::Uniform> {
-  size_t operator()(const rydz_gl::Uniform &k) const noexcept {
+template <> struct hash<gl::Uniform> {
+  size_t operator()(const gl::Uniform &k) const noexcept {
     size_t seed = 0;
     rydz::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.type)));
     rydz::hash_combine(seed, std::hash<int>{}(k.count));

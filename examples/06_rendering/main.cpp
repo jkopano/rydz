@@ -81,7 +81,7 @@ void load_textured_cube(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
                         ResMut<Assets<ecs::Material>> materials,
                         NonSendMarker) {
   // ładowanko tekstury można też przez AssetServer
-  auto tex_handle = textures->add(rydz_gl::load_texture("res/textures/stone.jpg"));
+  auto tex_handle = textures->add(gl::load_texture("res/textures/stone.jpg"));
 
   // materiał z teksturą
   auto mat = materials->add(StandardMaterial::from_texture(tex_handle));

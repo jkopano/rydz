@@ -26,16 +26,16 @@ struct ViewVisibility {
   bool visible = true;
 };
 
-inline AABox compute_local_bbox(const rydz_gl::Mesh &mesh) {
-  if (!rydz_gl::mesh_vertices(mesh) || rydz_gl::mesh_vertex_count(mesh) <= 0) {
+inline AABox compute_local_bbox(const gl::Mesh &mesh) {
+  if (!gl::mesh_vertices(mesh) || gl::mesh_vertex_count(mesh) <= 0) {
     return AABox();
   }
 
   AABox bbox;
   bbox.mMin = Vec3(FLT_MAX, FLT_MAX, FLT_MAX);
   bbox.mMax = Vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-  for (int i = 0; i < rydz_gl::mesh_vertex_count(mesh); ++i) {
-    const float *vertices = rydz_gl::mesh_vertices(mesh);
+  for (int i = 0; i < gl::mesh_vertex_count(mesh); ++i) {
+    const float *vertices = gl::mesh_vertices(mesh);
     Vec3 v(vertices[i * 3 + 0], vertices[i * 3 + 1], vertices[i * 3 + 2]);
     bbox.Encapsulate(v);
   }
@@ -114,8 +114,8 @@ compute_mesh_bounds_system(Query<Entity, Mesh3d, Without<MeshBounds>> query,
                            Res<Assets<Mesh>> mesh_assets, Cmd cmd) {
   for (auto [e, mesh3d] : query.iter()) {
     const auto *mesh = mesh_assets->get(mesh3d->mesh);
-    if (!mesh || rydz_gl::mesh_vertex_count(*mesh) <= 0 ||
-        !rydz_gl::mesh_vertices(*mesh)) {
+    if (!mesh || gl::mesh_vertex_count(*mesh) <= 0 ||
+        !gl::mesh_vertices(*mesh)) {
       continue;
     }
 

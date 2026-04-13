@@ -3,7 +3,7 @@
 #include "rydz_graphics/gl/core.hpp"
 #include <string>
 
-namespace rydz_gl {
+namespace gl {
 
 inline Image load_image(const char *path) { return rl::LoadImage(path); }
 
@@ -81,7 +81,9 @@ inline Mesh gen_knot(float radius = 0.5f, float size = 0.2f,
 
 inline void gen_tangents(Mesh &mesh) { mesh.gen_tangents(); }
 
-inline void upload_mesh(Mesh &mesh, bool dynamic = false) { mesh.upload(dynamic); }
+inline void upload_mesh(Mesh &mesh, bool dynamic = false) {
+  mesh.upload(dynamic);
+}
 
 inline void unload_mesh(Mesh &mesh) { mesh.unload(); }
 
@@ -89,7 +91,9 @@ inline bool mesh_uploaded(const Mesh &mesh) { return mesh.uploaded(); }
 
 inline int mesh_vertex_count(const Mesh &mesh) { return mesh.vertex_count(); }
 
-inline const float *mesh_vertices(const Mesh &mesh) { return mesh.vertex_data(); }
+inline const float *mesh_vertices(const Mesh &mesh) {
+  return mesh.vertex_data();
+}
 
 inline float *mesh_vertices(Mesh &mesh) { return mesh.vertex_data(); }
 
@@ -130,7 +134,9 @@ inline void unload_model(Model &model) { model.unload(); }
 
 inline unsigned int load_vertex_array() { return rl::rlLoadVertexArray(); }
 
-inline void enable_vertex_array(unsigned int vao) { rl::rlEnableVertexArray(vao); }
+inline void enable_vertex_array(unsigned int vao) {
+  rl::rlEnableVertexArray(vao);
+}
 
 inline void disable_vertex_array() { rl::rlDisableVertexArray(); }
 
@@ -150,7 +156,9 @@ inline void enable_vertex_attribute(unsigned int index) {
   rl::rlEnableVertexAttribute(index);
 }
 
-inline void unload_vertex_array(unsigned int vao) { rl::rlUnloadVertexArray(vao); }
+inline void unload_vertex_array(unsigned int vao) {
+  rl::rlUnloadVertexArray(vao);
+}
 
 inline void unload_vertex_buffer(unsigned int vbo) {
   rl::rlUnloadVertexBuffer(vbo);
@@ -168,9 +176,9 @@ inline void draw_vertex_array(int offset, int count) {
   rl::rlDrawVertexArray(offset, count);
 }
 
-inline unsigned int load_texture_cubemap(const void *data, int size,
-                                         int format, int mipmaps) {
+inline unsigned int load_texture_cubemap(const void *data, int size, int format,
+                                         int mipmaps) {
   return rl::rlLoadTextureCubemap(data, size, format, mipmaps);
 }
 
-} // namespace rydz_gl
+} // namespace gl
