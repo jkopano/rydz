@@ -2,9 +2,9 @@
 // Pokazuje: add_event, add_observer, EntityCommands::observe i trigger
 
 #include "rl.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/render_plugin.hpp"
-#include "rydz_platform/rydz_platform.hpp"
+#include "rydz_platform/mod.hpp"
 #include <print>
 
 using namespace ecs;
@@ -23,7 +23,7 @@ struct LogEvent {
 struct DamageEvent {
   using T = EntityEvent;
   Entity target;
-  i32 amount;
+  i32 amount{};
 };
 
 void setup(Cmd cmd) {
@@ -50,15 +50,18 @@ void trigger_events(Cmd cmd, Res<Input> input,
   }
 
   if (input->key_pressed(KEY_D)) {
-    cmd.trigger(DamageEvent{player_ent, 10});
+    cmd.trigger(DamageEvent{.target = player_ent, .amount = 10});
   }
 }
 
 int main() {
   App app;
   app.add_plugin(rydz_platform::RayPlugin::install({
-          .window = {800, 600, "12 - Observers", 60},
-      }))
+                     .window = {.width = 800,
+                                .height = 600,
+                                .title = "12 - Observers",
+                                .target_fps = 60},
+                 }))
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)
       .add_event<LogEvent>()

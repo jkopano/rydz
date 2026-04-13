@@ -1,6 +1,7 @@
 #pragma once
 
-#include "rydz_gl/core.hpp"
+#include "hash.hpp"
+#include "rydz_graphics/gl/core.hpp"
 #include <array>
 #include <functional>
 #include <string>
@@ -39,96 +40,70 @@ enum class UniformType {
 };
 
 struct Uniform {
-  std::string name;
   UniformType type = UniformType::Float;
-  std::array<float, 16> float_data{};
-  std::array<int, 4> int_data{};
   int count = 1;
 
-  bool operator==(const Uniform &other) const = default;
+  union {
+    std::array<float, 16> float_data;
+    std::array<int, 4> int_data;
+  };
 
-  static Uniform float1(std::string name, f32 value) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Float;
-    uniform.float_data[0] = value;
-    return uniform;
+  Uniform() : float_data{} {}
+
+  explicit Uniform(float v) : float_data{} {
+    type = UniformType::Float;
+    float_data[0] = v;
   }
 
-  static Uniform vec2(std::string name, f32 x, f32 y) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Vec2;
-    uniform.float_data[0] = x;
-    uniform.float_data[1] = y;
-    return uniform;
+  Uniform(float x, float y) : float_data{} {
+    type = UniformType::Vec2;
+    float_data[0] = x;
+    float_data[1] = y;
   }
 
-  static Uniform vec3(std::string name, f32 x, f32 y, f32 z) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Vec3;
-    uniform.float_data[0] = x;
-    uniform.float_data[1] = y;
-    uniform.float_data[2] = z;
-    return uniform;
+  Uniform(float x, float y, float z) : float_data{} {
+    type = UniformType::Vec3;
+    float_data[0] = x;
+    float_data[1] = y;
+    float_data[2] = z;
   }
 
-  static Uniform vec4(std::string name, f32 x, f32 y, f32 z, f32 w) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Vec4;
-    uniform.float_data[0] = x;
-    uniform.float_data[1] = y;
-    uniform.float_data[2] = z;
-    uniform.float_data[3] = w;
-    return uniform;
+  Uniform(float x, float y, float z, float w) : float_data{} {
+    type = UniformType::Vec4;
+    float_data[0] = x;
+    float_data[1] = y;
+    float_data[2] = z;
+    float_data[3] = w;
   }
 
-  static Uniform int1(std::string name, int value) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Int;
-    uniform.int_data[0] = value;
-    return uniform;
+  explicit Uniform(int v) : float_data{} {
+    type = UniformType::Int;
+    int_data[0] = v;
   }
 
-  static Uniform ivec2(std::string name, int x, int y) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::IVec2;
-    uniform.int_data[0] = x;
-    uniform.int_data[1] = y;
-    return uniform;
+  Uniform(int x, int y) : float_data{} {
+    type = UniformType::IVec2;
+    int_data[0] = x;
+    int_data[1] = y;
   }
 
-  static Uniform ivec3(std::string name, int x, int y, int z) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::IVec3;
-    uniform.int_data[0] = x;
-    uniform.int_data[1] = y;
-    uniform.int_data[2] = z;
-    return uniform;
-  }
+  explicit Uniform(const std::array<float, 16> &mat)
+      : type(UniformType::Mat4), float_data(mat) {}
 
-  static Uniform ivec4(std::string name, int x, int y, int z, int w) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::IVec4;
-    uniform.int_data[0] = x;
-    uniform.int_data[1] = y;
-    uniform.int_data[2] = z;
-    uniform.int_data[3] = w;
-    return uniform;
-  }
+  Uniform(const math::Vec3 &v) : Uniform(v.GetX(), v.GetY(), v.GetZ()) {}
+  bool operator==(const Uniform &other) const {
+    if (type != other.type || count != other.count)
+      return false;
 
-  static Uniform mat4(std::string name, const std::array<float, 16> &value) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Mat4;
-    uniform.float_data = value;
-    return uniform;
+    switch (type) {
+    case UniformType::Int:
+    case UniformType::IVec2:
+    case UniformType::IVec3:
+    case UniformType::IVec4:
+      return int_data == other.int_data;
+    default:
+      return float_data == other.float_data;
+    }
   }
 };
 
@@ -283,44 +258,37 @@ public:
     }
   }
 
-  void apply(const Uniform &uniform) {
+  void apply(const std::string &name, const Uniform &uniform) {
     switch (uniform.type) {
     case UniformType::Float:
       if (uniform.count > 1) {
-        set_float_array(uniform.name.c_str(), uniform.float_data.data(),
-                        uniform.count);
+        set_float_array(name.c_str(), uniform.float_data.data(), uniform.count);
       } else {
-        set(uniform.name.c_str(), uniform.float_data[0]);
+        set(name.c_str(), uniform.float_data[0]);
       }
       break;
     case UniformType::Vec2:
-      set(uniform.name.c_str(),
-          Vec2{uniform.float_data[0], uniform.float_data[1]});
+      set(name.c_str(), Vec2{uniform.float_data[0], uniform.float_data[1]});
       break;
     case UniformType::Vec3:
-      set(uniform.name.c_str(),
-          Vec3{uniform.float_data[0], uniform.float_data[1],
-               uniform.float_data[2]});
+      set(name.c_str(), Vec3{uniform.float_data[0], uniform.float_data[1],
+                             uniform.float_data[2]});
       break;
     case UniformType::Vec4:
-      set(uniform.name.c_str(),
-          Vec4{uniform.float_data[0], uniform.float_data[1],
-               uniform.float_data[2], uniform.float_data[3]});
+      set(name.c_str(), Vec4{uniform.float_data[0], uniform.float_data[1],
+                             uniform.float_data[2], uniform.float_data[3]});
       break;
     case UniformType::Int:
-      set(uniform.name.c_str(), uniform.int_data[0]);
+      set(name.c_str(), uniform.int_data[0]);
       break;
     case UniformType::IVec2:
-      set_ints(uniform.name.c_str(), uniform.int_data.data(),
-               SHADER_UNIFORM_IVEC2);
+      set_ints(name.c_str(), uniform.int_data.data(), SHADER_UNIFORM_IVEC2);
       break;
     case UniformType::IVec3:
-      set_ints(uniform.name.c_str(), uniform.int_data.data(),
-               SHADER_UNIFORM_IVEC3);
+      set_ints(name.c_str(), uniform.int_data.data(), SHADER_UNIFORM_IVEC3);
       break;
     case UniformType::IVec4:
-      set_ints(uniform.name.c_str(), uniform.int_data.data(),
-               SHADER_UNIFORM_IVEC4);
+      set_ints(name.c_str(), uniform.int_data.data(), SHADER_UNIFORM_IVEC4);
       break;
     case UniformType::Mat4: {
       const Matrix matrix = {
@@ -333,7 +301,7 @@ public:
           uniform.float_data[12], uniform.float_data[13],
           uniform.float_data[14], uniform.float_data[15],
       };
-      set(uniform.name.c_str(), matrix);
+      set(name.c_str(), matrix);
       break;
     }
     }
@@ -405,3 +373,29 @@ inline int shader_location_attrib(const Shader &shader, const char *name) {
 }
 
 } // namespace rydz_gl
+
+namespace std {
+template <> struct hash<rydz_gl::ShaderSpec> {
+  size_t operator()(const rydz_gl::ShaderSpec &k) const noexcept {
+    size_t seed = 0;
+    rydz::hash_combine(seed, std::hash<std::string>{}(k.vertex_path));
+    rydz::hash_combine(seed, std::hash<std::string>{}(k.fragment_path));
+    return seed;
+  }
+};
+
+template <> struct hash<rydz_gl::Uniform> {
+  size_t operator()(const rydz_gl::Uniform &k) const noexcept {
+    size_t seed = 0;
+    rydz::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.type)));
+    rydz::hash_combine(seed, std::hash<int>{}(k.count));
+    for (float value : k.float_data) {
+      rydz::hash_combine(seed, std::hash<float>{}(value));
+    }
+    for (int value : k.int_data) {
+      rydz::hash_combine(seed, std::hash<int>{}(value));
+    }
+    return seed;
+  }
+};
+} // namespace std

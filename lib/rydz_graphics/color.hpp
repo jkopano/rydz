@@ -1,6 +1,7 @@
 #pragma once
 
-#include "rydz_gl/core.hpp"
+#include "rydz_ecs/fwd.hpp"
+#include "rydz_graphics/gl/core.hpp"
 
 namespace ecs {
 
@@ -34,5 +35,10 @@ inline constexpr Color kOrange = {255, 161, 0, 255};
 inline rydz_gl::Vec3 color_to_vec3(Color color) {
   return {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f};
 }
+
+struct ClearColor {
+  using T = Component;
+  Color color = {30, 30, 40, 255};
+};
 
 } // namespace ecs

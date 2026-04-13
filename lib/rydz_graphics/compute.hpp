@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rydz_ecs/asset.hpp"
-#include "rydz_gl/shader.hpp"
+#include "rydz_graphics/gl/shader.hpp"
 #include <concepts>
 
 namespace ecs {

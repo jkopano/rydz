@@ -1,5 +1,9 @@
 CompileFlags:
   Add: 
+    - "-std=c++23"
+    - "-Ilib"
+    - "-Ilib/external/raylib/src"
+    - "-I/home/kuba/.xmake/packages/g/glm/1.0.3/edce8ea0eff64febb086d70410650481/include"
     - "-Wall"
     - "-Wextra"
     - "-Wpedantic"

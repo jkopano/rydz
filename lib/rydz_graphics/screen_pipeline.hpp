@@ -1,7 +1,7 @@
 #pragma once
 
-#include "rydz_ecs/rydz_ecs.hpp"
-#include "rydz_gl/resources.hpp"
+#include "rydz_ecs/mod.hpp"
+#include "rydz_graphics/gl/resources.hpp"
 #include <algorithm>
 
 namespace ecs {

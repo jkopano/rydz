@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rydz_gl/core.hpp"
+#include "rydz_graphics/gl/core.hpp"
 #include <string>
 
 namespace rydz_gl {

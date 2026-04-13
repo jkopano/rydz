@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstring>
 
 namespace ecs {
 
@@ -87,7 +86,11 @@ struct RenderPassSystems {
                                   Res<Assets<Mesh>> mesh_assets,
                                   Res<Assets<Texture>> texture_assets,
                                   ResMut<ShaderCache> shader_cache,
+                                  Res<SlotProviderRegistry> slot_registry,
                                   Res<ExtractedView> view,
+                                  Res<ExtractedLights> lights,
+                                  Res<ClusterConfig> cluster_config,
+                                  Res<ClusteredLightingState> cluster_state,
                                   NonSendMarker marker) {
       if (!state->world_pass_active) {
         return;
@@ -96,7 +99,8 @@ struct RenderPassSystems {
       begin_depth_prepass(marker);
       for (const auto &batch : phase->batches) {
         draw_depth_batch(marker, batch, *mesh_assets, *texture_assets,
-                         *shader_cache);
+                         *shader_cache, *slot_registry, *view, *lights,
+                         *cluster_config, *cluster_state);
       }
       end_depth_prepass(marker, *view);
     }
@@ -117,7 +121,8 @@ struct RenderPassSystems {
         Res<RenderExecutionState> state, Res<OpaquePhase> phase,
         Res<Assets<Mesh>> mesh_assets,
         Res<Assets<Texture>> texture_assets,
-        ResMut<ShaderCache> shader_cache, Res<ExtractedView> view,
+        ResMut<ShaderCache> shader_cache, Res<SlotProviderRegistry> slot_registry,
+        Res<ExtractedView> view,
         Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
         Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
       if (!state->world_pass_active) {
@@ -126,7 +131,7 @@ struct RenderPassSystems {
 
       for (const auto &batch : phase->batches) {
         draw_opaque_batch(marker, batch, *mesh_assets, *texture_assets,
-                          *shader_cache, *view, *lights, *cluster_config,
+                          *shader_cache, *slot_registry, *view, *lights, *cluster_config,
                           *cluster_state);
       }
     }
@@ -135,7 +140,8 @@ struct RenderPassSystems {
         Res<RenderExecutionState> state, Res<TransparentPhase> phase,
         Res<Assets<Mesh>> mesh_assets,
         Res<Assets<Texture>> texture_assets,
-        ResMut<ShaderCache> shader_cache, Res<ExtractedView> view,
+        ResMut<ShaderCache> shader_cache, Res<SlotProviderRegistry> slot_registry,
+        Res<ExtractedView> view,
         Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
         Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
       if (!state->world_pass_active) {
@@ -145,14 +151,14 @@ struct RenderPassSystems {
       rydz_gl::disable_depth_mask();
       for (const auto &item : phase->items) {
         draw_transparent_item(marker, item, *mesh_assets, *texture_assets,
-                              *shader_cache, *view, *lights, *cluster_config,
+                              *shader_cache, *slot_registry, *view, *lights, *cluster_config,
                               *cluster_state);
       }
       rydz_gl::enable_depth_mask();
     }
 
     static void begin_world_pass(NonSendMarker, const ExtractedView &view) {
-      const RenderConfig *config =
+      const rydz_gl::RenderConfig *config =
           view.has_render_config ? &view.render_config : nullptr;
       rydz_gl::begin_world_pass(view.camera_view.view, view.camera_view.proj,
                                 config);
@@ -165,14 +171,14 @@ struct RenderPassSystems {
     static void end_world_pass(NonSendMarker) { rydz_gl::end_world_pass(); }
 
   private:
-    static void apply_material_cull_mode(const MaterialDescriptor &material) {
-      if (material.flags.double_sided) {
+    static void apply_material_cull_mode(const CompiledMaterial &material) {
+      if (material.double_sided) {
         rydz_gl::disable_backface_culling();
         return;
       }
 
       rydz_gl::enable_backface_culling();
-      rydz_gl::set_cull_face(RL_CULL_FACE_BACK);
+      rydz_gl::set_cull_face(rydz_gl::CullFace::Back);
     }
 
     static const ShaderSpec &depth_prepass_shader_spec() {
@@ -186,7 +192,7 @@ struct RenderPassSystems {
     }
 
     static void end_depth_prepass(NonSendMarker, const ExtractedView &view) {
-      const RenderConfig *config =
+      const rydz_gl::RenderConfig *config =
           view.has_render_config ? &view.render_config : nullptr;
       rydz_gl::end_depth_prepass(config);
     }
@@ -194,22 +200,35 @@ struct RenderPassSystems {
     static void draw_depth_batch(NonSendMarker marker, const OpaqueBatch &batch,
                                  const Assets<Mesh> &mesh_assets,
                                  const Assets<Texture> &texture_assets,
-                                 ShaderCache &shader_cache) {
+                                 ShaderCache &shader_cache,
+                                 const SlotProviderRegistry &slot_registry,
+                                 const ExtractedView &view,
+                                 const ExtractedLights &lights,
+                                 const ClusterConfig &cluster_config,
+                                 const ClusteredLightingState &cluster_state) {
       const auto *mesh = mesh_assets.get(batch.key.mesh);
       if (!mesh) {
         return;
       }
 
       PreparedMaterial prepared{};
-      prepare_material(marker, batch.key.material, texture_assets, shader_cache,
-                       prepared);
-      ShaderProgram &depth_shader =
-          resolve_shader(marker, shader_cache, depth_prepass_shader_spec());
-      prepared.material.shader = depth_shader.raw();
-
-      float alpha_cutoff = 0.1f;
-      depth_shader.set("u_alpha_cutoff", alpha_cutoff);
-      apply_descriptor_uniforms(marker, depth_shader, batch.key.material);
+      SlotPrepareContext prepare_ctx{
+          .texture_assets = &texture_assets,
+          .instanced = true,
+      };
+      ShaderProgram &depth_shader = prepare_material(
+          marker, batch.key.material, texture_assets, shader_cache,
+          slot_registry, prepare_ctx, depth_prepass_shader_spec(), prepared);
+      apply_compiled_uniforms(depth_shader, batch.key.material);
+      RenderSlotContext render_ctx{
+          .view_data = &view,
+          .lights_data = &lights,
+          .cluster_config_data = &cluster_config,
+          .cluster_state_data = &cluster_state,
+          .instanced = true,
+      };
+      apply_slot_uniforms(slot_registry, render_ctx, batch.key.material,
+                          prepared, depth_shader);
       apply_material_cull_mode(batch.key.material);
       draw_batch_instances(depth_shader, *mesh, prepared.material, batch);
     }
@@ -326,6 +345,7 @@ struct RenderPassSystems {
                                   const Assets<Mesh> &mesh_assets,
                                   const Assets<Texture> &texture_assets,
                                   ShaderCache &shader_cache,
+                                  const SlotProviderRegistry &slot_registry,
                                   const ExtractedView &view,
                                   const ExtractedLights &lights,
                                   const ClusterConfig &cluster_config,
@@ -336,12 +356,23 @@ struct RenderPassSystems {
       }
 
       PreparedMaterial prepared{};
-      prepare_material(marker, batch.key.material, texture_assets, shader_cache,
-                       prepared);
-      ShaderProgram &shader =
-          resolve_shader(marker, shader_cache, batch.key.material.shader);
-      apply_shader_uniforms(marker, shader, batch.key.material, prepared, view,
-                            lights, cluster_config, cluster_state);
+      SlotPrepareContext prepare_ctx{
+          .texture_assets = &texture_assets,
+          .instanced = true,
+      };
+      ShaderProgram &shader = prepare_material(
+          marker, batch.key.material, texture_assets, shader_cache,
+          slot_registry, prepare_ctx, batch.key.material.shader, prepared);
+      apply_compiled_uniforms(shader, batch.key.material);
+      RenderSlotContext render_ctx{
+          .view_data = &view,
+          .lights_data = &lights,
+          .cluster_config_data = &cluster_config,
+          .cluster_state_data = &cluster_state,
+          .instanced = true,
+      };
+      apply_slot_uniforms(slot_registry, render_ctx, batch.key.material,
+                          prepared, shader);
       apply_material_cull_mode(batch.key.material);
       draw_batch_instances(shader, *mesh, prepared.material, batch);
     }
@@ -350,7 +381,8 @@ struct RenderPassSystems {
         NonSendMarker marker, const TransparentPhaseItem &item,
         const Assets<Mesh> &mesh_assets,
         const Assets<Texture> &texture_assets,
-        ShaderCache &shader_cache, const ExtractedView &view,
+        ShaderCache &shader_cache, const SlotProviderRegistry &slot_registry,
+        const ExtractedView &view,
         const ExtractedLights &lights, const ClusterConfig &cluster_config,
         const ClusteredLightingState &cluster_state) {
       const auto *mesh = mesh_assets.get(item.mesh);
@@ -359,12 +391,23 @@ struct RenderPassSystems {
       }
 
       PreparedMaterial prepared{};
-      prepare_material(marker, item.material, texture_assets, shader_cache,
-                       prepared);
-      ShaderProgram &shader =
-          resolve_shader(marker, shader_cache, item.material.shader);
-      apply_shader_uniforms(marker, shader, item.material, prepared, view,
-                            lights, cluster_config, cluster_state);
+      SlotPrepareContext prepare_ctx{
+          .texture_assets = &texture_assets,
+          .instanced = false,
+      };
+      ShaderProgram &shader = prepare_material(
+          marker, item.material, texture_assets, shader_cache, slot_registry,
+          prepare_ctx, item.material.shader, prepared);
+      apply_compiled_uniforms(shader, item.material);
+      RenderSlotContext render_ctx{
+          .view_data = &view,
+          .lights_data = &lights,
+          .cluster_config_data = &cluster_config,
+          .cluster_state_data = &cluster_state,
+          .instanced = false,
+      };
+      apply_slot_uniforms(slot_registry, render_ctx, item.material, prepared,
+                          shader);
       apply_material_cull_mode(item.material);
       draw_single_instance(shader, *mesh, prepared.material,
                            rydz_gl::to_matrix(item.world_transform));
@@ -455,8 +498,8 @@ struct RenderPassSystems {
       shader.set("u_resolution", resolution);
       shader.set("u_time", time.elapsed_seconds);
       shader.set("u_enabled", effect.enabled ? 1 : 0);
-      for (const auto &uniform : effect.uniforms) {
-        shader.apply(uniform);
+      for (const auto &[name, uniform] : effect._uniforms) {
+        shader.apply(std::string(name), uniform);
       }
     }
 

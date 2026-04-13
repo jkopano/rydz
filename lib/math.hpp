@@ -1,5 +1,5 @@
 #pragma once
 
-#include "rydz_math/rydz_math.hpp"
+#include "rydz_math/mod.hpp"
 
 namespace math = rydz_math;

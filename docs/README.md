@@ -44,7 +44,7 @@ Namespace: `ecs`
 ## Szybki start
 
 ```cpp
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 
 struct Position { f32 x, y; };
 struct Velocity { f32 x, y; };

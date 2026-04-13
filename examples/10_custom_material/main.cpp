@@ -2,29 +2,31 @@
 
 #include "math.hpp"
 #include "rl.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/render_plugin.hpp"
-#include "rydz_graphics/rydz_graphics.hpp"
-#include "rydz_platform/rydz_platform.hpp"
+#include "rydz_graphics/mod.hpp"
+#include "rydz_platform/mod.hpp"
 
 using namespace ecs;
 using namespace math;
 
-struct ToonMaterial {
+struct ToonMaterial : MaterialTrait<HasCamera> {
   ecs::Color base_color = kWhite;
   float rim_strength = 0.15f;
 
-  MaterialDescriptor describe() const {
-    MaterialDescriptor descriptor;
-    descriptor.shader =
-        ShaderSpec::from("res/shaders/toon.vert", "res/shaders/toon.frag");
-    descriptor.flags.transparent = base_color.a < 255;
-    descriptor.flags.casts_shadows = base_color.a == 255;
-    descriptor.maps.push_back(
-        MaterialMapBinding::color_binding(MATERIAL_MAP_DIFFUSE, base_color));
-    descriptor.uniforms.push_back(
-        Uniform::float1("u_rim_strength", rim_strength));
-    return descriptor;
+  static ShaderRef vertex_shader() { return "res/shaders/toon.vert"; }
+  static ShaderRef fragment_shader() { return "res/shaders/toon.frag"; }
+
+  RenderMethod render_method() const {
+    return base_color.a < 255 ? RenderMethod::Transparent
+                              : RenderMethod::Opaque;
+  }
+
+  bool enable_shadows() const { return base_color.a == 255; }
+
+  void bind(MaterialBuilder &builder) const {
+    builder.color(MATERIAL_MAP_DIFFUSE, base_color);
+    builder.uniform("u_rim_strength", rim_strength);
   }
 };
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rydz_gl/core.hpp"
+#include "rydz_graphics/gl/core.hpp"
 #include <algorithm>
 
 namespace rydz_gl {
@@ -35,6 +35,25 @@ enum class CullMode {
   Front,
 };
 
+enum class CullFace {
+  Back,
+  Front,
+};
+
+inline int backend_cull_face(CullFace face) {
+  switch (face) {
+  case CullFace::Back:
+    return RL_CULL_FACE_BACK;
+  case CullFace::Front:
+    return RL_CULL_FACE_FRONT;
+  }
+  return RL_CULL_FACE_BACK;
+}
+
+inline void set_cull_face(CullFace face) {
+  rl::rlSetCullFace(backend_cull_face(face));
+}
+
 enum class PolygonMode {
   Fill,
   Line,
@@ -63,11 +82,11 @@ struct RenderConfig {
     switch (cull) {
     case CullMode::Back:
       rl::rlEnableBackfaceCulling();
-      rl::rlSetCullFace(RL_CULL_FACE_BACK);
+      set_cull_face(CullFace::Back);
       break;
     case CullMode::Front:
       rl::rlEnableBackfaceCulling();
-      rl::rlSetCullFace(RL_CULL_FACE_FRONT);
+      set_cull_face(CullFace::Front);
       break;
     case CullMode::None:
       rl::rlDisableBackfaceCulling();
@@ -99,7 +118,7 @@ struct RenderConfig {
     rl::rlEnableDepthTest();
     rl::rlEnableDepthMask();
     rl::rlEnableBackfaceCulling();
-    rl::rlSetCullFace(RL_CULL_FACE_BACK);
+    set_cull_face(CullFace::Back);
     rl::rlDisableWireMode();
     rl::rlSetBlendMode(RL_BLEND_ALPHA);
   }
@@ -161,8 +180,6 @@ inline void disable_wire_mode() { rl::rlDisableWireMode(); }
 
 inline void set_blend_mode(int mode) { rl::rlSetBlendMode(mode); }
 
-inline void set_cull_face(int mode) { rl::rlSetCullFace(mode); }
-
 inline void color_mask(bool r, bool g, bool b, bool a) {
   rl::rlColorMask(r, g, b, a);
 }
@@ -204,7 +221,7 @@ inline void begin_depth_prepass() {
   enable_depth_test();
   enable_depth_mask();
   enable_backface_culling();
-  set_cull_face(RL_CULL_FACE_BACK);
+  set_cull_face(CullFace::Back);
 }
 
 inline void end_depth_prepass(const RenderConfig *config = nullptr) {

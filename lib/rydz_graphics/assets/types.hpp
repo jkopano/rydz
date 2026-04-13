@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rydz_gl/resources.hpp"
+#include "rydz_graphics/gl/resources.hpp"
 
 namespace ecs {
 

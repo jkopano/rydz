@@ -5,7 +5,7 @@ Isometric camera system for top-down games and RPGs. Single header, ~70 lines.
 ## Quick Start
 
 ```cpp
-#include "rydz_camera/rydz_camera.hpp"
+#include "rydz_camera/mod.hpp"
 
 // In your startup system:
 setup_isometric_camera(cmd, target, offset);

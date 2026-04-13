@@ -2,9 +2,9 @@
 // Sety grupują systemy i dają możliwość wspólnego orderingu/warunki
 
 #include "rl.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/render_plugin.hpp"
-#include "rydz_platform/rydz_platform.hpp"
+#include "rydz_platform/mod.hpp"
 #include <print>
 
 using namespace ecs;

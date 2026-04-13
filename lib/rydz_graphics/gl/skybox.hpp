@@ -1,7 +1,7 @@
 #pragma once
 
-#include "rydz_gl/resources.hpp"
-#include "rydz_gl/shader.hpp"
+#include "rydz_graphics/gl/resources.hpp"
+#include "rydz_graphics/gl/shader.hpp"
 #include <cstring>
 #include <string>
 
@@ -10,12 +10,12 @@ namespace rydz_gl {
 class Skybox {
 public:
   struct Config {
-    std::string right = "";
-    std::string left = "";
-    std::string top = "";
-    std::string bottom = "";
-    std::string front = "";
-    std::string back = "";
+    std::string right{};
+    std::string left{};
+    std::string top{};
+    std::string bottom{};
+    std::string front{};
+    std::string back{};
 
     static Config from_directory(const std::string &dir,
                                  const std::string &ext = ".jpg") {
@@ -94,9 +94,8 @@ public:
 private:
   static ShaderProgram &get_skybox_shader() {
     static ShaderProgram shader = [] {
-      ShaderProgram program = ShaderProgram::load(
-          ShaderSpec::from("res/shaders/skybox.vert",
-                           "res/shaders/skybox.frag"));
+      ShaderProgram program = ShaderProgram::load(ShaderSpec::from(
+          "res/shaders/skybox.vert", "res/shaders/skybox.frag"));
       int value = 0;
       program.set("u_skybox", value);
       return program;
@@ -154,9 +153,8 @@ private:
       unload_image(images[i]);
     }
 
-    unsigned int id = load_texture_cubemap(data, width,
-                                           PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
-                                           1);
+    unsigned int id =
+        load_texture_cubemap(data, width, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
     RL_FREE(data);
     return id;
   }

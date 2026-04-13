@@ -1,7 +1,7 @@
 #pragma once
 
 #include "math.hpp"
-#include "rydz_graphics/types.hpp"
+#include "rydz_graphics/color.hpp"
 
 namespace ecs {
 

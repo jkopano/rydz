@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rydz_gl/skybox.hpp"
+#include "rydz_graphics/gl/skybox.hpp"
 
 namespace ecs {
 

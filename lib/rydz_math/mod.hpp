@@ -2,11 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <limits>
 #include <raylib.h>
 
 namespace rydz_math {

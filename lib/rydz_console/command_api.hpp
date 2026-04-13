@@ -1,7 +1,7 @@
 #pragma once
 #include "rydz_console/console.hpp"
 #include "rydz_console/scripting.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 #include <sol/sol.hpp>
 #include <string>
 

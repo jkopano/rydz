@@ -1,8 +1,8 @@
 #pragma once
 
 #include "rydz_ecs/asset.hpp"
-#include "rydz_gl/resources.hpp"
-#include "rydz_graphics/scene_graph.hpp"
+#include "rydz_graphics/assets/scene_graph.hpp"
+#include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/transform.hpp"
 #include <algorithm>
 #include <array>
@@ -27,12 +27,12 @@ inline std::string strip_gltf_fragment(const std::string &path) {
 inline Transform transform_from_cgltf_node(const cgltf_node &node) {
   Transform transform{};
 
-  if (node.has_translation) {
+  if (node.has_translation != 0) {
     transform.translation =
         Vec3(node.translation[0], node.translation[1], node.translation[2]);
   }
 
-  if (node.has_rotation) {
+  if (node.has_rotation != 0) {
     transform.rotation = Quat(node.rotation[0], node.rotation[1],
                               node.rotation[2], node.rotation[3]);
   }
@@ -43,15 +43,15 @@ inline Transform transform_from_cgltf_node(const cgltf_node &node) {
 
   if (node.has_matrix) {
     rydz_gl::Matrix matrix = {
-        node.matrix[0],  node.matrix[4],  node.matrix[8],  node.matrix[12],
-        node.matrix[1],  node.matrix[5],  node.matrix[9],  node.matrix[13],
-        node.matrix[2],  node.matrix[6],  node.matrix[10], node.matrix[14],
-        node.matrix[3],  node.matrix[7],  node.matrix[11], node.matrix[15],
+        node.matrix[0], node.matrix[4], node.matrix[8],  node.matrix[12],
+        node.matrix[1], node.matrix[5], node.matrix[9],  node.matrix[13],
+        node.matrix[2], node.matrix[6], node.matrix[10], node.matrix[14],
+        node.matrix[3], node.matrix[7], node.matrix[11], node.matrix[15],
     };
 
     Vec3 translation = Vec3::sZero();
     Quat rotation = Quat::sIdentity();
-    Vec3 scale = Vec3::sReplicate(1.0f);
+    Vec3 scale = Vec3::sReplicate(1.0F);
     rydz_gl::decompose_matrix(matrix, translation, rotation, scale);
 
     transform.translation = translation;
@@ -65,7 +65,7 @@ inline Transform transform_from_cgltf_node(const cgltf_node &node) {
 inline Transform transform_from_matrix(const Mat4 &matrix) {
   Vec3 translation = Vec3::sZero();
   Quat rotation = Quat::sIdentity();
-  Vec3 scale = Vec3::sReplicate(1.0f);
+  Vec3 scale = Vec3::sReplicate(1.0F);
   rydz_gl::decompose_matrix(matrix, translation, rotation, scale);
 
   Transform transform;
@@ -75,38 +75,40 @@ inline Transform transform_from_matrix(const Mat4 &matrix) {
   return transform;
 }
 
-inline void apply_gltf_material_properties(MaterialDescriptor &descriptor,
+inline void apply_gltf_material_properties(CompiledMaterial &material_desc,
                                            const cgltf_material *material) {
+  static constexpr auto DEFAULT_TRANSPARENT_MARGIN = 0.001F;
+  static constexpr auto DEFAULT_ALPHACUTOFF = 0.5F;
+
   if (!material) {
     return;
   }
 
   if (material->unlit) {
-    descriptor.shader =
+    material_desc.shader =
         ShaderSpec::from("res/shaders/basic.vert", "res/shaders/basic.frag");
-    descriptor.shading_model = MaterialShadingModel::Unlit;
+    material_desc.slots.clear();
   }
 
-  descriptor.flags.double_sided = material->double_sided;
+  material_desc.double_sided = material->double_sided;
 
   switch (material->alpha_mode) {
   case cgltf_alpha_mode_blend:
-    descriptor.flags.transparent = true;
-    descriptor.flags.casts_shadows = false;
-    descriptor.uniforms.push_back(Uniform::float1("u_alpha_cutoff", 0.001f));
+    material_desc.render_method = RenderMethod::Transparent;
+    material_desc.casts_shadows = false;
+    material_desc.alpha_cutoff = DEFAULT_TRANSPARENT_MARGIN;
     break;
   case cgltf_alpha_mode_mask:
-    descriptor.flags.transparent = false;
-    descriptor.flags.casts_shadows = true;
-    descriptor.uniforms.push_back(
-        Uniform::float1("u_alpha_cutoff",
-                        material->alpha_cutoff > 0.0f ? material->alpha_cutoff
-                                                      : 0.5f));
+    material_desc.render_method = RenderMethod::AlphaCutout;
+    material_desc.casts_shadows = true;
+    material_desc.alpha_cutoff = material->alpha_cutoff > 0.0F
+                                     ? material->alpha_cutoff
+                                     : DEFAULT_ALPHACUTOFF;
     break;
   case cgltf_alpha_mode_opaque:
   default:
-    descriptor.flags.transparent = false;
-    descriptor.flags.casts_shadows = true;
+    material_desc.render_method = RenderMethod::Opaque;
+    material_desc.casts_shadows = true;
     break;
   }
 }
@@ -138,8 +140,9 @@ inline SceneMaterial material_from_backend_material(
   scene_material.name = name;
   StandardMaterial material_value;
 
-  if (material.maps) {
-    material_value.base_color = material.maps[rydz_gl::MATERIAL_MAP_DIFFUSE].color;
+  if (material.maps != nullptr) {
+    material_value.base_color =
+        material.maps[rydz_gl::MATERIAL_MAP_DIFFUSE].color;
     material_value.emissive_color =
         material.maps[rydz_gl::MATERIAL_MAP_EMISSION].color;
     material_value.texture = transfer_texture(
@@ -170,9 +173,9 @@ inline SceneMaterial material_from_backend_material(
         material.maps[rydz_gl::MATERIAL_MAP_OCCLUSION].value;
   }
 
-  MaterialDescriptor descriptor = material_value.describe();
-  apply_gltf_material_properties(descriptor, gltf_material);
-  scene_material.material = materials.add(Material{std::move(descriptor)});
+  CompiledMaterial compiled = Material{material_value}.compiled;
+  apply_gltf_material_properties(compiled, gltf_material);
+  scene_material.material = materials.add(Material{std::move(compiled)});
 
   return scene_material;
 }
@@ -189,7 +192,7 @@ public:
 
   std::any load(const std::vector<uint8_t> & /*data*/,
                 const std::string &path) override {
-    return std::any(std::string(path));
+    return {std::string(path)};
   }
 
   void insert_into_world(World &world, uint32_t handle_id,
@@ -201,7 +204,8 @@ public:
     auto *mesh_assets = world.get_resource<Assets<Mesh>>();
     auto *texture_assets = world.get_resource<Assets<Texture>>();
     auto *material_assets = world.get_resource<Assets<Material>>();
-    if (!scene_assets || !mesh_assets || !texture_assets || !material_assets) {
+    if ((scene_assets == nullptr) || (mesh_assets == nullptr) ||
+        (texture_assets == nullptr) || (material_assets == nullptr)) {
       return;
     }
 
@@ -236,7 +240,7 @@ public:
       std::string material_name;
       const cgltf_material *gltf_material = nullptr;
       if (i > 0 && static_cast<usize>(i - 1) < data->materials_count &&
-          data->materials[i - 1].name) {
+          (data->materials[i - 1].name != nullptr)) {
         material_name = data->materials[i - 1].name;
       }
       if (i > 0 && static_cast<usize>(i - 1) < data->materials_count) {
@@ -244,8 +248,8 @@ public:
       }
       if (model.materials && i < model.materialCount) {
         scene.materials.push_back(detail::material_from_backend_material(
-            model.materials[i], *texture_assets, *material_assets, texture_cache,
-            material_name, gltf_material));
+            model.materials[i], *texture_assets, *material_assets,
+            texture_cache, material_name, gltf_material));
       } else {
         SceneMaterial material;
         material.name = std::move(material_name);

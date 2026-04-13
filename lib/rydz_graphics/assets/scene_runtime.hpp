@@ -1,7 +1,8 @@
 #pragma once
+
 #include "rydz_ecs/core/hierarchy.hpp"
+#include "rydz_graphics/assets/scene_graph.hpp"
 #include "rydz_graphics/visibility.hpp"
-#include "scene_graph.hpp"
 #include <algorithm>
 
 namespace ecs {

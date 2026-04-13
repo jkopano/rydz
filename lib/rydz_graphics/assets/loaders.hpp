@@ -1,16 +1,12 @@
 #pragma once
 
-#include "gltf_asset.hpp"
 #include "rydz_ecs/asset.hpp"
-#include "rydz_graphics/assets.hpp"
+#include "rydz_graphics/assets/gltf.hpp"
+#include "rydz_graphics/assets/types.hpp"
 
 namespace ecs {
 
-class TextureLoader : public AssetLoader<TextureLoader, Texture> {
-private:
-  std::string path_;
-
-public:
+struct TextureLoader : public AssetLoader<TextureLoader, Texture> {
   std::vector<std::string> extensions() const override {
     return {"png", "jpg", "jpeg", "bmp", "tga", "gif"};
   }
@@ -32,10 +28,12 @@ public:
       assets->set(Handle<Texture>{handle_id}, Texture{texture});
     }
   }
+
+private:
+  std::string path_;
 };
 
-class SoundLoader : public AssetLoader<SoundLoader, Sound> {
-public:
+struct SoundLoader : public AssetLoader<SoundLoader, Sound> {
   std::vector<std::string> extensions() const override {
     return {"wav", "ogg", "mp3"};
   }

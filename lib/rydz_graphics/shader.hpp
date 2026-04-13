@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rydz_gl/shader.hpp"
+#include "rydz_graphics/gl/shader.hpp"
 
 namespace ecs {
 

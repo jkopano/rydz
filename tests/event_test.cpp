@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 
 using namespace ecs;
 

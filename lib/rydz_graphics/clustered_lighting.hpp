@@ -1,8 +1,11 @@
 #pragma once
 
-#include "rydz_gl/clustered_lighting.hpp"
+#include "math.hpp"
+#include "rydz_graphics/gl/clustered_lighting.hpp"
 
 namespace ecs {
+
+using namespace math;
 
 using ClusterConfig = rydz_gl::ClusterConfig;
 using GpuPointLight = rydz_gl::GpuPointLight;

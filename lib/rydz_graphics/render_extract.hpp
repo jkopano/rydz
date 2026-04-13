@@ -1,16 +1,16 @@
 #pragma once
 
-#include "clear_color.hpp"
-#include "rydz_graphics/assets.hpp"
+#include "color.hpp"
 #include "light.hpp"
 #include "material3d.hpp"
 #include "math.hpp"
 #include "mesh3d.hpp"
 #include "postprocess_material.hpp"
-#include "render_config.hpp"
 #include "rydz_camera/camera3d.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
+#include "rydz_graphics/assets/types.hpp"
 #include "rydz_graphics/frustum.hpp"
+#include "rydz_graphics/gl/state.hpp"
 #include "skybox.hpp"
 #include "transform.hpp"
 #include "visibility.hpp"
@@ -34,7 +34,7 @@ struct ExtractedView {
   };
   Color clear_color = ClearColor{}.color;
   const Skybox *active_skybox = nullptr;
-  RenderConfig render_config{};
+  rydz_gl::RenderConfig render_config{};
   PostProcessDescriptor postprocess{};
   bool active = false;
   bool has_render_config = false;
@@ -85,7 +85,7 @@ struct ExtractedLights {
 
 struct ExtractedMesh {
   Handle<Mesh> mesh{};
-  MaterialDescriptor material{};
+  CompiledMaterial material{};
   Mat4 world_transform = Mat4::sIdentity();
   float distance_to_camera = 0.0f;
   bool transparent = false;
@@ -114,19 +114,17 @@ struct ExtractedUi {
 };
 
 struct RenderExtractSystems {
-  static void
-  extract_view_system(Query<Camera3DComponent, ActiveCamera, GlobalTransform,
-                            Opt<ClearColor>, Opt<Skybox>, Opt<RenderConfig>,
-                            Opt<PostProcessMaterial>>
-                          cam_query,
-                      Res<Window> window, ResMut<ExtractedView> view) {
+  static void extract_view_system(
+      Query<Camera3DComponent, ActiveCamera, GlobalTransform, Opt<ClearColor>,
+            Opt<Skybox>, Opt<rydz_gl::RenderConfig>, Opt<PostProcessMaterial>>
+          cam_query,
+      Res<Window> window, ResMut<ExtractedView> view) {
     view->reset();
     const float aspect = compute_camera_aspect_ratio(
         static_cast<float>(window->width), static_cast<float>(window->height));
 
     for (auto [cam_comp, _, cam_gt, clear_color, skybox, render_config,
-               postprocess] :
-         cam_query.iter()) {
+               postprocess] : cam_query.iter()) {
       if (!cam_comp || !cam_gt) {
         continue;
       }
@@ -203,14 +201,14 @@ struct RenderExtractSystems {
         continue;
       }
 
-      MaterialDescriptor descriptor = material_asset->descriptor;
-      const bool transparent = detail::material_is_transparent(descriptor);
-      const bool casts_shadows = descriptor.flags.casts_shadows;
+      CompiledMaterial compiled = material_asset->compiled;
+      const bool transparent = detail::material_is_transparent(compiled);
+      const bool casts_shadows = compiled.casts_shadows;
       Vec3 camera_offset = global->translation() - view->camera_view.position;
 
       meshes->items.push_back(ExtractedMesh{
           .mesh = mesh3d->mesh,
-          .material = std::move(descriptor),
+          .material = std::move(compiled),
           .world_transform = global->matrix,
           .distance_to_camera = camera_offset.LengthSq(),
           .transparent = transparent,
@@ -244,8 +242,8 @@ struct RenderExtractSystems {
 
 private:
   struct detail {
-    static bool material_is_transparent(const MaterialDescriptor &material) {
-      return material.flags.transparent;
+    static bool material_is_transparent(const CompiledMaterial &material) {
+      return material.render_method == RenderMethod::Transparent;
     }
   };
 };

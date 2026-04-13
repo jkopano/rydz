@@ -23,7 +23,7 @@ struct ShadowPhase {
 
 struct OpaquePhaseItem {
   Handle<Mesh> mesh{};
-  MaterialDescriptor material{};
+  CompiledMaterial material{};
   Mat4 world_transform = Mat4::sIdentity();
   float distance_to_camera = 0.0f;
 };
@@ -41,7 +41,7 @@ struct OpaquePhase {
 
 struct TransparentPhaseItem {
   Handle<Mesh> mesh{};
-  MaterialDescriptor material{};
+  CompiledMaterial material{};
   Mat4 world_transform = Mat4::sIdentity();
   float sort_key = 0.0f;
 };

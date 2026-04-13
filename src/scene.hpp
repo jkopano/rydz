@@ -2,11 +2,11 @@
 #include "math.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/fwd.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/render_plugin.hpp"
-#include "rydz_graphics/rydz_graphics.hpp"
+#include "rydz_graphics/mod.hpp"
 #include <algorithm>
 #include <print>
 
@@ -101,8 +101,8 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform>> query,
 
 inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
   cmd.spawn(MapTag{}, CameraState{FreeLook{}},
-            SceneRoot{asset_server->load<Scene>("res/models/race_map.glb")},
-            Transform{.scale = Vec3{0.01f, .01f, .01f}});
+            SceneRoot{asset_server->load<Scene>("res/models/sponza.glb")},
+            Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}});
 }
 
 inline void spawn_model(Cmd cmd, Res<AssetServer> asset_server) {
@@ -198,11 +198,8 @@ inline void scene_plugin(App &app) {
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
   app.add_systems(ScheduleLabel::Startup, spawn_some_texture);
-  app.add_systems(ScheduleLabel::Update, group(spawn_map).run_if(run_once()));
-  app.add_systems(ScheduleLabel::Update, group(spawn_model).run_if(run_once()));
-
-  // app.add_systems(ScheduleLabel::Update,
-  // group(spawn_model).run_if(run_once()));
+  app.add_systems(ScheduleLabel::Update,
+                  group(spawn_map, spawn_model).run_if(run_once()));
 
   app.add_systems(ScheduleLabel::Update, camera_controller_system);
   app.add_systems(ScheduleLabel::Update, camera_mouse_system);

@@ -202,8 +202,9 @@ public:
 
     out << "=======================\n";
     out << "SCHEDULE " << schedule_name << ":\n";
-    out << "  COUNTS: systems=" << entries_.size() << ", configured_sets="
-        << set_configs_.size() << ", steps=" << steps_.size()
+    out << "  COUNTS: systems=" << entries_.size()
+        << ", configured_sets=" << set_configs_.size()
+        << ", steps=" << steps_.size()
         << ", max_concurrency=" << debug_max_concurrency() << "\n";
 
     if (!steps_.empty()) {
@@ -233,8 +234,8 @@ public:
       for (usize i = 0; i < entries_.size(); ++i) {
         const auto &entry = entries_[i];
         out << debug_item("    - ", entry.system->name());
-        auto step = i < placements.size() ? std::to_string(placements[i].step)
-                                          : "?";
+        auto step =
+            i < placements.size() ? std::to_string(placements[i].step) : "?";
         auto placement =
             i < placements.size() ? placements[i].placement : "unknown";
         debug_append_system_metadata(out, i, entry, step, placement);
@@ -269,7 +270,7 @@ private:
       add_system(make_system(std::forward<F>(func)), std::move(base_ordering));
     }
   }
- 
+
   static void merge_ordering(SystemOrdering &target,
                              const SystemOrdering &extra) {
     target.after.insert(target.after.end(), extra.after.begin(),
@@ -600,8 +601,7 @@ private:
     for (const auto &step : steps_) {
       if (const auto *parallel = std::get_if<ParallelStep>(&step)) {
         for (const auto &batch : parallel->batches) {
-          max_concurrency =
-              std::max(max_concurrency, batch.end - batch.start);
+          max_concurrency = std::max(max_concurrency, batch.end - batch.start);
         }
       }
     }
@@ -667,8 +667,8 @@ private:
         for (usize i : range(batch.start, batch.end)) {
           if (entries_[i].access.main_thread_only) {
             placements[i] = DebugPlacement{
-                step_index, "main_thread(batch=" + std::to_string(batch_index) +
-                                ")"};
+                step_index,
+                "main_thread(batch=" + std::to_string(batch_index) + ")"};
             continue;
           }
 
@@ -740,8 +740,8 @@ private:
                                            const SystemEntry &entry,
                                            const std::string &step,
                                            const std::string &placement) {
-    out << "      ORDER: " << order << ", SETS: "
-        << inline_set_ids(entry.in_sets) << ", MAIN_THREAD_ONLY: "
+    out << "      ORDER: " << order
+        << ", SETS: " << inline_set_ids(entry.in_sets) << ", MAIN_THREAD_ONLY: "
         << (entry.access.main_thread_only ? "yes" : "no")
         << ", EXCLUSIVE: " << (entry.access.exclusive ? "yes" : "no")
         << ", STEP: " << step << ", PLACEMENT: " << placement << "\n";
@@ -781,12 +781,12 @@ public:
 #ifndef NDEBUG
   std::string debug_dump() const {
     constexpr std::array labels{
-        ScheduleLabel::PreStartup, ScheduleLabel::Startup,
+        ScheduleLabel::PreStartup,  ScheduleLabel::Startup,
         ScheduleLabel::PostStartup, ScheduleLabel::First,
-        ScheduleLabel::PreUpdate,  ScheduleLabel::Update,
-        ScheduleLabel::PostUpdate, ScheduleLabel::ExtractRender,
-        ScheduleLabel::Render,     ScheduleLabel::PostRender,
-        ScheduleLabel::Last,       ScheduleLabel::FixedUpdate,
+        ScheduleLabel::PreUpdate,   ScheduleLabel::Update,
+        ScheduleLabel::PostUpdate,  ScheduleLabel::ExtractRender,
+        ScheduleLabel::Render,      ScheduleLabel::PostRender,
+        ScheduleLabel::Last,        ScheduleLabel::FixedUpdate,
     };
 
     usize total_schedules = 0;
@@ -801,8 +801,8 @@ public:
     std::ostringstream out;
     out << "[ecs] main schedule graph\n";
     out << "totals: schedules=" << total_schedules
-        << ", systems=" << total_systems
-        << ", configured_sets=" << total_sets << "\n";
+        << ", systems=" << total_systems << ", configured_sets=" << total_sets
+        << "\n";
 
     for (auto label : labels) {
       auto it = schedules_.find(label);

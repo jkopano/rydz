@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "rydz_camera/camera3d.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 
 using namespace ecs;
 
@@ -63,7 +63,7 @@ TEST(RequiresTest, CameraAutomaticallyInsertsDefaultClearColor) {
 
     auto *clear_color = world.get_component<ClearColor>(e);
     ASSERT_NE(clear_color, nullptr);
-    EXPECT_TRUE(world.has_component<RenderConfig>(e));
+    EXPECT_TRUE(world.has_component<rydz_gl::RenderConfig>(e));
     EXPECT_EQ(clear_color->color.r, 30);
     EXPECT_EQ(clear_color->color.g, 30);
     EXPECT_EQ(clear_color->color.b, 40);

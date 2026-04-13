@@ -2,14 +2,14 @@
 
 #include "shader.hpp"
 #include <concepts>
+#include <unordered_map>
 #include <utility>
-#include <vector>
 
 namespace ecs {
 
 struct PostProcessDescriptor {
   ShaderSpec shader;
-  std::vector<Uniform> uniforms;
+  std::unordered_map<std::string_view, Uniform> _uniforms;
   bool enabled = true;
 
   bool operator==(const PostProcessDescriptor &o) const = default;
@@ -28,29 +28,28 @@ struct PostProcessMaterial {
       : material(std::move(descriptor)) {}
 
   template <IsPostProcess M>
-  explicit PostProcessMaterial(M material)
-      : material(material.describe()) {}
+  explicit PostProcessMaterial(M material) : material(material.describe()) {}
 };
 
 struct DefaultPostProcessMaterial {
   bool enabled = true;
-  float exposure = 1.0f;
-  float contrast = 1.05f;
-  float saturation = 1.0f;
-  float vignette = 0.18f;
-  float grain = 0.015f;
+  float exposure = 1.0F;
+  float contrast = 1.05F;
+  float saturation = 1.0F;
+  float vignette = 0.18F;
+  float grain = 0.015F;
 
+  [[nodiscard]]
   PostProcessDescriptor describe() const {
     PostProcessDescriptor descriptor;
-    descriptor.shader =
-        ShaderSpec::from("res/shaders/postprocess.vert",
-                         "res/shaders/postprocess.frag");
+    descriptor.shader = ShaderSpec::from("res/shaders/postprocess.vert",
+                                         "res/shaders/postprocess.frag");
     descriptor.enabled = enabled;
-    descriptor.uniforms.push_back(Uniform::float1("u_exposure", exposure));
-    descriptor.uniforms.push_back(Uniform::float1("u_contrast", contrast));
-    descriptor.uniforms.push_back(Uniform::float1("u_saturation", saturation));
-    descriptor.uniforms.push_back(Uniform::float1("u_vignette", vignette));
-    descriptor.uniforms.push_back(Uniform::float1("u_grain", grain));
+    descriptor._uniforms.insert_or_assign("u_exposure", Uniform{exposure});
+    descriptor._uniforms.insert_or_assign("u_contrast", Uniform{contrast});
+    descriptor._uniforms.insert_or_assign("u_saturation", Uniform{saturation});
+    descriptor._uniforms.insert_or_assign("u_vignette", Uniform{vignette});
+    descriptor._uniforms.insert_or_assign("u_grain", Uniform{grain});
     return descriptor;
   }
 };

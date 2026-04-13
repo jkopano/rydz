@@ -3,7 +3,7 @@
 #include "math.hpp"
 #include "mesh3d.hpp"
 #include "rydz_camera/camera3d.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"
 #include "types.hpp"
@@ -109,9 +109,9 @@ struct MeshBounds {
   AABox bbox;
 };
 
-inline void compute_mesh_bounds_system(
-    Query<Entity, Mesh3d, Without<MeshBounds>> query,
-    Res<Assets<Mesh>> mesh_assets, Cmd cmd) {
+inline void
+compute_mesh_bounds_system(Query<Entity, Mesh3d, Without<MeshBounds>> query,
+                           Res<Assets<Mesh>> mesh_assets, Cmd cmd) {
   for (auto [e, mesh3d] : query.iter()) {
     const auto *mesh = mesh_assets->get(mesh3d->mesh);
     if (!mesh || rydz_gl::mesh_vertex_count(*mesh) <= 0 ||
