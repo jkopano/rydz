@@ -81,17 +81,13 @@ struct RenderPassSystems {
     static void run_shadow_pass(Res<RenderExecutionState>, Res<ShadowPhase>,
                                 NonSendMarker) {}
 
-    static void run_depth_prepass(Res<RenderExecutionState> state,
-                                  Res<OpaquePhase> phase,
-                                  Res<Assets<Mesh>> mesh_assets,
-                                  Res<Assets<Texture>> texture_assets,
-                                  ResMut<ShaderCache> shader_cache,
-                                  Res<SlotProviderRegistry> slot_registry,
-                                  Res<ExtractedView> view,
-                                  Res<ExtractedLights> lights,
-                                  Res<ClusterConfig> cluster_config,
-                                  Res<ClusteredLightingState> cluster_state,
-                                  NonSendMarker marker) {
+    static void run_depth_prepass(
+        Res<RenderExecutionState> state, Res<OpaquePhase> phase,
+        Res<Assets<Mesh>> mesh_assets, Res<Assets<Texture>> texture_assets,
+        ResMut<ShaderCache> shader_cache,
+        Res<SlotProviderRegistry> slot_registry, Res<ExtractedView> view,
+        Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
+        Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
       if (!state->world_pass_active) {
         return;
       }
@@ -119,10 +115,9 @@ struct RenderPassSystems {
 
     static void run_opaque_pass(
         Res<RenderExecutionState> state, Res<OpaquePhase> phase,
-        Res<Assets<Mesh>> mesh_assets,
-        Res<Assets<Texture>> texture_assets,
-        ResMut<ShaderCache> shader_cache, Res<SlotProviderRegistry> slot_registry,
-        Res<ExtractedView> view,
+        Res<Assets<Mesh>> mesh_assets, Res<Assets<Texture>> texture_assets,
+        ResMut<ShaderCache> shader_cache,
+        Res<SlotProviderRegistry> slot_registry, Res<ExtractedView> view,
         Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
         Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
       if (!state->world_pass_active) {
@@ -131,17 +126,16 @@ struct RenderPassSystems {
 
       for (const auto &batch : phase->batches) {
         draw_opaque_batch(marker, batch, *mesh_assets, *texture_assets,
-                          *shader_cache, *slot_registry, *view, *lights, *cluster_config,
-                          *cluster_state);
+                          *shader_cache, *slot_registry, *view, *lights,
+                          *cluster_config, *cluster_state);
       }
     }
 
     static void run_transparent_pass(
         Res<RenderExecutionState> state, Res<TransparentPhase> phase,
-        Res<Assets<Mesh>> mesh_assets,
-        Res<Assets<Texture>> texture_assets,
-        ResMut<ShaderCache> shader_cache, Res<SlotProviderRegistry> slot_registry,
-        Res<ExtractedView> view,
+        Res<Assets<Mesh>> mesh_assets, Res<Assets<Texture>> texture_assets,
+        ResMut<ShaderCache> shader_cache,
+        Res<SlotProviderRegistry> slot_registry, Res<ExtractedView> view,
         Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
         Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
       if (!state->world_pass_active) {
@@ -151,8 +145,8 @@ struct RenderPassSystems {
       rydz_gl::disable_depth_mask();
       for (const auto &item : phase->items) {
         draw_transparent_item(marker, item, *mesh_assets, *texture_assets,
-                              *shader_cache, *slot_registry, *view, *lights, *cluster_config,
-                              *cluster_state);
+                              *shader_cache, *slot_registry, *view, *lights,
+                              *cluster_config, *cluster_state);
       }
       rydz_gl::enable_depth_mask();
     }
@@ -230,7 +224,7 @@ struct RenderPassSystems {
       apply_slot_uniforms(slot_registry, render_ctx, batch.key.material,
                           prepared, depth_shader);
       apply_material_cull_mode(batch.key.material);
-      draw_batch_instances(depth_shader, *mesh, prepared.material, batch);
+      draw_batch(depth_shader, *mesh, prepared.material, batch);
     }
 
     static void build_cluster_buffers(NonSendMarker, const ExtractedView &view,
@@ -340,16 +334,13 @@ struct RenderPassSystems {
       }
     }
 
-    static void draw_opaque_batch(NonSendMarker marker,
-                                  const OpaqueBatch &batch,
-                                  const Assets<Mesh> &mesh_assets,
-                                  const Assets<Texture> &texture_assets,
-                                  ShaderCache &shader_cache,
-                                  const SlotProviderRegistry &slot_registry,
-                                  const ExtractedView &view,
-                                  const ExtractedLights &lights,
-                                  const ClusterConfig &cluster_config,
-                                  const ClusteredLightingState &cluster_state) {
+    static void draw_opaque_batch(
+        NonSendMarker marker, const OpaqueBatch &batch,
+        const Assets<Mesh> &mesh_assets, const Assets<Texture> &texture_assets,
+        ShaderCache &shader_cache, const SlotProviderRegistry &slot_registry,
+        const ExtractedView &view, const ExtractedLights &lights,
+        const ClusterConfig &cluster_config,
+        const ClusteredLightingState &cluster_state) {
       const auto *mesh = mesh_assets.get(batch.key.mesh);
       if (!mesh) {
         return;
@@ -374,16 +365,15 @@ struct RenderPassSystems {
       apply_slot_uniforms(slot_registry, render_ctx, batch.key.material,
                           prepared, shader);
       apply_material_cull_mode(batch.key.material);
-      draw_batch_instances(shader, *mesh, prepared.material, batch);
+      draw_batch(shader, *mesh, prepared.material, batch);
     }
 
     static void draw_transparent_item(
         NonSendMarker marker, const TransparentPhaseItem &item,
-        const Assets<Mesh> &mesh_assets,
-        const Assets<Texture> &texture_assets,
+        const Assets<Mesh> &mesh_assets, const Assets<Texture> &texture_assets,
         ShaderCache &shader_cache, const SlotProviderRegistry &slot_registry,
-        const ExtractedView &view,
-        const ExtractedLights &lights, const ClusterConfig &cluster_config,
+        const ExtractedView &view, const ExtractedLights &lights,
+        const ClusterConfig &cluster_config,
         const ClusteredLightingState &cluster_state) {
       const auto *mesh = mesh_assets.get(item.mesh);
       if (!mesh) {
@@ -480,12 +470,11 @@ struct RenderPassSystems {
       };
     }
 
-    static void draw_world_target_to_screen(
-        const rydz_gl::Texture &source_texture) {
-      rydz_gl::draw_texture_pro(source_texture,
-                                postprocess_source_rect(source_texture),
-                                postprocess_dest_rect(), {0.0f, 0.0f}, 0.0f,
-                                rydz_gl::kWhite);
+    static void
+    draw_world_target_to_screen(const rydz_gl::Texture &source_texture) {
+      rydz_gl::draw_texture_pro(
+          source_texture, postprocess_source_rect(source_texture),
+          postprocess_dest_rect(), {0.0f, 0.0f}, 0.0f, rydz_gl::kWhite);
     }
 
     static void apply_postprocess_uniforms(ShaderProgram &shader,
@@ -516,8 +505,8 @@ struct RenderPassSystems {
       ShaderProgram &shader =
           resolve_shader(marker, shader_cache, view.postprocess.shader);
       apply_postprocess_uniforms(shader, view.postprocess, time);
-      shader.set_texture(
-          shader.raw().locs[rydz_gl::SHADER_LOC_MAP_DIFFUSE], source_texture);
+      shader.set_texture(shader.raw().locs[rydz_gl::SHADER_LOC_MAP_DIFFUSE],
+                         source_texture);
 
       shader.with_bound([&] { draw_world_target_to_screen(source_texture); });
     }
@@ -526,8 +515,7 @@ struct RenderPassSystems {
   struct Ui {
     static void run_ui_pass(Res<UiPhase> phase,
                             Res<Assets<Texture>> texture_assets,
-                            ResMut<RenderExecutionState> state,
-                            NonSendMarker) {
+                            ResMut<RenderExecutionState> state, NonSendMarker) {
       if (!state->backbuffer_active) {
         rydz_gl::begin_drawing();
         state->backbuffer_active = true;
@@ -541,14 +529,13 @@ struct RenderPassSystems {
 
         rydz_gl::Vec2 position = {item.transform.translation.GetX(),
                                   item.transform.translation.GetY()};
-        rydz_gl::Rectangle source = {
-            0, 0, static_cast<float>(texture->value.width),
-            static_cast<float>(texture->value.height)};
-        rydz_gl::Rectangle dest = {position.x, position.y,
-                                   texture->value.width *
-                                       item.transform.scale.GetX(),
-                                   texture->value.height *
-                                       item.transform.scale.GetY()};
+        rydz_gl::Rectangle source = {0, 0,
+                                     static_cast<float>(texture->value.width),
+                                     static_cast<float>(texture->value.height)};
+        rydz_gl::Rectangle dest = {
+            position.x, position.y,
+            texture->value.width * item.transform.scale.GetX(),
+            texture->value.height * item.transform.scale.GetY()};
         rydz_gl::Vec2 origin = {0, 0};
 
         rydz_gl::draw_texture_pro(texture->value, source, dest, origin,
