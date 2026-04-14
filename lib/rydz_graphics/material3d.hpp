@@ -195,7 +195,7 @@ inline bool is_reserved_uniform_name(std::string_view name) {
       "u_dir_light_color",     "u_has_directional",
       "u_cluster_dimensions",  "u_cluster_screen_size",
       "u_cluster_near_far",    "u_cluster_max_lights",
-      "u_is_orthographic",
+      "u_is_orthographic",     "u_render_method",
   };
   return reserved.contains(name);
 }

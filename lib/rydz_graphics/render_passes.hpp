@@ -123,11 +123,17 @@ struct RenderPassSystems {
         return;
       }
 
+      gl::draw_render_batch_active();
+      gl::disable_color_blend();
+      gl::enable_depth_test();
+      gl::enable_depth_mask();
       for (const auto &batch : phase->batches) {
         draw_opaque_batch(marker, batch, *mesh_assets, *texture_assets,
                           *shader_cache, *slot_registry, *view, *lights,
                           *cluster_config, *cluster_state);
       }
+      gl::draw_render_batch_active();
+      gl::enable_color_blend();
     }
 
     static void run_transparent_pass(
@@ -141,12 +147,17 @@ struct RenderPassSystems {
         return;
       }
 
+      gl::draw_render_batch_active();
+      gl::enable_color_blend();
+      gl::set_blend_mode(RL_BLEND_ALPHA);
+      gl::enable_depth_test();
       gl::disable_depth_mask();
       for (const auto &batch : phase->batches) {
         draw_transparent_batch(marker, batch, *mesh_assets, *texture_assets,
                                *shader_cache, *slot_registry, *view, *lights,
                                *cluster_config, *cluster_state);
       }
+      gl::draw_render_batch_active();
       gl::enable_depth_mask();
     }
 

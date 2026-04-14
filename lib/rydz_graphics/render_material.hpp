@@ -268,6 +268,7 @@ prepare_material(NonSendMarker marker, const CompiledMaterial &material,
 inline void apply_compiled_uniforms(ShaderProgram &shader,
                                     const CompiledMaterial &material) {
   shader.set("u_alpha_cutoff", material.alpha_cutoff);
+  shader.set("u_render_method", static_cast<int>(material.render_method));
   shader.set("u_use_instancing", 0);
   for (const auto &[name, uniform] : material.uniforms) {
     shader.apply(std::string(name), uniform);
