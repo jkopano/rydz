@@ -66,8 +66,8 @@ struct RenderPassSystems {
       }
 
       if (debug_settings->draw_fps) {
-        gl::draw_fps(static_cast<int>(debug_settings->fps_position.x),
-                     static_cast<int>(debug_settings->fps_position.y));
+        gl::draw_fps(static_cast<i32>(debug_settings->fps_position.x),
+                     static_cast<i32>(debug_settings->fps_position.y));
       }
 
       if (state->backbuffer_active) {
@@ -327,7 +327,7 @@ struct RenderPassSystems {
         const ClusterConfig &cluster_config,
         const ClusteredLightingState &cluster_state) {
       const auto *mesh = mesh_assets.get(batch.key.mesh);
-      if (!mesh) {
+      if (mesh == nullptr) {
         return;
       }
 
@@ -349,7 +349,7 @@ struct RenderPassSystems {
       };
       apply_slot_uniforms(slot_registry, render_ctx, batch.key.material,
                           prepared, shader);
-      apply_material_cull_mode(batch.key.material);
+      batch.key.material.apply_cull_mode();
       draw_batch(shader, *mesh, prepared.material, batch);
     }
 
@@ -361,7 +361,7 @@ struct RenderPassSystems {
         const ClusterConfig &cluster_config,
         const ClusteredLightingState &cluster_state) {
       const auto *mesh = mesh_assets.get(batch.key.mesh);
-      if (!mesh) {
+      if (mesh == nullptr) {
         return;
       }
 
@@ -383,21 +383,21 @@ struct RenderPassSystems {
       };
       apply_slot_uniforms(slot_registry, render_ctx, batch.key.material,
                           prepared, shader);
-      apply_material_cull_mode(batch.key.material);
+      batch.key.material.apply_cull_mode();
       draw_batch(shader, *mesh, prepared.material, batch);
     }
 
-    static bool sphere_intersects_cluster(const gl::Vec3 &center, float radius,
+    static bool sphere_intersects_cluster(const gl::Vec3 &center, f32 radius,
                                           const ClusterGpuRecord &cluster) {
-      const float closest_x =
+      const f32 closest_x =
           std::clamp(center.x, cluster.min_bounds.x, cluster.max_bounds.x);
-      const float closest_y =
+      const f32 closest_y =
           std::clamp(center.y, cluster.min_bounds.y, cluster.max_bounds.y);
-      const float closest_z =
+      const f32 closest_z =
           std::clamp(center.z, cluster.min_bounds.z, cluster.max_bounds.z);
-      const float dx = center.x - closest_x;
-      const float dy = center.y - closest_y;
-      const float dz = center.z - closest_z;
+      const f32 dx = center.x - closest_x;
+      const f32 dy = center.y - closest_y;
+      const f32 dz = center.z - closest_z;
       return dx * dx + dy * dy + dz * dz <= radius * radius;
     }
   };
@@ -437,8 +437,8 @@ struct RenderPassSystems {
       return {
           0.0f,
           0.0f,
-          static_cast<float>(texture.width),
-          -static_cast<float>(texture.height),
+          static_cast<f32>(texture.width),
+          -static_cast<f32>(texture.height),
       };
     }
 
@@ -446,8 +446,8 @@ struct RenderPassSystems {
       return {
           0.0f,
           0.0f,
-          static_cast<float>(gl::screen_width()),
-          static_cast<float>(gl::screen_height()),
+          static_cast<f32>(gl::screen_width()),
+          static_cast<f32>(gl::screen_height()),
       };
     }
 
@@ -461,8 +461,8 @@ struct RenderPassSystems {
                                            const PostProcessDescriptor &effect,
                                            const Time &time) {
       const gl::Vec2 resolution = {
-          static_cast<float>(std::max(gl::screen_width(), 1)),
-          static_cast<float>(std::max(gl::screen_height(), 1)),
+          static_cast<f32>(std::max(gl::screen_width(), 1)),
+          static_cast<f32>(std::max(gl::screen_height(), 1)),
       };
       shader.set("u_resolution", resolution);
       shader.set("u_time", time.elapsed_seconds);
@@ -509,8 +509,8 @@ struct RenderPassSystems {
 
         gl::Vec2 position = {item.transform.translation.GetX(),
                              item.transform.translation.GetY()};
-        gl::Rectangle source = {0, 0, static_cast<float>(texture->width),
-                                static_cast<float>(texture->height)};
+        gl::Rectangle source = {0, 0, static_cast<f32>(texture->width),
+                                static_cast<f32>(texture->height)};
         gl::Rectangle dest = {position.x, position.y,
                               texture->width * item.transform.scale.GetX(),
                               texture->height * item.transform.scale.GetY()};
@@ -523,11 +523,11 @@ struct RenderPassSystems {
     }
 
   private:
-    static float texture_rotation_degrees(const Transform &transform) {
-      float siny_cosp =
+    static f32 texture_rotation_degrees(const Transform &transform) {
+      f32 siny_cosp =
           2.0f * (transform.rotation.GetW() * transform.rotation.GetZ() +
                   transform.rotation.GetX() * transform.rotation.GetY());
-      float cosy_cosp =
+      f32 cosy_cosp =
           1.0f - 2.0f * (transform.rotation.GetY() * transform.rotation.GetY() +
                          transform.rotation.GetZ() * transform.rotation.GetZ());
       return std::atan2(siny_cosp, cosy_cosp) * (180.0f / 3.14159265f);
