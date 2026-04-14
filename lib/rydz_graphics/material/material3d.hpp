@@ -6,6 +6,7 @@
 #include "rydz_ecs/helpers.hpp"
 #include "rydz_graphics/assets/types.hpp"
 #include "rydz_graphics/color.hpp"
+#include "rydz_graphics/render_config.hpp"
 #include "rydz_graphics/shader.hpp"
 #include <algorithm>
 #include <concepts>
@@ -118,6 +119,16 @@ struct CompiledMaterial {
   bool has_uniform_named(std::string_view name) {
     return this->uniforms.contains(name);
   }
+
+  void apply_cull_mode() const {
+    if (this->double_sided) {
+      gl::disable_backface_culling();
+      return;
+    }
+
+    gl::enable_backface_culling();
+    gl::set_cull_face(gl::CullFace::Back);
+  }
 };
 
 class MaterialBuilder {
@@ -136,8 +147,7 @@ public:
     return *this;
   }
 
-  MaterialBuilder &color(gl::MaterialMapIndex map_type,
-                         Color color_value) {
+  MaterialBuilder &color(gl::MaterialMapIndex map_type, Color color_value) {
     maps_.push_back(MaterialMapBinding::color_binding(map_type, color_value));
     return *this;
   }

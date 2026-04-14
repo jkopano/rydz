@@ -92,13 +92,13 @@ struct RenderPassSystems {
         return;
       }
 
-      begin_depth_prepass(marker);
+      RenderConfig::depth_prepass()(marker);
       for (const auto &batch : phase->batches) {
         draw_depth_batch(marker, batch, *mesh_assets, *texture_assets,
                          *shader_cache, *slot_registry, *view, *lights,
                          *cluster_config, *cluster_state);
       }
-      end_depth_prepass(marker, *view);
+      RenderConfig::post_depth_prepass()(marker);
     }
 
     static void run_cluster_build_pass(
@@ -169,28 +169,10 @@ struct RenderPassSystems {
     }
 
   private:
-    static void apply_material_cull_mode(const CompiledMaterial &material) {
-      if (material.double_sided) {
-        gl::disable_backface_culling();
-        return;
-      }
-
-      gl::enable_backface_culling();
-      gl::set_cull_face(gl::CullFace::Back);
-    }
-
     static const ShaderSpec &depth_prepass_shader_spec() {
       static const ShaderSpec spec =
           ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth.frag");
       return spec;
-    }
-
-    static void begin_depth_prepass(NonSendMarker marker) {
-      RenderConfig::depth_prepass()(marker);
-    }
-
-    static void end_depth_prepass(NonSendMarker marker, const ExtractedView &) {
-      RenderConfig::post_depth_prepass()(marker);
     }
 
     static void draw_depth_batch(NonSendMarker marker, const OpaqueBatch &batch,
@@ -225,7 +207,7 @@ struct RenderPassSystems {
       };
       apply_slot_uniforms(slot_registry, render_ctx, batch.key.material,
                           prepared, depth_shader);
-      apply_material_cull_mode(batch.key.material);
+      batch.key.material.apply_cull_mode();
       draw_batch(depth_shader, *mesh, prepared.material, batch);
     }
 
@@ -263,7 +245,7 @@ struct RenderPassSystems {
         for (i32 y = 0; y < config.tile_count_y; ++y) {
           for (i32 x = 0; x < config.tile_count_x; ++x) {
             const u32 cluster_index = static_cast<u32>(
-                (z * config.tile_count_y + y) * config.tile_count_x + x);
+                ((z * config.tile_count_y + y) * config.tile_count_x) + x);
             state.clusters_cpu[cluster_index] = gl::build_cluster_record(
                 config, inverse_projection, view.orthographic, view.near_plane,
                 view.far_plane, x, y, z);
@@ -304,24 +286,26 @@ struct RenderPassSystems {
       }
 
       if (!state.point_lights_cpu.empty()) {
-        gl::update_shader_buffer(
-            state.point_light_buffer, state.point_lights_cpu.data(),
+        state.point_light_buffer.update(
+            state.point_lights_cpu.data(),
             static_cast<unsigned int>(state.point_lights_cpu.size() *
                                       sizeof(GpuPointLight)),
             0);
       }
-      gl::update_shader_buffer(
-          state.cluster_buffer, state.clusters_cpu.data(),
+
+      state.cluster_buffer.update(
+          state.clusters_cpu.data(),
           static_cast<unsigned int>(state.clusters_cpu.size() *
                                     sizeof(ClusterGpuRecord)),
           0);
-      gl::update_shader_buffer(
-          state.light_index_buffer, state.light_indices_cpu.data(),
+
+      state.light_index_buffer.update(
+          state.light_indices_cpu.data(),
           static_cast<unsigned int>(state.light_indices_cpu.size() *
                                     sizeof(u32)),
           0);
-      gl::update_shader_buffer(state.overflow_buffer, &overflow_count,
-                               sizeof(overflow_count), 0);
+
+      state.overflow_buffer.update(&overflow_count, sizeof(overflow_count), 0);
 
       if (overflow_count > 0) {
         if (last_reported_overflow != overflow_count) {

@@ -64,24 +64,21 @@ public:
   ClusteredLightingState(const ClusteredLightingState &) = delete;
   ClusteredLightingState &operator=(const ClusteredLightingState &) = delete;
   ClusteredLightingState(ClusteredLightingState &&) noexcept = default;
-  ClusteredLightingState &operator=(ClusteredLightingState &&) noexcept =
-      default;
+  ClusteredLightingState &
+  operator=(ClusteredLightingState &&) noexcept = default;
 
   void ensure_buffers(const ClusterConfig &config) {
     if (!point_light_buffer.ready()) {
-      point_light_buffer =
-          SSBO(sizeof(GpuPointLight) * config.max_point_lights, nullptr,
-               RL_DYNAMIC_DRAW);
+      point_light_buffer = SSBO(sizeof(GpuPointLight) * config.max_point_lights,
+                                nullptr, RL_DYNAMIC_DRAW);
     }
     if (!cluster_buffer.ready()) {
-      cluster_buffer =
-          SSBO(sizeof(ClusterGpuRecord) * config.cluster_count(), nullptr,
-               RL_DYNAMIC_DRAW);
+      cluster_buffer = SSBO(sizeof(ClusterGpuRecord) * config.cluster_count(),
+                            nullptr, RL_DYNAMIC_DRAW);
     }
     if (!light_index_buffer.ready()) {
-      light_index_buffer =
-          SSBO(sizeof(u32) * config.max_light_indices(), nullptr,
-               RL_DYNAMIC_DRAW);
+      light_index_buffer = SSBO(sizeof(u32) * config.max_light_indices(),
+                                nullptr, RL_DYNAMIC_DRAW);
     }
     if (!overflow_buffer.ready()) {
       overflow_buffer = SSBO(sizeof(u32), nullptr, RL_DYNAMIC_DRAW);
@@ -111,11 +108,6 @@ inline void bind_clustered_lighting(const ClusteredLightingState &state) {
   if (state.overflow_buffer.ready()) {
     state.overflow_buffer.bind(3);
   }
-}
-
-inline void update_shader_buffer(const Buffer &buffer, const void *data,
-                                 unsigned int size, unsigned int offset = 0) {
-  buffer.update(data, size, offset);
 }
 
 inline f32 cluster_slice_distance(const ClusterConfig &config, f32 near_plane,
