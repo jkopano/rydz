@@ -8,6 +8,8 @@
 namespace gl {
 
 class Skybox {
+  static constexpr u32 FACE_COUNT = 6;
+
 public:
   struct Config {
     std::string right{};
@@ -28,17 +30,17 @@ public:
     }
   };
 
-  unsigned int cubemap_id = 0;
-  unsigned int vao = 0;
-  unsigned int vbo = 0;
+  u32 cubemap_id = 0;
+  u32 vao = 0;
+  u32 vbo = 0;
   bool loaded = false;
 
   Skybox() = default;
 
   static Skybox from(Config cfg) {
     Skybox skybox{};
-    const std::string paths[6] = {cfg.right,  cfg.left,  cfg.top,
-                                  cfg.bottom, cfg.front, cfg.back};
+    const std::array<std::string, FACE_COUNT> paths = {
+        cfg.right, cfg.left, cfg.top, cfg.bottom, cfg.front, cfg.back};
 
     skybox.cubemap_id = load_cubemap_from_paths(paths);
     skybox.create_cube_vao();
@@ -117,7 +119,7 @@ private:
         -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
         -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f};
 
-    vao = load_vertex_array();
+    vao = spawn_vertex_array();
     enable_vertex_array(vao);
     vbo = load_vertex_buffer(vertices, sizeof(vertices), false);
     set_vertex_attribute(0, 3, RL_FLOAT, false, 0, 0);
@@ -125,37 +127,40 @@ private:
     disable_vertex_array();
   }
 
-  static unsigned int load_cubemap_from_paths(const std::string paths[6]) {
-    Image images[6];
-    for (int i = 0; i < 6; ++i) {
-      images[i] = load_image(paths[i]);
-      if (images[i].data == nullptr) {
-        for (int j = 0; j < i; ++j) {
-          unload_image(images[j]);
+  static unsigned int
+  load_cubemap_from_paths(const std::array<std::string, FACE_COUNT> &paths) {
+    std::array<Image, FACE_COUNT> images;
+
+    for (usize i = 0; i < images.size(); ++i) {
+      images.at(i) = load_image(paths.at(i));
+      if (images.at(i).data == nullptr) {
+        for (usize j = 0; j < i; ++j) {
+          unload_image(images.at(j));
         }
         return 0;
       }
-      if (images[i].format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
-        image_format(images[i], PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+      if (images.at(i).format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
+        image_format(images.at(i), PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
       }
     }
 
-    int width = images[0].width;
-    int height = images[0].height;
-    int pixel_size = 4;
+    u32 width = images[0].width;
+    u32 height = images[0].height;
+    u32 pixel_size = 4U;
 
-    auto *data = static_cast<unsigned char *>(
-        RL_MALLOC(width * height * 6 * pixel_size));
+    std::vector<u8> data(width * height * FACE_COUNT * pixel_size);
 
-    for (int i = 0; i < 6; ++i) {
-      std::memcpy(data + i * width * height * pixel_size, images[i].data,
+    for (usize i = 0; i < FACE_COUNT; ++i) {
+      u32 size = width * height * pixel_size;
+      usize offset = i * size;
+      std::memcpy(data.data() + offset, images.at(i).data,
                   width * height * pixel_size);
-      unload_image(images[i]);
+      unload_image(images.at(i));
     }
 
-    unsigned int id =
-        load_texture_cubemap(data, width, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
-    RL_FREE(data);
+    unsigned int id = load_texture_cubemap(
+        data.data(), width, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
+
     return id;
   }
 };

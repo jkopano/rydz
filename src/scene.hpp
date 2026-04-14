@@ -1,12 +1,11 @@
 #pragma once
 #include "math.hpp"
 #include "rl.hpp"
-#include "rydz_ecs/fwd.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
-#include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/mod.hpp"
+#include "rydz_graphics/render_plugin.hpp"
 #include <algorithm>
 #include <print>
 
@@ -129,8 +128,7 @@ inline void some_shit(Query<CameraState> q) {
 
 inline void spawn_some_texture(Cmd cmd, ResMut<Assets<ecs::Texture>> textures,
                                NonSendMarker) {
-  auto stone_tex =
-      textures->add(gl::load_texture("res/textures/stone.jpg"));
+  auto stone_tex = textures->add(gl::load_texture("res/textures/stone.jpg"));
   cmd.spawn(ecs::Sprite{stone_tex}, Transform{
                                         .translation = Vec3(10.0f, 10.0f, 0.0f),
                                         .scale = Vec3::sReplicate(1.0f),
@@ -157,8 +155,7 @@ inline void spawn_lights_on_input(Cmd cmd,
       .intensity = 0.5f,
   });
 
-  auto stone_tex =
-      textures->add(gl::load_texture("res/textures/stone.jpg"));
+  auto stone_tex = textures->add(gl::load_texture("res/textures/stone.jpg"));
   auto stone_mat = materials->add(StandardMaterial::from_texture(stone_tex));
 
   auto cube_h = meshes->add(mesh::cube());
@@ -186,9 +183,8 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(Camera3DComponent::perspective(), ActiveCamera{},
             Transform::from_xyz(8, 6, 8).look_at(Vec3::sZero()),
             CameraController{},
-            PostProcessMaterial{DefaultPostProcessMaterial{}}
-            // Skybox::from("res/hdri/skybox")
-  );
+            PostProcessMaterial{DefaultPostProcessMaterial{}},
+            Skybox::from("res/hdri/skybox"));
   rl::DisableCursor();
 }
 
@@ -198,8 +194,7 @@ inline void scene_plugin(App &app) {
 
   app.add_systems(Startup, setup_camera);
   app.add_systems(Startup, spawn_some_texture);
-  app.add_systems(Update,
-                  group(spawn_map, spawn_model).run_if(run_once()));
+  app.add_systems(Update, group(spawn_map, spawn_model).run_if(run_once()));
 
   app.add_systems(Update, camera_controller_system);
   app.add_systems(Update, camera_mouse_system);

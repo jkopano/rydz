@@ -4,8 +4,10 @@
 #include "rl.hpp"
 #include "types.hpp"
 #include <bit>
+#include <external/glad.h>
 #include <raymath.h>
 #include <type_traits>
+#include <utility>
 
 namespace gl {
 
@@ -36,6 +38,75 @@ template <typename To, typename From>
 
 struct Texture;
 struct Material;
+
+class Buffer {
+public:
+  Buffer() = default;
+  Buffer(const Buffer &) = delete;
+  Buffer &operator=(const Buffer &) = delete;
+  Buffer(Buffer &&) noexcept = default;
+  Buffer &operator=(Buffer &&) noexcept = default;
+
+  virtual ~Buffer() = default;
+
+  [[nodiscard]] virtual bool ready() const = 0;
+  [[nodiscard]] virtual u32 id() const = 0;
+
+  virtual void reset() = 0;
+  virtual void update(const void *data, unsigned int size,
+                      unsigned int offset = 0) const = 0;
+  virtual void bind(unsigned int index) const = 0;
+};
+
+class SSBO final : public Buffer {
+public:
+  SSBO() = default;
+  SSBO(unsigned int size, const void *data = nullptr,
+       int usage = RL_DYNAMIC_DRAW);
+
+  SSBO(const SSBO &) = delete;
+  SSBO &operator=(const SSBO &) = delete;
+  SSBO(SSBO &&other) noexcept;
+  SSBO &operator=(SSBO &&other) noexcept;
+
+  ~SSBO() override;
+
+  [[nodiscard]] bool ready() const override;
+  [[nodiscard]] u32 id() const override;
+
+  void reset() override;
+  void update(const void *data, unsigned int size,
+              unsigned int offset = 0) const override;
+  void bind(unsigned int index) const override;
+
+private:
+  u32 id_ = 0;
+};
+
+class UBO final : public Buffer {
+public:
+  UBO() = default;
+  UBO(unsigned int size, const void *data = nullptr,
+      int usage = RL_DYNAMIC_DRAW);
+
+  UBO(const UBO &) = delete;
+  UBO &operator=(const UBO &) = delete;
+  UBO(UBO &&other) noexcept;
+  UBO &operator=(UBO &&other) noexcept;
+
+  ~UBO() override;
+
+  [[nodiscard]] bool ready() const override;
+  [[nodiscard]] u32 id() const override;
+
+  void reset() override;
+  void update(const void *data, unsigned int size,
+              unsigned int offset = 0) const override;
+  void bind(unsigned int index) const override;
+
+private:
+  u32 id_ = 0;
+};
 
 struct Image {
   void *data = nullptr;
@@ -269,37 +340,6 @@ struct RenderTarget {
   void begin_mode() const;
 };
 
-struct Model {
-  Matrix transform{};
-  int meshCount = 0;
-  int materialCount = 0;
-  Mesh *meshes = nullptr;
-  Material *materials = nullptr;
-  int *meshMaterial = nullptr;
-  ModelSkeleton skeleton{};
-  ModelAnimPose currentPose = nullptr;
-  Matrix *boneMatrices = nullptr;
-
-  constexpr Model() = default;
-  constexpr Model(const ::Model &raw) noexcept
-      : Model(detail::raylib_cast<Model>(raw)) {}
-
-  constexpr operator ::Model() const noexcept {
-    return detail::raylib_cast<::Model>(*this);
-  }
-
-  Model &operator=(const ::Model &raw) noexcept {
-    *this = Model(raw);
-    return *this;
-  }
-
-  [[nodiscard]] bool ready() const {
-    return meshCount > 0 && meshes != nullptr;
-  }
-
-  void unload();
-};
-
 static_assert(sizeof(Image) == sizeof(::Image));
 static_assert(alignof(Image) == alignof(::Image));
 static_assert(std::is_trivially_copyable_v<Image>);
@@ -324,9 +364,6 @@ static_assert(std::is_trivially_copyable_v<Material>);
 static_assert(sizeof(RenderTarget) == sizeof(::RenderTexture));
 static_assert(alignof(RenderTarget) == alignof(::RenderTexture));
 static_assert(std::is_trivially_copyable_v<RenderTarget>);
-static_assert(sizeof(Model) == sizeof(::Model));
-static_assert(alignof(Model) == alignof(::Model));
-static_assert(std::is_trivially_copyable_v<Model>);
 
 inline constexpr Color kWhite = {255, 255, 255, 255};
 inline constexpr Color kBlack = {0, 0, 0, 255};
@@ -416,6 +453,94 @@ inline Vec3 color_to_vec3(Color color) {
 template <typename... Args>
 inline void trace_log(int level, const char *format, Args... args) {
   rl::TraceLog(level, format, args...);
+}
+
+inline SSBO::SSBO(unsigned int size, const void *data, int usage)
+    : id_(rl::rlLoadShaderBuffer(size, data, usage)) {}
+
+inline SSBO::SSBO(SSBO &&other) noexcept : id_(std::exchange(other.id_, 0)) {}
+
+inline SSBO &SSBO::operator=(SSBO &&other) noexcept {
+  if (this == &other) {
+    return *this;
+  }
+
+  reset();
+  id_ = std::exchange(other.id_, 0);
+  return *this;
+}
+
+inline SSBO::~SSBO() { reset(); }
+
+inline bool SSBO::ready() const { return id_ != 0; }
+
+inline u32 SSBO::id() const { return id_; }
+
+inline void SSBO::reset() {
+  if (id_ != 0) {
+    rl::rlUnloadShaderBuffer(id_);
+    id_ = 0;
+  }
+}
+
+inline void SSBO::update(const void *data, unsigned int size,
+                         unsigned int offset) const {
+  if (id_ != 0) {
+    rl::rlUpdateShaderBuffer(id_, data, size, offset);
+  }
+}
+
+inline void SSBO::bind(unsigned int index) const {
+  if (id_ != 0) {
+    rl::rlBindShaderBuffer(id_, index);
+  }
+}
+
+inline UBO::UBO(unsigned int size, const void *data, int usage) {
+  glGenBuffers(1, &id_);
+  glBindBuffer(GL_UNIFORM_BUFFER, id_);
+  glBufferData(GL_UNIFORM_BUFFER, size, data, usage);
+  glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
+
+inline UBO::UBO(UBO &&other) noexcept : id_(std::exchange(other.id_, 0)) {}
+
+inline UBO &UBO::operator=(UBO &&other) noexcept {
+  if (this == &other) {
+    return *this;
+  }
+
+  reset();
+  id_ = std::exchange(other.id_, 0);
+  return *this;
+}
+
+inline UBO::~UBO() { reset(); }
+
+inline bool UBO::ready() const { return id_ != 0; }
+
+inline u32 UBO::id() const { return id_; }
+
+inline void UBO::reset() {
+  if (id_ != 0) {
+    glDeleteBuffers(1, &id_);
+    id_ = 0;
+  }
+}
+
+inline void UBO::update(const void *data, unsigned int size,
+                        unsigned int offset) const {
+  if (id_ != 0) {
+    glBindBuffer(GL_UNIFORM_BUFFER, id_);
+    glBufferSubData(GL_UNIFORM_BUFFER, offset, size, data);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+  }
+}
+
+inline void UBO::bind(unsigned int index) const {
+  if (id_ != 0) {
+    glBindBufferBase(GL_UNIFORM_BUFFER, index, id_);
+  }
 }
 
 inline void Image::unload() {
@@ -527,14 +652,5 @@ inline void RenderTarget::unload() {
 }
 
 inline void RenderTarget::begin_mode() const { rl::BeginTextureMode(*this); }
-
-inline void Model::unload() {
-  if (ready() || materials != nullptr || meshMaterial != nullptr ||
-      skeleton.bones != nullptr || skeleton.bindPose != nullptr ||
-      currentPose != nullptr || boneMatrices != nullptr) {
-    rl::UnloadModel(*this);
-    *this = Model{};
-  }
-}
 
 } // namespace gl

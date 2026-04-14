@@ -141,8 +141,7 @@ inline SceneMaterial material_from_backend_material(
   StandardMaterial material_value;
 
   if (material.maps != nullptr) {
-    material_value.base_color =
-        material.maps[gl::MATERIAL_MAP_DIFFUSE].color;
+    material_value.base_color = material.maps[gl::MATERIAL_MAP_DIFFUSE].color;
     material_value.emissive_color =
         material.maps[gl::MATERIAL_MAP_EMISSION].color;
     material_value.texture = transfer_texture(
@@ -163,12 +162,9 @@ inline SceneMaterial material_from_backend_material(
     material_value.emissive_map = transfer_texture(
         textures, material.maps[gl::MATERIAL_MAP_EMISSION].texture,
         texture_cache);
-    material_value.metallic =
-        material.maps[gl::MATERIAL_MAP_METALNESS].value;
-    material_value.roughness =
-        material.maps[gl::MATERIAL_MAP_ROUGHNESS].value;
-    material_value.normal_scale =
-        material.maps[gl::MATERIAL_MAP_NORMAL].value;
+    material_value.metallic = material.maps[gl::MATERIAL_MAP_METALNESS].value;
+    material_value.roughness = material.maps[gl::MATERIAL_MAP_ROUGHNESS].value;
+    material_value.normal_scale = material.maps[gl::MATERIAL_MAP_NORMAL].value;
     material_value.occlusion_strength =
         material.maps[gl::MATERIAL_MAP_OCCLUSION].value;
   }
@@ -209,7 +205,8 @@ public:
       return;
     }
 
-    auto model = gl::load_model(file_path);
+    auto model = rl::LoadModel(file_path.c_str());
+
     if (model.meshCount <= 0 || model.meshes == nullptr) {
       return;
     }
@@ -218,14 +215,14 @@ public:
     cgltf_data *data = nullptr;
     if (cgltf_parse_file(&options, file_path.c_str(), &data) !=
         cgltf_result_success) {
-      gl::unload_model(model);
+      rl::UnloadModel(model);
       return;
     }
 
     if (cgltf_load_buffers(&options, data, file_path.c_str()) !=
         cgltf_result_success) {
       cgltf_free(data);
-      gl::unload_model(model);
+      rl::UnloadModel(model);
       return;
     }
 
@@ -438,7 +435,8 @@ public:
     scene_assets->set(Handle<Scene>{handle_id}, std::move(scene));
 
     cgltf_free(data);
-    gl::unload_model(model);
+
+    rl::UnloadModel(model);
   }
 };
 

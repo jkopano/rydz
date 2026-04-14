@@ -61,11 +61,6 @@ public:
 
   std::unordered_set<KeyCode> &keys_down() { return keys_down_; }
 
-  std::unordered_set<KeyCode> keys_down_;
-  std::unordered_set<KeyCode> keys_pressed_;
-  std::unordered_set<KeyCode> keys_released_;
-  MouseState mouse_;
-
   static void input_polling_system(ResMut<Input> input, NonSendMarker) {
     input->clear_frame();
 
@@ -88,6 +83,12 @@ public:
     rl::Vector2 md = rl::GetMouseDelta();
     input->set_mouse_delta(md.x, md.y);
   }
+
+private:
+  std::unordered_set<KeyCode> keys_down_;
+  std::unordered_set<KeyCode> keys_pressed_;
+  std::unordered_set<KeyCode> keys_released_;
+  MouseState mouse_;
 };
 
 } // namespace ecs

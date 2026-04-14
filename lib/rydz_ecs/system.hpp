@@ -16,12 +16,12 @@ class ISystem {
 public:
   virtual ~ISystem() = default;
   virtual void run(World &world) = 0;
-  virtual std::string name() const = 0;
-  virtual std::string type_name() const { return name(); }
-  virtual SystemAccess access() const { return {}; }
+  [[nodiscard]] virtual std::string name() const = 0;
+  [[nodiscard]] virtual std::string type_name() const { return name(); }
+  [[nodiscard]] virtual SystemAccess access() const { return {}; }
 
-  Tick last_run() const { return last_run_; }
-  void set_last_run(Tick t) { last_run_ = t; }
+  [[nodiscard]] Tick last_run() const { return last_run_; }
+  void set_last_run(Tick tick) { last_run_ = tick; }
 
 protected:
   Tick last_run_{};
@@ -123,10 +123,10 @@ public:
     last_run_ = this_run;
   }
 
-  std::string name() const override { return name_; }
-  std::string type_name() const override { return type_name_; }
+  [[nodiscard]] std::string name() const override { return name_; }
+  [[nodiscard]] std::string type_name() const override { return type_name_; }
 
-  SystemAccess access() const override {
+  [[nodiscard]] SystemAccess access() const override {
     SystemAccess acc;
     function_traits<F>::apply([&]<SystemParameter... Args>() {
       access_with_args<Args...>(acc, type_name_);
@@ -136,8 +136,9 @@ public:
 
 private:
   void ensure_param_states(World &world) {
-    if (state_world_ == &world)
+    if (state_world_ == &world) {
       return;
+    }
 
     function_traits<F>::apply([&]<SystemParameter... Args>() {
       param_states_ = Tuple<typename SystemParamTraits<bare_t<Args>>::State...>{
@@ -176,11 +177,13 @@ private:
     ((SystemParamTraits<bare_t<Args>>::access(per_param[i]), ++i), ...);
 
     for (std::size_t a = 0; a < per_param.size(); ++a) {
-      if (!per_param[a].has_data_access())
+      if (!per_param[a].has_data_access()) {
         continue;
+      }
       for (std::size_t b = a + 1; b < per_param.size(); ++b) {
-        if (!per_param[b].has_data_access())
+        if (!per_param[b].has_data_access()) {
           continue;
+        }
         if (!per_param[a].is_compatible(per_param[b]) &&
             !per_param[a].is_archetype_disjoint(per_param[b])) {
           throw std::runtime_error(
