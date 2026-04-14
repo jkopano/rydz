@@ -2,13 +2,15 @@
 
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/requires.hpp"
-#include "rydz_graphics/assets/types.hpp"
+#include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/material/material3d.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"
 
 namespace ecs {
+
+using gl::Mesh;
 
 struct Mesh3d {
   using Required = Requires<Visibility, Transform>;

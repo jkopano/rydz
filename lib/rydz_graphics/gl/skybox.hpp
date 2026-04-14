@@ -166,3 +166,6 @@ private:
 };
 
 } // namespace gl
+namespace ecs {
+using Skybox = gl::Skybox;
+}

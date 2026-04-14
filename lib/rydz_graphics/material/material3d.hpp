@@ -4,10 +4,10 @@
 #include "math.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/helpers.hpp"
-#include "rydz_graphics/assets/types.hpp"
 #include "rydz_graphics/color.hpp"
+#include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/gl/shader.hpp"
 #include "rydz_graphics/render_config.hpp"
-#include "rydz_graphics/shader.hpp"
 #include <algorithm>
 #include <concepts>
 #include <optional>
@@ -24,6 +24,13 @@
 #include <vector>
 
 namespace ecs {
+
+using gl::Mesh;
+using gl::ShaderProgram;
+using gl::ShaderSpec;
+using gl::Texture;
+using gl::Uniform;
+using gl::UniformType;
 
 struct MaterialMapBinding {
   gl::MaterialMapIndex map_type = gl::MATERIAL_MAP_DIFFUSE;

@@ -2,10 +2,13 @@
 
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/assets/gltf.hpp"
-#include "rydz_graphics/assets/types.hpp"
+#include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 
 namespace ecs {
+
+using gl::Sound;
+using gl::Texture;
 
 struct TextureLoader : public AssetLoader<TextureLoader, Texture> {
   std::vector<std::string> extensions() const override {

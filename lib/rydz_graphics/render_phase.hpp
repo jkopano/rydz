@@ -11,7 +11,7 @@ namespace ecs {
 struct ShadowPhaseItem {
   Handle<Mesh> mesh{};
   Mat4 world_transform = Mat4::sIdentity();
-  float distance_to_camera = 0.0f;
+  f32 distance_to_camera = 0.0f;
 };
 
 struct ShadowPhase {
@@ -25,7 +25,7 @@ struct OpaquePhaseItem {
   Handle<Mesh> mesh{};
   CompiledMaterial material{};
   Mat4 world_transform = Mat4::sIdentity();
-  float distance_to_camera = 0.0F;
+  f32 distance_to_camera = 0.0F;
 };
 
 struct OpaquePhase {
@@ -43,7 +43,7 @@ struct TransparentPhaseItem {
   Handle<Mesh> mesh{};
   CompiledMaterial material{};
   Mat4 world_transform = Mat4::sIdentity();
-  float sort_key = 0.0f;
+  f32 sort_key = 0.0F;
 };
 
 struct TransparentPhase {

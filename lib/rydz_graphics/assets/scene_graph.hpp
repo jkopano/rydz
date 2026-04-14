@@ -3,7 +3,7 @@
 #include "math.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/entity.hpp"
-#include "rydz_graphics/assets/types.hpp"
+#include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/mesh3d.hpp"
 #include "rydz_graphics/transform.hpp"
 #include <array>
@@ -11,6 +11,9 @@
 #include <vector>
 
 namespace ecs {
+
+using gl::Mesh;
+using gl::Texture;
 
 struct SceneMaterial {
   std::string name;

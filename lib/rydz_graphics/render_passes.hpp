@@ -288,22 +288,19 @@ struct RenderPassSystems {
       if (!state.point_lights_cpu.empty()) {
         state.point_light_buffer.update(
             state.point_lights_cpu.data(),
-            static_cast<unsigned int>(state.point_lights_cpu.size() *
-                                      sizeof(GpuPointLight)),
+            static_cast<u32>(state.point_lights_cpu.size() *
+                             sizeof(GpuPointLight)),
             0);
       }
 
-      state.cluster_buffer.update(
-          state.clusters_cpu.data(),
-          static_cast<unsigned int>(state.clusters_cpu.size() *
-                                    sizeof(ClusterGpuRecord)),
-          0);
+      state.cluster_buffer.update(state.clusters_cpu.data(),
+                                  static_cast<u32>(state.clusters_cpu.size() *
+                                                   sizeof(ClusterGpuRecord)),
+                                  0);
 
       state.light_index_buffer.update(
           state.light_indices_cpu.data(),
-          static_cast<unsigned int>(state.light_indices_cpu.size() *
-                                    sizeof(u32)),
-          0);
+          static_cast<u32>(state.light_indices_cpu.size() * sizeof(u32)), 0);
 
       state.overflow_buffer.update(&overflow_count, sizeof(overflow_count), 0);
 

@@ -6,11 +6,11 @@
 #include "mesh3d.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/mod.hpp"
-#include "rydz_graphics/assets/types.hpp"
 #include "rydz_graphics/frustum.hpp"
+#include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/gl/skybox.hpp"
 #include "rydz_graphics/material/material3d.hpp"
 #include "rydz_graphics/material/postprocess_material.hpp"
-#include "skybox.hpp"
 #include "transform.hpp"
 #include "visibility.hpp"
 #include <array>
@@ -32,7 +32,7 @@ struct ExtractedView {
       .position = Vec3{},
   };
   Color clear_color = ClearColor{}.color;
-  const gl::Skybox *active_skybox{};
+  const Skybox *active_skybox{};
   PostProcessDescriptor postprocess{};
   bool active{};
   bool has_postprocess{};
@@ -100,8 +100,8 @@ struct RenderExtractSystems {
     const float aspect = compute_camera_aspect_ratio(
         static_cast<float>(window->width), static_cast<float>(window->height));
 
-    for (auto [cam_comp, _, cam_gt, clear_color, skybox,
-               postprocess] : cam_query.iter()) {
+    for (auto [cam_comp, _, cam_gt, clear_color, skybox, postprocess] :
+         cam_query.iter()) {
       view->camera_view = compute_camera_view(*cam_gt, *cam_comp, aspect);
       if (clear_color != nullptr) {
         view->clear_color = clear_color->color;

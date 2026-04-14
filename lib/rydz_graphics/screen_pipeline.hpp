@@ -7,17 +7,6 @@
 
 namespace ecs {
 
-struct PostProcessSettings {
-  using T = Resource;
-
-  bool enabled = true;
-  float exposure = 1.0f;
-  float contrast = 1.05f;
-  float saturation = 1.0f;
-  float vignette = 0.18f;
-  float grain = 0.015f;
-};
-
 struct DebugOverlaySettings {
   using T = Resource;
 
@@ -29,8 +18,8 @@ struct ScreenPipelineState {
   using T = Resource;
 
   gl::RenderTarget world_target{};
-  int width = 0;
-  int height = 0;
+  u32 width = 0;
+  u32 height = 0;
 
   ScreenPipelineState() = default;
   ScreenPipelineState(const ScreenPipelineState &) = delete;
@@ -63,16 +52,16 @@ struct ScreenPipelineState {
 
   [[nodiscard]] bool ready() const { return world_target.ready(); }
 
-  void ensure_target(int target_width, int target_height) {
-    target_width = std::max(target_width, 1);
-    target_height = std::max(target_height, 1);
+  void ensure_target(u32 target_width, u32 target_height) {
+    target_width = std::max(target_width, 1U);
+    target_height = std::max(target_height, 1U);
 
     if (ready() && width == target_width && height == target_height) {
       return;
     }
 
     unload();
-    world_target = gl::load_render_target(target_width, target_height);
+    world_target = gl::RenderTarget{target_width, target_height};
     width = target_width;
     height = target_height;
 

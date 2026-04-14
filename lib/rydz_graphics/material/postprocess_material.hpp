@@ -1,11 +1,14 @@
 #pragma once
 
-#include "rydz_graphics/shader.hpp"
+#include "rydz_graphics/gl/shader.hpp"
 #include <concepts>
 #include <unordered_map>
 #include <utility>
 
 namespace ecs {
+
+using gl::ShaderSpec;
+using gl::Uniform;
 
 struct PostProcessDescriptor {
   ShaderSpec shader;

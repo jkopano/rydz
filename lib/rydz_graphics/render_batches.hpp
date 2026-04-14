@@ -2,7 +2,6 @@
 
 #include "hash.hpp"
 #include "rydz_ecs/asset.hpp"
-#include "rydz_graphics/assets/types.hpp"
 #include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/material/material3d.hpp"
 #include <cstdint>
@@ -10,6 +9,8 @@
 #include <vector>
 
 namespace ecs {
+
+using gl::Mesh;
 
 struct RenderBatchKey {
   Handle<Mesh> mesh{};

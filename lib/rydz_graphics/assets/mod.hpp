@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rydz_graphics/assets/types.hpp"
+#include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/assets/scene_graph.hpp"
 #include "rydz_graphics/assets/gltf.hpp"
 #include "rydz_graphics/assets/loaders.hpp"
