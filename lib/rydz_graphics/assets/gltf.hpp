@@ -49,30 +49,14 @@ inline Transform transform_from_cgltf_node(const cgltf_node &node) {
         node.matrix[3], node.matrix[7], node.matrix[11], node.matrix[15],
     };
 
-    Vec3 translation = Vec3::sZero();
-    Quat rotation = Quat::sIdentity();
-    Vec3 scale = Vec3::sReplicate(1.0F);
-    gl::decompose_matrix(matrix, translation, rotation, scale);
-
-    transform.translation = translation;
-    transform.rotation = rotation;
-    transform.scale = scale;
+    transform = math::from_rl(matrix).decompose();
   }
 
   return transform;
 }
 
 inline Transform transform_from_matrix(const Mat4 &matrix) {
-  Vec3 translation = Vec3::sZero();
-  Quat rotation = Quat::sIdentity();
-  Vec3 scale = Vec3::sReplicate(1.0F);
-  gl::decompose_matrix(matrix, translation, rotation, scale);
-
-  Transform transform;
-  transform.translation = translation;
-  transform.rotation = rotation;
-  transform.scale = scale;
-  return transform;
+  return matrix.decompose();
 }
 
 inline void apply_gltf_material_properties(CompiledMaterial &material_desc,

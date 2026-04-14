@@ -2,9 +2,10 @@
 
 #include "clustered_lighting.hpp"
 #include "render_extract.hpp"
-#include "render_material.hpp"
 #include "render_phase.hpp"
 #include "rydz_ecs/core/time.hpp"
+#include "rydz_graphics/material/render_material.hpp"
+#include "rydz_graphics/render_config.hpp"
 #include "screen_pipeline.hpp"
 #include <algorithm>
 #include <array>
@@ -123,17 +124,13 @@ struct RenderPassSystems {
         return;
       }
 
-      gl::draw_render_batch_active();
-      gl::disable_color_blend();
-      gl::enable_depth_test();
-      gl::enable_depth_mask();
+      RenderConfig::opaque()(marker);
       for (const auto &batch : phase->batches) {
         draw_opaque_batch(marker, batch, *mesh_assets, *texture_assets,
                           *shader_cache, *slot_registry, *view, *lights,
                           *cluster_config, *cluster_state);
       }
-      gl::draw_render_batch_active();
-      gl::enable_color_blend();
+      RenderConfig{}(marker);
     }
 
     static void run_transparent_pass(
@@ -147,32 +144,29 @@ struct RenderPassSystems {
         return;
       }
 
-      gl::draw_render_batch_active();
-      gl::enable_color_blend();
-      gl::set_blend_mode(RL_BLEND_ALPHA);
-      gl::enable_depth_test();
-      gl::disable_depth_mask();
+      RenderConfig::transparent()(marker);
       for (const auto &batch : phase->batches) {
         draw_transparent_batch(marker, batch, *mesh_assets, *texture_assets,
                                *shader_cache, *slot_registry, *view, *lights,
                                *cluster_config, *cluster_state);
       }
-      gl::draw_render_batch_active();
-      gl::enable_depth_mask();
+      RenderConfig{}(marker);
     }
 
-    static void begin_world_pass(NonSendMarker, const ExtractedView &view) {
-      const gl::RenderConfig *config =
-          view.has_render_config ? &view.render_config : nullptr;
-      gl::begin_world_pass(view.camera_view.view, view.camera_view.proj,
-                           config);
+    static void begin_world_pass(NonSendMarker marker,
+                                 const ExtractedView &view) {
+      gl::begin_world_pass(view.camera_view.view, view.camera_view.proj);
+      RenderConfig::world_default()(marker);
 
       if (view.active_skybox && view.active_skybox->loaded) {
         view.active_skybox->draw(view.camera_view.view, view.camera_view.proj);
       }
     }
 
-    static void end_world_pass(NonSendMarker) { gl::end_world_pass(); }
+    static void end_world_pass(NonSendMarker marker) {
+      gl::end_world_pass();
+      RenderConfig::end_world_pass()(marker);
+    }
 
   private:
     static void apply_material_cull_mode(const CompiledMaterial &material) {
@@ -191,20 +185,12 @@ struct RenderPassSystems {
       return spec;
     }
 
-    static void begin_depth_prepass(NonSendMarker) {
-      gl::draw_render_batch_active();
-      gl::color_mask(false, false, false, false);
-      gl::disable_color_blend();
-      gl::enable_depth_test();
-      gl::enable_depth_mask();
-      gl::enable_backface_culling();
-      gl::set_cull_face(gl::CullFace::Back);
+    static void begin_depth_prepass(NonSendMarker marker) {
+      RenderConfig::depth_prepass()(marker);
     }
 
-    static void end_depth_prepass(NonSendMarker, const ExtractedView &view) {
-      const gl::RenderConfig *config =
-          view.has_render_config ? &view.render_config : nullptr;
-      gl::end_depth_prepass(config);
+    static void end_depth_prepass(NonSendMarker marker, const ExtractedView &) {
+      RenderConfig::post_depth_prepass()(marker);
     }
 
     static void draw_depth_batch(NonSendMarker marker, const OpaqueBatch &batch,
@@ -295,7 +281,7 @@ struct RenderPassSystems {
             view.camera_view.view * Vec3(light.position_range.x,
                                          light.position_range.y,
                                          light.position_range.z);
-        const auto view_position = gl::to_vector3(view_position_math);
+        const auto view_position = math::to_rl(view_position_math);
 
         for (u32 cluster_index = 0;
              cluster_index < static_cast<u32>(state.clusters_cpu.size());

@@ -212,7 +212,7 @@ public:
   }
 
   void set(const char *name, const math::Mat4 &value) {
-    set(name, to_matrix(value));
+    set(name, math::to_rl(value));
   }
 
   void set(const std::string &name, float value) { set(name.c_str(), value); }

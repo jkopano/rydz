@@ -1,7 +1,7 @@
 #pragma once
 
 #include "render_extract.hpp"
-#include "render_material.hpp"
+#include "rydz_graphics/material/render_material.hpp"
 #include <algorithm>
 #include <unordered_map>
 #include <vector>
@@ -206,14 +206,14 @@ struct RenderPhaseSystems {
             usize batch_slot = phase.batches.size();
             OpaqueBatch batch{};
             batch.key = key;
-            batch.transforms.push_back(gl::to_matrix(item.world_transform));
+            batch.transforms.push_back(math::to_rl(item.world_transform));
             phase.batches.push_back(std::move(batch));
             batch_index.emplace(phase.batches.back().key, batch_slot);
             continue;
           }
 
           phase.batches[it->second].transforms.push_back(
-              gl::to_matrix(item.world_transform));
+              math::to_rl(item.world_transform));
         }
       }
 
@@ -234,13 +234,13 @@ struct RenderPhaseSystems {
           if (phase.batches.empty() || !(phase.batches.back().key == key)) {
             TransparentBatch batch{};
             batch.key = key;
-            batch.transforms.push_back(gl::to_matrix(item.world_transform));
+            batch.transforms.push_back(math::to_rl(item.world_transform));
             phase.batches.push_back(std::move(batch));
             continue;
           }
 
           phase.batches.back().transforms.push_back(
-              gl::to_matrix(item.world_transform));
+              math::to_rl(item.world_transform));
         }
       }
     };

@@ -5,7 +5,6 @@
 #include "types.hpp"
 #include <bit>
 #include <external/glad.h>
-#include <raymath.h>
 #include <type_traits>
 #include <utility>
 
@@ -512,43 +511,6 @@ inline unsigned int default_shader_id() { return rl::rlGetShaderIdDefault(); }
 inline int *default_shader_locs() { return rl::rlGetShaderLocsDefault(); }
 
 inline unsigned int default_texture_id() { return rl::rlGetTextureIdDefault(); }
-
-inline Matrix to_matrix(math::Mat4 value) { return math::to_rl(value); }
-
-inline Vec3 to_vector3(math::Vec3 value) { return math::to_rl(value); }
-
-inline Vec4 to_vector4(math::Vec4 value) { return math::to_rl(value); }
-
-inline Vec4 to_vector4(math::Quat value) { return math::to_rl(value); }
-
-inline math::Mat4 from_matrix(const Matrix &value) {
-  return math::from_rl(value);
-}
-
-inline math::Vec3 from_vector3(const Vec3 &value) {
-  return math::from_rl(value);
-}
-
-inline math::Vec4 from_vector4(const Vec4 &value) {
-  return math::from_rl(value);
-}
-
-inline void decompose_matrix(const Matrix &matrix, math::Vec3 &translation,
-                             math::Quat &rotation, math::Vec3 &scale) {
-  rl::Vector3 rl_translation{};
-  rl::Quaternion rl_rotation{};
-  rl::Vector3 rl_scale{};
-  MatrixDecompose(matrix, &rl_translation, &rl_rotation, &rl_scale);
-  translation = math::from_rl(rl_translation);
-  rotation =
-      math::Quat(rl_rotation.x, rl_rotation.y, rl_rotation.z, rl_rotation.w);
-  scale = math::from_rl(rl_scale);
-}
-
-inline void decompose_matrix(math::Mat4 matrix, math::Vec3 &translation,
-                             math::Quat &rotation, math::Vec3 &scale) {
-  decompose_matrix(to_matrix(matrix), translation, rotation, scale);
-}
 
 inline Vec3 color_to_vec3(Color color) {
   return {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f};

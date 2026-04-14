@@ -1,6 +1,6 @@
 #pragma once
 
-#include "shader.hpp"
+#include "rydz_graphics/shader.hpp"
 #include <concepts>
 #include <unordered_map>
 #include <utility>

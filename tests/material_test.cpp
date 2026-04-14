@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "rydz_graphics/material3d.hpp"
+#include "rydz_graphics/material/material3d.hpp"
 
 namespace {
 

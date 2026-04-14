@@ -1,10 +1,10 @@
 #pragma once
 
-#include "rydz_graphics/assets/types.hpp"
 #include "hash.hpp"
-#include "material3d.hpp"
 #include "rydz_ecs/asset.hpp"
+#include "rydz_graphics/assets/types.hpp"
 #include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/material/material3d.hpp"
 #include <cstdint>
 #include <functional>
 #include <vector>

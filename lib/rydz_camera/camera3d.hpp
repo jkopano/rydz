@@ -2,7 +2,6 @@
 #include "math.hpp"
 #include "rydz_ecs/requires.hpp"
 #include "rydz_graphics/color.hpp"
-#include "rydz_graphics/gl/state.hpp"
 #include "rydz_graphics/transform.hpp"
 #include <algorithm>
 
@@ -16,7 +15,7 @@ enum class CameraProjection3D {
 };
 
 struct Camera3DComponent {
-  using Required = Requires<gl::RenderConfig, ClearColor>;
+  using Required = Requires<ClearColor>;
   CameraProjection3D projection = CameraProjection3D::Perspective;
   float perspective_fov_y_deg = 45.0f;
   float orthographic_height = 10.0f;

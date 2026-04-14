@@ -4,7 +4,7 @@
 #include "rydz_ecs/requires.hpp"
 #include "rydz_graphics/assets/types.hpp"
 #include "rydz_graphics/gl/resources.hpp"
-#include "rydz_graphics/material3d.hpp"
+#include "rydz_graphics/material/material3d.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"
 

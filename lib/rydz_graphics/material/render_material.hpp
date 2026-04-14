@@ -1,8 +1,8 @@
 #pragma once
 
-#include "clustered_lighting.hpp"
-#include "render_batches.hpp"
-#include "render_extract.hpp"
+#include "rydz_graphics/clustered_lighting.hpp"
+#include "rydz_graphics/render_batches.hpp"
+#include "rydz_graphics/render_extract.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/gl/state.hpp"
 #include <algorithm>
@@ -285,7 +285,7 @@ inline SlotProvider make_has_camera_slot_provider() {
   SlotProvider provider;
   provider.apply = [](const RenderSlotContext &ctx, const CompiledMaterial &,
                       const PreparedMaterial &, ShaderProgram &shader) {
-    shader.set("u_camera_pos", gl::to_vector3(ctx.view().camera_view.position));
+    shader.set("u_camera_pos", math::to_rl(ctx.view().camera_view.position));
     shader.set("matView", ctx.view().camera_view.view);
   };
   return provider;
@@ -306,7 +306,7 @@ inline SlotProvider make_has_pbr_slot_provider() {
 
     int has_directional = lights.has_directional ? 1 : 0;
     gl::Vec3 dir_color = color_to_vec3(lights.dir_light.color);
-    gl::Vec3 dir_dir = gl::to_vector3(lights.dir_light.direction.Normalized());
+    gl::Vec3 dir_dir = math::to_rl(lights.dir_light.direction.Normalized());
     float dir_intensity = lights.dir_light.intensity;
     gl::Vec2 cluster_screen_size = {
         static_cast<float>(std::max(gl::screen_width(), 1)),
