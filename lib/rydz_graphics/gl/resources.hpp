@@ -15,7 +15,7 @@ inline void unload_image(Image &image) { image.unload(); }
 
 inline void image_format(Image &image, i32 format) { image.format_to(format); }
 
-inline Image gen_image_color(i32 width, i32 height, Color color) {
+inline Image gen_image_with_color(i32 width, i32 height, Color color) {
   return rl::GenImageColor(width, height, color);
 }
 
@@ -29,13 +29,7 @@ inline Texture load_texture_from_image(const Image &image) {
   return image.load_texture();
 }
 
-inline void unload_texture(Texture &texture) { texture.unload(); }
-
 inline void unload_texture_id(u32 id) { rl::rlUnloadTexture(id); }
-
-inline void set_texture_filter(Texture texture, i32 filter) {
-  texture.set_filter(filter);
-}
 
 inline Sound load_sound(const char *path) { return rl::LoadSound(path); }
 
@@ -81,22 +75,6 @@ inline Mesh gen_knot(float radius = 0.5F, float size = 0.2F,
 
 inline void gen_tangents(Mesh &mesh) { mesh.gen_tangents(); }
 
-inline void upload_mesh(Mesh &mesh, bool dynamic = false) {
-  mesh.upload(dynamic);
-}
-
-inline void unload_mesh(Mesh &mesh) { mesh.unload(); }
-
-inline bool mesh_uploaded(const Mesh &mesh) { return mesh.uploaded(); }
-
-inline i32 mesh_vertex_count(const Mesh &mesh) { return mesh.vertex_count(); }
-
-inline const float *mesh_vertices(const Mesh &mesh) {
-  return mesh.vertex_data();
-}
-
-inline float *mesh_vertices(Mesh &mesh) { return mesh.vertex_data(); }
-
 inline void update_mesh_buffer(Mesh &mesh, i32 index, const void *data,
                                i32 data_size, i32 offset) {
   mesh.update_buffer(index, data, data_size, offset);
@@ -104,24 +82,6 @@ inline void update_mesh_buffer(Mesh &mesh, i32 index, const void *data,
 
 inline RenderTarget load_render_target(i32 width, i32 height) {
   return rl::LoadRenderTexture(width, height);
-}
-
-inline void unload_render_target(RenderTarget &target) { target.unload(); }
-
-inline Texture &render_target_texture(RenderTarget &target) {
-  return target.texture;
-}
-
-inline const Texture &render_target_texture(const RenderTarget &target) {
-  return target.texture;
-}
-
-inline bool render_target_ready(const RenderTarget &target) {
-  return target.ready();
-}
-
-inline Model load_model(const std::string &path) {
-  return rl::LoadModel(path.c_str());
 }
 
 inline u32 spawn_vertex_array() { return rl::rlLoadVertexArray(); }

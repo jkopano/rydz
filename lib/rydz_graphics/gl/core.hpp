@@ -61,23 +61,45 @@ public:
 class SSBO final : public Buffer {
 public:
   SSBO() = default;
-  SSBO(unsigned int size, const void *data = nullptr,
-       int usage = RL_DYNAMIC_DRAW);
+  SSBO(unsigned int size, const void *data, int usage)
+      : id_(rl::rlLoadShaderBuffer(size, data, usage)) {}
 
   SSBO(const SSBO &) = delete;
   SSBO &operator=(const SSBO &) = delete;
-  SSBO(SSBO &&other) noexcept;
-  SSBO &operator=(SSBO &&other) noexcept;
+  SSBO(SSBO &&other) noexcept : id_(std::exchange(other.id_, 0)) {}
+  SSBO &operator=(SSBO &&other) noexcept {
+    if (this == &other) {
+      return *this;
+    }
 
-  ~SSBO() override;
+    reset();
+    id_ = std::exchange(other.id_, 0);
+    return *this;
+  }
 
-  [[nodiscard]] bool ready() const override;
-  [[nodiscard]] u32 id() const override;
+  ~SSBO() override { reset(); }
 
-  void reset() override;
+  [[nodiscard]] bool ready() const override { return id_ != 0; }
+  [[nodiscard]] u32 id() const override { return id_; }
+
+  void reset() override {
+    if (id_ != 0) {
+      rl::rlUnloadShaderBuffer(id_);
+      id_ = 0;
+    }
+  }
   void update(const void *data, unsigned int size,
-              unsigned int offset = 0) const override;
-  void bind(unsigned int index) const override;
+              unsigned int offset) const override {
+    if (id_ != 0) {
+      rl::rlUpdateShaderBuffer(id_, data, size, offset);
+    }
+  }
+
+  void bind(unsigned int index) const override {
+    if (id_ != 0) {
+      rl::rlBindShaderBuffer(id_, index);
+    }
+  }
 
 private:
   u32 id_ = 0;
@@ -86,23 +108,52 @@ private:
 class UBO final : public Buffer {
 public:
   UBO() = default;
-  UBO(unsigned int size, const void *data = nullptr,
-      int usage = RL_DYNAMIC_DRAW);
+  UBO(unsigned int size, const void *data, int usage) {
+    glGenBuffers(1, &id_);
+    glBindBuffer(GL_UNIFORM_BUFFER, id_);
+    glBufferData(GL_UNIFORM_BUFFER, size, data, usage);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+  }
 
   UBO(const UBO &) = delete;
+  UBO(UBO &&other) noexcept : id_(std::exchange(other.id_, 0)) {}
   UBO &operator=(const UBO &) = delete;
-  UBO(UBO &&other) noexcept;
-  UBO &operator=(UBO &&other) noexcept;
+  UBO &operator=(UBO &&other) noexcept {
+    if (this == &other) {
+      return *this;
+    }
 
-  ~UBO() override;
+    reset();
+    id_ = std::exchange(other.id_, 0);
+    return *this;
+  }
 
-  [[nodiscard]] bool ready() const override;
-  [[nodiscard]] u32 id() const override;
+  ~UBO() override { reset(); }
 
-  void reset() override;
+  [[nodiscard]] bool ready() const override { return id_ != 0; }
+  [[nodiscard]] u32 id() const override { return id_; }
+
+  void reset() override {
+    if (id_ != 0) {
+      glDeleteBuffers(1, &id_);
+      id_ = 0;
+    }
+  }
+
   void update(const void *data, unsigned int size,
-              unsigned int offset = 0) const override;
-  void bind(unsigned int index) const override;
+              unsigned int offset) const override {
+    if (id_ != 0) {
+      glBindBuffer(GL_UNIFORM_BUFFER, id_);
+      glBufferSubData(GL_UNIFORM_BUFFER, offset, size, data);
+      glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    }
+  }
+
+  void bind(unsigned int index) const override {
+    if (id_ != 0) {
+      glBindBufferBase(GL_UNIFORM_BUFFER, index, id_);
+    }
+  }
 
 private:
   u32 id_ = 0;
@@ -130,8 +181,19 @@ struct Image {
 
   [[nodiscard]] bool ready() const { return data != nullptr; }
 
-  void unload();
-  void format_to(int pixel_format);
+  void unload() {
+    if (ready()) {
+      rl::UnloadImage(*this);
+      *this = Image{};
+    }
+  }
+
+  void format_to(int pixel_format) {
+    auto raw = static_cast<::Image>(*this);
+    rl::ImageFormat(&raw, pixel_format);
+    *this = raw;
+  }
+
   [[nodiscard]] Texture load_texture() const;
 };
 
@@ -155,12 +217,24 @@ struct Texture {
     return *this;
   }
 
-  [[nodiscard]] bool ready() const { return id != 0; }
+  [[nodiscard]] bool ready() const { return id > 0; }
 
-  void unload();
-  void set_filter(int filter) const;
-  [[nodiscard]] Rectangle rect() const;
-  [[nodiscard]] Rectangle flipped_rect() const;
+  void unload() {
+    if (ready()) {
+      rl::UnloadTexture(*this);
+      *this = Texture{};
+    }
+  }
+
+  void set_filter(int filter) const { rl::SetTextureFilter(*this, filter); }
+
+  [[nodiscard]] Rectangle rect() const {
+    return {0.0F, 0.0F, static_cast<float>(width), static_cast<float>(height)};
+  }
+
+  [[nodiscard]] Rectangle flipped_rect() const {
+    return {0.0F, 0.0F, static_cast<float>(width), -static_cast<float>(height)};
+  }
 };
 
 struct Sound {
@@ -184,7 +258,12 @@ struct Sound {
     return stream.buffer != nullptr && frameCount > 0;
   }
 
-  void unload();
+  void unload() {
+    if (ready()) {
+      ::UnloadSound(*this);
+      *this = Sound{};
+    }
+  }
 };
 
 struct Shader {
@@ -207,8 +286,13 @@ struct Shader {
   [[nodiscard]] bool ready() const { return id != 0; }
   [[nodiscard]] bool has_locations() const { return locs != nullptr; }
 
-  int uniform_location(const char *name) const;
-  int attribute_location(const char *name) const;
+  int uniform_location(const char *name) const {
+    return rl::GetShaderLocation(*this, name);
+  }
+
+  int attribute_location(const char *name) const {
+    return rl::GetShaderLocationAttrib(*this, name);
+  }
 };
 
 struct MaterialMap {
@@ -275,13 +359,28 @@ struct Mesh {
   [[nodiscard]] const float *vertex_data() const { return vertices; }
   [[nodiscard]] float *vertex_data() { return vertices; }
 
-  void gen_tangents();
-  void upload(bool dynamic = false);
-  void unload();
+  void gen_tangents() {
+    auto raw = static_cast<::Mesh>(*this);
+    rl::GenMeshTangents(&raw);
+    *this = raw;
+  }
+
+  void upload(bool dynamic) {
+    auto raw = static_cast<::Mesh>(*this);
+    rl::UploadMesh(&raw, dynamic);
+    *this = raw;
+  }
+
+  void unload() {
+    if (Mesh::ready()) {
+      rl::UnloadMesh(*this);
+      *this = Mesh{};
+    }
+  }
   void update_buffer(int index, const void *data, int data_size,
-                     int offset) const;
-  void draw(Material &material, const math::Mat4 &transform) const;
-  void draw(Material &material, const Matrix &transform) const;
+                     int offset) const {
+    rl::UpdateMeshBuffer(*this, index, data, data_size, offset);
+  }
   void draw_instanced(Material &material, const Matrix *transforms,
                       i32 count) const;
 };
@@ -310,10 +409,6 @@ struct Material {
 
   MaterialMap &map(MaterialMapIndex index) { return maps[index]; }
   const MaterialMap &map(MaterialMapIndex index) const { return maps[index]; }
-
-  void draw(const Mesh &mesh, const math::Mat4 &transform);
-  void draw(const Mesh &mesh, const Matrix &transform);
-  void draw_instanced(const Mesh &mesh, const Matrix *transforms, i32 count);
 };
 
 struct RenderTarget {
@@ -324,6 +419,9 @@ struct RenderTarget {
   constexpr RenderTarget() = default;
   constexpr RenderTarget(const ::RenderTexture &raw) noexcept
       : RenderTarget(detail::raylib_cast<RenderTarget>(raw)) {}
+
+  RenderTarget(u32 width, u32 height)
+      : RenderTarget(rl::LoadRenderTexture(width, height)) {}
 
   constexpr operator ::RenderTexture() const noexcept {
     return detail::raylib_cast<::RenderTexture>(*this);
@@ -336,7 +434,13 @@ struct RenderTarget {
 
   [[nodiscard]] bool ready() const { return id != 0; }
 
-  void unload();
+  void unload() {
+    if (RenderTarget::ready()) {
+      rl::UnloadRenderTexture(*this);
+      *this = RenderTarget{};
+    }
+  }
+
   void begin_mode() const;
 };
 
@@ -455,200 +559,13 @@ inline void trace_log(int level, const char *format, Args... args) {
   rl::TraceLog(level, format, args...);
 }
 
-inline SSBO::SSBO(unsigned int size, const void *data, int usage)
-    : id_(rl::rlLoadShaderBuffer(size, data, usage)) {}
-
-inline SSBO::SSBO(SSBO &&other) noexcept : id_(std::exchange(other.id_, 0)) {}
-
-inline SSBO &SSBO::operator=(SSBO &&other) noexcept {
-  if (this == &other) {
-    return *this;
-  }
-
-  reset();
-  id_ = std::exchange(other.id_, 0);
-  return *this;
-}
-
-inline SSBO::~SSBO() { reset(); }
-
-inline bool SSBO::ready() const { return id_ != 0; }
-
-inline u32 SSBO::id() const { return id_; }
-
-inline void SSBO::reset() {
-  if (id_ != 0) {
-    rl::rlUnloadShaderBuffer(id_);
-    id_ = 0;
-  }
-}
-
-inline void SSBO::update(const void *data, unsigned int size,
-                         unsigned int offset) const {
-  if (id_ != 0) {
-    rl::rlUpdateShaderBuffer(id_, data, size, offset);
-  }
-}
-
-inline void SSBO::bind(unsigned int index) const {
-  if (id_ != 0) {
-    rl::rlBindShaderBuffer(id_, index);
-  }
-}
-
-inline UBO::UBO(unsigned int size, const void *data, int usage) {
-  glGenBuffers(1, &id_);
-  glBindBuffer(GL_UNIFORM_BUFFER, id_);
-  glBufferData(GL_UNIFORM_BUFFER, size, data, usage);
-  glBindBuffer(GL_UNIFORM_BUFFER, 0);
-}
-
-inline UBO::UBO(UBO &&other) noexcept : id_(std::exchange(other.id_, 0)) {}
-
-inline UBO &UBO::operator=(UBO &&other) noexcept {
-  if (this == &other) {
-    return *this;
-  }
-
-  reset();
-  id_ = std::exchange(other.id_, 0);
-  return *this;
-}
-
-inline UBO::~UBO() { reset(); }
-
-inline bool UBO::ready() const { return id_ != 0; }
-
-inline u32 UBO::id() const { return id_; }
-
-inline void UBO::reset() {
-  if (id_ != 0) {
-    glDeleteBuffers(1, &id_);
-    id_ = 0;
-  }
-}
-
-inline void UBO::update(const void *data, unsigned int size,
-                        unsigned int offset) const {
-  if (id_ != 0) {
-    glBindBuffer(GL_UNIFORM_BUFFER, id_);
-    glBufferSubData(GL_UNIFORM_BUFFER, offset, size, data);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-  }
-}
-
-inline void UBO::bind(unsigned int index) const {
-  if (id_ != 0) {
-    glBindBufferBase(GL_UNIFORM_BUFFER, index, id_);
-  }
-}
-
-inline void Image::unload() {
-  if (ready()) {
-    rl::UnloadImage(*this);
-    *this = Image{};
-  }
-}
-
-inline void Image::format_to(int pixel_format) {
-  auto raw = static_cast<::Image>(*this);
-  rl::ImageFormat(&raw, pixel_format);
-  *this = raw;
-}
-
-inline void Texture::unload() {
-  if (ready()) {
-    rl::UnloadTexture(*this);
-    *this = Texture{};
-  }
-}
-
-inline void Texture::set_filter(int filter) const {
-  rl::SetTextureFilter(*this, filter);
-}
-
-inline Rectangle Texture::rect() const {
-  return {0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)};
-}
-
-inline Rectangle Texture::flipped_rect() const {
-  return {0.0f, 0.0f, static_cast<float>(width), -static_cast<float>(height)};
-}
-
-inline void Sound::unload() {
-  if (ready()) {
-    ::UnloadSound(*this);
-    *this = Sound{};
-  }
-}
-
-inline int Shader::uniform_location(const char *name) const {
-  return rl::GetShaderLocation(*this, name);
-}
-
-inline int Shader::attribute_location(const char *name) const {
-  return rl::GetShaderLocationAttrib(*this, name);
-}
-
 inline Texture Image::load_texture() const {
   return rl::LoadTextureFromImage(*this);
-}
-
-inline void Mesh::gen_tangents() {
-  auto raw = static_cast<::Mesh>(*this);
-  rl::GenMeshTangents(&raw);
-  *this = raw;
-}
-
-inline void Mesh::upload(bool dynamic) {
-  auto raw = static_cast<::Mesh>(*this);
-  rl::UploadMesh(&raw, dynamic);
-  *this = raw;
-}
-
-inline void Mesh::unload() {
-  if (Mesh::ready()) {
-    rl::UnloadMesh(*this);
-    *this = Mesh{};
-  }
-}
-
-inline void Mesh::update_buffer(int index, const void *data, int data_size,
-                                int offset) const {
-  rl::UpdateMeshBuffer(*this, index, data, data_size, offset);
-}
-
-inline void Mesh::draw(Material &material, const math::Mat4 &transform) const {
-  draw(material, to_matrix(transform));
-}
-
-inline void Mesh::draw(Material &material, const Matrix &transform) const {
-  rl::DrawMesh(*this, material, transform);
 }
 
 inline void Mesh::draw_instanced(Material &material, const Matrix *transforms,
                                  i32 count) const {
   rl::DrawMeshInstanced(*this, material, transforms, count);
-}
-
-inline void Material::draw(const Mesh &mesh, const math::Mat4 &transform) {
-  mesh.draw(*this, transform);
-}
-
-inline void Material::draw(const Mesh &mesh, const Matrix &transform) {
-  mesh.draw(*this, transform);
-}
-
-inline void Material::draw_instanced(const Mesh &mesh, const Matrix *transforms,
-                                     i32 count) {
-  mesh.draw_instanced(*this, transforms, count);
-}
-
-inline void RenderTarget::unload() {
-  if (RenderTarget::ready()) {
-    rl::UnloadRenderTexture(*this);
-    *this = RenderTarget{};
-  }
 }
 
 inline void RenderTarget::begin_mode() const { rl::BeginTextureMode(*this); }

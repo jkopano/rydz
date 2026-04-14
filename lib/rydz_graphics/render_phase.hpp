@@ -25,7 +25,7 @@ struct OpaquePhaseItem {
   Handle<Mesh> mesh{};
   CompiledMaterial material{};
   Mat4 world_transform = Mat4::sIdentity();
-  float distance_to_camera = 0.0f;
+  float distance_to_camera = 0.0F;
 };
 
 struct OpaquePhase {
@@ -174,13 +174,13 @@ struct RenderPhaseSystems {
       static bool prepare_mesh(const Handle<Mesh> &handle,
                                Assets<Mesh> &mesh_assets) {
         auto *mesh = mesh_assets.get(handle);
-        if (!mesh || gl::mesh_vertex_count(*mesh) <= 0 ||
-            gl::mesh_vertices(*mesh) == nullptr) {
+        if (!mesh || mesh->vertex_count() <= 0 ||
+            mesh->vertex_data() == nullptr) {
           return false;
         }
 
-        if (!gl::mesh_uploaded(*mesh)) {
-          gl::upload_mesh(*mesh, false);
+        if (!mesh->uploaded()) {
+          mesh->upload(false);
         }
 
         return true;

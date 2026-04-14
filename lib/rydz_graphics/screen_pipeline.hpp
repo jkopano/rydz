@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rydz_ecs/mod.hpp"
+#include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 #include <algorithm>
 
@@ -60,7 +61,7 @@ struct ScreenPipelineState {
 
   ~ScreenPipelineState() { unload(); }
 
-  bool ready() const { return gl::render_target_ready(world_target); }
+  [[nodiscard]] bool ready() const { return world_target.ready(); }
 
   void ensure_target(int target_width, int target_height) {
     target_width = std::max(target_width, 1);
@@ -75,15 +76,14 @@ struct ScreenPipelineState {
     width = target_width;
     height = target_height;
 
-    if (gl::render_target_texture(world_target).id != 0) {
-      gl::set_texture_filter(gl::render_target_texture(world_target),
-                                  gl::TEXTURE_FILTER_BILINEAR);
+    if (world_target.texture.id != 0) {
+      world_target.texture.set_filter(gl::TEXTURE_FILTER_BILINEAR);
     }
   }
 
   void unload() {
     if (world_target.id != 0) {
-      gl::unload_render_target(world_target);
+      world_target.unload();
       world_target = gl::RenderTarget{};
     }
     width = 0;

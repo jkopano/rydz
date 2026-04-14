@@ -282,7 +282,7 @@ public:
         }
 
         Handle<Mesh> mesh_handle =
-            mesh_assets->add(Mesh{model.meshes[model_mesh_index]});
+            mesh_assets->add(model.meshes[model_mesh_index]);
         model.meshes[model_mesh_index] = gl::Mesh{};
 
         usize material_index = 0;

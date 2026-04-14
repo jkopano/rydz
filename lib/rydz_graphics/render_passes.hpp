@@ -458,9 +458,8 @@ struct RenderPassSystems {
         return;
       }
 
-      draw_postprocess_pass(
-          marker, gl::render_target_texture(screen_pipeline->world_target),
-          *shader_cache, *view, *time);
+      draw_postprocess_pass(marker, screen_pipeline->world_target.texture,
+                            *shader_cache, *view, *time);
     }
 
   private:
@@ -540,15 +539,14 @@ struct RenderPassSystems {
 
         gl::Vec2 position = {item.transform.translation.GetX(),
                              item.transform.translation.GetY()};
-        gl::Rectangle source = {0, 0, static_cast<float>(texture->value.width),
-                                static_cast<float>(texture->value.height)};
-        gl::Rectangle dest = {
-            position.x, position.y,
-            texture->value.width * item.transform.scale.GetX(),
-            texture->value.height * item.transform.scale.GetY()};
+        gl::Rectangle source = {0, 0, static_cast<float>(texture->width),
+                                static_cast<float>(texture->height)};
+        gl::Rectangle dest = {position.x, position.y,
+                              texture->width * item.transform.scale.GetX(),
+                              texture->height * item.transform.scale.GetY()};
         gl::Vec2 origin = {0, 0};
 
-        gl::draw_texture_pro(texture->value, source, dest, origin,
+        gl::draw_texture_pro(*texture, source, dest, origin,
                              texture_rotation_degrees(item.transform),
                              item.tint);
       }

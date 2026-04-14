@@ -106,8 +106,8 @@ inline gl::Material &fallback_material(NonSendMarker) {
 inline PbrFallbackTextures &pbr_fallback_textures() {
   static PbrFallbackTextures textures = [] {
     auto make_texture = [](gl::Color color) {
-      gl::Image image = gl::gen_image_color(1, 1, color);
-      gl::Texture texture = gl::load_texture_from_image(image);
+      gl::Image image = gl::gen_image_with_color(1, 1, color);
+      gl::Texture texture = image.load_texture();
       gl::unload_image(image);
       return texture;
     };
@@ -127,10 +127,9 @@ inline void apply_pbr_defaults(gl::Material &material) {
   if (material.maps[gl::MATERIAL_MAP_DIFFUSE].color.a == 0) {
     material.maps[gl::MATERIAL_MAP_DIFFUSE].color = gl::kWhite;
   }
-  if (material.maps[gl::MATERIAL_MAP_ROUGHNESS].value <= 0.0f &&
-      !gl::has_texture(
-          material.maps[gl::MATERIAL_MAP_ROUGHNESS].texture)) {
-    material.maps[gl::MATERIAL_MAP_ROUGHNESS].value = 1.0f;
+  if (material.maps[gl::MATERIAL_MAP_ROUGHNESS].value <= 0.0F &&
+      !material.maps[gl::MATERIAL_MAP_ROUGHNESS].texture.ready()) {
+    material.maps[gl::MATERIAL_MAP_ROUGHNESS].value = 1.0F;
   }
   if (material.maps[gl::MATERIAL_MAP_NORMAL].value <= 0.0f) {
     material.maps[gl::MATERIAL_MAP_NORMAL].value = 1.0f;
@@ -143,29 +142,23 @@ inline void apply_pbr_defaults(gl::Material &material) {
 inline void apply_pbr_fallback_textures(gl::Material &material) {
   auto &fallbacks = pbr_fallback_textures();
 
-  if (!gl::has_texture(
-          material.maps[gl::MATERIAL_MAP_METALNESS].texture)) {
+  if (!material.maps[gl::MATERIAL_MAP_METALNESS].texture.ready()) {
     material.maps[gl::MATERIAL_MAP_METALNESS].texture =
         fallbacks.metallic_black;
   }
-  if (!gl::has_texture(
-          material.maps[gl::MATERIAL_MAP_ROUGHNESS].texture)) {
+  if (!material.maps[gl::MATERIAL_MAP_ROUGHNESS].texture.ready()) {
     material.maps[gl::MATERIAL_MAP_ROUGHNESS].texture =
         fallbacks.roughness_white;
   }
-  if (!gl::has_texture(
-          material.maps[gl::MATERIAL_MAP_NORMAL].texture)) {
+  if (!material.maps[gl::MATERIAL_MAP_NORMAL].texture.ready()) {
     material.maps[gl::MATERIAL_MAP_NORMAL].texture = fallbacks.normal_flat;
   }
-  if (!gl::has_texture(
-          material.maps[gl::MATERIAL_MAP_OCCLUSION].texture)) {
+  if (!material.maps[gl::MATERIAL_MAP_OCCLUSION].texture.ready()) {
     material.maps[gl::MATERIAL_MAP_OCCLUSION].texture =
         fallbacks.occlusion_white;
   }
-  if (!gl::has_texture(
-          material.maps[gl::MATERIAL_MAP_EMISSION].texture)) {
-    material.maps[gl::MATERIAL_MAP_EMISSION].texture =
-        fallbacks.emission_black;
+  if (!material.maps[gl::MATERIAL_MAP_EMISSION].texture.ready()) {
+    material.maps[gl::MATERIAL_MAP_EMISSION].texture = fallbacks.emission_black;
   }
 }
 
@@ -292,8 +285,7 @@ inline SlotProvider make_has_camera_slot_provider() {
   SlotProvider provider;
   provider.apply = [](const RenderSlotContext &ctx, const CompiledMaterial &,
                       const PreparedMaterial &, ShaderProgram &shader) {
-    shader.set("u_camera_pos",
-               gl::to_vector3(ctx.view().camera_view.position));
+    shader.set("u_camera_pos", gl::to_vector3(ctx.view().camera_view.position));
     shader.set("matView", ctx.view().camera_view.view);
   };
   return provider;
@@ -314,8 +306,7 @@ inline SlotProvider make_has_pbr_slot_provider() {
 
     int has_directional = lights.has_directional ? 1 : 0;
     gl::Vec3 dir_color = color_to_vec3(lights.dir_light.color);
-    gl::Vec3 dir_dir =
-        gl::to_vector3(lights.dir_light.direction.Normalized());
+    gl::Vec3 dir_dir = gl::to_vector3(lights.dir_light.direction.Normalized());
     float dir_intensity = lights.dir_light.intensity;
     gl::Vec2 cluster_screen_size = {
         static_cast<float>(std::max(gl::screen_width(), 1)),
@@ -347,8 +338,7 @@ inline SlotProvider make_has_pbr_slot_provider() {
   return provider;
 }
 
-inline bool can_draw_instanced(gl::Material &material,
-                               const gl::Mesh &mesh) {
+inline bool can_draw_instanced(gl::Material &material, const gl::Mesh &mesh) {
   if (!material.shader.locs || mesh.vaoId == 0) {
     return false;
   }
@@ -362,24 +352,15 @@ inline bool can_draw_instanced(gl::Material &material,
         gl::shader_location(material.shader, "matModel");
   }
 
-  return material.shader.locs[gl::SHADER_LOC_VERTEX_INSTANCETRANSFORM] >=
-         0;
+  return material.shader.locs[gl::SHADER_LOC_VERTEX_INSTANCETRANSFORM] >= 0;
 }
 
 template <typename BatchT>
 inline void draw_batch(ShaderProgram &shader, const gl::Mesh &mesh,
                        gl::Material &material, const BatchT &batch) {
-  // if (can_draw_instanced(material, mesh)) {
   shader.set("u_use_instancing", 1);
   gl::draw_mesh_instanced(mesh, material, batch.transforms.data(),
-                               static_cast<i32>(batch.transforms.size()));
-  // return;
-  // }
-
-  // shader.set("u_use_instancing", 0);
-  // for (const auto &transform : batch.transforms) {
-  //   gl::draw_mesh(mesh, material, transform);
-  // }
+                          static_cast<i32>(batch.transforms.size()));
 }
 
 } // namespace ecs

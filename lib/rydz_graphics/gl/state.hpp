@@ -252,16 +252,6 @@ inline void draw_texture_pro(const Texture &texture, Rectangle source,
   rl::DrawTexturePro(texture, source, dest, origin, rotation, tint);
 }
 
-inline void draw_mesh(const Mesh &mesh, Material &material,
-                      const math::Mat4 &transform) {
-  mesh.draw(material, transform);
-}
-
-inline void draw_mesh(const Mesh &mesh, Material &material,
-                      const Matrix &transform) {
-  mesh.draw(material, transform);
-}
-
 inline void draw_mesh_instanced(const Mesh &mesh, Material &material,
                                 const Matrix *transforms, i32 count) {
   mesh.draw_instanced(material, transforms, count);

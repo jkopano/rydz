@@ -3,6 +3,7 @@
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/assets/gltf.hpp"
 #include "rydz_graphics/assets/types.hpp"
+#include "rydz_graphics/gl/resources.hpp"
 
 namespace ecs {
 
@@ -25,7 +26,7 @@ struct TextureLoader : public AssetLoader<TextureLoader, Texture> {
     auto *assets = world.get_resource<Assets<Texture>>();
     if (assets) {
       auto texture = gl::load_texture(path);
-      assets->set(Handle<Texture>{handle_id}, Texture{texture});
+      assets->set(Handle<Texture>{handle_id}, texture);
     }
   }
 
@@ -51,7 +52,7 @@ struct SoundLoader : public AssetLoader<SoundLoader, Sound> {
     auto *assets = world.get_resource<Assets<Sound>>();
     if (assets) {
       auto sound = gl::load_sound(path_);
-      assets->set(Handle<Sound>{handle_id}, Sound{sound});
+      assets->set(Handle<Sound>{handle_id}, sound);
     }
   }
 

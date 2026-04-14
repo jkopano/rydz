@@ -28,8 +28,7 @@ enum class RenderPassSet {
 };
 
 struct RenderPlugin {
-  template <MaterialValue M> static void register_material(App &) {
-  }
+  template <MaterialValue M> static void register_material(App &) {}
 
   template <typename SlotT>
   static void register_slot(App &app, SlotProvider provider) {
@@ -40,10 +39,9 @@ struct RenderPlugin {
   }
 
   static void install(App &app) {
-    app.init_resource<Assets<Mesh>>(
-           [](Mesh &mesh) { gl::unload_mesh(mesh); })
+    app.init_resource<Assets<Mesh>>([](Mesh &mesh) { mesh.unload(); })
         .init_resource<Assets<Texture>>(
-            [](Texture &texture) { gl::unload_texture(texture); })
+            [](Texture &texture) { texture.unload(); })
         .init_resource<Assets<Material>>()
         .init_resource<Assets<Scene>>()
         .init_resource<AssetServer>()
@@ -75,11 +73,10 @@ struct RenderPlugin {
       }
     });
 
-    app.configure_set(ExtractRender,
-                      configure(RenderExtractSet::Extract,
-                                RenderExtractSet::Queue,
-                                RenderExtractSet::Prepare)
-                          .chain())
+    app.configure_set(ExtractRender, configure(RenderExtractSet::Extract,
+                                               RenderExtractSet::Queue,
+                                               RenderExtractSet::Prepare)
+                                         .chain())
         .configure_set(Render,
                        configure(RenderPassSet::Setup, RenderPassSet::Main,
                                  RenderPassSet::PostProcess, RenderPassSet::Ui,
@@ -89,8 +86,7 @@ struct RenderPlugin {
     app.add_systems(First,
                     SceneRuntimeSystems::cleanup_orphan_scene_entities_system)
 
-        .add_systems(PreUpdate,
-                     SceneRuntimeSystems::sync_scene_roots_system)
+        .add_systems(PreUpdate, SceneRuntimeSystems::sync_scene_roots_system)
 
         .add_systems(PostUpdate,
                      group(propagate_transforms, compute_visibility,
@@ -111,12 +107,14 @@ struct RenderPlugin {
                            RenderPhaseSystems::Queue::queue_ui_phase)
                          .chain())
 
-        .add_systems(RenderExtractSet::Prepare,
-                     group(RenderPhaseSystems::Prepare::build_opaque_batches,
-                           RenderPhaseSystems::Prepare::build_transparent_batches)
-                         .chain())
+        .add_systems(
+            RenderExtractSet::Prepare,
+            group(RenderPhaseSystems::Prepare::build_opaque_batches,
+                  RenderPhaseSystems::Prepare::build_transparent_batches)
+                .chain())
 
-        .add_systems(RenderPassSet::Setup, RenderPassSystems::Frame::begin_frame)
+        .add_systems(RenderPassSet::Setup,
+                     RenderPassSystems::Frame::begin_frame)
 
         .add_systems(RenderPassSet::Main,
                      group(RenderPassSystems::World::run_shadow_pass,
@@ -132,7 +130,6 @@ struct RenderPlugin {
         .add_systems(RenderPassSet::Ui, RenderPassSystems::Ui::run_ui_pass)
         .add_systems(RenderPassSet::Cleanup,
                      RenderPassSystems::Frame::end_frame);
-
   }
 };
 
