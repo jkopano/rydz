@@ -23,6 +23,8 @@ struct ConsoleState {
   std::vector<std::string> command_history;
   int history_index = 0;
   int scroll_offset = 0;
+  float backspace_held_time = 0.0f;
+  bool backspace_repeating = false;
 
   //dodanie wpisu do logu konsoli, dzieli wielolinijkowe komunikaty na pojedyncze linie i ogranicza historię do 200 wpisów
   void log(const std::string &msg) {
@@ -51,7 +53,8 @@ struct ConsoleState {
 
 inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
                                 ecs::ResMut<LuaResource> lua, 
-                                ecs::ResMut<ecs::Input> input) {
+                                ecs::ResMut<ecs::Input> input,
+                                ecs::Res<ecs::Time> time) {
   //klawisze otwarcia
   std::vector<i32> pressed_chars;
   for (i32 key = GetCharPressed(); key > 0; key = GetCharPressed()) {
@@ -107,9 +110,39 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
       }
   }
 
-  if (rl::IsKeyPressed(KEY_BACKSPACE) && console->cursor_pos > 0) {
-      console->current_input.erase(console->cursor_pos - 1, 1);
-      console->cursor_pos--;
+  const float REPEAT_DELAY = 0.4f;   // czas przytrzymania przed rozpoczęciem powtarzania
+  const float REPEAT_RATE = 0.05f;  // czas między kolejnymi usunięciami podczas powtarzania
+
+  auto do_backspace = [&]() {
+      if (console->cursor_pos > 0) {
+          console->current_input.erase(console->cursor_pos - 1, 1);
+          console->cursor_pos--;
+      }
+      };
+
+  if (rl::IsKeyDown(KEY_BACKSPACE)) {
+      if (rl::IsKeyPressed(KEY_BACKSPACE)) {
+          do_backspace();
+          console->backspace_held_time = 0.0f;
+          console->backspace_repeating = false;
+      }
+      else {
+          console->backspace_held_time += time->delta_seconds;
+
+          if (!console->backspace_repeating && console->backspace_held_time >= REPEAT_DELAY) {
+              console->backspace_repeating = true;
+              console->backspace_held_time = 0.0f;
+              do_backspace();
+          }
+          else if (console->backspace_repeating && console->backspace_held_time >= REPEAT_RATE) {
+              console->backspace_held_time = 0.0f;
+              do_backspace();
+          }
+      }
+  }
+  else {
+      console->backspace_held_time = 0.0f;
+      console->backspace_repeating = false;
   }
 
   if (rl::IsKeyPressed(KEY_LEFT) && console->cursor_pos > 0) {
