@@ -1,18 +1,19 @@
 #pragma once
+#include <algorithm>
 #include <set>
 #include <typeindex>
 
 namespace ecs {
 
 struct SystemAccess {
-  std::set<std::type_index> components_read;
-  std::set<std::type_index> components_write;
-  std::set<std::type_index> resources_read;
-  std::set<std::type_index> resources_write;
-  std::set<std::type_index> archetype_required;
-  std::set<std::type_index> archetype_excluded;
-  bool exclusive = false;
-  bool main_thread_only = false;
+  std::set<std::type_index> components_read{};
+  std::set<std::type_index> components_write{};
+  std::set<std::type_index> resources_read{};
+  std::set<std::type_index> resources_write{};
+  std::set<std::type_index> archetype_required{};
+  std::set<std::type_index> archetype_excluded{};
+  bool exclusive{};
+  bool main_thread_only{};
 
   template <typename T> void add_component_read() {
     components_read.insert(std::type_index(typeid(T)));
@@ -41,26 +42,32 @@ struct SystemAccess {
   void set_exclusive() { exclusive = true; }
   void set_main_thread_only() { main_thread_only = true; }
 
-  bool has_data_access() const {
+  [[nodiscard]] bool has_data_access() const {
     return !components_read.empty() || !components_write.empty() ||
            !resources_read.empty() || !resources_write.empty() ||
            !archetype_required.empty() || !archetype_excluded.empty();
   }
 
-  bool is_empty() const {
+  [[nodiscard]] bool is_empty() const {
     return components_read.empty() && components_write.empty() &&
            resources_read.empty() && resources_write.empty() && !exclusive;
   }
 
   // Not 100% sure it works as it should, tbh
-  bool is_archetype_disjoint(const SystemAccess &other) const {
-    for (auto &req : archetype_required)
-      if (other.archetype_excluded.contains(req))
-        return true;
-    for (auto &req : other.archetype_required)
-      if (archetype_excluded.contains(req))
-        return true;
-    return false;
+  [[nodiscard]] bool is_archetype_disjoint(const SystemAccess &other) const {
+    const bool we_are_excluded_by_other =
+        std::ranges::any_of(archetype_required, [&](const auto &component_id) {
+          return other.archetype_excluded.contains(component_id);
+        });
+
+    if (we_are_excluded_by_other) {
+      return true;
+    }
+
+    return std::ranges::any_of(
+        other.archetype_required, [&](const auto &other_component_id) {
+          return archetype_excluded.contains(other_component_id);
+        });
   }
 
   void merge(const SystemAccess &other) {
@@ -80,22 +87,23 @@ struct SystemAccess {
                               other.archetype_excluded.end());
   }
 
-  bool is_compatible(const SystemAccess &other) const {
-    if (exclusive || other.exclusive)
+  [[nodiscard]] bool is_compatible(const SystemAccess &other) const {
+    if (exclusive || other.exclusive) {
       return false;
-    auto disjoint = [](const std::set<std::type_index> &a,
-                       const std::set<std::type_index> &b) {
-      for (auto &x : a)
-        if (b.contains(x))
-          return false;
-      return true;
+    }
+
+    auto are_disjoint = [](const std::set<std::type_index> &set_a,
+                           const std::set<std::type_index> &set_b) {
+      return std::ranges::all_of(
+          set_a, [&](const auto &type_id) { return !set_b.contains(type_id); });
     };
-    return disjoint(components_write, other.components_write) &&
-           disjoint(components_write, other.components_read) &&
-           disjoint(components_read, other.components_write) &&
-           disjoint(resources_write, other.resources_write) &&
-           disjoint(resources_write, other.resources_read) &&
-           disjoint(resources_read, other.resources_write);
+
+    return are_disjoint(components_write, other.components_write) &&
+           are_disjoint(components_write, other.components_read) &&
+           are_disjoint(components_read, other.components_write) &&
+           are_disjoint(resources_write, other.resources_write) &&
+           are_disjoint(resources_write, other.resources_read) &&
+           are_disjoint(resources_read, other.resources_write);
   }
 };
 

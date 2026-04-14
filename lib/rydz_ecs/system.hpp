@@ -14,6 +14,11 @@ namespace ecs {
 
 class ISystem {
 public:
+  ISystem() = default;
+  ISystem(const ISystem &) = default;
+  ISystem(ISystem &&) = delete;
+  ISystem &operator=(const ISystem &) = default;
+  ISystem &operator=(ISystem &&) = delete;
   virtual ~ISystem() = default;
   virtual void run(World &world) = 0;
   [[nodiscard]] virtual std::string name() const = 0;
@@ -173,8 +178,8 @@ private:
   static void access_with_args(SystemAccess &acc,
                                const std::string &system_name) {
     std::array<SystemAccess, sizeof...(Args)> per_param;
-    std::size_t i = 0;
-    ((SystemParamTraits<bare_t<Args>>::access(per_param[i]), ++i), ...);
+    std::size_t idx = 0;
+    ((SystemParamTraits<bare_t<Args>>::access(per_param[idx]), ++idx), ...);
 
     for (std::size_t a = 0; a < per_param.size(); ++a) {
       if (!per_param[a].has_data_access()) {

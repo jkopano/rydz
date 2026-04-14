@@ -14,11 +14,12 @@ class IStorage {
 public:
   virtual ~IStorage() = default;
   virtual void remove(Entity entity) = 0;
-  virtual bool has(Entity entity) const = 0;
-  virtual usize size() const = 0;
-  virtual bool empty() const = 0;
-  virtual std::optional<ComponentTicks> get_ticks(Entity entity) const = 0;
-  virtual std::span<const Entity> entities() const = 0;
+  [[nodiscard]] virtual bool has(Entity entity) const = 0;
+  [[nodiscard]] virtual usize size() const = 0;
+  [[nodiscard]] virtual bool empty() const = 0;
+  [[nodiscard]] virtual std::optional<ComponentTicks>
+  get_ticks(Entity entity) const = 0;
+  [[nodiscard]] virtual std::span<const Entity> entities() const = 0;
 };
 
 template <typename T> class SparseSetStorage : public IStorage {
@@ -27,7 +28,7 @@ template <typename T> class SparseSetStorage : public IStorage {
   std::vector<ComponentTicks> dense_ticks_;
   std::vector<Entity> dense_entities_;
 
-  std::optional<u32> get_dense_idx(Entity e) const {
+  [[nodiscard]] std::optional<u32> get_dense_idx(Entity e) const {
     u32 idx = e.index();
     if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
         dense_entities_[sparse_[idx]] == e) {
@@ -45,8 +46,9 @@ public:
     }
 
     u32 idx = entity.index();
-    if (idx >= sparse_.size())
+    if (idx >= sparse_.size()) {
       sparse_.resize(idx + 1, UINT32_MAX);
+    }
 
     sparse_[idx] = static_cast<u32>(dense_data_.size());
     dense_data_.push_back(std::move(component));
@@ -54,33 +56,29 @@ public:
     dense_entities_.push_back(entity);
   }
 
-  T *get(Entity e) {
-    auto i = get_dense_idx(e);
-    return i ? &dense_data_[*i] : nullptr;
+  template <typename Self> auto *get(this Self &self, Entity entity) {
+    auto idx = self.get_dense_idx(entity);
+    return idx ? &self.dense_data_[*idx] : nullptr;
   }
 
-  const T *get(Entity e) const {
-    auto i = get_dense_idx(e);
-    return i ? &dense_data_[*i] : nullptr;
+  ComponentTicks *get_ticks_mut(Entity enitity) {
+    auto idx = get_dense_idx(enitity);
+    return idx ? &dense_ticks_[*idx] : nullptr;
   }
 
-  ComponentTicks *get_ticks_mut(Entity e) {
-    auto i = get_dense_idx(e);
-    return i ? &dense_ticks_[*i] : nullptr;
-  }
-
-  std::pair<T *, ComponentTicks *> get_with_ticks(Entity e) {
-    auto i = get_dense_idx(e);
-    if (i) {
-      return {&dense_data_[*i], &dense_ticks_[*i]};
+  std::pair<T *, ComponentTicks *> get_with_ticks(Entity entity) {
+    auto idx = get_dense_idx(entity);
+    if (idx) {
+      return {&dense_data_[*idx], &dense_ticks_[*idx]};
     }
     return {nullptr, nullptr};
   }
 
   void remove(Entity entity) override {
     auto d_idx = get_dense_idx(entity);
-    if (!d_idx)
+    if (!d_idx) {
       return;
+    }
 
     u32 last = static_cast<u32>(dense_data_.size() - 1);
     if (*d_idx != last) {

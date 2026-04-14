@@ -12,6 +12,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <print>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -23,10 +24,10 @@ class App;
 struct Window {
   using T = ecs::Resource;
 
-  u32 width;
-  u32 height;
+  u32 width{};
+  u32 height{};
   std::string title = "ECS App";
-  u32 target_fps = 60;
+  u32 target_fps{60};
 
 public:
   static auto install(Window config);
@@ -39,20 +40,26 @@ struct AppRunner {
 
 class App {
   struct PendingSetSystemsBase {
+    PendingSetSystemsBase() = default;
+    PendingSetSystemsBase(const PendingSetSystemsBase &) = default;
+    PendingSetSystemsBase(PendingSetSystemsBase &&) = delete;
+    PendingSetSystemsBase &operator=(const PendingSetSystemsBase &) = default;
+    PendingSetSystemsBase &operator=(PendingSetSystemsBase &&) = delete;
     virtual ~PendingSetSystemsBase() = default;
     virtual void attach(App &app) = 0;
   };
 
   template <typename F> struct PendingSetSystems final : PendingSetSystemsBase {
-    SetList sets;
-    decay_t<F> func;
+    SetList sets{};
+    decay_t<F> func{};
 
     PendingSetSystems(SetList selector, F &&system_fn)
         : sets(std::move(selector)), func(std::forward<F>(system_fn)) {}
 
     void attach(App &app) override {
       auto label = app.resolve_set_schedule(sets);
-      app.schedules_.entry(label).add_system_fn(std::move(sets), std::move(func));
+      app.schedules_.entry(label).add_system_fn(std::move(sets),
+                                                std::move(func));
     }
   };
 
@@ -109,12 +116,12 @@ public:
 
   App &configure_set(ScheduleLabel label, SetConfigDescriptor &&desc) {
     register_set_schedule(label, desc.id());
-    schedules_.entry(label).add_set_config(desc.take());
+    schedules_.entry(label).add_set_config(std::move(desc).take());
     return *this;
   }
 
   App &configure_set(ScheduleLabel label, ChainedSetConfigDescriptor &&desc) {
-    auto configs = desc.take();
+    auto configs = std::move(desc).take();
     for (const auto &config : configs) {
       register_set_schedule(label, config.id);
     }
@@ -136,7 +143,7 @@ private:
 
 public:
   template <OnEnterLabel Label, typename F>
-  App &add_systems(Label &&label, F &&func) {
+  App &add_systems(Label &label, F &&func) {
     using S = bare_t<decltype(label.value)>;
     get_or_init_state_schedules<S>().on_enter[label.value].add_system_fn(
         std::forward<F>(func));
@@ -144,7 +151,7 @@ public:
   }
 
   template <OnExitLabel Label, typename F>
-  App &add_systems(Label &&label, F &&func) {
+  App &add_systems(Label &label, F &&func) {
     using S = bare_t<decltype(label.value)>;
     get_or_init_state_schedules<S>().on_exit[label.value].add_system_fn(
         std::forward<F>(func));
@@ -160,7 +167,7 @@ public:
   }
 
   template <typename F> App &add_plugin(F &&plugin_fn) {
-    plugin_fn(*this);
+    std::forward<F>(plugin_fn)(*this);
     return *this;
   }
 
@@ -195,9 +202,10 @@ public:
         .add_system(make_system([initial_copy](World &world_ref) {
           auto *schedules = world_ref.get_resource<StateSchedules<S>>();
           if (schedules) {
-            auto it = schedules->on_enter.find(initial_copy);
-            if (it != schedules->on_enter.end())
-              it->second.run(world_ref);
+            auto iter = schedules->on_enter.find(initial_copy);
+            if (iter != schedules->on_enter.end()) {
+              iter->second.run(world_ref);
+            }
           }
         }));
     return *this;
@@ -229,8 +237,9 @@ public:
   void startup() {
     flush_pending_set_systems();
     debug_dump_schedule_graph_once();
-    if (startup_done_)
+    if (startup_done_) {
       return;
+    }
     startup_done_ = true;
 
     schedules_.run(ScheduleLabel::PreStartup, world_);
@@ -241,11 +250,11 @@ public:
     apply_commands();
   }
 
-  void update(float delta_seconds = 0.0f) {
+  void update(float delta_seconds = 0.0F) {
     flush_pending_set_systems();
     debug_dump_schedule_graph_once();
     auto *time = world_.get_resource<Time>();
-    if (time) {
+    if (time != nullptr) {
       time->delta_seconds = delta_seconds;
       time->elapsed_seconds += time->delta_seconds;
       time->frame_count++;
@@ -273,8 +282,9 @@ public:
 
   void run() {
     auto *runner = world_.get_resource<AppRunner>();
-    if (!runner || !runner->run) {
-      std::fputs("App::run() called without an AppRunner resource.\n", stderr);
+    if ((runner == nullptr) || !runner->run) {
+      std::println(stderr,
+                   "App::run() called without an AppRunner resource.\n");
       return;
     }
     runner->run(*this);
@@ -282,30 +292,30 @@ public:
 
 private:
   void register_set_schedule(ScheduleLabel label, const SetId &set_id) {
-    auto [it, inserted] = set_schedules_.emplace(set_id, label);
-    if (!inserted && it->second != label) {
-      throw std::runtime_error("Set '" + set_name(set_id) +
-                               "' is configured for both schedules '" +
-                               std::string(schedule_label_name(it->second)) +
-                               "' and '" +
-                               std::string(schedule_label_name(label)) + "'");
+    auto [iter, inserted] = set_schedules_.emplace(set_id, label);
+    if (!inserted && iter->second != label) {
+      throw std::runtime_error(
+          "Set '" + set_name(set_id) + "' is configured for both schedules '" +
+          std::string(schedule_label_name(iter->second)) + "' and '" +
+          std::string(schedule_label_name(label)) + "'");
     }
   }
 
-  std::optional<ScheduleLabel> try_resolve_set_schedule(const SetList &sets) const {
+  std::optional<ScheduleLabel>
+  try_resolve_set_schedule(const SetList &sets) const {
     std::optional<ScheduleLabel> label;
 
     for (const auto &set_id : sets.ids) {
-      auto it = set_schedules_.find(set_id);
-      if (it == set_schedules_.end()) {
+      auto iter = set_schedules_.find(set_id);
+      if (iter == set_schedules_.end()) {
         return std::nullopt;
       }
 
-      if (label && *label != it->second) {
+      if (label && *label != iter->second) {
         throw std::runtime_error("Sets '" + detail::set_names(sets.ids) +
                                  "' are configured for different schedules");
       }
-      label = it->second;
+      label = iter->second;
     }
 
     return label;
@@ -349,7 +359,7 @@ private:
 
   void apply_commands() {
     auto *queues = world_.get_resource<CommandQueues>();
-    if (queues && !queues->empty()) {
+    if ((queues != nullptr) && !queues->empty()) {
       world_.increment_change_tick();
       queues->apply(world_);
     }

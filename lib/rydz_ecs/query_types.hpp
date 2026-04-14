@@ -4,10 +4,10 @@
 namespace ecs {
 
 template <typename T> struct Mut {
-  T *ptr = nullptr;
-  ComponentTicks *ticks = nullptr;
+  T *ptr{};
+  ComponentTicks *ticks{};
   Tick tick{};
-  bool marked = false;
+  bool marked{};
 
   Mut() = default;
   Mut(T *p, ComponentTicks *t, Tick current_tick)
@@ -43,7 +43,7 @@ template <typename T> struct Mut {
 
 private:
   void mark() {
-    if (!marked && ticks) {
+    if (!marked && (ticks != nullptr)) {
       ticks->changed = tick;
       marked = true;
     }

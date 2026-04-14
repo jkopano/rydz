@@ -55,7 +55,7 @@ ChainedSystems::Entry make_chain_entry(Func &&func, const std::string &prev) {
     ordering.after.push_back(prev);
   }
 
-  return {std::move(sys), std::move(ordering)};
+  return {.system = std::move(sys), .ordering = std::move(ordering)};
 }
 
 } // namespace detail
@@ -106,8 +106,11 @@ class Schedule {
 
 public:
   Schedule() = default;
+  ~Schedule() = default;
   Schedule(Schedule &&) = default;
   Schedule &operator=(Schedule &&) = default;
+  Schedule(const Schedule &) = delete;
+  Schedule &operator=(const Schedule &) = delete;
 
   void add_system(std::unique_ptr<ISystem> system,
                   SystemOrdering ordering = {}) {
@@ -152,8 +155,9 @@ public:
   }
 
   void run(World &world) {
-    if (entries_.empty())
+    if (entries_.empty()) {
       return;
+    }
 
     current_world_ = &world;
     prepare();
@@ -178,9 +182,11 @@ public:
     }
   }
 
-  usize system_count() const { return entries_.size(); }
-  usize configured_set_count() const { return set_configs_.size(); }
-  bool empty() const { return entries_.empty(); }
+  [[nodiscard]] usize system_count() const { return entries_.size(); }
+  [[nodiscard]] usize configured_set_count() const {
+    return set_configs_.size();
+  }
+  [[nodiscard]] bool empty() const { return entries_.empty(); }
 
   void prepare() {
     if (needs_rebuild_) {
@@ -190,63 +196,12 @@ public:
   }
 
 #ifndef NDEBUG
-  std::string debug_dump(const std::string &schedule_name) const {
-    std::ostringstream out;
-
-    std::unordered_map<SetId, usize> set_counts;
-    for (const auto &entry : entries_) {
-      for (const auto &set_id : entry.in_sets) {
-        set_counts[set_id]++;
-      }
-    }
-
-    out << "=======================\n";
-    out << "SCHEDULE " << schedule_name << ":\n";
-    out << "  COUNTS: systems=" << entries_.size()
-        << ", configured_sets=" << set_configs_.size()
-        << ", steps=" << steps_.size()
-        << ", max_concurrency=" << debug_max_concurrency() << "\n";
-
-    if (!steps_.empty()) {
-      out << "  EXECUTION:\n";
-      usize step_index = 0;
-      for (const auto &step : steps_) {
-        out << "    step[" << step_index << "]:\n";
-        out << debug_step_summary(step);
-        step_index++;
-      }
-    }
-
-    if (!set_configs_.empty()) {
-      out << "  SETS:\n";
-      for (const auto &cfg : set_configs_) {
-        out << "    - " << set_name(cfg.id) << "\n";
-        out << "      MEMBERS: " << set_counts[cfg.id] << "\n";
-        debug_append_names(out, "      ORDER", ordered_systems_in_set(cfg.id),
-                           "        ");
-        out << "      RUN_IF: " << (cfg.condition ? "yes" : "no") << "\n";
-      }
-    }
-
-    if (!entries_.empty()) {
-      auto placements = debug_system_placements();
-      out << "  SYSTEMS:\n";
-      for (usize i = 0; i < entries_.size(); ++i) {
-        const auto &entry = entries_[i];
-        out << debug_item("    - ", entry.system->name());
-        auto step =
-            i < placements.size() ? std::to_string(placements[i].step) : "?";
-        auto placement =
-            i < placements.size() ? placements[i].placement : "unknown";
-        debug_append_system_metadata(out, i, entry, step, placement);
-      }
-    }
-
-    return out.str();
-  }
+  [[nodiscard]] std::string debug_dump(const std::string &schedule_name) const;
 #endif
 
 private:
+  friend struct ScheduleDebug;
+
   template <typename F>
   void add_system_fn_with_ordering(F &&func, SystemOrdering base_ordering) {
     if constexpr (is_chained_systems_v<bare_t<F>>) {
@@ -256,14 +211,14 @@ private:
       }
 
     } else if constexpr (is_system_group_descriptor_v<bare_t<F>>) {
-      for (auto &e : func.build()) {
-        merge_ordering(e.ordering, base_ordering);
-        add_system(std::move(e.system), std::move(e.ordering));
+      for (auto &entry : func.build()) {
+        merge_ordering(entry.ordering, base_ordering);
+        add_system(std::move(entry.system), std::move(entry.ordering));
       }
 
     } else if constexpr (is_system_descriptor_v<bare_t<F>>) {
       auto ordering = func.take_ordering();
-      merge_ordering(ordering, std::move(base_ordering));
+      merge_ordering(ordering, base_ordering);
       add_system(func.build(), std::move(ordering));
 
     } else {
@@ -370,8 +325,9 @@ private:
     const usize n = entries_.size();
 
     std::unordered_map<std::string, usize> name_to_idx;
-    for (usize i = 0; i < n; ++i)
+    for (usize i = 0; i < n; ++i) {
       name_to_idx[entries_[i].system->name()] = i;
+    }
 
     std::vector<std::vector<usize>> adj(n);
     std::vector<usize> in_degree(n, 0);
@@ -406,35 +362,42 @@ private:
 
     // Kahn's algorithm, stable by insertion order
     std::vector<usize> ready;
-    for (usize i = 0; i < n; ++i)
-      if (in_degree[i] == 0)
+    for (usize i = 0; i < n; ++i) {
+      if (in_degree[i] == 0) {
         ready.push_back(i);
+      }
+    }
 
     std::vector<usize> order;
     order.reserve(n);
     while (!ready.empty()) {
-      auto min_it = std::min_element(ready.begin(), ready.end());
+      auto min_it = std::ranges::min_element(ready);
       usize curr = *min_it;
       ready.erase(min_it);
       order.push_back(curr);
 
-      for (usize next : adj[curr])
-        if (--in_degree[next] == 0)
+      for (usize next : adj[curr]) {
+        if (--in_degree[next] == 0) {
           ready.push_back(next);
+        }
+      }
     }
 
     if (order.size() != n) {
       std::string msg = "Cycle detected in system ordering. Systems in cycle:";
-      for (usize i = 0; i < n; ++i)
-        if (in_degree[i] != 0)
+      for (usize i = 0; i < n; ++i) {
+        if (in_degree[i] != 0) {
           msg += " " + entries_[i].system->name();
+        }
+      }
       throw std::runtime_error(msg);
     }
 
     std::vector<SystemEntry> sorted;
     sorted.reserve(n);
-    for (usize idx : order)
+    for (usize idx : order) {
       sorted.push_back(std::move(entries_[idx]));
+    }
     entries_ = std::move(sorted);
   }
 
@@ -442,7 +405,7 @@ private:
     usize start = 0;
     while (start < entries_.size()) {
       if (entries_[start].access.exclusive) {
-        steps_.emplace_back(InlineStep{start, start + 1});
+        steps_.emplace_back(InlineStep{.start = start, .end = start + 1});
         ++start;
         continue;
       }
@@ -453,7 +416,7 @@ private:
       }
 
       if (end - start == 1) {
-        steps_.emplace_back(InlineStep{start, end});
+        steps_.emplace_back(InlineStep{.start = start, .end = end});
       } else {
         steps_.emplace_back(build_parallel_step(start, end));
       }
@@ -537,29 +500,29 @@ private:
       tf::Taskflow taskflow;
       bool has_worker_tasks = false;
 
-      for (usize i : range(batch.start, batch.end)) {
-        if (entries_[i].access.main_thread_only) {
+      for (usize idx : range(batch.start, batch.end)) {
+        if (entries_[idx].access.main_thread_only) {
           continue;
         }
 
         has_worker_tasks = true;
-        taskflow.emplace([this, i, &world] { run_entry(i, world); });
+        taskflow.emplace([this, idx, &world] { run_entry(idx, world); });
       }
 
       if (!has_worker_tasks) {
-        for (usize i : range(batch.start, batch.end)) {
-          run_entry(i, world);
+        for (usize idx : range(batch.start, batch.end)) {
+          run_entry(idx, world);
         }
         continue;
       }
 
       auto future = global_executor().run(taskflow);
 
-      for (usize i : range(batch.start, batch.end)) {
-        if (!entries_[i].access.main_thread_only) {
+      for (usize idx : range(batch.start, batch.end)) {
+        if (!entries_[idx].access.main_thread_only) {
           continue;
         }
-        run_entry(i, world);
+        run_entry(idx, world);
       }
 
       future.wait();
@@ -576,199 +539,14 @@ private:
 
   static bool have_ordering_dependency(const SystemEntry &a,
                                        const SystemEntry &b) {
-    const auto &na = a.system->name();
-    const auto &nb = b.system->name();
+    const auto &a_name = a.system->name();
+    const auto &b_name = b.system->name();
 
-    return std::ranges::contains(a.ordering.after, nb) ||
-           std::ranges::contains(a.ordering.before, nb) ||
-           std::ranges::contains(b.ordering.after, na) ||
-           std::ranges::contains(b.ordering.before, na);
+    return std::ranges::contains(a.ordering.after, b_name) ||
+           std::ranges::contains(a.ordering.before, b_name) ||
+           std::ranges::contains(b.ordering.after, a_name) ||
+           std::ranges::contains(b.ordering.before, a_name);
   }
-
-#ifndef NDEBUG
-  struct DebugPlacement {
-    usize step = 0;
-    std::string placement;
-  };
-
-  static std::string wrap_commas(const std::string &text,
-                                 const std::string &continuation_indent) {
-    std::string result;
-    result.reserve(text.size());
-
-    for (usize i = 0; i < text.size(); ++i) {
-      result.push_back(text[i]);
-      if (text[i] == ',' && i + 1 < text.size() && text[i + 1] == ' ') {
-        result.push_back('\n');
-        result += continuation_indent;
-        ++i;
-      }
-    }
-
-    return result;
-  }
-
-  static std::string debug_item(const std::string &prefix,
-                                const std::string &text) {
-    return prefix + wrap_commas(text, std::string(prefix.size(), ' ')) + "\n";
-  }
-
-  [[nodiscard]] usize debug_max_concurrency() const {
-    usize max_concurrency = entries_.empty() ? 0 : 1;
-    for (const auto &step : steps_) {
-      if (const auto *parallel = std::get_if<ParallelStep>(&step)) {
-        for (const auto &batch : parallel->batches) {
-          max_concurrency = std::max(max_concurrency, batch.end - batch.start);
-        }
-      }
-    }
-    return max_concurrency;
-  }
-
-  [[nodiscard]] std::string
-  debug_step_summary(const ExecutionStep &step) const {
-    if (const auto *inline_step = std::get_if<InlineStep>(&step)) {
-      std::ostringstream out;
-      out << "      MODE: inline\n";
-      out << "      THREADS: 1\n";
-      out << "      SYSTEMS: " << (inline_step->end - inline_step->start)
-          << "\n";
-      out << "      MEMBERS:\n";
-      for (usize idx : range(inline_step->start, inline_step->end)) {
-        out << debug_item("        - ", entries_[idx].system->name());
-      }
-      return out.str();
-    }
-
-    const auto &parallel = std::get<ParallelStep>(step);
-    std::ostringstream out;
-    usize max_concurrency = 0;
-    usize system_count = 0;
-    for (const auto &batch : parallel.batches) {
-      max_concurrency = std::max(max_concurrency, batch.end - batch.start);
-      system_count += batch.end - batch.start;
-    }
-
-    out << "      MODE: parallel\n";
-    out << "      MAX_CONCURRENCY: " << max_concurrency << "\n";
-    out << "      SYSTEMS: " << system_count << "\n";
-    out << "      BATCHES:\n";
-    for (usize batch_index = 0; batch_index < parallel.batches.size();
-         ++batch_index) {
-      const auto &batch = parallel.batches[batch_index];
-      out << "        BATCH[" << batch_index
-          << "] SIZE=" << (batch.end - batch.start) << "\n";
-      for (usize idx : range(batch.start, batch.end)) {
-        out << debug_item("          - ", entries_[idx].system->name());
-      }
-    }
-    return out.str();
-  }
-
-  [[nodiscard]] std::vector<DebugPlacement> debug_system_placements() const {
-    std::vector<DebugPlacement> placements(entries_.size());
-
-    for (usize step_index = 0; step_index < steps_.size(); ++step_index) {
-      const auto &step = steps_[step_index];
-      if (const auto *inline_step = std::get_if<InlineStep>(&step)) {
-        for (usize idx : range(inline_step->start, inline_step->end)) {
-          placements[idx] =
-              DebugPlacement{.step = step_index, .placement = "main"};
-        }
-        continue;
-      }
-
-      const auto &parallel = std::get<ParallelStep>(step);
-      for (usize batch_index = 0; batch_index < parallel.batches.size();
-           ++batch_index) {
-        const auto &batch = parallel.batches[batch_index];
-        usize slot = 0;
-        for (usize idx : range(batch.start, batch.end)) {
-          if (entries_[idx].access.main_thread_only) {
-            placements[idx] = DebugPlacement{
-                .step = step_index,
-                .placement =
-                    "main_thread(batch=" + std::to_string(batch_index) + ")"};
-            continue;
-          }
-
-          placements[idx] = DebugPlacement{
-              .step = step_index,
-              .placement = "worker_pool(batch=" + std::to_string(batch_index) +
-                           ", slot=" + std::to_string(slot) + ")"};
-          slot++;
-        }
-      }
-    }
-
-    return placements;
-  }
-
-  static void debug_append_names(std::ostringstream &out, const char *label,
-                                 const std::vector<std::string> &names,
-                                 const char *indent) {
-    if (names.empty()) {
-      out << label << ": none\n";
-      return;
-    }
-
-    out << label << ":\n";
-    for (const auto &name : names) {
-      out << debug_item(std::string(indent) + "- ", name);
-    }
-  }
-
-  static void debug_append_set_ids(std::ostringstream &out, const char *label,
-                                   const std::vector<SetId> &sets,
-                                   const char *indent) {
-    if (sets.empty()) {
-      out << label << ": none\n";
-      return;
-    }
-
-    out << label << ":\n";
-    for (const auto &set_id : sets) {
-      out << indent << "- " << set_name(set_id) << "\n";
-    }
-  }
-
-  [[nodiscard]] std::vector<std::string>
-  ordered_systems_in_set(const SetId &set_id) const {
-    std::vector<std::string> systems;
-    for (const auto &entry : entries_) {
-      if (std::ranges::contains(entry.in_sets, set_id)) {
-        systems.push_back(entry.system->name());
-      }
-    }
-    return systems;
-  }
-
-  static std::string inline_set_ids(const std::vector<SetId> &sets) {
-    if (sets.empty()) {
-      return "none";
-    }
-
-    std::ostringstream out;
-    for (usize i = 0; i < sets.size(); ++i) {
-      if (i != 0) {
-        out << ", ";
-      }
-      out << set_name(sets[i]);
-    }
-    return out.str();
-  }
-
-  static void debug_append_system_metadata(std::ostringstream &out, usize order,
-                                           const SystemEntry &entry,
-                                           const std::string &step,
-                                           const std::string &placement) {
-    out << "      ORDER: " << order
-        << ", SETS: " << inline_set_ids(entry.in_sets) << ", MAIN_THREAD_ONLY: "
-        << (entry.access.main_thread_only ? "yes" : "no")
-        << ", EXCLUSIVE: " << (entry.access.exclusive ? "yes" : "no")
-        << ", STEP: " << step << ", PLACEMENT: " << placement << "\n";
-  }
-#endif
 };
 
 class Schedules {
@@ -801,43 +579,11 @@ public:
   }
 
 #ifndef NDEBUG
-  std::string debug_dump() const {
-    constexpr std::array labels{
-        ScheduleLabel::PreStartup,  ScheduleLabel::Startup,
-        ScheduleLabel::PostStartup, ScheduleLabel::First,
-        ScheduleLabel::PreUpdate,   ScheduleLabel::Update,
-        ScheduleLabel::PostUpdate,  ScheduleLabel::ExtractRender,
-        ScheduleLabel::Render,      ScheduleLabel::PostRender,
-        ScheduleLabel::Last,        ScheduleLabel::FixedUpdate,
-    };
-
-    usize total_schedules = 0;
-    usize total_systems = 0;
-    usize total_sets = 0;
-    for (const auto &[_, schedule] : schedules_) {
-      total_schedules++;
-      total_systems += schedule.system_count();
-      total_sets += schedule.configured_set_count();
-    }
-
-    std::ostringstream out;
-    out << "[ecs] main schedule graph\n";
-    out << "totals: schedules=" << total_schedules
-        << ", systems=" << total_systems << ", configured_sets=" << total_sets
-        << "\n";
-
-    for (auto label : labels) {
-      auto iter = schedules_.find(label);
-      if (iter == schedules_.end()) {
-        continue;
-      }
-
-      const auto &schedule = iter->second;
-      out << schedule.debug_dump(schedule_label_name(label));
-    }
-    return out.str();
-  }
+  std::string debug_dump() const;
 #endif
+
+private:
+  friend struct ScheduleDebug;
 };
 
 namespace detail {
@@ -855,3 +601,18 @@ inline auto system_multithreading(TaskPoolOptions opts = {}) {
 }
 
 } // namespace ecs
+
+#ifndef NDEBUG
+#include "schedule_debug.hpp"
+
+namespace ecs {
+inline std::string
+Schedule::debug_dump(const std::string &schedule_name) const {
+  return ScheduleDebug::dump(*this, schedule_name);
+}
+
+inline std::string Schedules::debug_dump() const {
+  return ScheduleDebug::dump(*this);
+}
+} // namespace ecs
+#endif

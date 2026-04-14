@@ -5,12 +5,12 @@
 namespace ecs {
 
 struct Tick {
-  u32 value = 0;
+  u32 value{};
 
   Tick() = default;
   explicit Tick(u32 v) : value(v) {}
 
-  bool is_newer_than(Tick last_run, Tick this_run) const {
+  [[nodiscard]] bool is_newer_than(Tick last_run, Tick this_run) const {
     u32 ticks_since_last_run = this_run.value - last_run.value;
     u32 ticks_since_self = this_run.value - value;
     return ticks_since_self < ticks_since_last_run;

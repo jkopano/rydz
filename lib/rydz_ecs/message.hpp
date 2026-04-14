@@ -23,8 +23,8 @@ public:
     typename std::vector<const E *>::const_iterator it_;
 
   public:
-    explicit iterator(typename std::vector<const E *>::const_iterator it)
-        : it_(it) {}
+    explicit iterator(typename std::vector<const E *>::const_iterator iter)
+        : it_(iter) {}
 
     const E &operator*() const { return **it_; }
     const E *operator->() const { return *it_; }
@@ -41,8 +41,8 @@ public:
   iterator begin() const { return iterator{messages_.begin()}; }
   iterator end() const { return iterator{messages_.end()}; }
 
-  bool empty() const { return messages_.empty(); }
-  usize size() const { return messages_.size(); }
+  [[nodiscard]] bool empty() const { return messages_.empty(); }
+  [[nodiscard]] usize size() const { return messages_.size(); }
 };
 
 template <typename E> class Messages {
@@ -96,11 +96,11 @@ public:
   }
 
   usize register_reader() {
-    usize id = next_reader_id_++;
-    usize start =
-        buffers_.prev.empty() ? message_count_ : buffers_.prev.front().second.id;
-    reader_cursors_[id] = MessageId{start};
-    return id;
+    usize idx = next_reader_id_++;
+    usize start = buffers_.prev.empty() ? message_count_
+                                        : buffers_.prev.front().second.id;
+    reader_cursors_[idx] = MessageId{start};
+    return idx;
   }
 
   MessageRange<E> iter(usize reader_id) {
@@ -125,11 +125,11 @@ public:
   }
 
   bool has_unread(usize reader_id) const {
-    auto it = reader_cursors_.find(reader_id);
-    if (it == reader_cursors_.end()) {
+    auto iter = reader_cursors_.find(reader_id);
+    if (iter == reader_cursors_.end()) {
       return !is_empty();
     }
-    return it->second.id < message_count_;
+    return iter->second.id < message_count_;
   }
 };
 
