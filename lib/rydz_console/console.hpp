@@ -50,14 +50,15 @@ struct ConsoleState {
 };
 
 inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
-                                ecs::ResMut<LuaResource> lua) {
+                                ecs::ResMut<LuaResource> lua, 
+                                ecs::ResMut<ecs::Input> input) {
   //klawisze otwarcia
   std::vector<i32> pressed_chars;
   for (i32 key = GetCharPressed(); key > 0; key = GetCharPressed()) {
     pressed_chars.push_back(key);
   }
 
-  bool toggle_requested = IsKeyPressed(KEY_GRAVE) || IsKeyPressed(KEY_F1); 
+  bool toggle_requested = input->key_pressed(KEY_GRAVE) || input->key_pressed(KEY_F1); 
   for (i32 codepoint : pressed_chars) {
     if (is_console_toggle_char(codepoint)) {
       toggle_requested = true;
