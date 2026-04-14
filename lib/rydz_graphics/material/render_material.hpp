@@ -1,10 +1,10 @@
 #pragma once
 
 #include "rydz_graphics/clustered_lighting.hpp"
-#include "rydz_graphics/render_batches.hpp"
-#include "rydz_graphics/render_extract.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/gl/state.hpp"
+#include "rydz_graphics/render_batches.hpp"
+#include "rydz_graphics/render_extract.hpp"
 #include <algorithm>
 #include <array>
 #include <cstdlib>
@@ -55,32 +55,24 @@ struct SlotProvider {
 struct SlotProviderRegistry {
   using T = Resource;
   std::unordered_map<std::type_index, SlotProvider> providers;
+
+  template <typename SlotT> void register_slot(SlotProvider provider) {
+    this->providers[typeid(SlotT)] = std::move(provider);
+  }
 };
 
 struct PbrFallbackTextures {
-  gl::Texture metallic_black{};
-  gl::Texture roughness_white{};
-  gl::Texture normal_flat{};
-  gl::Texture occlusion_white{};
-  gl::Texture emission_black{};
+  gl::Texture metallic_black;
+  gl::Texture roughness_white;
+  gl::Texture normal_flat;
+  gl::Texture occlusion_white;
+  gl::Texture emission_black;
 };
 
 struct ShaderCache {
   using T = Resource;
   std::unordered_map<ShaderSpec, ShaderProgram> shaders;
 };
-
-inline void register_slot_provider(SlotProviderRegistry &registry,
-                                   std::type_index slot_type,
-                                   SlotProvider provider) {
-  registry.providers[slot_type] = std::move(provider);
-}
-
-template <typename SlotT>
-inline void register_slot_provider(SlotProviderRegistry &registry,
-                                   SlotProvider provider) {
-  register_slot_provider(registry, typeid(SlotT), std::move(provider));
-}
 
 inline gl::Material &fallback_material(NonSendMarker) {
   static gl::Material fallback = {};

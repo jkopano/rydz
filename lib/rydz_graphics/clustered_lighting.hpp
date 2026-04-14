@@ -1,6 +1,7 @@
 #pragma once
 
 #include "math.hpp"
+#include "render_extract.hpp"
 #include "rydz_ecs/fwd.hpp"
 #include "rydz_graphics/gl/core.hpp"
 #include "types.hpp"
@@ -46,69 +47,6 @@ static constexpr auto CLUSTER_RECORD_SIZE = 48;
 
 static_assert(sizeof(GpuPointLight) == POINT_LIGHT_SIZE);
 static_assert(sizeof(ClusterGpuRecord) == CLUSTER_RECORD_SIZE);
-
-struct ClusteredLightingState {
-  using T = ecs::Resource;
-
-  SSBO point_light_buffer{};
-  SSBO cluster_buffer{};
-  SSBO light_index_buffer{};
-  SSBO overflow_buffer{};
-
-  std::vector<GpuPointLight> point_lights_cpu;
-  std::vector<ClusterGpuRecord> clusters_cpu;
-  std::vector<u32> light_indices_cpu;
-
-public:
-  ClusteredLightingState() = default;
-  ClusteredLightingState(const ClusteredLightingState &) = delete;
-  ClusteredLightingState &operator=(const ClusteredLightingState &) = delete;
-  ClusteredLightingState(ClusteredLightingState &&) noexcept = default;
-  ClusteredLightingState &
-  operator=(ClusteredLightingState &&) noexcept = default;
-
-  void ensure_buffers(const ClusterConfig &config) {
-    if (!point_light_buffer.ready()) {
-      point_light_buffer = SSBO(sizeof(GpuPointLight) * config.max_point_lights,
-                                nullptr, RL_DYNAMIC_DRAW);
-    }
-    if (!cluster_buffer.ready()) {
-      cluster_buffer = SSBO(sizeof(ClusterGpuRecord) * config.cluster_count(),
-                            nullptr, RL_DYNAMIC_DRAW);
-    }
-    if (!light_index_buffer.ready()) {
-      light_index_buffer = SSBO(sizeof(u32) * config.max_light_indices(),
-                                nullptr, RL_DYNAMIC_DRAW);
-    }
-    if (!overflow_buffer.ready()) {
-      overflow_buffer = SSBO(sizeof(u32), nullptr, RL_DYNAMIC_DRAW);
-    }
-  }
-
-  void reset_cpu_storage(const ClusterConfig &config) {
-    point_lights_cpu.clear();
-    point_lights_cpu.reserve(config.max_point_lights);
-    clusters_cpu.clear();
-    clusters_cpu.resize(config.cluster_count());
-    light_indices_cpu.clear();
-    light_indices_cpu.resize(config.max_light_indices(), 0);
-  }
-};
-
-inline void bind_clustered_lighting(const ClusteredLightingState &state) {
-  if (state.point_light_buffer.ready()) {
-    state.point_light_buffer.bind(0);
-  }
-  if (state.cluster_buffer.ready()) {
-    state.cluster_buffer.bind(1);
-  }
-  if (state.light_index_buffer.ready()) {
-    state.light_index_buffer.bind(2);
-  }
-  if (state.overflow_buffer.ready()) {
-    state.overflow_buffer.bind(3);
-  }
-}
 
 inline f32 cluster_slice_distance(const ClusterConfig &config, f32 near_plane,
                                   f32 far_plane, bool orthographic,
@@ -208,13 +146,188 @@ build_cluster_record(const ClusterConfig &config,
   return record;
 }
 
+struct ClusteredLightingState {
+  using T = ecs::Resource;
+
+  SSBO point_light_buffer{};
+  SSBO cluster_buffer{};
+  SSBO light_index_buffer{};
+  SSBO overflow_buffer{};
+
+  std::vector<GpuPointLight> point_lights_cpu;
+  std::vector<ClusterGpuRecord> clusters_cpu;
+  std::vector<u32> light_indices_cpu;
+
+public:
+  ClusteredLightingState() = default;
+  ClusteredLightingState(const ClusteredLightingState &) = delete;
+  ClusteredLightingState &operator=(const ClusteredLightingState &) = delete;
+  ClusteredLightingState(ClusteredLightingState &&) noexcept = default;
+  ClusteredLightingState &
+  operator=(ClusteredLightingState &&) noexcept = default;
+
+  void ensure_buffers(const ClusterConfig &config) {
+    if (!point_light_buffer.ready()) {
+      point_light_buffer = SSBO(sizeof(GpuPointLight) * config.max_point_lights,
+                                nullptr, RL_DYNAMIC_DRAW);
+    }
+    if (!cluster_buffer.ready()) {
+      cluster_buffer = SSBO(sizeof(ClusterGpuRecord) * config.cluster_count(),
+                            nullptr, RL_DYNAMIC_DRAW);
+    }
+    if (!light_index_buffer.ready()) {
+      light_index_buffer = SSBO(sizeof(u32) * config.max_light_indices(),
+                                nullptr, RL_DYNAMIC_DRAW);
+    }
+    if (!overflow_buffer.ready()) {
+      overflow_buffer = SSBO(sizeof(u32), nullptr, RL_DYNAMIC_DRAW);
+    }
+  }
+
+  void reset_cpu_storage(const ClusterConfig &config) {
+    point_lights_cpu.clear();
+    point_lights_cpu.reserve(config.max_point_lights);
+    clusters_cpu.clear();
+    clusters_cpu.resize(config.cluster_count());
+    light_indices_cpu.clear();
+    light_indices_cpu.resize(config.max_light_indices(), 0);
+  }
+
+  void build_cluster_buffers(ecs::NonSendMarker marker,
+                             const ecs::ExtractedView &view,
+                             const ecs::ExtractedLights &lights,
+                             const ClusterConfig &config) {
+    static u32 last_reported_overflow = U32_MAX;
+
+    ensure_buffers(config);
+    reset_cpu_storage(config);
+
+    const usize point_light_count =
+        std::min(lights.point_lights.size(),
+                 static_cast<usize>(config.max_point_lights));
+    if (lights.point_lights.size() > point_light_count) {
+      gl::trace_log(
+          gl::LOG_WARNING,
+          "Forward+: dropping %d point lights beyond configured cap",
+          static_cast<int>(lights.point_lights.size() - point_light_count));
+    }
+
+    for (usize i = 0; i < point_light_count; ++i) {
+      const auto &light = lights.point_lights[i];
+      point_lights_cpu.push_back(GpuPointLight{
+          .position_range = {light.position.GetX(), light.position.GetY(),
+                             light.position.GetZ(), light.range},
+          .color_intensity = {light.color.r / 255.0f, light.color.g / 255.0f,
+                              light.color.b / 255.0f, light.intensity},
+      });
+    }
+
+    const math::Mat4 inverse_projection = view.camera_view.proj.Inversed();
+    for (i32 z = 0; z < config.slice_count_z; ++z) {
+      for (i32 y = 0; y < config.tile_count_y; ++y) {
+        for (i32 x = 0; x < config.tile_count_x; ++x) {
+          const u32 cluster_index = static_cast<u32>(
+              ((z * config.tile_count_y + y) * config.tile_count_x) + x);
+          clusters_cpu[cluster_index] = gl::build_cluster_record(
+              config, inverse_projection, view.orthographic, view.near_plane,
+              view.far_plane, x, y, z);
+        }
+      }
+    }
+
+    u32 overflow_count = 0;
+
+    for (u32 light_index = 0;
+         light_index < static_cast<u32>(point_lights_cpu.size());
+         ++light_index) {
+      const auto &light = point_lights_cpu[light_index];
+      const math::Vec3 view_position_math =
+          view.camera_view.view * math::Vec3(light.position_range.x,
+                                             light.position_range.y,
+                                             light.position_range.z);
+      const auto view_position = math::to_rl(view_position_math);
+
+      for (u32 cluster_index = 0;
+           cluster_index < static_cast<u32>(clusters_cpu.size());
+           ++cluster_index) {
+        auto &cluster = clusters_cpu[cluster_index];
+
+        const f32 closest_x = std::clamp(view_position.x, cluster.min_bounds.x,
+                                         cluster.max_bounds.x);
+        const f32 closest_y = std::clamp(view_position.y, cluster.min_bounds.y,
+                                         cluster.max_bounds.y);
+        const f32 closest_z = std::clamp(view_position.z, cluster.min_bounds.z,
+                                         cluster.max_bounds.z);
+        const f32 dx = view_position.x - closest_x;
+        const f32 dy = view_position.y - closest_y;
+        const f32 dz = view_position.z - closest_z;
+        if (dx * dx + dy * dy + dz * dz >
+            light.position_range.w * light.position_range.w) {
+          continue;
+        }
+
+        if (cluster.meta[1] >= config.max_lights_per_cluster) {
+          ++overflow_count;
+          continue;
+        }
+
+        const u32 offset = cluster.meta[0] + cluster.meta[1];
+        light_indices_cpu[offset] = light_index;
+        ++cluster.meta[1];
+      }
+    }
+
+    if (!point_lights_cpu.empty()) {
+      point_light_buffer.update(
+          point_lights_cpu.data(),
+          static_cast<u32>(point_lights_cpu.size() * sizeof(GpuPointLight)), 0);
+    }
+
+    cluster_buffer.update(
+        clusters_cpu.data(),
+        static_cast<u32>(clusters_cpu.size() * sizeof(ClusterGpuRecord)), 0);
+
+    light_index_buffer.update(
+        light_indices_cpu.data(),
+        static_cast<u32>(light_indices_cpu.size() * sizeof(u32)), 0);
+
+    overflow_buffer.update(&overflow_count, sizeof(overflow_count), 0);
+
+    if (overflow_count > 0) {
+      if (last_reported_overflow != overflow_count) {
+        gl::trace_log(gl::LOG_WARNING,
+                      "Forward+: cluster light list overflowed %u writes",
+                      overflow_count);
+        last_reported_overflow = overflow_count;
+      }
+    } else {
+      last_reported_overflow = U32_MAX;
+    }
+  }
+};
+
+inline void bind_clustered_lighting(const ClusteredLightingState &state) {
+  if (state.point_light_buffer.ready()) {
+    state.point_light_buffer.bind(0);
+  }
+  if (state.cluster_buffer.ready()) {
+    state.cluster_buffer.bind(1);
+  }
+  if (state.light_index_buffer.ready()) {
+    state.light_index_buffer.bind(2);
+  }
+  if (state.overflow_buffer.ready()) {
+    state.overflow_buffer.bind(3);
+  }
+}
+
 } // namespace gl
 
 namespace ecs {
 
 using gl::ClusterConfig;
 using gl::ClusteredLightingState;
-using gl::GpuPointLight;
 using gl::ClusterGpuRecord;
+using gl::GpuPointLight;
 
 } // namespace ecs

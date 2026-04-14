@@ -3,6 +3,7 @@
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/assets/scene_graph.hpp"
 #include "rydz_graphics/gl/resources.hpp"
+#include "rydz_graphics/material/standard_material.hpp"
 #include "rydz_graphics/transform.hpp"
 #include <algorithm>
 #include <array>

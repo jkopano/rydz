@@ -34,7 +34,7 @@ struct RenderPlugin {
   static void register_slot(App &app, SlotProvider provider) {
     app.init_resource<SlotProviderRegistry>();
     if (auto *registry = app.world().get_resource<SlotProviderRegistry>()) {
-      register_slot_provider<SlotT>(*registry, std::move(provider));
+      registry->register_slot<SlotT>(std::move(provider));
     }
   }
 
@@ -93,43 +93,43 @@ struct RenderPlugin {
                            compute_mesh_bounds_system, frustum_cull_system))
 
         .add_systems(RenderExtractSet::Extract,
-                     group(RenderExtractSystems::clear_extracted_meshes_system,
-                           RenderExtractSystems::extract_view_system,
-                           RenderExtractSystems::extract_lighting_system,
-                           RenderExtractSystems::extract_ui_system,
-                           RenderExtractSystems::extract_meshes_system)
-                         .chain())
-
-        .add_systems(RenderExtractSet::Queue,
-                     group(RenderPhaseSystems::Queue::queue_shadow_phase,
-                           RenderPhaseSystems::Queue::queue_opaque_phase,
-                           RenderPhaseSystems::Queue::queue_transparent_phase,
-                           RenderPhaseSystems::Queue::queue_ui_phase)
+                     group(extract::clear_meshes, extract::view,
+                           extract::lighting, extract::ui, extract::meshes)
                          .chain())
 
         .add_systems(
-            RenderExtractSet::Prepare,
-            group(RenderPhaseSystems::Prepare::build_opaque_batches,
-                  RenderPhaseSystems::Prepare::build_transparent_batches)
+            RenderExtractSet::Queue,
+            group([](Res<ExtractedMeshes> m,
+                     ResMut<ShadowPhase> p) { p->queue(*m); },
+                  [](Res<ExtractedMeshes> m, ResMut<OpaquePhase> p) {
+                    p->queue(*m);
+                  },
+                  [](Res<ExtractedMeshes> m, ResMut<TransparentPhase> p) {
+                    p->queue(*m);
+                  },
+                  [](Res<ExtractedUi> u, ResMut<UiPhase> p) { p->queue(*u); })
                 .chain())
 
-        .add_systems(RenderPassSet::Setup,
-                     RenderPassSystems::Frame::begin_frame)
+        .add_systems(
+            RenderExtractSet::Prepare,
+            group([](ResMut<OpaquePhase> p, ResMut<Assets<Mesh>> a,
+                     NonSendMarker) { p->build_batches(*a); },
+                  [](ResMut<TransparentPhase> p, ResMut<Assets<Mesh>> a,
+                     NonSendMarker) { p->build_batches(*a); })
+                .chain())
+
+        .add_systems(RenderPassSet::Setup, FramePass::begin)
 
         .add_systems(RenderPassSet::Main,
-                     group(RenderPassSystems::World::run_shadow_pass,
-                           RenderPassSystems::World::run_depth_prepass,
-                           RenderPassSystems::World::run_cluster_build_pass,
-                           RenderPassSystems::World::run_opaque_pass,
-                           RenderPassSystems::World::run_transparent_pass)
+                     group(WorldPass::shadow, WorldPass::depth_prepass,
+                           WorldPass::cluster_build, WorldPass::opaque,
+                           WorldPass::transparent)
                          .chain())
 
-        .add_systems(RenderPassSet::PostProcess,
-                     RenderPassSystems::PostProcessing::run_postprocess_pass)
+        .add_systems(RenderPassSet::PostProcess, PostProcessPass::postprocess)
 
-        .add_systems(RenderPassSet::Ui, RenderPassSystems::Ui::run_ui_pass)
-        .add_systems(RenderPassSet::Cleanup,
-                     RenderPassSystems::Frame::end_frame);
+        .add_systems(RenderPassSet::Ui, UiPass::ui)
+        .add_systems(RenderPassSet::Cleanup, FramePass::end);
   }
 };
 

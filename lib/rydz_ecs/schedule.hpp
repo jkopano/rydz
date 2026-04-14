@@ -284,9 +284,10 @@ private:
   void rebuild() {
     steps_.clear();
 
-    const usize n = entries_.size();
-    if (n == 0)
+    const usize count = entries_.size();
+    if (count == 0) {
       return;
+    }
 
     apply_set_configs();
     topological_sort();
@@ -295,48 +296,70 @@ private:
 
   void apply_set_configs() {
     std::unordered_map<SetId, std::vector<usize>> set_members;
-    for (usize i = 0; i < entries_.size(); ++i)
-      for (const auto &sid : entries_[i].in_sets)
+    for (usize i = 0; i < entries_.size(); ++i) {
+      for (const auto &sid : entries_[i].in_sets) {
         set_members[sid].push_back(i);
-
-    std::unordered_map<SetId, bool> configured_sets;
-    for (const auto &cfg : set_configs_) {
-      configured_sets[cfg.id] = true;
+      }
     }
 
     for (const auto &[sid, _] : set_members) {
-      if (!configured_sets.contains(sid)) {
-        throw std::runtime_error("Set '" + set_name(sid) +
-                                 "' is used by systems in this schedule but "
-                                 "was never configured");
+      auto it = std::ranges::find_if(set_configs_,
+                                     [&](auto &c) { return c.id == sid; });
+      if (it == set_configs_.end()) {
+        throw std::runtime_error(
+            std::format("Set '{}' used but never configured", set_name(sid)));
       }
     }
 
     for (auto &cfg : set_configs_) {
+      const auto &members = set_members[cfg.id];
+      if (members.empty()) {
+        continue;
+      }
+
+      // CONDITION
       if (cfg.condition) {
-        for (usize idx : set_members[cfg.id]) {
-          entries_[idx].system = std::make_unique<ConditionedSystem>(
-              std::move(entries_[idx].system), cfg.condition);
-          entries_[idx].access = entries_[idx].system->access();
+        for (usize idx : members) {
+          auto &entry = entries_[idx];
+          entry.system = std::make_unique<ConditionedSystem>(
+              std::move(entry.system), cfg.condition);
+          entry.access = entry.system->access();
         }
       }
 
-      for (const auto &before_set : cfg.before) {
-        for (usize from : set_members[cfg.id]) {
-          for (usize to : set_members[before_set]) {
-            if (from != to)
-              entries_[from].ordering.before.push_back(
-                  entries_[to].system->name());
+      // CACHING
+      auto get_names = [&](SetId set_id) {
+        std::vector<std::string> names;
+        if (auto iter = set_members.find(set_id); iter != set_members.end()) {
+          for (usize idx : iter->second) {
+            names.push_back(entries_[idx].system->name());
+          }
+        }
+        return names;
+      };
+
+      // BEFORE
+      for (const auto &target_set : cfg.before) {
+        auto target_names = get_names(target_set);
+        for (usize from_idx : members) {
+          auto &before_list = entries_[from_idx].ordering.before;
+          for (const auto &name : target_names) {
+            if (name != entries_[from_idx].system->name()) {
+              before_list.emplace_back(name);
+            }
           }
         }
       }
 
-      for (const auto &after_set : cfg.after) {
-        for (usize to : set_members[cfg.id]) {
-          for (usize from : set_members[after_set]) {
-            if (from != to)
-              entries_[to].ordering.after.push_back(
-                  entries_[from].system->name());
+      // AFTER
+      for (const auto &target_set : cfg.after) {
+        auto target_names = get_names(target_set);
+        for (usize to_idx : members) {
+          auto &after_list = entries_[to_idx].ordering.after;
+          for (const auto &name : target_names) {
+            if (name != entries_[to_idx].system->name()) {
+              after_list.emplace_back(name);
+            }
           }
         }
       }
@@ -439,7 +462,7 @@ private:
     }
   }
 
-  bool systems_conflict(usize i, usize j) const {
+  [[nodiscard]] bool systems_conflict(usize i, usize j) const {
     const auto &a = entries_[i];
     const auto &b = entries_[j];
 
@@ -452,27 +475,20 @@ private:
 
   using Batch = std::vector<usize>;
 
-  std::vector<Batch> batch_compatible_systems(usize start, usize end) const {
+  [[nodiscard]] std::vector<Batch> batch_compatible_systems(usize start,
+                                                            usize end) const {
     std::vector<Batch> batches;
+    for (usize offset = 0; offset < (end - start); ++offset) {
+      auto iter = std::ranges::find_if(batches, [&](const auto &batch) {
+        return std::ranges::none_of(batch, [&](auto member) {
+          return systems_conflict(start + offset, start + member);
+        });
+      });
 
-    const usize count = end - start;
-    for (usize i = 0; i < count; ++i) {
-
-      auto compatible = [&](auto &batch) {
-        for (usize j : batch) {
-          if (systems_conflict(start + i, start + j)) {
-            return false;
-          }
-        }
-        return true;
-      };
-
-      auto it = std::ranges::find_if(batches, compatible);
-
-      if (it != batches.end()) {
-        it->push_back(i);
+      if (iter != batches.end()) {
+        iter->push_back(offset);
       } else {
-        batches.push_back({i});
+        batches.push_back({offset});
       }
     }
     return batches;
@@ -500,8 +516,9 @@ private:
 
     bool any_parallel =
         std::ranges::any_of(batches, [](auto &b) { return b.size() > 1; });
-    if (!any_parallel)
-      return InlineStep{start, end};
+    if (!any_parallel) {
+      return InlineStep{.start = start, .end = end};
+    }
 
     ParallelStep step;
     usize batch_start = start;
@@ -596,7 +613,7 @@ private:
     return prefix + wrap_commas(text, std::string(prefix.size(), ' ')) + "\n";
   }
 
-  usize debug_max_concurrency() const {
+  [[nodiscard]] usize debug_max_concurrency() const {
     usize max_concurrency = entries_.empty() ? 0 : 1;
     for (const auto &step : steps_) {
       if (const auto *parallel = std::get_if<ParallelStep>(&step)) {
@@ -608,7 +625,8 @@ private:
     return max_concurrency;
   }
 
-  std::string debug_step_summary(const ExecutionStep &step) const {
+  [[nodiscard]] std::string
+  debug_step_summary(const ExecutionStep &step) const {
     if (const auto *inline_step = std::get_if<InlineStep>(&step)) {
       std::ostringstream out;
       out << "      MODE: inline\n";
@@ -616,8 +634,8 @@ private:
       out << "      SYSTEMS: " << (inline_step->end - inline_step->start)
           << "\n";
       out << "      MEMBERS:\n";
-      for (usize i : range(inline_step->start, inline_step->end)) {
-        out << debug_item("        - ", entries_[i].system->name());
+      for (usize idx : range(inline_step->start, inline_step->end)) {
+        out << debug_item("        - ", entries_[idx].system->name());
       }
       return out.str();
     }
@@ -640,21 +658,22 @@ private:
       const auto &batch = parallel.batches[batch_index];
       out << "        BATCH[" << batch_index
           << "] SIZE=" << (batch.end - batch.start) << "\n";
-      for (usize i : range(batch.start, batch.end)) {
-        out << debug_item("          - ", entries_[i].system->name());
+      for (usize idx : range(batch.start, batch.end)) {
+        out << debug_item("          - ", entries_[idx].system->name());
       }
     }
     return out.str();
   }
 
-  std::vector<DebugPlacement> debug_system_placements() const {
+  [[nodiscard]] std::vector<DebugPlacement> debug_system_placements() const {
     std::vector<DebugPlacement> placements(entries_.size());
 
     for (usize step_index = 0; step_index < steps_.size(); ++step_index) {
       const auto &step = steps_[step_index];
       if (const auto *inline_step = std::get_if<InlineStep>(&step)) {
-        for (usize i : range(inline_step->start, inline_step->end)) {
-          placements[i] = DebugPlacement{step_index, "main"};
+        for (usize idx : range(inline_step->start, inline_step->end)) {
+          placements[idx] =
+              DebugPlacement{.step = step_index, .placement = "main"};
         }
         continue;
       }
@@ -664,17 +683,19 @@ private:
            ++batch_index) {
         const auto &batch = parallel.batches[batch_index];
         usize slot = 0;
-        for (usize i : range(batch.start, batch.end)) {
-          if (entries_[i].access.main_thread_only) {
-            placements[i] = DebugPlacement{
-                step_index,
-                "main_thread(batch=" + std::to_string(batch_index) + ")"};
+        for (usize idx : range(batch.start, batch.end)) {
+          if (entries_[idx].access.main_thread_only) {
+            placements[idx] = DebugPlacement{
+                .step = step_index,
+                .placement =
+                    "main_thread(batch=" + std::to_string(batch_index) + ")"};
             continue;
           }
 
-          placements[i] = DebugPlacement{
-              step_index, "worker_pool(batch=" + std::to_string(batch_index) +
-                              ", slot=" + std::to_string(slot) + ")"};
+          placements[idx] = DebugPlacement{
+              .step = step_index,
+              .placement = "worker_pool(batch=" + std::to_string(batch_index) +
+                           ", slot=" + std::to_string(slot) + ")"};
           slot++;
         }
       }
@@ -711,7 +732,8 @@ private:
     }
   }
 
-  std::vector<std::string> ordered_systems_in_set(const SetId &set_id) const {
+  [[nodiscard]] std::vector<std::string>
+  ordered_systems_in_set(const SetId &set_id) const {
     std::vector<std::string> systems;
     for (const auto &entry : entries_) {
       if (std::ranges::contains(entry.in_sets, set_id)) {
@@ -756,13 +778,13 @@ public:
   Schedule &entry(ScheduleLabel label) { return schedules_[label]; }
 
   Schedule *get(ScheduleLabel label) {
-    auto it = schedules_.find(label);
-    return it != schedules_.end() ? &it->second : nullptr;
+    auto iter = schedules_.find(label);
+    return iter != schedules_.end() ? &iter->second : nullptr;
   }
 
   void run(ScheduleLabel label, World &world) {
     auto *schedule = get(label);
-    if (schedule) {
+    if (schedule != nullptr) {
       ZoneScopedN("Schedule");
 #ifdef TRACY_ENABLE
       auto name = schedule_label_name(label);
@@ -805,12 +827,12 @@ public:
         << "\n";
 
     for (auto label : labels) {
-      auto it = schedules_.find(label);
-      if (it == schedules_.end()) {
+      auto iter = schedules_.find(label);
+      if (iter == schedules_.end()) {
         continue;
       }
 
-      const auto &schedule = it->second;
+      const auto &schedule = iter->second;
       out << schedule.debug_dump(schedule_label_name(label));
     }
     return out.str();

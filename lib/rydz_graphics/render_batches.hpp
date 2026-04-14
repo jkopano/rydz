@@ -21,16 +21,6 @@ struct RenderBatchKey {
   }
 };
 
-struct OpaqueBatch {
-  RenderBatchKey key;
-  std::vector<gl::Matrix> transforms;
-};
-
-struct TransparentBatch {
-  RenderBatchKey key;
-  std::vector<gl::Matrix> transforms;
-};
-
 } // namespace ecs
 
 namespace std {
