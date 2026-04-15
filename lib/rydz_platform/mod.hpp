@@ -3,6 +3,9 @@
 #include "rl.hpp"
 #include "rydz_ecs/app.hpp"
 #include <cstdio>
+#include <print>
+
+#include "rydz_log/mod.hpp"
 
 namespace rydz_platform {
 
@@ -15,21 +18,22 @@ struct RayPlugin {
       .title = "ECS App",
       .target_fps = 60,
   };
-  int trace_log_level = LOG_WARNING;
+  i32 trace_log_level = LOG_NONE;
 
   static auto install(RayPlugin config) {
     return [config = std::move(config)](ecs::App &app) mutable {
       app.insert_resource(config.window);
       app.insert_resource(config);
       app.insert_resource(ecs::AppRunner{
-          .run = [](ecs::App &app_ref) {
-            auto *runner = app_ref.world().get_resource<RayPlugin>();
-            if (!runner) {
-              std::fputs("RayPlugin not installed.\n", stderr);
-              return;
-            }
-            runner->run_app(app_ref);
-          },
+          .run =
+              [](ecs::App &app_ref) {
+                auto *runner = app_ref.world().get_resource<RayPlugin>();
+                if (!runner) {
+                  std::fputs("RayPlugin not installed.\n", stderr);
+                  return;
+                }
+                runner->run_app(app_ref);
+              },
       });
     };
   }
@@ -46,7 +50,7 @@ private:
 
   static void sync_window(ecs::App &app) {
     auto *window = app.world().get_resource<ecs::Window>();
-    if (!window) {
+    if (window == nullptr) {
       return;
     }
 
@@ -57,12 +61,12 @@ private:
   void run_app(ecs::App &app) const {
     ecs::Window config = resolve_window(app);
 
-    rl::SetTraceLogLevel(trace_log_level);
-    rl::InitWindow(static_cast<int>(config.width), static_cast<int>(config.height),
-                   config.title.c_str());
+    init_logging();
+    rl::InitWindow(static_cast<int>(config.width),
+                   static_cast<int>(config.height), config.title.c_str());
     rl::SetTargetFPS(static_cast<int>(config.target_fps));
     if (!rl::IsWindowReady()) {
-      std::fprintf(stderr, "InitWindow failed; aborting run loop.\n");
+      std::println(stderr, "InitWindow failed; aborting run loop.");
       return;
     }
 

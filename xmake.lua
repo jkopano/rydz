@@ -31,6 +31,7 @@ end
 -- if not is_nixos() then
 -- =======
 add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")
+add_requires("fmt", "spdlog", { configs = { external_fmt = true } })
 add_requires("sol2 v3.3.0", { configs = { includes_lua = false } })
 if is_plat("windows") then
 	-- kopano
@@ -166,7 +167,7 @@ add_deps("raylib")
 -- add_packages("taskflow", "joltphysics", "sol2")
 -- if not is_nixos() then
 -- =======
-add_packages("taskflow", "joltphysics", "sol2", "glaze", "glm")
+add_packages("taskflow", "joltphysics", "sol2", "glaze", "glm", "spdlog", "fmt")
 if is_plat("windows") then
 	-- >>>>>>> kopano
 	add_packages("luajit")
@@ -181,14 +182,14 @@ set_kind("binary")
 set_default(false)
 add_files("tests/*.cpp")
 add_deps("raylib")
-add_packages("gtest", "taskflow", "joltphysics", "glaze", "glm")
+add_packages("gtest", "taskflow", "joltphysics", "glaze", "glm", "spdlog", "fmt")
 
 target("bench")
 set_kind("binary")
 set_default(false)
 add_files("benches/*.cpp")
 add_deps("raylib")
-add_packages("benchmark", "taskflow", "joltphysics", "glaze", "glm")
+add_packages("benchmark", "taskflow", "joltphysics", "glaze", "glm", "spdlog", "fmt")
 
 local examples = {
 	"01_hello_window",
@@ -216,7 +217,7 @@ for _, name in ipairs(examples) do
 	--   add_packages("taskflow", "joltphysics", "sol2")
 	--   if not is_nixos() then
 	-- =======
-	add_packages("taskflow", "joltphysics", "sol2", "glaze", "glm")
+	add_packages("taskflow", "joltphysics", "sol2", "glaze", "glm", "spdlog", "fmt")
 	if is_plat("windows") then
 		-- >>>>>>> kopano
 		add_packages("luajit")

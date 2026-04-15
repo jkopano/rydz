@@ -9,6 +9,8 @@
 #include <type_traits>
 #include <utility>
 
+#include "rydz_log/mod.hpp"
+
 namespace gl {
 
 using Color = rl::Color;
@@ -698,11 +700,6 @@ static_assert(std::is_trivially_copyable_v<RenderTarget>);
 
 inline Vec3 color_to_vec3(Color color) {
   return {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f};
-}
-
-template <typename... Args>
-inline void trace_log(int level, const char *format, Args... args) {
-  rl::TraceLog(level, format, args...);
 }
 
 inline Texture Image::load_texture() const {

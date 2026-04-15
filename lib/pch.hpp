@@ -29,3 +29,4 @@
 #include <vector>
 
 #include "math.hpp"
+#include "rydz_log/mod.hpp"

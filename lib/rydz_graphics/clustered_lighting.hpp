@@ -4,6 +4,7 @@
 #include "render_extract.hpp"
 #include "rydz_ecs/fwd.hpp"
 #include "rydz_graphics/gl/core.hpp"
+#include "rydz_log/mod.hpp"
 #include "types.hpp"
 #include <array>
 #include <cfloat>
@@ -206,10 +207,8 @@ public:
         std::min(lights.point_lights.size(),
                  static_cast<usize>(config.max_point_lights));
     if (lights.point_lights.size() > point_light_count) {
-      gl::trace_log(
-          gl::LOG_WARNING,
-          "Forward+: dropping %d point lights beyond configured cap",
-          static_cast<int>(lights.point_lights.size() - point_light_count));
+      warn("Forward+: dropping {} point lights beyonds configured cap",
+           static_cast<int>(lights.point_lights.size() - point_light_count));
     }
 
     for (usize i = 0; i < point_light_count; ++i) {
@@ -247,11 +246,7 @@ public:
                                              light.position_range.z);
       const auto view_position = math::to_rl(view_position_math);
 
-      for (u32 cluster_index = 0;
-           cluster_index < static_cast<u32>(clusters_cpu.size());
-           ++cluster_index) {
-        auto &cluster = clusters_cpu[cluster_index];
-
+      for (auto &cluster : clusters_cpu) {
         const f32 closest_x = std::clamp(view_position.x, cluster.min_bounds.x,
                                          cluster.max_bounds.x);
         const f32 closest_y = std::clamp(view_position.y, cluster.min_bounds.y,
@@ -261,7 +256,7 @@ public:
         const f32 dx = view_position.x - closest_x;
         const f32 dy = view_position.y - closest_y;
         const f32 dz = view_position.z - closest_z;
-        if (dx * dx + dy * dy + dz * dz >
+        if ((dx * dx) + (dy * dy) + dz * dz >
             light.position_range.w * light.position_range.w) {
           continue;
         }
@@ -295,9 +290,8 @@ public:
 
     if (overflow_count > 0) {
       if (last_reported_overflow != overflow_count) {
-        gl::trace_log(gl::LOG_WARNING,
-                      "Forward+: cluster light list overflowed %u writes",
-                      overflow_count);
+        warn("Forward+: cluster light list overflowed {} writes",
+             overflow_count);
         last_reported_overflow = overflow_count;
       }
     } else {
