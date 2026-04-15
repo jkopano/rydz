@@ -365,7 +365,7 @@ Font LoadFont(const char *fileName)
     else
 #endif
     {
-        Image image = LoadImage(fileName);
+        Image image = rlLoadImage(fileName);
         if (image.data != NULL) font = LoadFontFromImage(image, MAGENTA, FONT_TTF_DEFAULT_FIRST_CHAR);
         else font = GetFontDefault();
         UnloadImage(image);
@@ -2504,7 +2504,7 @@ static Font LoadBMFont(const char *fileName)
 
     for (int i = 0; i < pageCount; i++)
     {
-        imFonts[i] = LoadImage(TextFormat("%s/%s", GetDirectoryPath(fileName), imFileName[i]));
+        imFonts[i] = rlLoadImage(TextFormat("%s/%s", GetDirectoryPath(fileName), imFileName[i]));
 
         if (imFonts[i].format == PIXELFORMAT_UNCOMPRESSED_GRAYSCALE)
         {

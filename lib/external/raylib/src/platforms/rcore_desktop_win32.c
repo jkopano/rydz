@@ -57,7 +57,7 @@
 #undef rlCloseWindow      // raylib symbol collision
 #undef Rectangle        // raylib symbol collision
 #undef rlShowCursor       // raylib symbol collision
-#undef LoadImage        // raylib symbol collision
+#undef rlLoadImage        // raylib symbol collision
 #undef DrawText         // raylib symbol collision
 #undef DrawTextA
 #undef DrawTextW

@@ -47,7 +47,7 @@
 
 #if defined(_WIN32) || defined(_WIN64)
     #define BI_ALPHABITFIELDS 4
-    #define LoadImage LoadImageA
+    #define rlLoadImage LoadImageA
 
     // Temporarily rename conflicting symbols
     #define rlCloseWindow CloseWindowWin32
@@ -61,7 +61,7 @@
     #undef rlCloseWindow
     #undef Rectangle
     #undef rlShowCursor
-    #undef LoadImage
+    #undef rlLoadImage
 
     #include "../external/fix_win32_compatibility.h"
 #endif

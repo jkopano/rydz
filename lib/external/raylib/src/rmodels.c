@@ -5343,7 +5343,7 @@ static Image LoadImageFromCgltfImage(cgltf_image *cgltfImage, const char *texPat
         }
         else     // Check if image is provided as image path
         {
-            image = LoadImage(TextFormat("%s/%s", texPath, cgltfImage->uri));
+            image = rlLoadImage(TextFormat("%s/%s", texPath, cgltfImage->uri));
         }
     }
     else if ((cgltfImage->buffer_view != NULL) && (cgltfImage->buffer_view->buffer->data != NULL))    // Check if image is provided as data buffer

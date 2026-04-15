@@ -5,7 +5,7 @@
 
 namespace gl {
 
-inline Image load_image(const char *path) { return rl::LoadImage(path); }
+inline Image load_image(const char *path) { return rl::rlLoadImage(path); }
 
 inline Image load_image(const std::string &path) {
   return load_image(path.c_str());

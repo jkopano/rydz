@@ -1809,7 +1809,7 @@ RLAPI rlRectangle GetCollisionRec(
 // Image loading functions
 // NOTE: These functions do not require GPU access
 RLAPI Image
-LoadImage(const char *fileName); // Load image from file into CPU memory (RAM)
+rlLoadImage(const char *fileName); // Load image from file into CPU memory (RAM)
 RLAPI Image LoadImageRaw(const char *fileName, int width, int height,
                          int format,
                          int headerSize); // Load image from RAW file data

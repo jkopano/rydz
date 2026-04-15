@@ -93,7 +93,7 @@ using ::GenImageColor;
 using ::ImageText;
 using ::ImageTextEx;
 using ::ImageFormat;
-using ::LoadImage;
+using LoadImage = ::rlLoadImage;
 using ::LoadTexture;
 using ::LoadTextureFromImage;
 using ::LoadRenderTexture;
