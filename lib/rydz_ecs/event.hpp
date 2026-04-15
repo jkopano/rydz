@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <tuple>
 #include <typeindex>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -17,15 +18,15 @@
 namespace ecs {
 
 template <typename E> struct On {
-  const E *event = nullptr;
+  const E *event{};
   Entity observer{};
   std::optional<Entity> target;
 
   const E &operator*() const { return *event; }
   const E *operator->() const { return event; }
 
-  Entity observer_entity() const { return observer; }
-  std::optional<Entity> target_entity() const { return target; }
+  [[nodiscard]] Entity observer_entity() const { return observer; }
+  [[nodiscard]] std::optional<Entity> target_entity() const { return target; }
 };
 
 struct ObservedBy {
@@ -34,6 +35,11 @@ struct ObservedBy {
 
 class IObserver {
 public:
+  IObserver() = default;
+  IObserver(const IObserver &) = default;
+  IObserver(IObserver &&) = delete;
+  IObserver &operator=(const IObserver &) = default;
+  IObserver &operator=(IObserver &&) = delete;
   virtual ~IObserver() = default;
   virtual void run(World &world, const void *event, Entity observer,
                    std::optional<Entity> target) = 0;
@@ -132,9 +138,8 @@ struct first_on_type_selector<false, First, Rest...> {
 
 template <typename First, typename... Rest>
 struct first_on_type_impl<First, Rest...> {
-  using type =
-      typename first_on_type_selector<is_on_param_v<First>, First, Rest...>::
-          type;
+  using type = typename first_on_type_selector<is_on_param_v<First>, First,
+                                               Rest...>::type;
 };
 
 template <typename TupleT> struct observer_traits;
@@ -143,14 +148,13 @@ template <typename... Args> struct observer_traits<Tuple<Args...>> {
   using event_type = typename first_on_type_impl<Args...>::type;
 };
 
-template <typename F> using observer_event_t =
-    typename observer_traits<
-        typename observer_function_traits<decay_t<F>>::args_tuple>::event_type;
+template <typename F>
+using observer_event_t = typename observer_traits<
+    typename observer_function_traits<decay_t<F>>::args_tuple>::event_type;
 
 template <typename F>
-inline constexpr usize observer_on_count_v =
-    observer_traits<typename observer_function_traits<decay_t<F>>::args_tuple>::
-        on_count;
+inline constexpr usize observer_on_count_v = observer_traits<
+    typename observer_function_traits<decay_t<F>>::args_tuple>::on_count;
 
 template <typename T>
 using observer_state_t =
@@ -164,8 +168,7 @@ template <typename E> Entity entity_event_target(const E &event) {
   auto tuple = to_tuple(event);
   static_assert(std::tuple_size_v<decltype(tuple)> > 0,
                 "EntityEvent must have Entity as its first field.");
-  using First =
-      bare_t<std::tuple_element_t<0, decltype(tuple)>>;
+  using First = bare_t<std::tuple_element_t<0, decltype(tuple)>>;
   static_assert(std::same_as<First, Entity>,
                 "EntityEvent must have Entity as its first field.");
   return std::get<0>(tuple);
@@ -198,7 +201,7 @@ public:
     ensure_param_states(world);
 
     Tick this_run = world.read_change_tick();
-    SystemContext ctx{last_run_, this_run};
+    SystemContext ctx{.last_run = last_run_, .this_run = this_run};
     const auto &typed_event = *static_cast<const EventT *>(event);
     observer_function_traits<F>::apply([&]<ObserverParameter... Args>() {
       run_with_args<Args...>(world, ctx, typed_event, observer, target);
@@ -207,7 +210,8 @@ public:
   }
 
 private:
-  template <typename Arg> static observer_state_t<Arg> init_param_state(World &world) {
+  template <typename Arg>
+  static observer_state_t<Arg> init_param_state(World &world) {
     if constexpr (is_on_param_v<Arg>) {
       return {};
     } else {
@@ -221,17 +225,17 @@ private:
     }
 
     observer_function_traits<F>::apply([&]<ObserverParameter... Args>() {
-      param_states_ = Tuple<observer_state_t<Args>...>{
-          init_param_state<Args>(world)...};
+      param_states_ =
+          Tuple<observer_state_t<Args>...>{init_param_state<Args>(world)...};
     });
     state_world_ = &world;
   }
 
   template <ObserverParameter Arg>
-  static decltype(auto)
-  retrieve_param(World &world, const SystemContext &ctx,
-                 observer_state_t<Arg> &state, const EventT &event,
-                 Entity observer, std::optional<Entity> target) {
+  static decltype(auto) retrieve_param(World &world, const SystemContext &ctx,
+                                       observer_state_t<Arg> &state,
+                                       const EventT &event, Entity observer,
+                                       std::optional<Entity> target) {
     using Raw = bare_t<Arg>;
 
     if constexpr (is_on_param_v<Raw>) {
@@ -244,8 +248,9 @@ private:
   }
 
   template <ObserverParameter... Args>
-  void run_with_args(World &world, const SystemContext &ctx, const EventT &event,
-                     Entity observer, std::optional<Entity> target) {
+  void run_with_args(World &world, const SystemContext &ctx,
+                     const EventT &event, Entity observer,
+                     std::optional<Entity> target) {
     run_with_args_impl<Args...>(world, ctx, event, observer, target,
                                 std::index_sequence_for<Args...>{});
   }
@@ -281,7 +286,8 @@ private:
   std::unordered_set<std::type_index> registered_events_;
   std::unordered_map<Entity, ObserverEntry> observers_;
   std::unordered_map<std::type_index, std::vector<Entity>> global_observers_;
-  std::unordered_map<std::type_index, std::unordered_map<Entity, std::vector<Entity>>>
+  std::unordered_map<std::type_index,
+                     std::unordered_map<Entity, std::vector<Entity>>>
       entity_observers_;
   std::unordered_map<Entity, std::vector<Entity>> observers_by_target_;
 
@@ -313,18 +319,22 @@ public:
     return registered_events_.contains(event_type);
   }
 
-  bool has_observer(Entity observer) const { return observers_.contains(observer); }
+  bool has_observer(Entity observer) const {
+    return observers_.contains(observer);
+  }
 
   std::vector<Entity> observers_for_target(Entity target) const {
-    auto it = observers_by_target_.find(target);
-    return (it == observers_by_target_.end()) ? std::vector<Entity>{} : it->second;
+    auto iter = observers_by_target_.find(target);
+    return (iter == observers_by_target_.end()) ? std::vector<Entity>{}
+                                                : iter->second;
   }
 
   void insert_global(Entity observer, std::type_index event_type,
                      std::unique_ptr<IObserver> callback) {
     ensure_registered(event_type);
-    observers_[observer] = ObserverEntry{
-        .event_type = event_type, .callback = std::move(callback), .target = {}};
+    observers_[observer] = ObserverEntry{.event_type = event_type,
+                                         .callback = std::move(callback),
+                                         .target = {}};
     global_observers_[event_type].push_back(observer);
   }
 
@@ -339,7 +349,7 @@ public:
     observers_by_target_[target].push_back(observer);
 
     auto *observed_by = world.get_component<ObservedBy>(target);
-    if (!observed_by) {
+    if (observed_by == nullptr) {
       world.insert_component(target, ObservedBy{});
       observed_by = world.get_component<ObservedBy>(target);
     }
@@ -397,7 +407,7 @@ public:
 
   template <typename E>
     requires IsEvent<bare_t<E>>
-  void trigger(World &world, E &&event) {
+  void trigger(World &world, E &event) {
     using EventT = bare_t<E>;
     auto event_type = std::type_index(typeid(EventT));
     ensure_registered(event_type);
@@ -406,11 +416,11 @@ public:
                        std::optional<Entity> target) {
       auto pending = ids;
       for (Entity observer : pending) {
-        auto it = observers_.find(observer);
-        if (it == observers_.end()) {
+        auto iter = observers_.find(observer);
+        if (iter == observers_.end()) {
           continue;
         }
-        it->second.callback->run(world, &event, observer, target);
+        iter->second.callback->run(world, &event, observer, target);
       }
     };
 
@@ -434,7 +444,7 @@ public:
 
 inline ObserverRegistry &World::ensure_observer_registry() {
   auto *registry = get_resource<ObserverRegistry>();
-  if (!registry) {
+  if (registry == nullptr) {
     insert_resource(ObserverRegistry{});
     registry = get_resource<ObserverRegistry>();
   }
@@ -511,7 +521,12 @@ inline Entity World::add_observer(Entity target, F &&func) {
 template <typename E>
   requires IsEvent<bare_t<E>>
 inline void World::trigger(E &&event) {
-  ensure_observer_registry().trigger(*this, std::forward<E>(event));
+  if constexpr (std::is_lvalue_reference_v<E &&>) {
+    ensure_observer_registry().trigger(*this, event);
+  } else {
+    bare_t<E> local_event = std::forward<E>(event);
+    ensure_observer_registry().trigger(*this, local_event);
+  }
 }
 
 } // namespace ecs

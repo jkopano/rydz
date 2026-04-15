@@ -15,7 +15,7 @@ namespace ecs {
 struct NonSendMarker {};
 
 template <typename T> struct Local {
-  T *ptr = nullptr;
+  T *ptr{};
 
   T &operator*() { return *ptr; }
   T *operator->() { return ptr; }
@@ -24,14 +24,14 @@ template <typename T> struct Local {
 };
 
 template <typename T> struct Res {
-  const T *ptr = nullptr;
+  const T *ptr{};
 
   const T &operator*() const { return *ptr; }
   const T *operator->() const { return ptr; }
 };
 
 template <typename T> struct ResMut {
-  T *ptr = nullptr;
+  T *ptr{};
 
   T &operator*() { return *ptr; }
   T *operator->() { return ptr; }
@@ -57,11 +57,11 @@ public:
   explicit MessageReader(Messages<E> *messages)
       : messages_(messages), reader_id_(messages->register_reader()) {}
 
-  template <typename Func> void for_each(Func &&func) {
-    messages_->read(reader_id_, std::forward<Func>(func));
-  }
+  auto iter() { return messages_->iter(reader_id_); }
 
-  bool is_empty() const { return !messages_->has_unread(reader_id_); }
+  [[nodiscard]] bool is_empty() const {
+    return !messages_->has_unread(reader_id_);
+  }
 };
 
 template <typename P> struct DefaultSystemParamState {
@@ -77,7 +77,7 @@ struct SystemParamTraits<Res<T>> : DefaultSystemParamState<Res<T>> {
 
   static Item retrieve(World &world, const SystemContext &) {
     const T *ptr = world.get_resource<T>();
-    if (!ptr) {
+    if (ptr == nullptr) {
       throw std::runtime_error(std::string("Resource not found: ") +
                                typeid(T).name());
     }
@@ -94,7 +94,7 @@ struct SystemParamTraits<ResMut<T>> : DefaultSystemParamState<ResMut<T>> {
 
   static Item retrieve(World &world, const SystemContext &) {
     T *ptr = world.get_resource<T>();
-    if (!ptr) {
+    if (ptr == nullptr) {
       throw std::runtime_error(std::string("Resource not found: ") +
                                typeid(T).name());
     }
@@ -138,8 +138,9 @@ struct SystemParamTraits<MessageWriter<E>>
 
   static Item retrieve(World &world, const SystemContext &) {
     auto *messages = world.get_resource<Messages<E>>();
-    if (!messages)
+    if (messages == nullptr) {
       throw std::runtime_error("Messages resource not found");
+    }
     return MessageWriter<E>(messages);
   }
 
@@ -159,8 +160,9 @@ struct SystemParamTraits<MessageReader<E>>
 
   static Item retrieve(World &world, const SystemContext &) {
     auto *messages = world.get_resource<Messages<E>>();
-    if (!messages)
+    if (messages == nullptr) {
       throw std::runtime_error("Messages resource not found");
+    }
     return MessageReader<E>(messages);
   }
 

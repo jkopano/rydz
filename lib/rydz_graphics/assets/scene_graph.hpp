@@ -1,8 +1,10 @@
 #pragma once
+
 #include "math.hpp"
-#include "mesh3d.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/entity.hpp"
+#include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/mesh3d.hpp"
 #include "rydz_graphics/transform.hpp"
 #include <array>
 #include <string>
@@ -10,13 +12,16 @@
 
 namespace ecs {
 
+using gl::Mesh;
+using gl::Texture;
+
 struct SceneMaterial {
   std::string name;
-  StandardMaterial material;
+  Handle<Material> material;
 };
 
 struct ScenePrimitive {
-  Handle<rl::Mesh> mesh;
+  Handle<Mesh> mesh;
   usize material_index = 0;
   i32 skin_index = -1;
   Transform local_transform{};

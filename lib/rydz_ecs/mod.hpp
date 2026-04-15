@@ -19,8 +19,8 @@
 #include "rydz_ecs/system.hpp"
 
 #include "rydz_ecs/command.hpp"
-#include "rydz_ecs/message.hpp"
 #include "rydz_ecs/event.hpp"
+#include "rydz_ecs/message.hpp"
 
 #include "rydz_ecs/condition.hpp"
 #include "rydz_ecs/schedule.hpp"

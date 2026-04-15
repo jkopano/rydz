@@ -2,7 +2,6 @@
 #include "math.hpp"
 #include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_ecs/query.hpp"
-#include "rydz_ecs/requires.hpp"
 #include <functional>
 #include <unordered_map>
 
@@ -10,68 +9,8 @@ namespace ecs {
 
 using namespace math;
 
-struct GlobalTransform;
-
-struct Transform {
-  using Required = Requires<GlobalTransform>;
-  Vec3 translation = Vec3::sZero();
-  Quat rotation = Quat::sIdentity();
-  Vec3 scale = Vec3::sReplicate(1.0f);
-
-  static Transform from_xyz(float x, float y, float z) {
-    return Transform{
-        {Vec3(x, y, z)}, Quat::sIdentity(), Vec3::sReplicate(1.0f)};
-  }
-
-  static Transform from_translation(Vec3 pos) {
-    return Transform{pos, Quat::sIdentity(), Vec3::sReplicate(1.0f)};
-  }
-
-  static Transform from_rotation(Quat q) {
-    return Transform{Vec3::sZero(), q, Vec3::sReplicate(1.0f)};
-  }
-
-  static Transform from_scale(Vec3 s) {
-    return Transform{Vec3::sZero(), Quat::sIdentity(), s};
-  }
-
-  Mat4 compute_matrix() const {
-    return Mat4::sRotationTranslation(rotation, translation).PreScaled(scale);
-  }
-
-  Vec3 forward() const { return rotation * Vec3(0, 0, -1); }
-
-  Vec3 right() const { return rotation * Vec3(1, 0, 0); }
-
-  Vec3 up() const { return rotation * Vec3(0, 1, 0); }
-
-  Transform &look_at(Vec3 target, Vec3 world_up = Vec3(0, 1, 0)) {
-    Vec3 dir = target - translation;
-    if (dir.LengthSq() < 1e-10f) {
-      return *this;
-    }
-
-    Mat4 look = Mat4::sLookAt(translation, target, world_up);
-    Mat4 inv = look.Inversed();
-    inv.SetTranslation(Vec3::sZero());
-    rotation = inv.GetQuaternion().Normalized();
-    return *this;
-  }
-};
-
-struct GlobalTransform {
-  Mat4 matrix = Mat4::sIdentity();
-
-  static GlobalTransform from_matrix(Mat4 m) { return {m}; }
-
-  Vec3 translation() const { return matrix.GetTranslation(); }
-
-  Vec3 forward() const { return (-matrix.GetAxisZ()).Normalized(); }
-
-  Vec3 right() const { return matrix.GetAxisX().Normalized(); }
-
-  Vec3 up() const { return matrix.GetAxisY().Normalized(); }
-};
+using Transform = math::Transform;
+using GlobalTransform = math::GlobalTransform;
 
 inline void propagate_transforms(
     Query<Entity, Transform, Opt<Parent>, Mut<GlobalTransform>> query) {
@@ -81,7 +20,7 @@ inline void propagate_transforms(
 
   for (auto [entity, transform, parent, global] : query.iter()) {
     local_matrices[entity] = transform->compute_matrix();
-    if (parent) {
+    if (parent != nullptr) {
       parents[entity] = parent->entity;
     }
   }

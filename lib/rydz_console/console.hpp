@@ -1,7 +1,7 @@
 // Odpowiada za rysowanie konsoli i przechwytywanie wejścia z klawiatury
 #pragma once
 #include "rl.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "scripting.hpp"
 #include <sstream>
 #include <string>
@@ -170,7 +170,7 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
 
 inline void console_plugin(ecs::App &app) {
   app.init_resource<ConsoleState>();
-  app.add_systems(ecs::ScheduleLabel::Update, ConsoleUpdateSystem);
-  //app.add_systems(ecs::ScheduleLabel::Render, ConsoleRenderSystem);
+  app.add_systems(ecs::Update, ConsoleUpdateSystem);
+  app.add_systems(ecs::Render, ConsoleRenderSystem);
 }
 } // namespace engine

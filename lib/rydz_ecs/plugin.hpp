@@ -7,6 +7,11 @@ class App;
 
 class IPlugin {
 public:
+  IPlugin() = default;
+  IPlugin(const IPlugin &) = default;
+  IPlugin(IPlugin &&) = delete;
+  IPlugin &operator=(const IPlugin &) = default;
+  IPlugin &operator=(IPlugin &&) = delete;
   virtual ~IPlugin() = default;
   virtual void build(App &app) = 0;
 };

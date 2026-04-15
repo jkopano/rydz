@@ -53,8 +53,9 @@ struct QueryFilterTraits<Filters<F, Fs...>> {
   static std::span<const Entity> candidates(const World &world) {
     usize size_f = QueryFilterTraits<F>::candidate_size(world);
     usize size_rest = QueryFilterTraits<Filters<Fs...>>::candidate_size(world);
-    if (size_f <= size_rest)
+    if (size_f <= size_rest) {
       return QueryFilterTraits<F>::candidates(world);
+    }
     return QueryFilterTraits<Filters<Fs...>>::candidates(world);
   }
   static usize candidate_size(const World &world) {
@@ -97,8 +98,9 @@ template <typename T> struct QueryFilterTraits<Added<T>> {
   static bool matches(const World &world, Entity entity, Tick last_run,
                       Tick this_run) {
     auto ticks = world.get_component_ticks<T>(entity);
-    if (!ticks)
+    if (!ticks) {
       return false;
+    }
 
     return ticks->added.is_newer_than(last_run, this_run);
   }
@@ -122,8 +124,9 @@ template <typename T> struct QueryFilterTraits<Changed<T>> {
   static bool matches(const World &world, Entity entity, Tick last_run,
                       Tick this_run) {
     auto ticks = world.get_component_ticks<T>(entity);
-    if (!ticks)
+    if (!ticks) {
       return false;
+    }
     return ticks->changed.is_newer_than(last_run, this_run);
   }
 
