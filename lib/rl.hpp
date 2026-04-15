@@ -93,7 +93,8 @@ using ::GenImageColor;
 using ::ImageText;
 using ::ImageTextEx;
 using ::ImageFormat;
-using LoadImage = ::rlLoadImage;
+using ::rlLoadImage;
+inline Image LoadImage(const char *fileName) { return ::rlLoadImage(fileName); }
 using ::LoadTexture;
 using ::LoadTextureFromImage;
 using ::LoadRenderTexture;
