@@ -1,9 +1,9 @@
 #pragma once
+
 #include "math.hpp"
 #include "mesh3d.hpp"
-#include "rl.hpp"
 #include "rydz_camera/camera3d.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"
 #include "types.hpp"
@@ -26,17 +26,19 @@ struct ViewVisibility {
   bool visible = true;
 };
 
-inline AABox compute_local_bbox(const rl::Mesh &mesh) {
-  if (!mesh.vertices || mesh.vertexCount <= 0)
-    return AABox();
+inline AABox compute_local_bbox(const gl::Mesh &mesh) {
+  if ((mesh.vertex_data() == nullptr) || mesh.vertex_count() <= 0) {
+    return {};
+  }
 
   AABox bbox;
   bbox.mMin = Vec3(FLT_MAX, FLT_MAX, FLT_MAX);
   bbox.mMax = Vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-  for (int i = 0; i < mesh.vertexCount; ++i) {
-    Vec3 v(mesh.vertices[i * 3 + 0], mesh.vertices[i * 3 + 1],
-           mesh.vertices[i * 3 + 2]);
-    bbox.Encapsulate(v);
+  for (int i = 0; i < mesh.vertex_count(); ++i) {
+    const float *vertices = mesh.vertex_data();
+    Vec3 vec(vertices[(i * 3) + 0], vertices[(i * 3) + 1],
+             vertices[(i * 3) + 2]);
+    bbox.Encapsulate(vec);
   }
   return bbox;
 }
@@ -71,8 +73,9 @@ inline bool aabb_in_frustum(const AABox &bbox,
         plane.normal.GetY() >= 0 ? bbox.mMax.GetY() : bbox.mMin.GetY(),
         plane.normal.GetZ() >= 0 ? bbox.mMax.GetZ() : bbox.mMin.GetZ());
     float dist = plane.normal.Dot(p_vertex) + plane.distance;
-    if (dist < 0)
+    if (dist < 0) {
       return false;
+    }
   }
   return true;
 }
@@ -90,18 +93,16 @@ inline std::array<FrustumPlane, 6> extract_frustum_planes(Mat4 vp) {
   auto normalize_plane = [](Vec4 v) -> FrustumPlane {
     Vec3 n(v.GetX(), v.GetY(), v.GetZ());
     float len = n.Length();
-    if (len > 1e-8f)
+    if (len > 1e-8f) {
       return {n / len, v.GetW() / len};
+    }
     return {};
   };
 
   return {
-      normalize_plane(r3 + r0), // Left
-      normalize_plane(r3 - r0), // Right
-      normalize_plane(r3 + r1), // Bottom
-      normalize_plane(r3 - r1), // Top
-      normalize_plane(r3 + r2), // Near
-      normalize_plane(r3 - r2), // Far
+      normalize_plane(r3 + r0), normalize_plane(r3 - r0),
+      normalize_plane(r3 + r1), normalize_plane(r3 - r1),
+      normalize_plane(r3 + r2), normalize_plane(r3 - r2),
   };
 }
 
@@ -111,11 +112,13 @@ struct MeshBounds {
 
 inline void
 compute_mesh_bounds_system(Query<Entity, Mesh3d, Without<MeshBounds>> query,
-                           Res<Assets<rl::Mesh>> mesh_assets, Cmd cmd) {
+                           Res<Assets<Mesh>> mesh_assets, Cmd cmd) {
   for (auto [e, mesh3d] : query.iter()) {
-    const rl::Mesh *mesh = mesh_assets->get(mesh3d->mesh);
-    if (!mesh || mesh->vertexCount <= 0 || !mesh->vertices)
+    const auto *mesh = mesh_assets->get(mesh3d->mesh);
+    if ((mesh == nullptr) || mesh->vertex_count() <= 0 ||
+        (mesh->vertex_data() == nullptr)) {
       continue;
+    }
 
     cmd.entity(e).insert(MeshBounds{.bbox = compute_local_bbox(*mesh)});
   }
@@ -127,8 +130,9 @@ inline void frustum_cull_system(
         mesh_query,
     Res<Window> window, Cmd cmd) {
   auto cam_result = cam_query.single();
-  if (!cam_result)
+  if (!cam_result) {
     return;
+  }
   auto [cam_comp, cam_gt] = *cam_result;
   const float aspect = compute_camera_aspect_ratio(
       static_cast<float>(window->width), static_cast<float>(window->height));
@@ -147,11 +151,13 @@ inline void frustum_cull_system(
   };
 
   std::vector<CullEntry> entries;
-  for (auto [e, mb, gt, cv] : mesh_query.iter())
+  for (auto [e, mb, gt, cv] : mesh_query.iter()) {
     entries.push_back({e, mb, gt, cv});
+  }
 
-  if (entries.empty())
+  if (entries.empty()) {
     return;
+  }
 
   std::vector<ViewVisibility> results(entries.size());
 
@@ -172,8 +178,9 @@ inline void frustum_cull_system(
   static tf::Executor executor;
   executor.run(taskflow).wait();
 
-  for (size_t i = 0; i < entries.size(); ++i)
+  for (size_t i = 0; i < entries.size(); ++i) {
     cmd.entity(entries[i].entity).insert(results[i]);
+  }
 }
 
 } // namespace ecs

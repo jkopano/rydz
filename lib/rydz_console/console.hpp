@@ -1,7 +1,7 @@
 // Odpowiada za rysowanie konsoli i przechwytywanie wejścia z klawiatury
 #pragma once
 #include "rl.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "scripting.hpp"
 #include <sstream>
 #include <string>

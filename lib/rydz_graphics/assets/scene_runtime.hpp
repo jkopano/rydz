@@ -1,7 +1,9 @@
 #pragma once
+
 #include "rydz_ecs/core/hierarchy.hpp"
+#include "rydz_graphics/assets/scene_graph.hpp"
+#include "rydz_graphics/material/standard_material.hpp"
 #include "rydz_graphics/visibility.hpp"
-#include "scene_graph.hpp"
 #include <algorithm>
 
 namespace ecs {
@@ -187,7 +189,7 @@ private:
     }
 
     static void ensure_mesh(World &world, Entity entity,
-                            Handle<rl::Mesh> mesh) {
+                            Handle<Mesh> mesh) {
       if (auto *existing = world.get_component<Mesh3d>(entity)) {
         existing->mesh = mesh;
       } else {
@@ -196,11 +198,11 @@ private:
     }
 
     static void ensure_material(World &world, Entity entity,
-                                const StandardMaterial &material) {
-      if (auto *existing = world.get_component<MeshMaterial3d<>>(entity)) {
+                                Handle<Material> material) {
+      if (auto *existing = world.get_component<MeshMaterial3d>(entity)) {
         existing->material = material;
       } else {
-        world.insert_component(entity, MeshMaterial3d<>{material});
+        world.insert_component(entity, MeshMaterial3d{material});
       }
     }
 

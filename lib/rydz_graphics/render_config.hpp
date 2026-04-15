@@ -1,104 +1,129 @@
 #pragma once
-#include "rl.hpp"
+
+#include "rydz_ecs/params.hpp"
+#include "rydz_graphics/gl/state.hpp"
 
 namespace ecs {
 
-enum class DepthFunc {
-  Always,
-  Never,
-  Less,
-  LessEqual,
-  Greater,
-  GreaterEqual,
-  Equal,
-  NotEqual,
-};
-
-struct Depth {
-  bool test = true;
-  bool write = true;
-  DepthFunc func = DepthFunc::Less;
-};
-
-enum class BlendMode {
-  Alpha,
-  Additive,
-  Multiplied,
-  Custom,
-};
-
-enum class CullMode {
-  None,
-  Back,
-  Front,
-};
-
-enum class PolygonMode {
-  Fill,
-  Line,
-  Point,
+struct ColorMask {
+  bool r = true;
+  bool g = true;
+  bool b = true;
+  bool a = true;
 };
 
 struct RenderConfig {
-  Depth depth;
-  BlendMode blend = BlendMode::Alpha;
-  CullMode cull = CullMode::Back;
-  PolygonMode polygon_mode = PolygonMode::Fill;
+  gl::Depth depth{};
+  gl::BlendMode blend = gl::BlendMode::Alpha;
+  gl::CullMode cull_mode = gl::CullMode::Back;
+  gl::PolygonMode polygon_mode = gl::PolygonMode::Fill;
+  ColorMask color_mask{};
+  bool color_blend = true;
   bool wireframe = false;
 
-  void apply() const {
+  void operator()(NonSendMarker) const {
+    gl::draw_render_batch_active();
+    gl::color_mask(color_mask.r, color_mask.g, color_mask.b, color_mask.a);
+
+    if (color_blend) {
+      gl::enable_color_blend();
+    } else {
+      gl::disable_color_blend();
+    }
 
     if (depth.test) {
-      rl::rlEnableDepthTest();
+      gl::enable_depth_test();
     } else {
-      rl::rlDisableDepthTest();
+      gl::disable_depth_test();
     }
+
     if (depth.write) {
-      rl::rlEnableDepthMask();
+      gl::enable_depth_mask();
     } else {
-      rl::rlDisableDepthMask();
+      gl::disable_depth_mask();
     }
 
-    switch (cull) {
-    case CullMode::Back:
-      rl::rlEnableBackfaceCulling();
-      rl::rlSetCullFace(RL_CULL_FACE_BACK);
+    switch (cull_mode) {
+    case gl::CullMode::Back:
+      gl::enable_backface_culling();
+      gl::set_cull_face(gl::CullFace::Back);
       break;
-    case CullMode::Front:
-      rl::rlEnableBackfaceCulling();
-      rl::rlSetCullFace(RL_CULL_FACE_FRONT);
+    case gl::CullMode::Front:
+      gl::enable_backface_culling();
+      gl::set_cull_face(gl::CullFace::Front);
       break;
-    case CullMode::None:
-      rl::rlDisableBackfaceCulling();
+    case gl::CullMode::None:
+      gl::disable_backface_culling();
       break;
     }
 
-    if (wireframe || polygon_mode == PolygonMode::Line) {
-      rl::rlEnableWireMode();
+    if (wireframe || polygon_mode == gl::PolygonMode::Line) {
+      gl::enable_wire_mode();
+    } else {
+      gl::disable_wire_mode();
     }
 
     switch (blend) {
-    case BlendMode::Alpha:
-      rl::rlSetBlendMode(RL_BLEND_ALPHA);
+    case gl::BlendMode::Alpha:
+      gl::set_blend_mode(RL_BLEND_ALPHA);
       break;
-    case BlendMode::Additive:
-      rl::rlSetBlendMode(RL_BLEND_ADDITIVE);
+    case gl::BlendMode::Additive:
+      gl::set_blend_mode(RL_BLEND_ADDITIVE);
       break;
-    case BlendMode::Multiplied:
-      rl::rlSetBlendMode(RL_BLEND_MULTIPLIED);
+    case gl::BlendMode::Multiplied:
+      gl::set_blend_mode(RL_BLEND_MULTIPLIED);
       break;
-    case BlendMode::Custom:
+    case gl::BlendMode::Custom:
       break;
     }
   }
 
-  static void restore_defaults() {
-    rl::rlEnableDepthTest();
-    rl::rlEnableDepthMask();
-    rl::rlEnableBackfaceCulling();
-    rl::rlSetCullFace(RL_CULL_FACE_BACK);
-    rl::rlDisableWireMode();
-    rl::rlSetBlendMode(RL_BLEND_ALPHA);
+  static RenderConfig world_default() { return {}; }
+
+  static RenderConfig depth_prepass() {
+    return {
+        .depth = {.test = true, .write = true},
+        .blend = gl::BlendMode::Alpha,
+        .cull_mode = gl::CullMode::Back,
+        .polygon_mode = gl::PolygonMode::Fill,
+        .color_mask = {.r = false, .g = false, .b = false, .a = false},
+        .color_blend = false,
+    };
+  }
+
+  static RenderConfig post_depth_prepass() { return world_default(); }
+
+  static RenderConfig opaque() {
+    return {
+        .depth = {.test = true, .write = true},
+        .blend = gl::BlendMode::Alpha,
+        .cull_mode = gl::CullMode::Back,
+        .polygon_mode = gl::PolygonMode::Fill,
+        .color_mask = {},
+        .color_blend = false,
+    };
+  }
+
+  static RenderConfig transparent() {
+    return {
+        .depth = {.test = true, .write = false},
+        .blend = gl::BlendMode::Alpha,
+        .cull_mode = gl::CullMode::Back,
+        .polygon_mode = gl::PolygonMode::Fill,
+        .color_mask = {},
+        .color_blend = true,
+    };
+  }
+
+  static RenderConfig end_world_pass() {
+    return {
+        .depth = {.test = false, .write = true},
+        .blend = gl::BlendMode::Alpha,
+        .cull_mode = gl::CullMode::None,
+        .polygon_mode = gl::PolygonMode::Fill,
+        .color_mask = {},
+        .color_blend = true,
+    };
   }
 };
 

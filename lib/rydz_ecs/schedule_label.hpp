@@ -20,6 +20,19 @@ enum struct ScheduleLabel {
   FixedUpdate,
 };
 
+inline constexpr ScheduleLabel PreStartup = ScheduleLabel::PreStartup;
+inline constexpr ScheduleLabel Startup = ScheduleLabel::Startup;
+inline constexpr ScheduleLabel PostStartup = ScheduleLabel::PostStartup;
+inline constexpr ScheduleLabel First = ScheduleLabel::First;
+inline constexpr ScheduleLabel PreUpdate = ScheduleLabel::PreUpdate;
+inline constexpr ScheduleLabel Update = ScheduleLabel::Update;
+inline constexpr ScheduleLabel PostUpdate = ScheduleLabel::PostUpdate;
+inline constexpr ScheduleLabel ExtractRender = ScheduleLabel::ExtractRender;
+inline constexpr ScheduleLabel Render = ScheduleLabel::Render;
+inline constexpr ScheduleLabel PostRender = ScheduleLabel::PostRender;
+inline constexpr ScheduleLabel Last = ScheduleLabel::Last;
+inline constexpr ScheduleLabel FixedUpdate = ScheduleLabel::FixedUpdate;
+
 template <typename H> H AbslHashValue(H h, ScheduleLabel l) {
   return H::combine(std::move(h), static_cast<i32>(l));
 }

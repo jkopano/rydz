@@ -1,5 +1,17 @@
 CompileFlags:
   Add: 
+    - "-std=c++23"
+    - "-Ilib"
+    - "-Ilib/external/raylib/src"
+    - "-I/home/kuba/.xmake/packages/g/glm/1.0.3/edce8ea0eff64febb086d70410650481/include"
+    - "-I/home/kuba/.xmake/packages/t/taskflow/v4.0.0/659212b31374427584fe8768f48ad7d4/include"
+    - "-I/home/kuba/.xmake/packages/j/joltphysics/v5.5.0/b495e9cccbaa4cf1b4ce849c98fd5868/include"
+    - "-I/home/kuba/.xmake/packages/s/sol2/v3.3.0/b2295c1398504133bc5383eccd58d71e/include"
+    - "-I/home/kuba/.xmake/packages/g/glaze/v7.0.2/4af43556010746b5945916eb4cbf13e8/include"
+    - "-I/home/kuba/.xmake/packages/g/gtest/v1.17.0/bb81fecd0b4d4e4fb844c37702663b92/include"
+    - "-I/home/kuba/.xmake/packages/s/spdlog/v1.17.0/3fa7b85c2b654633a261398ce4940a63/include"
+    - "-I/home/kuba/.xmake/packages/f/fmt/12.1.0/d3ea32b4d32e4cfbab907f41436b0b1d/include"
+    - "-I/nix/store/7rk2ic67w77kvirns0c14151q253jxra-luajit-2.1.1741730670/include/luajit-2.1"
     - "-Wall"
     - "-Wextra"
     - "-Wpedantic"

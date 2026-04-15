@@ -12,10 +12,9 @@ template <typename T, typename StoragePtr = const storage_t<T> *>
 struct FetcherBase {
   StoragePtr storage = nullptr;
 
-  usize size() const { return storage ? storage->size() : 0; }
-  bool is_required() const { return true; }
-
-  std::span<const Entity> entities() const {
+  [[nodiscard]] usize size() const { return storage ? storage->size() : 0; }
+  [[nodiscard]] bool is_required() const { return true; }
+  [[nodiscard]] std::span<const Entity> entities() const {
     return storage ? storage->entities() : std::span<const Entity>{};
   }
 };
@@ -48,15 +47,16 @@ template <typename T> struct WorldQueryTraits<Mut<T>> {
   static bool is_valid(const Item &item) { return item.ptr != nullptr; }
 
   struct Fetcher : FetcherBase<T, storage_t<T> *> {
-    Tick tick{};
+    Tick tick;
 
     void init(World &world) {
       this->storage = world.get_storage<T>();
       tick = world.read_change_tick();
     }
     Item fetch(Entity entity) const {
-      if (!this->storage)
+      if (!this->storage) {
         return Item{};
+      }
       auto [p, t] = this->storage->get_with_ticks(entity);
       return Item{p, t, tick};
     }
@@ -68,8 +68,8 @@ template <typename T> struct WorldQueryTraits<Opt<T>> : WorldQueryTraits<T> {
   static bool is_valid(typename WorldQueryTraits<T>::Item) { return true; }
 
   struct Fetcher : WorldQueryTraits<T>::Fetcher {
-    usize size() const { return SIZE_MAX; }
-    bool is_required() const { return false; }
+    [[nodiscard]] usize size() const { return SIZE_MAX; }
+    [[nodiscard]] bool is_required() const { return false; }
   };
 };
 
@@ -81,8 +81,8 @@ struct WorldQueryTraits<Opt<Mut<T>>> : WorldQueryTraits<Mut<T>> {
   }
 
   struct Fetcher : WorldQueryTraits<Mut<T>>::Fetcher {
-    usize size() const { return SIZE_MAX; }
-    bool is_required() const { return false; }
+    [[nodiscard]] usize size() const { return SIZE_MAX; }
+    [[nodiscard]] bool is_required() const { return false; }
   };
 };
 
@@ -94,10 +94,10 @@ template <> struct WorldQueryTraits<Entity> {
 
   struct Fetcher {
     void init(World &) {}
-    Item fetch(Entity entity) const { return entity; }
-    usize size() const { return SIZE_MAX; }
-    bool is_required() const { return false; }
-    std::span<const Entity> entities() const { return {}; }
+    static Item fetch(Entity entity) { return entity; }
+    static usize size() { return SIZE_MAX; }
+    static bool is_required() { return false; }
+    static std::span<const Entity> entities() { return {}; }
   };
 };
 

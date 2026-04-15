@@ -1,21 +1,23 @@
 #pragma once
-#include "math.hpp"
-#include "rl.hpp"
-#include "shader.hpp"
+
+#include "rydz_graphics/gl/resources.hpp"
+#include "rydz_graphics/gl/shader.hpp"
 #include <cstring>
 #include <string>
 
-namespace ecs {
+namespace gl {
 
 class Skybox {
+  static constexpr u32 FACE_COUNT = 6;
+
 public:
   struct Config {
-    std::string right = "";
-    std::string left = "";
-    std::string top = "";
-    std::string bottom = "";
-    std::string front = "";
-    std::string back = "";
+    std::string right{};
+    std::string left{};
+    std::string top{};
+    std::string bottom{};
+    std::string front{};
+    std::string back{};
 
     static Config from_directory(const std::string &dir,
                                  const std::string &ext = ".jpg") {
@@ -28,17 +30,17 @@ public:
     }
   };
 
-  unsigned int cubemap_id = 0;
-  unsigned int vao = 0;
-  unsigned int vbo = 0;
+  u32 cubemap_id = 0;
+  VAO vao{};
+  VBO vbo{};
   bool loaded = false;
 
   Skybox() = default;
 
   static Skybox from(Config cfg) {
     Skybox skybox{};
-    const std::string paths[6] = {cfg.right,  cfg.left,  cfg.top,
-                                  cfg.bottom, cfg.front, cfg.back};
+    const std::array<std::string, FACE_COUNT> paths = {
+        cfg.right, cfg.left, cfg.top, cfg.bottom, cfg.front, cfg.back};
 
     skybox.cubemap_id = load_cubemap_from_paths(paths);
     skybox.create_cube_vao();
@@ -61,30 +63,30 @@ public:
     rl::rlDisableBackfaceCulling();
     rl::rlDisableDepthMask();
 
-    shader.set("matView", math::to_rl(view));
-    shader.set("matProjection", math::to_rl(proj));
+    shader.set("matView", view);
+    shader.set("matProjection", proj);
 
-    rl::rlActiveTextureSlot(0);
-    rl::rlEnableTextureCubemap(cubemap_id);
+    active_texture_slot(0);
+    enable_texture_cubemap(cubemap_id);
 
     shader.with_enabled([&] {
-      rl::rlEnableVertexArray(vao);
-      rl::rlDrawVertexArray(0, 36);
-      rl::rlDisableVertexArray();
+      vao.bind();
+      vao.draw(0, 36);
+      VAO::unbind();
     });
 
-    rl::rlDisableTextureCubemap();
+    disable_texture_cubemap();
     rl::rlEnableDepthMask();
     rl::rlEnableBackfaceCulling();
   }
 
   void unload() {
-    if (cubemap_id != 0)
-      rl::rlUnloadTexture(cubemap_id);
-    if (vao != 0)
-      rl::rlUnloadVertexArray(vao);
-    if (vbo != 0)
-      rl::rlUnloadVertexBuffer(vbo);
+    if (cubemap_id != 0) {
+      unload_texture_id(cubemap_id);
+      cubemap_id = 0;
+    }
+    vao.reset();
+    vbo.reset();
     loaded = false;
   }
 
@@ -93,8 +95,8 @@ private:
     static ShaderProgram shader = [] {
       ShaderProgram program = ShaderProgram::load(ShaderSpec::from(
           "res/shaders/skybox.vert", "res/shaders/skybox.frag"));
-      int val = 0;
-      program.set("u_skybox", val);
+      int value = 0;
+      program.set("u_skybox", value);
       return program;
     }();
     return shader;
@@ -114,46 +116,53 @@ private:
         -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
         -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f};
 
-    vao = rl::rlLoadVertexArray();
-    rl::rlEnableVertexArray(vao);
-    vbo = rl::rlLoadVertexBuffer(vertices, sizeof(vertices), false);
-    rl::rlSetVertexAttribute(0, 3, RL_FLOAT, false, 0, 0);
-    rl::rlEnableVertexAttribute(0);
-    rl::rlDisableVertexArray();
+    vao = VAO::create();
+    vao.bind();
+    vbo = VBO::create(vertices, sizeof(vertices), false);
+    set_vertex_attribute(0, 3, RL_FLOAT, false, 0, 0);
+    enable_vertex_attribute(0);
+    VAO::unbind();
   }
 
-  static unsigned int load_cubemap_from_paths(const std::string paths[6]) {
-    rl::Image images[6];
-    for (int i = 0; i < 6; i++) {
-      images[i] = rl::LoadImage(paths[i].c_str());
-      if (images[i].data == nullptr) {
-        for (int j = 0; j < i; j++)
-          rl::UnloadImage(images[j]);
+  static unsigned int
+  load_cubemap_from_paths(const std::array<std::string, FACE_COUNT> &paths) {
+    std::array<Image, FACE_COUNT> images;
+
+    for (usize i = 0; i < images.size(); ++i) {
+      images.at(i) = load_image(paths.at(i));
+      if (images.at(i).data == nullptr) {
+        for (usize j = 0; j < i; ++j) {
+          unload_image(images.at(j));
+        }
         return 0;
       }
-      if (images[i].format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
-        rl::ImageFormat(&images[i], PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+      if (images.at(i).format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
+        image_format(images.at(i), PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
       }
     }
 
-    int w = images[0].width;
-    int h = images[0].height;
-    int pixel_size = 4;
+    u32 width = images[0].width;
+    u32 height = images[0].height;
+    u32 pixel_size = 4U;
 
-    auto *data =
-        static_cast<unsigned char *>(RL_MALLOC(w * h * 6 * pixel_size));
+    std::vector<u8> data(width * height * FACE_COUNT * pixel_size);
 
-    for (int i = 0; i < 6; i++) {
-      std::memcpy(data + i * w * h * pixel_size, images[i].data,
-                  w * h * pixel_size);
-      rl::UnloadImage(images[i]);
+    for (usize i = 0; i < FACE_COUNT; ++i) {
+      u32 size = width * height * pixel_size;
+      usize offset = i * size;
+      std::memcpy(data.data() + offset, images.at(i).data,
+                  width * height * pixel_size);
+      unload_image(images.at(i));
     }
 
-    unsigned int id =
-        rl::rlLoadTextureCubemap(data, w, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
-    RL_FREE(data);
+    unsigned int id = load_texture_cubemap(
+        data.data(), width, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
+
     return id;
   }
 };
 
-} // namespace ecs
+} // namespace gl
+namespace ecs {
+using Skybox = gl::Skybox;
+}

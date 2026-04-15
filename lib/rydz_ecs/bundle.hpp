@@ -30,14 +30,14 @@ concept IsMessage = requires { typename T::T; } &&
                     std::is_same_v<typename type_tag_of<T>::type, Message>;
 
 template <typename T>
-concept IsEntityEvent = requires { typename T::T; } &&
-                        std::is_same_v<typename type_tag_of<T>::type,
-                                       EntityEvent>;
+concept IsEntityEvent = requires {
+  typename T::T;
+} && std::is_same_v<typename type_tag_of<T>::type, EntityEvent>;
 
 template <typename T>
-concept IsEvent =
-    requires { typename T::T; } &&
-    (std::is_same_v<typename type_tag_of<T>::type, Event> || IsEntityEvent<T>);
+concept IsEvent = requires {
+  typename T::T;
+} && (std::is_same_v<typename type_tag_of<T>::type, Event> || IsEntityEvent<T>);
 
 template <typename T>
 concept Spawnable = IsComponent<bare_t<T>> || IsBundle<bare_t<T>>;
@@ -114,8 +114,6 @@ void insert_tuple_items(World &world, Entity entity, Tuple<Ts...> &&tup) {
       },
       std::move(tup));
 }
-
-template <typename T> void insert_single(World &world, Entity entity, T &&item);
 
 } // namespace detail
 

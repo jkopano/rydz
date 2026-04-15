@@ -1,7 +1,7 @@
 #pragma once
 
-#include "rl.hpp"
-#include "types.hpp"
+#include "hash.hpp"
+#include "rydz_graphics/gl/core.hpp"
 #include <array>
 #include <functional>
 #include <string>
@@ -9,13 +9,13 @@
 #include <unordered_map>
 #include <utility>
 
-namespace ecs {
+namespace gl {
 
 struct ShaderSpec {
   std::string vertex_path;
   std::string fragment_path;
 
-  bool operator==(const ShaderSpec &o) const = default;
+  bool operator==(const ShaderSpec &other) const = default;
 
   static ShaderSpec from(std::string vertex_path, std::string fragment_path) {
     return {
@@ -40,96 +40,70 @@ enum class UniformType {
 };
 
 struct Uniform {
-  std::string name;
   UniformType type = UniformType::Float;
-  std::array<float, 16> float_data{};
-  std::array<int, 4> int_data{};
   int count = 1;
 
-  bool operator==(const Uniform &o) const = default;
+  union {
+    std::array<float, 16> float_data;
+    std::array<int, 4> int_data;
+  };
 
-  static Uniform float1(std::string name, f32 value) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Float;
-    uniform.float_data[0] = value;
-    return uniform;
+  Uniform() : float_data{} {}
+
+  explicit Uniform(float v) : float_data{} {
+    type = UniformType::Float;
+    float_data[0] = v;
   }
 
-  static Uniform vec2(std::string name, f32 x, f32 y) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Vec2;
-    uniform.float_data[0] = x;
-    uniform.float_data[1] = y;
-    return uniform;
+  Uniform(float x, float y) : float_data{} {
+    type = UniformType::Vec2;
+    float_data[0] = x;
+    float_data[1] = y;
   }
 
-  static Uniform vec3(std::string name, f32 x, f32 y, f32 z) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Vec3;
-    uniform.float_data[0] = x;
-    uniform.float_data[1] = y;
-    uniform.float_data[2] = z;
-    return uniform;
+  Uniform(float x, float y, float z) : float_data{} {
+    type = UniformType::Vec3;
+    float_data[0] = x;
+    float_data[1] = y;
+    float_data[2] = z;
   }
 
-  static Uniform vec4(std::string name, f32 x, f32 y, f32 z, f32 w) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Vec4;
-    uniform.float_data[0] = x;
-    uniform.float_data[1] = y;
-    uniform.float_data[2] = z;
-    uniform.float_data[3] = w;
-    return uniform;
+  Uniform(float x, float y, float z, float w) : float_data{} {
+    type = UniformType::Vec4;
+    float_data[0] = x;
+    float_data[1] = y;
+    float_data[2] = z;
+    float_data[3] = w;
   }
 
-  static Uniform int1(std::string name, int value) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Int;
-    uniform.int_data[0] = value;
-    return uniform;
+  explicit Uniform(int v) : float_data{} {
+    type = UniformType::Int;
+    int_data[0] = v;
   }
 
-  static Uniform ivec2(std::string name, int x, int y) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::IVec2;
-    uniform.int_data[0] = x;
-    uniform.int_data[1] = y;
-    return uniform;
+  Uniform(int x, int y) : float_data{} {
+    type = UniformType::IVec2;
+    int_data[0] = x;
+    int_data[1] = y;
   }
 
-  static Uniform ivec3(std::string name, int x, int y, int z) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::IVec3;
-    uniform.int_data[0] = x;
-    uniform.int_data[1] = y;
-    uniform.int_data[2] = z;
-    return uniform;
-  }
+  explicit Uniform(const std::array<float, 16> &mat)
+      : type(UniformType::Mat4), float_data(mat) {}
 
-  static Uniform ivec4(std::string name, int x, int y, int z, int w) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::IVec4;
-    uniform.int_data[0] = x;
-    uniform.int_data[1] = y;
-    uniform.int_data[2] = z;
-    uniform.int_data[3] = w;
-    return uniform;
-  }
+  Uniform(const math::Vec3 &v) : Uniform(v.GetX(), v.GetY(), v.GetZ()) {}
+  bool operator==(const Uniform &other) const {
+    if (type != other.type || count != other.count)
+      return false;
 
-  static Uniform mat4(std::string name, const std::array<float, 16> &value) {
-    Uniform uniform;
-    uniform.name = std::move(name);
-    uniform.type = UniformType::Mat4;
-    uniform.float_data = value;
-    return uniform;
+    switch (type) {
+    case UniformType::Int:
+    case UniformType::IVec2:
+    case UniformType::IVec3:
+    case UniformType::IVec4:
+      return int_data == other.int_data;
+    default:
+      return float_data == other.float_data;
+    }
   }
 };
 
@@ -137,7 +111,7 @@ class ShaderProgram {
 public:
   ShaderProgram() = default;
 
-  explicit ShaderProgram(rl::Shader shader, bool owns_resource = true)
+  explicit ShaderProgram(Shader shader, bool owns_resource = true)
       : shader_(shader), owns_resource_(owns_resource) {}
 
   ShaderProgram(const ShaderProgram &) = delete;
@@ -148,7 +122,7 @@ public:
         uniform_locations_(std::move(other.uniform_locations_)),
         attribute_locations_(std::move(other.attribute_locations_)),
         owns_resource_(other.owns_resource_) {
-    other.shader_ = {};
+    other.shader_ = Shader{};
     other.owns_resource_ = false;
   }
 
@@ -162,7 +136,7 @@ public:
     uniform_locations_ = std::move(other.uniform_locations_);
     attribute_locations_ = std::move(other.attribute_locations_);
     owns_resource_ = other.owns_resource_;
-    other.shader_ = {};
+    other.shader_ = Shader{};
     other.owns_resource_ = false;
     return *this;
   }
@@ -179,14 +153,14 @@ public:
   }
 
   static ShaderProgram default_shader() {
-    rl::Shader shader{};
-    shader.id = rl::rlGetShaderIdDefault();
-    shader.locs = rl::rlGetShaderLocsDefault();
+    Shader shader{};
+    shader.id = Shader::default_id();
+    shader.locs = Shader::default_locs();
     return ShaderProgram(shader, false);
   }
 
-  rl::Shader &raw() { return shader_; }
-  const rl::Shader &raw() const { return shader_; }
+  Shader &raw() { return shader_; }
+  const Shader &raw() const { return shader_; }
 
   int uniform_location(const char *name) {
     auto it = uniform_locations_.find(name);
@@ -218,37 +192,44 @@ public:
     set_value(name, &value, SHADER_UNIFORM_INT);
   }
 
-  void set(const char *name, const rl::Vector2 &value) {
+  void set(const char *name, const Vec2 &value) {
     set_value(name, &value, SHADER_UNIFORM_VEC2);
   }
 
-  void set(const char *name, const rl::Vector3 &value) {
+  void set(const char *name, const Vec3 &value) {
     set_value(name, &value, SHADER_UNIFORM_VEC3);
   }
 
-  void set(const char *name, const rl::Vector4 &value) {
+  void set(const char *name, const Vec4 &value) {
     set_value(name, &value, SHADER_UNIFORM_VEC4);
   }
 
-  void set(const char *name, const rl::Matrix &value) {
+  void set(const char *name, const Matrix &value) {
     const int location = uniform_location(name);
     if (location >= 0) {
       rl::SetShaderValueMatrix(shader_, location, value);
     }
   }
 
+  void set(const char *name, const math::Mat4 &value) {
+    set(name, math::to_rl(value));
+  }
+
   void set(const std::string &name, float value) { set(name.c_str(), value); }
   void set(const std::string &name, int value) { set(name.c_str(), value); }
-  void set(const std::string &name, const rl::Vector2 &value) {
+  void set(const std::string &name, const Vec2 &value) {
     set(name.c_str(), value);
   }
-  void set(const std::string &name, const rl::Vector3 &value) {
+  void set(const std::string &name, const Vec3 &value) {
     set(name.c_str(), value);
   }
-  void set(const std::string &name, const rl::Vector4 &value) {
+  void set(const std::string &name, const Vec4 &value) {
     set(name.c_str(), value);
   }
-  void set(const std::string &name, const rl::Matrix &value) {
+  void set(const std::string &name, const Matrix &value) {
+    set(name.c_str(), value);
+  }
+  void set(const std::string &name, const math::Mat4 &value) {
     set(name.c_str(), value);
   }
 
@@ -264,60 +245,53 @@ public:
     set_value(name, value, type);
   }
 
-  void set_texture(const char *name, const rl::Texture2D &texture) {
+  void set_texture(const char *name, const Texture &texture) {
     const int location = uniform_location(name);
     if (location >= 0) {
       rl::SetShaderValueTexture(shader_, location, texture);
     }
   }
 
-  void set_texture(int location, const rl::Texture2D &texture) {
+  void set_texture(int location, const Texture &texture) {
     if (location >= 0) {
       rl::SetShaderValueTexture(shader_, location, texture);
     }
   }
 
-  void apply(const Uniform &uniform) {
+  void apply(const std::string &name, const Uniform &uniform) {
     switch (uniform.type) {
     case UniformType::Float:
       if (uniform.count > 1) {
-        set_float_array(uniform.name.c_str(), uniform.float_data.data(),
-                        uniform.count);
+        set_float_array(name.c_str(), uniform.float_data.data(), uniform.count);
       } else {
-        set(uniform.name.c_str(), uniform.float_data[0]);
+        set(name.c_str(), uniform.float_data[0]);
       }
       break;
     case UniformType::Vec2:
-      set(uniform.name.c_str(),
-          rl::Vector2{uniform.float_data[0], uniform.float_data[1]});
+      set(name.c_str(), Vec2{uniform.float_data[0], uniform.float_data[1]});
       break;
     case UniformType::Vec3:
-      set(uniform.name.c_str(),
-          rl::Vector3{uniform.float_data[0], uniform.float_data[1],
-                      uniform.float_data[2]});
+      set(name.c_str(), Vec3{uniform.float_data[0], uniform.float_data[1],
+                             uniform.float_data[2]});
       break;
     case UniformType::Vec4:
-      set(uniform.name.c_str(),
-          rl::Vector4{uniform.float_data[0], uniform.float_data[1],
-                      uniform.float_data[2], uniform.float_data[3]});
+      set(name.c_str(), Vec4{uniform.float_data[0], uniform.float_data[1],
+                             uniform.float_data[2], uniform.float_data[3]});
       break;
     case UniformType::Int:
-      set(uniform.name.c_str(), uniform.int_data[0]);
+      set(name.c_str(), uniform.int_data[0]);
       break;
     case UniformType::IVec2:
-      set_ints(uniform.name.c_str(), uniform.int_data.data(),
-               SHADER_UNIFORM_IVEC2);
+      set_ints(name.c_str(), uniform.int_data.data(), SHADER_UNIFORM_IVEC2);
       break;
     case UniformType::IVec3:
-      set_ints(uniform.name.c_str(), uniform.int_data.data(),
-               SHADER_UNIFORM_IVEC3);
+      set_ints(name.c_str(), uniform.int_data.data(), SHADER_UNIFORM_IVEC3);
       break;
     case UniformType::IVec4:
-      set_ints(uniform.name.c_str(), uniform.int_data.data(),
-               SHADER_UNIFORM_IVEC4);
+      set_ints(name.c_str(), uniform.int_data.data(), SHADER_UNIFORM_IVEC4);
       break;
     case UniformType::Mat4: {
-      const rl::Matrix matrix = {
+      const Matrix matrix = {
           uniform.float_data[0],  uniform.float_data[1],
           uniform.float_data[2],  uniform.float_data[3],
           uniform.float_data[4],  uniform.float_data[5],
@@ -327,7 +301,7 @@ public:
           uniform.float_data[12], uniform.float_data[13],
           uniform.float_data[14], uniform.float_data[15],
       };
-      set(uniform.name.c_str(), matrix);
+      set(name.c_str(), matrix);
       break;
     }
     }
@@ -368,17 +342,17 @@ public:
   }
 
 private:
-  rl::Shader shader_{};
+  Shader shader_{};
   std::unordered_map<std::string, int> uniform_locations_;
   std::unordered_map<std::string, int> attribute_locations_;
   bool owns_resource_ = false;
 
   void unload() {
     if (owns_resource_ && shader_.id != 0 &&
-        shader_.id != rl::rlGetShaderIdDefault()) {
+        shader_.id != Shader::default_id()) {
       ::UnloadShader(shader_);
     }
-    shader_ = {};
+    shader_ = Shader{};
     owns_resource_ = false;
   }
 
@@ -390,4 +364,38 @@ private:
   }
 };
 
-} // namespace ecs
+inline int shader_location(const Shader &shader, const char *name) {
+  return rl::GetShaderLocation(shader, name);
+}
+
+inline int shader_location_attrib(const Shader &shader, const char *name) {
+  return rl::GetShaderLocationAttrib(shader, name);
+}
+
+} // namespace gl
+
+namespace std {
+template <> struct hash<gl::ShaderSpec> {
+  size_t operator()(const gl::ShaderSpec &k) const noexcept {
+    size_t seed = 0;
+    rydz::hash_combine(seed, std::hash<std::string>{}(k.vertex_path));
+    rydz::hash_combine(seed, std::hash<std::string>{}(k.fragment_path));
+    return seed;
+  }
+};
+
+template <> struct hash<gl::Uniform> {
+  size_t operator()(const gl::Uniform &k) const noexcept {
+    size_t seed = 0;
+    rydz::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.type)));
+    rydz::hash_combine(seed, std::hash<int>{}(k.count));
+    for (float value : k.float_data) {
+      rydz::hash_combine(seed, std::hash<float>{}(value));
+    }
+    for (int value : k.int_data) {
+      rydz::hash_combine(seed, std::hash<int>{}(value));
+    }
+    return seed;
+  }
+};
+} // namespace std

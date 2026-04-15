@@ -37,9 +37,7 @@ struct TagABC {};
 struct TagABCD {};
 struct TagABCE {};
 
-static World make_world() {
-  World world;
-
+static void populate_world(World &world) {
   // 10,000 entities with A, B (AB group)
   for (int i = 0; i < 10000; i++) {
     auto e = world.spawn();
@@ -76,12 +74,11 @@ static World make_world() {
     world.insert_component(e, CompC{0.0f});
     world.insert_component(e, CompE{0.0f});
   }
-
-  return world;
 }
 
 static void BM_Schedule(benchmark::State &state) {
-  auto world = make_world();
+  World world;
+  populate_world(world);
 
   for (auto _ : state) {
     // System 1: swap A and B on all entities that have both (all 40,000)

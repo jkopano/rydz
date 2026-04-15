@@ -83,16 +83,19 @@ template <typename S> auto state_changed() {
 
 template <typename S> void check_state_transitions(World &world) {
   auto *event = world.get_resource<StateTransitionEvent<S>>();
-  if (event)
+  if (event) {
     event->changed = false;
+  }
 
   auto *next = world.get_resource<NextState<S>>();
-  if (!next || !next->pending)
+  if (!next || !next->pending) {
     return;
+  }
 
   auto *state = world.get_resource<State<S>>();
-  if (!state)
+  if (!state) {
     return;
+  }
 
   S new_value = std::move(*next->pending);
   next->pending = std::nullopt;
@@ -103,8 +106,9 @@ template <typename S> void check_state_transitions(World &world) {
     auto *schedules = world.get_resource<StateSchedules<S>>();
     if (schedules) {
       auto exit_it = schedules->on_exit.find(old_value);
-      if (exit_it != schedules->on_exit.end())
+      if (exit_it != schedules->on_exit.end()) {
         exit_it->second.run(world);
+      }
     }
 
     state->value = std::move(new_value);
@@ -113,12 +117,14 @@ template <typename S> void check_state_transitions(World &world) {
       schedules->on_transition.run(world);
 
       auto enter_it = schedules->on_enter.find(state->value);
-      if (enter_it != schedules->on_enter.end())
+      if (enter_it != schedules->on_enter.end()) {
         enter_it->second.run(world);
+      }
     }
 
-    if (event)
+    if (event) {
       event->changed = true;
+    }
   }
 }
 

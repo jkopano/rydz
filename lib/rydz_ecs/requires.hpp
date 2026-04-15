@@ -3,9 +3,8 @@
 
 namespace ecs {
 
-template <typename... Ts>
-struct Requires {
-    using as_tuple = std::tuple<Ts...>;
+template <typename... Ts> struct Requires {
+  using as_tuple = std::tuple<Ts...>;
 };
 
 template <typename T>
