@@ -101,7 +101,7 @@ inline void apply_gltf_material_properties(CompiledMaterial &material_desc,
 inline Handle<Texture> transfer_texture(
     Assets<Texture> &textures, const gl::Texture &texture,
     std::unordered_map<unsigned int, Handle<Texture>> &texture_cache) {
-  if (!gl::has_texture(texture)) {
+  if (!texture.ready()) {
     return {};
   }
 

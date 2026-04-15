@@ -18,14 +18,16 @@ namespace ecs {
 
 struct PreparedMaterial {
   std::array<gl::MaterialMap, 12> local_maps{};
-  gl::Material material{};
+  gl::Material material;
 };
 
 struct SlotPrepareContext {
   const Assets<Texture> *texture_assets = nullptr;
   bool instanced = false;
 
-  const Assets<Texture> &textures() const { return *texture_assets; }
+  [[nodiscard]] const Assets<Texture> &textures() const {
+    return *texture_assets;
+  }
 };
 
 struct RenderSlotContext {
@@ -35,10 +37,12 @@ struct RenderSlotContext {
   const ClusteredLightingState *cluster_state_data = nullptr;
   bool instanced = false;
 
-  const ExtractedView &view() const { return *view_data; }
-  const ExtractedLights &lights() const { return *lights_data; }
-  const ClusterConfig &cluster_config() const { return *cluster_config_data; }
-  const ClusteredLightingState &clustered_lighting() const {
+  [[nodiscard]] const ExtractedView &view() const { return *view_data; }
+  [[nodiscard]] const ExtractedLights &lights() const { return *lights_data; }
+  [[nodiscard]] const ClusterConfig &cluster_config() const {
+    return *cluster_config_data;
+  }
+  [[nodiscard]] const ClusteredLightingState &clustered_lighting() const {
     return *cluster_state_data;
   }
 };
@@ -78,8 +82,9 @@ inline gl::Material &fallback_material(NonSendMarker) {
   static gl::Material fallback = {};
   static bool init = false;
   if (!init) {
-    fallback.shader.id = gl::default_shader_id();
-    fallback.shader.locs = gl::default_shader_locs();
+    fallback.shader = gl::Shader::get_default();
+    fallback.shader.id = gl::Shader::default_id();
+    fallback.shader.locs = gl::Shader::default_locs();
     fallback.maps = static_cast<gl::MaterialMap *>(
         std::calloc(12, sizeof(gl::MaterialMap)));
     fallback.maps[gl::MATERIAL_MAP_DIFFUSE].texture.id =
@@ -208,9 +213,9 @@ inline const SlotProvider &
 lookup_slot_provider(const SlotProviderRegistry &registry,
                      const MaterialSlotRequirement &slot,
                      const CompiledMaterial &material) {
-  auto it = registry.providers.find(slot.type);
-  if (it != registry.providers.end()) {
-    return it->second;
+  auto iter = registry.providers.find(slot.type);
+  if (iter != registry.providers.end()) {
+    return iter->second;
   }
 
   throw std::runtime_error(
@@ -248,16 +253,6 @@ prepare_material(NonSendMarker marker, const CompiledMaterial &material,
   }
 
   return shader;
-}
-
-inline void apply_compiled_uniforms(ShaderProgram &shader,
-                                    const CompiledMaterial &material) {
-  shader.set("u_alpha_cutoff", material.alpha_cutoff);
-  shader.set("u_render_method", static_cast<int>(material.render_method));
-  shader.set("u_use_instancing", 0);
-  for (const auto &[name, uniform] : material.uniforms) {
-    shader.apply(std::string(name), uniform);
-  }
 }
 
 inline void apply_slot_uniforms(const SlotProviderRegistry &slot_registry,
@@ -331,7 +326,7 @@ inline SlotProvider make_has_pbr_slot_provider() {
 }
 
 inline bool can_draw_instanced(gl::Material &material, const gl::Mesh &mesh) {
-  if (!material.shader.locs || mesh.vaoId == 0) {
+  if (!material.shader.locs || !mesh.uploaded()) {
     return false;
   }
 

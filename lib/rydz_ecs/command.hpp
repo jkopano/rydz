@@ -15,9 +15,9 @@ class ICommand {
 public:
   ICommand() = default;
   ICommand(const ICommand &) = default;
-  ICommand(ICommand &&) = delete;
+  ICommand(ICommand &&) noexcept = default;
   ICommand &operator=(const ICommand &) = default;
-  ICommand &operator=(ICommand &&) = delete;
+  ICommand &operator=(ICommand &&) noexcept = default;
   virtual ~ICommand() = default;
   virtual void apply(World &world) = 0;
 };

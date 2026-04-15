@@ -154,8 +154,8 @@ public:
 
   static ShaderProgram default_shader() {
     Shader shader{};
-    shader.id = default_shader_id();
-    shader.locs = default_shader_locs();
+    shader.id = Shader::default_id();
+    shader.locs = Shader::default_locs();
     return ShaderProgram(shader, false);
   }
 
@@ -349,7 +349,7 @@ private:
 
   void unload() {
     if (owns_resource_ && shader_.id != 0 &&
-        shader_.id != default_shader_id()) {
+        shader_.id != Shader::default_id()) {
       ::UnloadShader(shader_);
     }
     shader_ = Shader{};

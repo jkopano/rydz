@@ -23,10 +23,11 @@ struct RenderExecutionState {
 
 struct FramePass {
   static void begin(Res<ExtractedView> view, ResMut<RenderExecutionState> state,
-                    ResMut<ScreenPipelineState> screen_pipeline,
+                    ResMut<PipelineState> screen_pipeline,
                     NonSendMarker marker);
 
   static void end(ResMut<RenderExecutionState> state,
+                  ResMut<PipelineState> screen_pipeline,
                   Res<DebugOverlaySettings> debug_settings,
                   NonSendMarker marker);
 };
@@ -158,7 +159,7 @@ private:
     ShaderProgram &shader = prepare_material(
         marker, batch.key.material, texture_assets, shader_cache, slot_registry,
         prepare_ctx, shader_spec, prepared);
-    apply_compiled_uniforms(shader, batch.key.material);
+    batch.key.material.apply(shader);
     RenderSlotContext render_ctx{
         .view_data = &view,
         .lights_data = &lights,
@@ -297,7 +298,7 @@ private:
     ShaderProgram &shader = prepare_material(
         marker, batch.key.material, texture_assets, shader_cache, slot_registry,
         prepare_ctx, batch.key.material.shader, prepared);
-    apply_compiled_uniforms(shader, batch.key.material);
+    batch.key.material.apply(shader);
     RenderSlotContext render_ctx{
         .view_data = &view,
         .lights_data = &lights,
@@ -331,7 +332,7 @@ private:
     ShaderProgram &shader = prepare_material(
         marker, batch.key.material, texture_assets, shader_cache, slot_registry,
         prepare_ctx, batch.key.material.shader, prepared);
-    apply_compiled_uniforms(shader, batch.key.material);
+    batch.key.material.apply(shader);
     RenderSlotContext render_ctx{
         .view_data = &view,
         .lights_data = &lights,
@@ -362,7 +363,7 @@ private:
 
 struct PostProcessPass {
   static void postprocess(ResMut<RenderExecutionState> state,
-                          Res<ScreenPipelineState> screen_pipeline,
+                          Res<PipelineState> pipeline,
                           ResMut<ShaderCache> shader_cache,
                           Res<ExtractedView> view, Res<Time> time,
                           NonSendMarker marker) {
@@ -372,7 +373,7 @@ struct PostProcessPass {
     }
 
     if (state->world_target_active) {
-      gl::end_texture_mode();
+      pipeline->world_target.end();
       state->world_target_active = false;
     }
 
@@ -382,19 +383,19 @@ struct PostProcessPass {
       state->backbuffer_active = true;
     }
 
-    if (!state->scene_active || !screen_pipeline->ready()) {
+    if (!state->scene_active || !pipeline->ready()) {
       return;
     }
 
-    draw_postprocess_pass(marker, screen_pipeline->world_target.texture,
-                          *shader_cache, *view, *time);
+    draw_postprocess_pass(marker, pipeline->world_target.texture, *shader_cache,
+                          *view, *time);
   }
 
 private:
   static gl::Rectangle postprocess_source_rect(const gl::Texture &texture) {
     return {
-        0.0f,
-        0.0f,
+        0.0F,
+        0.0F,
         static_cast<f32>(texture.width),
         -static_cast<f32>(texture.height),
     };
@@ -402,8 +403,8 @@ private:
 
   static gl::Rectangle postprocess_dest_rect() {
     return {
-        0.0f,
-        0.0f,
+        0.0F,
+        0.0F,
         static_cast<f32>(gl::screen_width()),
         static_cast<f32>(gl::screen_height()),
     };
@@ -412,7 +413,7 @@ private:
   static void draw_world_target_to_screen(const gl::Texture &source_texture) {
     gl::draw_texture_pro(
         source_texture, postprocess_source_rect(source_texture),
-        postprocess_dest_rect(), {0.0f, 0.0f}, 0.0f, gl::kWhite);
+        postprocess_dest_rect(), {0.0F, 0.0F}, 0.0F, gl::kWhite);
   }
 
   static void apply_postprocess_uniforms(ShaderProgram &shader,
@@ -460,7 +461,7 @@ struct UiPass {
 
     for (const auto &item : phase->items) {
       const auto *texture = texture_assets->get(item.texture);
-      if (!texture) {
+      if (texture == nullptr) {
         continue;
       }
 
@@ -492,7 +493,7 @@ private:
 
 inline void FramePass::begin(Res<ExtractedView> view,
                              ResMut<RenderExecutionState> state,
-                             ResMut<ScreenPipelineState> screen_pipeline,
+                             ResMut<PipelineState> pipeline,
                              NonSendMarker marker) {
   state->world_pass_active = false;
   state->world_target_active = false;
@@ -506,8 +507,8 @@ inline void FramePass::begin(Res<ExtractedView> view,
     return;
   }
 
-  screen_pipeline->ensure_target(gl::screen_width(), gl::screen_height());
-  gl::begin_texture_mode(screen_pipeline->world_target);
+  pipeline->ensure_target(gl::screen_width(), gl::screen_height());
+  pipeline->world_target.begin();
   gl::clear_background(view->clear_color);
   state->world_target_active = true;
   WorldPass::begin(marker, *view);
@@ -515,6 +516,7 @@ inline void FramePass::begin(Res<ExtractedView> view,
 }
 
 inline void FramePass::end(ResMut<RenderExecutionState> state,
+                           ResMut<PipelineState> pipeline,
                            Res<DebugOverlaySettings> debug_settings,
                            NonSendMarker marker) {
   if (state->world_pass_active) {
@@ -523,7 +525,7 @@ inline void FramePass::end(ResMut<RenderExecutionState> state,
   }
 
   if (state->world_target_active) {
-    gl::end_texture_mode();
+    pipeline->world_target.end();
     state->world_target_active = false;
   }
 

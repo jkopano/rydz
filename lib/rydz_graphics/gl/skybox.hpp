@@ -31,8 +31,8 @@ public:
   };
 
   u32 cubemap_id = 0;
-  u32 vao = 0;
-  u32 vbo = 0;
+  VAO vao{};
+  VBO vbo{};
   bool loaded = false;
 
   Skybox() = default;
@@ -70,9 +70,9 @@ public:
     enable_texture_cubemap(cubemap_id);
 
     shader.with_enabled([&] {
-      enable_vertex_array(vao);
-      draw_vertex_array(0, 36);
-      disable_vertex_array();
+      vao.bind();
+      vao.draw(0, 36);
+      VAO::unbind();
     });
 
     disable_texture_cubemap();
@@ -83,13 +83,10 @@ public:
   void unload() {
     if (cubemap_id != 0) {
       unload_texture_id(cubemap_id);
+      cubemap_id = 0;
     }
-    if (vao != 0) {
-      unload_vertex_array(vao);
-    }
-    if (vbo != 0) {
-      unload_vertex_buffer(vbo);
-    }
+    vao.reset();
+    vbo.reset();
     loaded = false;
   }
 
@@ -119,12 +116,12 @@ private:
         -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
         -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f};
 
-    vao = spawn_vertex_array();
-    enable_vertex_array(vao);
-    vbo = load_vertex_buffer(vertices, sizeof(vertices), false);
+    vao = VAO::create();
+    vao.bind();
+    vbo = VBO::create(vertices, sizeof(vertices), false);
     set_vertex_attribute(0, 3, RL_FLOAT, false, 0, 0);
     enable_vertex_attribute(0);
-    disable_vertex_array();
+    VAO::unbind();
   }
 
   static unsigned int

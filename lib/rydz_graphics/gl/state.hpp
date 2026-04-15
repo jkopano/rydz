@@ -70,9 +70,7 @@ inline void end_drawing() { rl::EndDrawing(); }
 
 inline void clear_background(Color color) { rl::ClearBackground(color); }
 
-inline void begin_texture_mode(RenderTarget target) { target.begin_mode(); }
-
-inline void end_texture_mode() { rl::EndTextureMode(); }
+inline void begin_texture_mode(RenderTarget target) { target.begin(); }
 
 inline void draw_fps(int x, int y) { rl::DrawFPS(x, y); }
 

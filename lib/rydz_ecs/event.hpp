@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <tuple>
 #include <typeindex>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -34,6 +35,7 @@ struct ObservedBy {
 
 class IObserver {
 public:
+  IObserver() = default;
   IObserver(const IObserver &) = default;
   IObserver(IObserver &&) = delete;
   IObserver &operator=(const IObserver &) = default;
@@ -519,7 +521,12 @@ inline Entity World::add_observer(Entity target, F &&func) {
 template <typename E>
   requires IsEvent<bare_t<E>>
 inline void World::trigger(E &&event) {
-  ensure_observer_registry().trigger(*this, std::forward<E>(event));
+  if constexpr (std::is_lvalue_reference_v<E &&>) {
+    ensure_observer_registry().trigger(*this, event);
+  } else {
+    bare_t<E> local_event = std::forward<E>(event);
+    ensure_observer_registry().trigger(*this, local_event);
+  }
 }
 
 } // namespace ecs

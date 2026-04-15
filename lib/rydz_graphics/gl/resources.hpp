@@ -75,26 +75,6 @@ inline Mesh gen_knot(float radius = 0.5F, float size = 0.2F,
 
 inline void gen_tangents(Mesh &mesh) { mesh.gen_tangents(); }
 
-inline void update_mesh_buffer(Mesh &mesh, i32 index, const void *data,
-                               i32 data_size, i32 offset) {
-  mesh.update_buffer(index, data, data_size, offset);
-}
-
-inline RenderTarget load_render_target(i32 width, i32 height) {
-  return rl::LoadRenderTexture(width, height);
-}
-
-inline u32 spawn_vertex_array() { return rl::rlLoadVertexArray(); }
-
-inline void enable_vertex_array(u32 vao) { rl::rlEnableVertexArray(vao); }
-
-inline void disable_vertex_array() { rl::rlDisableVertexArray(); }
-
-inline u32 load_vertex_buffer(const void *data, i32 size,
-                              bool dynamic = false) {
-  return rl::rlLoadVertexBuffer(data, size, dynamic);
-}
-
 inline void set_vertex_attribute(u32 index, i32 component_count, i32 type,
                                  bool normalized, i32 stride, i32 offset) {
   rl::rlSetVertexAttribute(index, component_count, type, normalized, stride,
@@ -105,10 +85,6 @@ inline void enable_vertex_attribute(u32 index) {
   rl::rlEnableVertexAttribute(index);
 }
 
-inline void unload_vertex_array(u32 vao) { rl::rlUnloadVertexArray(vao); }
-
-inline void unload_vertex_buffer(u32 vbo) { rl::rlUnloadVertexBuffer(vbo); }
-
 inline void active_texture_slot(i32 slot) { rl::rlActiveTextureSlot(slot); }
 
 inline void enable_texture_cubemap(u32 cubemap_id) {
@@ -116,10 +92,6 @@ inline void enable_texture_cubemap(u32 cubemap_id) {
 }
 
 inline void disable_texture_cubemap() { rl::rlDisableTextureCubemap(); }
-
-inline void draw_vertex_array(i32 offset, i32 count) {
-  rl::rlDrawVertexArray(offset, count);
-}
 
 inline u32 load_texture_cubemap(const void *data, i32 size, i32 format,
                                 i32 mipmaps) {

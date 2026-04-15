@@ -14,18 +14,18 @@ struct DebugOverlaySettings {
   gl::Vec2 fps_position = {10.0f, 10.0f};
 };
 
-struct ScreenPipelineState {
+struct PipelineState {
   using T = Resource;
 
   gl::RenderTarget world_target{};
   u32 width = 0;
   u32 height = 0;
 
-  ScreenPipelineState() = default;
-  ScreenPipelineState(const ScreenPipelineState &) = delete;
-  ScreenPipelineState &operator=(const ScreenPipelineState &) = delete;
+  PipelineState() = default;
+  PipelineState(const PipelineState &) = delete;
+  PipelineState &operator=(const PipelineState &) = delete;
 
-  ScreenPipelineState(ScreenPipelineState &&other) noexcept
+  PipelineState(PipelineState &&other) noexcept
       : world_target(other.world_target), width(other.width),
         height(other.height) {
     other.world_target = gl::RenderTarget{};
@@ -33,7 +33,7 @@ struct ScreenPipelineState {
     other.height = 0;
   }
 
-  ScreenPipelineState &operator=(ScreenPipelineState &&other) noexcept {
+  PipelineState &operator=(PipelineState &&other) noexcept {
     if (this == &other) {
       return *this;
     }
@@ -48,7 +48,7 @@ struct ScreenPipelineState {
     return *this;
   }
 
-  ~ScreenPipelineState() { unload(); }
+  ~PipelineState() { unload(); }
 
   [[nodiscard]] bool ready() const { return world_target.ready(); }
 

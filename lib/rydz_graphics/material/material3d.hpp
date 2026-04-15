@@ -87,7 +87,6 @@ enum class RenderMethod {
 using ShaderRef = std::string_view;
 using UniformName = std::string_view;
 
-
 struct CompiledMaterial {
   ShaderSpec shader;
   std::vector<MaterialMapBinding> maps;
@@ -122,6 +121,15 @@ struct CompiledMaterial {
 
     gl::enable_backface_culling();
     gl::set_cull_face(gl::CullFace::Back);
+  }
+
+  void apply(ShaderProgram &shader) const {
+    shader.set("u_alpha_cutoff", this->alpha_cutoff);
+    shader.set("u_render_method", static_cast<int>(this->render_method));
+    shader.set("u_use_instancing", 0);
+    for (const auto &[name, uniform] : this->uniforms) {
+      shader.apply(std::string(name), uniform);
+    }
   }
 };
 
@@ -190,7 +198,6 @@ template <typename M>
 concept MaterialValue = TraitMaterialValue<M>;
 
 namespace detail {
-
 
 inline std::optional<Uniform>
 remove_uniform_by_name(std::unordered_map<UniformName, Uniform> &uniforms,
@@ -332,7 +339,6 @@ struct Material {
       : compiled(detail::compile_trait_material(material)) {}
 };
 
-
 } // namespace ecs
 
 namespace std {
@@ -352,7 +358,6 @@ template <> struct hash<ecs::MaterialMapBinding> {
     return seed;
   }
 };
-
 
 template <> struct hash<ecs::CompiledMaterial> {
   size_t operator()(const ecs::CompiledMaterial &k) const noexcept {

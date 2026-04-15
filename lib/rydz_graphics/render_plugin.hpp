@@ -54,7 +54,7 @@ struct RenderPlugin {
         .init_resource<ShaderCache>()
         .init_resource<SlotProviderRegistry>()
         .init_resource<DebugOverlaySettings>()
-        .init_resource<ScreenPipelineState>()
+        .init_resource<PipelineState>()
         .init_resource<ShadowPhase>()
         .init_resource<OpaquePhase>()
         .init_resource<TransparentPhase>()
