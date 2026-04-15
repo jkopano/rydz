@@ -595,8 +595,8 @@ const char *TextFormat(const char *text, ...); // Formatting of text with variab
 //void SetClipboardText(const char *text)
 //const char *GetClipboardText(void)
 
-//void ShowCursor(void)
-//void HideCursor(void)
+//void rlShowCursor(void)
+//void rlHideCursor(void)
 //void EnableCursor(void)
 //void DisableCursor(void)
 
@@ -729,7 +729,7 @@ void InitWindow(int width, int height, const char *title)
 }
 
 // Close window and unload OpenGL context
-void CloseWindow(void)
+void rlCloseWindow(void)
 {
 #if SUPPORT_MODULE_RTEXT
     UnloadFontDefault();        // WARNING: Module required: rtext

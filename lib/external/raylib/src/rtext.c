@@ -124,7 +124,7 @@
 // Global variables
 //----------------------------------------------------------------------------------
 // Default font provided by raylib
-// NOTE: Default font is loaded on InitWindow() and disposed on CloseWindow() [module: core]
+// NOTE: Default font is loaded on InitWindow() and disposed on rlCloseWindow() [module: core]
 static Font defaultFont = { 0 };
 
 // Text vertical line spacing in pixels (between lines)
@@ -269,7 +269,7 @@ extern void LoadFontDefault(void)
     // Reconstruct charSet using charsWidth[], charsHeight, charsDivisor, glyphCount
     //------------------------------------------------------------------------------
     // Allocate space for our characters info data
-    // NOTE: This memory must be freed at end! --> Done by CloseWindow()
+    // NOTE: This memory must be freed at end! --> Done by rlCloseWindow()
     defaultFont.glyphs = (GlyphInfo *)RL_CALLOC(defaultFont.glyphCount, sizeof(GlyphInfo));
     defaultFont.recs = (rlRectangle *)RL_CALLOC(defaultFont.glyphCount, sizeof(rlRectangle));
 

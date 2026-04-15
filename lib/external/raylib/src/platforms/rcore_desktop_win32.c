@@ -43,9 +43,9 @@
 **********************************************************************************************/
 
 // Move windows.h symbols to new names to avoid redefining the same names as raylib
-#define CloseWindow CloseWindowWin32
+#define rlCloseWindow CloseWindowWin32
 #define Rectangle RectangleWin32
-#define ShowCursor ShowCursorWin32
+#define rlShowCursor ShowCursorWin32
 #define DrawTextA DrawTextAWin32
 #define DrawTextW DrawTextWin32
 #define DrawTextExA DrawTextExAWin32
@@ -54,9 +54,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-#undef CloseWindow      // raylib symbol collision
+#undef rlCloseWindow      // raylib symbol collision
 #undef Rectangle        // raylib symbol collision
-#undef ShowCursor       // raylib symbol collision
+#undef rlShowCursor       // raylib symbol collision
 #undef LoadImage        // raylib symbol collision
 #undef DrawText         // raylib symbol collision
 #undef DrawTextA
@@ -1140,16 +1140,16 @@ Image GetClipboardImage(void)
 }
 
 // Show mouse cursor
-void ShowCursor(void)
+void rlShowCursor(void)
 {
     SetCursor(LoadCursorW(NULL, (LPCWSTR)IDC_ARROW));
     CORE.Input.Mouse.cursorHidden = false;
 }
 
 // Hides mouse cursor
-void HideCursor(void)
+void rlHideCursor(void)
 {
-    // NOTE: Using SetCursor() instead of ShowCursor() because
+    // NOTE: Using SetCursor() instead of rlShowCursor() because
     // it makes it easy to only hide the cursor while it's inside the client area
     SetCursor(NULL);
     CORE.Input.Mouse.cursorHidden = true;
@@ -1170,7 +1170,7 @@ void EnableCursor(void)
         int result = RegisterRawInputDevices(&rid, 1, sizeof(rid));
         if (result == 0) TRACELOG(LOG_WARNING, "WIN32: Failed to register raw input devices [ERROR: %lu]", GetLastError());
 
-        ShowCursor();
+        rlShowCursor();
         CORE.Input.Mouse.cursorLocked = false;
     }
 }
@@ -1207,7 +1207,7 @@ void DisableCursor(void)
 
         CORE.Input.Mouse.previousPosition = (Vector2){ 0, 0 };
         CORE.Input.Mouse.currentPosition = (Vector2){ 0, 0 };
-        HideCursor();
+        rlHideCursor();
 
         CORE.Input.Mouse.cursorLocked = true;
     }

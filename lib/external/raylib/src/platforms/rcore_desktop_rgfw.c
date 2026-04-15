@@ -50,17 +50,17 @@
     #define LoadImage LoadImageA
 
     // Temporarily rename conflicting symbols
-    #define CloseWindow CloseWindowWin32
+    #define rlCloseWindow CloseWindowWin32
     #define Rectangle RectangleWin32
-    #define ShowCursor ShowCursorWin32
+    #define rlShowCursor ShowCursorWin32
 
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
 
     // Restore for raylib/RGFW
-    #undef CloseWindow
+    #undef rlCloseWindow
     #undef Rectangle
-    #undef ShowCursor
+    #undef rlShowCursor
     #undef LoadImage
 
     #include "../external/fix_win32_compatibility.h"
@@ -74,8 +74,8 @@
     #define RGFW_OPENGL_ES2
 #endif
 
-void ShowCursor(void);
-void CloseWindow(void);
+void rlShowCursor(void);
+void rlCloseWindow(void);
 double get_time_seconds(void);
 
 #if defined(__unix__) || defined(__linux__)
@@ -88,8 +88,8 @@ double get_time_seconds(void);
 #if defined(_WIN32) || defined(_WIN64)
     #define WIN32_LEAN_AND_MEAN
     #define Rectangle rectangle_win32
-    #define CloseWindow CloseWindow_win32
-    #define ShowCursor __imp_ShowCursor
+    #define rlCloseWindow CloseWindow_win32
+    #define rlShowCursor __imp_ShowCursor
     #define _APISETSTRING_
 
 #if defined(__cplusplus)
@@ -153,8 +153,8 @@ extern "C" {
 
 #if defined(_WIN32) || defined(_WIN64)
     #undef DrawText
-    #undef ShowCursor
-    #undef CloseWindow
+    #undef rlShowCursor
+    #undef rlCloseWindow
     #undef Rectangle
 
     #ifdef MAX_PATH
@@ -1080,14 +1080,14 @@ Image GetClipboardImage(void)
 }
 
 // Show mouse cursor
-void ShowCursor(void)
+void rlShowCursor(void)
 {
     RGFW_window_showMouse(platform.window, true);
     CORE.Input.Mouse.cursorHidden = false;
 }
 
 // Hides mouse cursor
-void HideCursor(void)
+void rlHideCursor(void)
 {
     RGFW_window_showMouse(platform.window, false);
     CORE.Input.Mouse.cursorHidden = true;
@@ -1100,7 +1100,7 @@ void EnableCursor(void)
 
     // Set cursor position in the middle
     SetMousePosition(CORE.Window.screen.width/2, CORE.Window.screen.height/2);
-    ShowCursor();
+    rlShowCursor();
 
     CORE.Input.Mouse.cursorLocked = true;
 }
@@ -1109,7 +1109,7 @@ void EnableCursor(void)
 void DisableCursor(void)
 {
     RGFW_window_captureMouse(platform.window, true);
-    HideCursor();
+    rlHideCursor();
 
     CORE.Input.Mouse.cursorLocked = true;
 }

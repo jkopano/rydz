@@ -603,13 +603,13 @@ Image GetClipboardImage(void)
 }
 
 // Show mouse cursor
-void ShowCursor(void)
+void rlShowCursor(void)
 {
     CORE.Input.Mouse.cursorHidden = false;
 }
 
 // Hides mouse cursor
-void HideCursor(void)
+void rlHideCursor(void)
 {
     CORE.Input.Mouse.cursorHidden = true;
 }
@@ -1146,7 +1146,7 @@ static void AndroidCommandCallback(struct android_app *app, int32_t cmd)
                 platform.contextRebindRequired = true;
             }
             // If 'platform.device' is already set to 'EGL_NO_DISPLAY'
-            // this means that the user has already called 'CloseWindow()'
+            // this means that the user has already called 'rlCloseWindow()'
 
         } break;
         case APP_CMD_SAVE_STATE: break;

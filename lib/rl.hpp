@@ -33,7 +33,8 @@ using ::BeginDrawing;
 using ::BeginShaderMode;
 using ::BeginTextureMode;
 using ::ClearBackground;
-using ::CloseWindow;
+using ::rlCloseWindow;
+inline void CloseWindow() { ::rlCloseWindow(); }
 using ::DrawFPS;
 using ::EndDrawing;
 using ::EndShaderMode;
@@ -52,6 +53,10 @@ using ::WindowShouldClose;
 // ---- Input ----
 using ::DisableCursor;
 using ::EnableCursor;
+using ::rlShowCursor;
+using ::rlHideCursor;
+inline void ShowCursor() { ::rlShowCursor(); }
+inline void HideCursor() { ::rlHideCursor(); }
 using ::GetKeyPressed;
 using ::GetMouseDelta;
 using ::IsKeyDown;
