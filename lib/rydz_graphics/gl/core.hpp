@@ -2,7 +2,7 @@
 
 #include "math.hpp"
 #include "rl.hpp"
-#include "rydz_ecs/mod.hpp"
+#include "rydz_ecs/params.hpp"
 #include "types.hpp"
 #include <bit>
 #include <external/glad.h>
