@@ -1,12 +1,12 @@
 #pragma once
 
 #include "clustered_lighting.hpp"
+#include "pipeline.hpp"
 #include "render_extract.hpp"
 #include "render_phase.hpp"
 #include "rydz_ecs/core/time.hpp"
 #include "rydz_graphics/material/render_material.hpp"
 #include "rydz_graphics/render_config.hpp"
-#include "screen_pipeline.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -116,7 +116,7 @@ struct WorldPass {
 
   static void begin(NonSendMarker marker, const ExtractedView &view) {
     gl::begin_world_pass(view.camera_view.view, view.camera_view.proj);
-    RenderConfig::world_default()(marker);
+    RenderConfig::get_default()(marker);
 
     if ((view.active_skybox != nullptr) && view.active_skybox->loaded) {
       view.active_skybox->draw(view.camera_view.view, view.camera_view.proj);

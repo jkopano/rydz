@@ -15,6 +15,7 @@
 #include "transform.hpp"
 #include "visibility.hpp"
 #include <array>
+#include <concepts>
 #include <vector>
 
 namespace ecs {
@@ -23,6 +24,11 @@ struct Sprite {
   Handle<Texture> handle;
   Color tint = kWhite;
   i32 layer{};
+};
+
+template <typename M>
+concept IsExtracted = requires(const M &m) {
+  { m.clear() } -> std::same_as<void>;
 };
 
 struct ExtractedView {
@@ -41,7 +47,7 @@ struct ExtractedView {
   float near_plane{0.1f};
   float far_plane{1000.0f};
 
-  void reset() { *this = ExtractedView{}; }
+  void clear() { *this = ExtractedView{}; }
 };
 
 struct ExtractedLights {
@@ -58,13 +64,13 @@ struct ExtractedLights {
   DirectionalLight dir_light{};
   bool has_directional{};
 
-  void reset() { *this = ExtractedLights{}; }
+  void clear() { *this = ExtractedLights{}; }
 };
 
 struct ExtractedMeshes {
   using T = Resource;
 
-  struct Inner {
+  struct Item {
     Handle<Mesh> mesh{};
     CompiledMaterial material{};
     Mat4 world_transform{Mat4::sIdentity()};
@@ -73,22 +79,22 @@ struct ExtractedMeshes {
     bool casts_shadows{true};
   };
 
-  std::vector<Inner> items;
-  void clear() { items.clear(); }
-};
-
-struct ExtractedUiItem {
-  Handle<Texture> texture{};
-  Transform transform{};
-  Color tint = kWhite;
-  i32 layer = 0;
+  std::vector<Item> items;
+  void clear() { *this = ExtractedMeshes{}; }
 };
 
 struct ExtractedUi {
   using T = Resource;
 
-  std::vector<ExtractedUiItem> items{};
-  void clear() { items.clear(); }
+  struct Item {
+    Handle<Texture> texture{};
+    Transform transform{};
+    Color tint = kWhite;
+    i32 layer = 0;
+  };
+
+  std::vector<Item> items{};
+  void clear() { *this = ExtractedUi{}; }
 };
 
 namespace extract {
@@ -97,7 +103,7 @@ view(Query<Camera3DComponent, ActiveCamera, GlobalTransform, Opt<ClearColor>,
            Opt<gl::Skybox>, Opt<PostProcessMaterial>>
          cam_query,
      Res<Window> window, ResMut<ExtractedView> view) {
-  view->reset();
+  view->clear();
   const float aspect = compute_camera_aspect_ratio(
       static_cast<float>(window->width), static_cast<float>(window->height));
 
@@ -112,7 +118,7 @@ view(Query<Camera3DComponent, ActiveCamera, GlobalTransform, Opt<ClearColor>,
     view->orthographic = cam_comp->is_orthographic();
     view->near_plane = cam_comp->near_plane;
     view->far_plane = cam_comp->far_plane;
-    if (postprocess) {
+    if (postprocess != nullptr) {
       view->postprocess = postprocess->material;
       view->has_postprocess = true;
     }
@@ -123,7 +129,7 @@ view(Query<Camera3DComponent, ActiveCamera, GlobalTransform, Opt<ClearColor>,
 inline void lighting(Query<DirectionalLight> dir_query,
                      Query<PointLight, GlobalTransform> point_query,
                      ResMut<ExtractedLights> lights) {
-  lights->reset();
+  lights->clear();
 
   for (auto [dir] : dir_query.iter()) {
     lights->dir_light = *dir;
@@ -166,7 +172,7 @@ inline void meshes(
     const bool casts_shadows = compiled.casts_shadows;
     Vec3 camera_offset = global->translation() - view->camera_view.position;
 
-    meshes->items.push_back(ExtractedMeshes::Inner{
+    meshes->items.push_back(ExtractedMeshes::Item{
         .mesh = mesh3d->mesh,
         .material = std::move(compiled),
         .world_transform = global->matrix,
@@ -185,7 +191,7 @@ inline void ui(Query<Sprite, Transform> textures, ResMut<ExtractedUi> ui) {
       continue;
     }
 
-    ui->items.push_back(ExtractedUiItem{
+    ui->items.push_back(ExtractedUi::Item{
         .texture = texture->handle,
         .transform = *transform,
         .tint = texture->tint,

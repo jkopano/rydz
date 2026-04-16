@@ -2,6 +2,7 @@
 
 #include "clustered_lighting.hpp"
 #include "frustum.hpp"
+#include "pipeline.hpp"
 #include "render_extract.hpp"
 #include "render_passes.hpp"
 #include "render_phase.hpp"
@@ -9,7 +10,6 @@
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/assets/loaders.hpp"
 #include "rydz_graphics/assets/scene_runtime.hpp"
-#include "screen_pipeline.hpp"
 
 namespace ecs {
 
@@ -25,6 +25,15 @@ enum class RenderPassSet {
   PostProcess,
   Ui,
   Cleanup,
+};
+
+template <typename M, typename P> void queue(Res<M> meshes, ResMut<P> phase) {
+  phase->queue(*meshes);
+};
+
+template <typename P>
+void build_batches(ResMut<P> phase, ResMut<Assets<Mesh>> meshes) {
+  phase->build_batches(*meshes);
 };
 
 struct RenderPlugin {
@@ -97,26 +106,17 @@ struct RenderPlugin {
                            extract::lighting, extract::ui, extract::meshes)
                          .chain())
 
-        .add_systems(
-            RenderExtractSet::Queue,
-            group([](Res<ExtractedMeshes> m,
-                     ResMut<ShadowPhase> p) { p->queue(*m); },
-                  [](Res<ExtractedMeshes> m, ResMut<OpaquePhase> p) {
-                    p->queue(*m);
-                  },
-                  [](Res<ExtractedMeshes> m, ResMut<TransparentPhase> p) {
-                    p->queue(*m);
-                  },
-                  [](Res<ExtractedUi> u, ResMut<UiPhase> p) { p->queue(*u); })
-                .chain())
+        .add_systems(RenderExtractSet::Queue,
+                     group(queue<ExtractedMeshes, ShadowPhase>,
+                           queue<ExtractedMeshes, OpaquePhase>,
+                           queue<ExtractedMeshes, TransparentPhase>,
+                           queue<ExtractedUi, UiPhase>)
+                         .chain())
 
-        .add_systems(
-            RenderExtractSet::Prepare,
-            group([](ResMut<OpaquePhase> p, ResMut<Assets<Mesh>> a,
-                     NonSendMarker) { p->build_batches(*a); },
-                  [](ResMut<TransparentPhase> p, ResMut<Assets<Mesh>> a,
-                     NonSendMarker) { p->build_batches(*a); })
-                .chain())
+        .add_systems(RenderExtractSet::Prepare,
+                     group(prepare_meshes, build_batches<OpaquePhase>,
+                           build_batches<TransparentPhase>)
+                         .chain())
 
         .add_systems(RenderPassSet::Setup, FramePass::begin)
 

@@ -22,17 +22,19 @@ inline bool prepare_mesh(const Handle<Mesh> &handle,
   return true;
 }
 } // namespace detail
-struct ShadowPhaseItem {
-  Handle<Mesh> mesh{};
-  Mat4 world_transform = Mat4::sIdentity();
-  f32 distance_to_camera = 0.0F;
-};
 
 struct ShadowPhase {
   using T = Resource;
-  std::vector<ShadowPhaseItem> items;
 
-  void clear() { items.clear(); }
+  struct Item {
+    Handle<Mesh> mesh{};
+    Mat4 world_transform = Mat4::sIdentity();
+    f32 distance_to_camera = 0.0F;
+  };
+
+  std::vector<Item> items;
+
+  void clear() { *this = ShadowPhase{}; }
 
   void queue(const ExtractedMeshes &meshes) {
     clear();
@@ -40,7 +42,7 @@ struct ShadowPhase {
       if (!item.casts_shadows) {
         continue;
       }
-      items.push_back(ShadowPhaseItem{
+      items.push_back(Item{
           .mesh = item.mesh,
           .world_transform = item.world_transform,
           .distance_to_camera = item.distance_to_camera,
@@ -67,10 +69,7 @@ struct OpaquePhase {
   std::vector<Item> items;
   std::vector<Batch> batches;
 
-  void clear() {
-    items.clear();
-    batches.clear();
-  }
+  void clear() { *this = OpaquePhase{}; }
 
   void queue(const ExtractedMeshes &meshes) {
     clear();
@@ -92,9 +91,6 @@ struct OpaquePhase {
     std::unordered_map<RenderBatchKey, usize> batch_index;
 
     for (const auto &item : items) {
-      if (!detail::prepare_mesh(item.mesh, mesh_assets)) {
-        continue;
-      }
 
       RenderBatchKey key{};
       key.mesh = item.mesh;
@@ -135,10 +131,7 @@ struct TransparentPhase {
   std::vector<Item> items;
   std::vector<Batch> batches;
 
-  void clear() {
-    items.clear();
-    batches.clear();
-  }
+  void clear() { *this = TransparentPhase{}; }
 
   void queue(const ExtractedMeshes &meshes) {
     clear();
@@ -163,9 +156,6 @@ struct TransparentPhase {
     batches.clear();
 
     for (const auto &item : items) {
-      if (!detail::prepare_mesh(item.mesh, mesh_assets)) {
-        continue;
-      }
 
       RenderBatchKey key{};
       key.mesh = item.mesh;
@@ -184,23 +174,24 @@ struct TransparentPhase {
   }
 };
 
-struct UiPhaseItem {
-  Handle<Texture> texture{};
-  Transform transform{};
-  Color tint = kWhite;
-  i32 layer = 0;
-};
-
 struct UiPhase {
   using T = Resource;
-  std::vector<UiPhaseItem> items;
 
-  void clear() { items.clear(); }
+  struct Item {
+    Handle<Texture> texture{};
+    Transform transform{};
+    Color tint = kWhite;
+    i32 layer = 0;
+  };
+
+  std::vector<Item> items;
+
+  void clear() { *this = UiPhase{}; }
 
   void queue(const ExtractedUi &ui) {
     clear();
     for (const auto &item : ui.items) {
-      items.push_back(UiPhaseItem{
+      items.push_back(Item{
           .texture = item.texture,
           .transform = item.transform,
           .tint = item.tint,
@@ -208,11 +199,23 @@ struct UiPhase {
       });
     }
 
-    std::ranges::stable_sort(
-        items, [](const UiPhaseItem &lhs, const UiPhaseItem &rhs) {
-          return lhs.layer < rhs.layer;
-        });
+    std::ranges::stable_sort(items, [](const Item &lhs, const Item &rhs) {
+      return lhs.layer < rhs.layer;
+    });
   }
 };
+
+void prepare_meshes(Res<ExtractedMeshes> extracted,
+                    ResMut<Assets<Mesh>> mesh_assets, NonSendMarker) {
+  std::unordered_set<u32> seen;
+
+  for (const auto &item : extracted->items) {
+    if (!seen.insert(item.mesh.id).second) {
+      continue;
+    }
+
+    detail::prepare_mesh(item.mesh, *mesh_assets);
+  }
+}
 
 } // namespace ecs

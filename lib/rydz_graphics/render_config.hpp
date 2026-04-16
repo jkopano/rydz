@@ -78,7 +78,7 @@ struct RenderConfig {
     }
   }
 
-  static RenderConfig world_default() { return {}; }
+  static RenderConfig get_default() { return {}; }
 
   static RenderConfig depth_prepass() {
     return {
@@ -91,7 +91,7 @@ struct RenderConfig {
     };
   }
 
-  static RenderConfig post_depth_prepass() { return world_default(); }
+  static RenderConfig post_depth_prepass() { return get_default(); }
 
   static RenderConfig opaque() {
     return {
