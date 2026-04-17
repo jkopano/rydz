@@ -43,8 +43,8 @@ using ::GetFrameTime;
 using ::InitWindow;
 using ::IsWindowReady;
 using ::LoadFileText;
-using ::SetTargetFPS;
 using ::SetShaderValueTexture;
+using ::SetTargetFPS;
 using ::SetTraceLogLevel;
 using ::TraceLog;
 using ::UnloadFileText;
@@ -53,8 +53,8 @@ using ::WindowShouldClose;
 // ---- Input ----
 using ::DisableCursor;
 using ::EnableCursor;
-using ::rlShowCursor;
 using ::rlHideCursor;
+using ::rlShowCursor;
 inline void ShowCursor() { ::rlShowCursor(); }
 inline void HideCursor() { ::rlHideCursor(); }
 using ::GetKeyPressed;
@@ -90,14 +90,16 @@ using ::UploadMesh;
 
 // ---- Textures / Images ----
 using ::GenImageColor;
+using ::ImageFormat;
 using ::ImageText;
 using ::ImageTextEx;
-using ::ImageFormat;
 using ::rlLoadImage;
-inline Image LoadImage(const char *fileName) { return ::rlLoadImage(fileName); }
+inline auto LoadImage(const char *fileName) -> Image {
+  return ::rlLoadImage(fileName);
+}
+using ::LoadRenderTexture;
 using ::LoadTexture;
 using ::LoadTextureFromImage;
-using ::LoadRenderTexture;
 using ::SetTextureFilter;
 using ::SetTextureWrap;
 using ::UnloadImage;
@@ -124,8 +126,8 @@ using ::rlActiveTextureSlot;
 using ::rlBegin;
 using ::rlBindShaderBuffer;
 using ::rlCheckRenderBatchLimit;
-using ::rlColorMask;
 using ::rlColor4ub;
+using ::rlColorMask;
 using ::rlCompileShader;
 using ::rlComputeShaderDispatch;
 using ::rlDisableBackfaceCulling;
@@ -140,10 +142,10 @@ using ::rlDisableVertexAttribute;
 using ::rlDisableVertexBuffer;
 using ::rlDisableVertexBufferElement;
 using ::rlDisableWireMode;
-using ::rlDrawVertexArrayInstanced;
 using ::rlDrawVertexArray;
 using ::rlDrawVertexArrayElements;
 using ::rlDrawVertexArrayElementsInstanced;
+using ::rlDrawVertexArrayInstanced;
 using ::rlEnableBackfaceCulling;
 using ::rlEnableColorBlend;
 using ::rlEnableDepthMask;
@@ -172,28 +174,28 @@ using ::rlSetCullFace;
 using ::rlSetShader;
 using ::rlSetTexture;
 using ::rlSetUniform;
-using ::rlSetUniformMatrix;
 using ::rlSetUniformMatrices;
+using ::rlSetUniformMatrix;
 using ::rlSetUniformSampler;
 using ::rlSetVertexAttribute;
 using ::rlSetVertexAttributeDivisor;
 using ::rlTexCoord2f;
-using ::rlVertex2f;
 using ::rlUnloadShaderBuffer;
 using ::rlUnloadShaderProgram;
 using ::rlUnloadTexture;
 using ::rlUnloadVertexArray;
 using ::rlUnloadVertexBuffer;
 using ::rlUpdateShaderBuffer;
+using ::rlVertex2f;
 
 // ---- rlgl: Matrix / Batch ----
 using ::rlDrawRenderBatchActive;
 using ::rlEnd;
+using ::rlGetLocationAttrib;
+using ::rlGetLocationUniform;
 using ::rlGetMatrixModelview;
 using ::rlGetMatrixProjection;
 using ::rlGetMatrixTransform;
-using ::rlGetLocationAttrib;
-using ::rlGetLocationUniform;
 using ::rlLoadIdentity;
 using ::rlMatrixMode;
 using ::rlMultMatrixf;

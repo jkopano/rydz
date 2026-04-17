@@ -117,12 +117,12 @@ struct RenderConfig {
 
   static auto end_world_pass() -> RenderConfig {
     return {
-        .depth = {.test = false, .write = true},
-        .blend = gl::BlendMode::Alpha,
-        .cull_mode = gl::CullMode::None,
-        .polygon_mode = gl::PolygonMode::Fill,
-        .color_mask = {},
-        .color_blend = true,
+        // .depth = {.test = false, .write = true},
+        // .blend = gl::BlendMode::Alpha,
+        // .cull_mode = gl::CullMode::None,
+        // .polygon_mode = gl::PolygonMode::Fill,
+        // .color_mask = {},
+        // .color_blend = true,
     };
   }
 };
