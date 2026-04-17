@@ -144,6 +144,7 @@ inline void scene_plugin(App &app) {
   app.add_plugin(system_multithreading({true}));
   app.add_plugin(engine::scripting_plugin);
   app.add_plugin(engine::console_plugin);
+  app.add_plugin(camera_plugin);
 
   app.add_systems(Startup, setup_camera);
   app.add_systems(Startup, setup_lighting);
@@ -153,7 +154,6 @@ inline void scene_plugin(App &app) {
   app.add_systems(Update, group(player_movement_system,
                                 update_isometric_camera_target_system)
                               .run_if(is_gameplay_active));
-  app.add_systems(Update, isometric_camera_system);
   app.add_systems(RenderPassSet::Cleanup,
                   group(engine::ConsoleRenderSystem).before(FramePass::end));
 }
