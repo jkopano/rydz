@@ -8,6 +8,8 @@
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/mod.hpp"
+#include "rydz_console/scripting.hpp"
+#include "rydz_console/console.hpp"
 #include <algorithm>
 #include <print>
 
@@ -27,6 +29,12 @@ static const float kCamOffY = 10.0f;
 static const float kCamOffZ = 10.0f;
 
 // ── Systems ──────────────────────────────────────────────────────────────────
+
+//Run condition - Only run gameplay systems when console is closed
+
+inline bool is_gameplay_active(Res<engine::ConsoleState> console) {
+    return !console->is_open;
+}
 
 // Move the player using WSAD relative to the isometric view direction
 inline void player_movement_system(Query<Mut<Transform>, Player> query,
@@ -136,13 +144,15 @@ inline void spawn_player(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
 inline void scene_plugin(App &app) {
   app.add_plugin(Input::install);
   app.add_plugin(system_multithreading({true}));
+  app.add_plugin(engine::scripting_plugin);
+  app.add_plugin(engine::console_plugin);
 
   app.add_systems(Startup, setup_camera);
   app.add_systems(Startup, setup_lighting);
   app.add_systems(Startup, spawn_ground);
   app.add_systems(Startup, spawn_player);
 
-  app.add_systems(Update, player_movement_system);
-  app.add_systems(Update, update_isometric_camera_target_system);
+  app.add_systems(Update, group(player_movement_system, update_isometric_camera_target_system).run_if(is_gameplay_active));
   app.add_systems(Update, isometric_camera_system);
+  app.add_systems(RenderPassSet::Cleanup, group(engine::ConsoleRenderSystem).before(RenderPassSystems::Frame::end_frame));
 }
