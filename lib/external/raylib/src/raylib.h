@@ -320,11 +320,11 @@ typedef RenderTexture RenderTexture2D;
 // NPatchInfo, n-patch layout info
 typedef struct NPatchInfo {
   rlRectangle source; // Texture source rectangle
-  int left;         // Left border offset
-  int top;          // Top border offset
-  int right;        // Right border offset
-  int bottom;       // Bottom border offset
-  int layout;       // Layout of the n-patch: 3x3, 1x3 or 3x1
+  int left;           // Left border offset
+  int top;            // Top border offset
+  int right;          // Right border offset
+  int bottom;         // Bottom border offset
+  int layout;         // Layout of the n-patch: 3x3, 1x3 or 3x1
 } NPatchInfo;
 
 // GlyphInfo, font characters glyphs info
@@ -342,7 +342,7 @@ typedef struct Font {
   int glyphCount;    // Number of glyph characters
   int glyphPadding;  // Padding around the glyph characters
   Texture2D texture; // Texture atlas containing the glyphs
-  rlRectangle *recs;   // Rectangles in texture for the glyphs
+  rlRectangle *recs; // Rectangles in texture for the glyphs
   GlyphInfo *glyphs; // Glyphs info data
 } Font;
 
@@ -1090,8 +1090,8 @@ extern "C" { // Prevents name mangling of functions
 // Window-related functions
 RLAPI void
 InitWindow(int width, int height,
-           const char *title); // Initialize window and OpenGL context
-RLAPI void rlCloseWindow(void);  // Close window and unload OpenGL context
+           const char *title);  // Initialize window and OpenGL context
+RLAPI void rlCloseWindow(void); // Close window and unload OpenGL context
 RLAPI bool
 WindowShouldClose(void); // Check if application should close (KEY_ESCAPE
                          // pressed or windows close icon clicked)
@@ -1167,8 +1167,8 @@ RLAPI void DisableEventWaiting(void); // Disable waiting for events on
                                       // EndDrawing(), automatic events polling
 
 // Cursor-related functions
-RLAPI void rlShowCursor(void);       // Shows cursor
-RLAPI void rlHideCursor(void);       // Hides cursor
+RLAPI void rlShowCursor(void);     // Shows cursor
+RLAPI void rlHideCursor(void);     // Hides cursor
 RLAPI bool IsCursorHidden(void);   // Check if cursor is not visible
 RLAPI void EnableCursor(void);     // Enables cursor (unlock cursor)
 RLAPI void DisableCursor(void);    // Disables cursor (lock cursor)
@@ -1591,9 +1591,9 @@ RLAPI void UpdateCameraPro(Camera *camera, Vector3 movement, Vector3 rotation,
 // NOTE: It can be useful when using basic shapes and one single font,
 // defining a font char white rectangle would allow drawing everything in a
 // single draw call
-RLAPI void SetShapesTexture(
-    Texture2D texture,
-    rlRectangle source); // Set texture and rectangle to be used on shapes drawing
+RLAPI void SetShapesTexture(Texture2D texture,
+                            rlRectangle source); // Set texture and rectangle to
+                                                 // be used on shapes drawing
 RLAPI Texture2D
 GetShapesTexture(void); // Get texture that is used for shapes drawing
 RLAPI rlRectangle GetShapesTextureRectangle(
@@ -2004,7 +2004,8 @@ RLAPI void ImageDrawTriangleFan(
 RLAPI void ImageDrawTriangleStrip(
     Image *dst, const Vector2 *points, int pointCount,
     Color color); // Draw a triangle strip defined by points within an image
-RLAPI void ImageDraw(Image *dst, Image src, rlRectangle srcRec, rlRectangle dstRec,
+RLAPI void ImageDraw(Image *dst, Image src, rlRectangle srcRec,
+                     rlRectangle dstRec,
                      Color tint); // Draw a source image within a destination
                                   // image (tint applied to source)
 RLAPI void ImageDrawText(Image *dst, const char *text, int posX, int posY,
@@ -2065,8 +2066,8 @@ DrawTextureEx(Texture2D texture, Vector2 position, float rotation, float scale,
 RLAPI void
 DrawTextureRec(Texture2D texture, rlRectangle source, Vector2 position,
                Color tint); // Draw a part of a texture defined by a rectangle
-RLAPI void DrawTexturePro(Texture2D texture, rlRectangle source, rlRectangle dest,
-                          Vector2 origin, float rotation,
+RLAPI void DrawTexturePro(Texture2D texture, rlRectangle source,
+                          rlRectangle dest, Vector2 origin, float rotation,
                           Color tint); // Draw a part of a texture defined by a
                                        // rectangle with 'pro' parameters
 RLAPI void DrawTextureNPatch(Texture2D texture, NPatchInfo nPatchInfo,
@@ -2160,8 +2161,8 @@ RLAPI bool ExportFontAsCode(
 
 // Text drawing functions
 RLAPI void DrawFPS(int posX, int posY); // Draw current FPS
-RLAPI void DrawText(const char *text, int posX, int posY, int fontSize,
-                    Color color); // Draw text (using default font)
+RLAPI void rlDrawText(const char *text, int posX, int posY, int fontSize,
+                      Color color); // Draw text (using default font)
 RLAPI void
 DrawTextEx(Font font, const char *text, Vector2 position, float fontSize,
            float spacing,

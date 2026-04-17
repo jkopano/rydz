@@ -13,20 +13,23 @@ inline bool is_console_toggle_char(i32 codepoint) {
   return codepoint == '`' || codepoint == '~';
 }
 
-//stan konsoli przechowywany jako zasób ECS, zawiera historię wpisów i aktualne wejście użytkownika
+// stan konsoli przechowywany jako zasób ECS, zawiera historię wpisów i aktualne
+// wejście użytkownika
 struct ConsoleState {
   using T = ecs::Resource;
   bool is_open = false;
   std::string current_input = "";
   int cursor_pos = 0;
-  std::vector<std::string> history = {"[System] Konsola gotowa. Wpisz komende..."};
+  std::vector<std::string> history = {
+      "[System] Konsola gotowa. Wpisz komende..."};
   std::vector<std::string> command_history;
   int history_index = 0;
   int scroll_offset = 0;
   float backspace_held_time = 0.0f;
   bool backspace_repeating = false;
 
-  //dodanie wpisu do logu konsoli, dzieli wielolinijkowe komunikaty na pojedyncze linie i ogranicza historię do 200 wpisów
+  // dodanie wpisu do logu konsoli, dzieli wielolinijkowe komunikaty na
+  // pojedyncze linie i ogranicza historię do 200 wpisów
   void log(const std::string &msg) {
     std::stringstream ss(msg);
     std::string line;
@@ -40,7 +43,8 @@ struct ConsoleState {
     scroll_offset = 0;
   }
 
-  //dodanie komendy do historii, zapobiega duplikatom i aktualizuje indeks historii
+  // dodanie komendy do historii, zapobiega duplikatom i aktualizuje indeks
+  // historii
   void add_command_to_history(const std::string &cmd) {
     if (cmd.empty())
       return;
@@ -52,16 +56,17 @@ struct ConsoleState {
 };
 
 inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
-                                ecs::ResMut<LuaResource> lua, 
+                                ecs::ResMut<LuaResource> lua,
                                 ecs::ResMut<ecs::Input> input,
                                 ecs::Res<ecs::Time> time) {
-  //klawisze otwarcia
+  // klawisze otwarcia
   std::vector<i32> pressed_chars;
   for (i32 key = GetCharPressed(); key > 0; key = GetCharPressed()) {
     pressed_chars.push_back(key);
   }
 
-  bool toggle_requested = input->key_pressed(KEY_GRAVE) || input->key_pressed(KEY_F1); 
+  bool toggle_requested =
+      input->key_pressed(KEY_GRAVE) || input->key_pressed(KEY_F1);
   for (i32 codepoint : pressed_chars) {
     if (is_console_toggle_char(codepoint)) {
       toggle_requested = true;
@@ -69,7 +74,7 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
     }
   }
 
-  //przełączanie konsoli, czyszczenie aktualnego wejścia po otwarciu
+  // przełączanie konsoli, czyszczenie aktualnego wejścia po otwarciu
   if (toggle_requested) {
     console->is_open = !console->is_open;
     if (console->is_open) {
@@ -81,7 +86,7 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
   if (!console->is_open)
     return;
 
-  //przewijanie konsoli
+  // przewijanie konsoli
   float wheel = GetMouseWheelMove();
   if (wheel != 0.0f) {
     console->scroll_offset += static_cast<int>(wheel) * 3;
@@ -99,62 +104,62 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
   if (console->scroll_offset > max_scroll)
     console->scroll_offset = max_scroll;
 
-  //zbieranie znaków z ograniczeniami
+  // zbieranie znaków z ograniczeniami
   for (i32 key : pressed_chars) {
-      if (key >= 32 && key <= 125 && !is_console_toggle_char(key)) {
-          console->current_input.insert(
-              console->current_input.begin() + console->cursor_pos,
-              static_cast<char>(key)
-          );
-          console->cursor_pos++;
-      }
+    if (key >= 32 && key <= 125 && !is_console_toggle_char(key)) {
+      console->current_input.insert(console->current_input.begin() +
+                                        console->cursor_pos,
+                                    static_cast<char>(key));
+      console->cursor_pos++;
+    }
   }
 
-  const float REPEAT_DELAY = 0.4f;   // czas przytrzymania przed rozpoczęciem powtarzania
-  const float REPEAT_RATE = 0.05f;  // czas między kolejnymi usunięciami podczas powtarzania
+  const float REPEAT_DELAY =
+      0.4f; // czas przytrzymania przed rozpoczęciem powtarzania
+  const float REPEAT_RATE =
+      0.05f; // czas między kolejnymi usunięciami podczas powtarzania
 
   auto do_backspace = [&]() {
-      if (console->cursor_pos > 0) {
-          console->current_input.erase(console->cursor_pos - 1, 1);
-          console->cursor_pos--;
-      }
-      };
+    if (console->cursor_pos > 0) {
+      console->current_input.erase(console->cursor_pos - 1, 1);
+      console->cursor_pos--;
+    }
+  };
 
   if (rl::IsKeyDown(KEY_BACKSPACE)) {
-      if (rl::IsKeyPressed(KEY_BACKSPACE)) {
-          do_backspace();
-          console->backspace_held_time = 0.0f;
-          console->backspace_repeating = false;
-      }
-      else {
-          console->backspace_held_time += time->delta_seconds;
-
-          if (!console->backspace_repeating && console->backspace_held_time >= REPEAT_DELAY) {
-              console->backspace_repeating = true;
-              console->backspace_held_time = 0.0f;
-              do_backspace();
-          }
-          else if (console->backspace_repeating && console->backspace_held_time >= REPEAT_RATE) {
-              console->backspace_held_time = 0.0f;
-              do_backspace();
-          }
-      }
-  }
-  else {
+    if (rl::IsKeyPressed(KEY_BACKSPACE)) {
+      do_backspace();
       console->backspace_held_time = 0.0f;
       console->backspace_repeating = false;
+    } else {
+      console->backspace_held_time += time->delta_seconds;
+
+      if (!console->backspace_repeating &&
+          console->backspace_held_time >= REPEAT_DELAY) {
+        console->backspace_repeating = true;
+        console->backspace_held_time = 0.0f;
+        do_backspace();
+      } else if (console->backspace_repeating &&
+                 console->backspace_held_time >= REPEAT_RATE) {
+        console->backspace_held_time = 0.0f;
+        do_backspace();
+      }
+    }
+  } else {
+    console->backspace_held_time = 0.0f;
+    console->backspace_repeating = false;
   }
 
   if (rl::IsKeyPressed(KEY_LEFT) && console->cursor_pos > 0) {
-      console->cursor_pos--;
+    console->cursor_pos--;
   }
 
   if (rl::IsKeyPressed(KEY_RIGHT) &&
       console->cursor_pos < static_cast<int>(console->current_input.size())) {
-      console->cursor_pos++;
+    console->cursor_pos++;
   }
 
-  //nawigacja po historii komend
+  // nawigacja po historii komend
   if (rl::IsKeyPressed(KEY_UP) && !console->command_history.empty()) {
     if (console->history_index > 0) {
       console->history_index--;
@@ -177,7 +182,8 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
     }
   }
 
-  //wykonanie komendy po naciśnięciu Enter, dodanie do historii i logu, obsługa błędów Lua
+  // wykonanie komendy po naciśnięciu Enter, dodanie do historii i logu, obsługa
+  // błędów Lua
   if (rl::IsKeyPressed(KEY_ENTER) && !console->current_input.empty()) {
     std::string cmd = console->current_input;
     console->log("> " + cmd);
@@ -192,14 +198,15 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
 
     int result = luaL_dostring(lua->vm, cmd.c_str());
     if (result != LUA_OK) {
-		const char* error_msg = lua_tostring(lua->vm, -1);
-        console->log("[Blad] " + std::string(error_msg ? error_msg : "Nieznany błąd"));
-		lua_pop(lua->vm, 1);
+      const char *error_msg = lua_tostring(lua->vm, -1);
+      console->log("[Blad] " +
+                   std::string(error_msg ? error_msg : "Nieznany błąd"));
+      lua_pop(lua->vm, 1);
     }
   }
 }
 
-//system renderujący konsolę
+// system renderujący konsolę
 inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
                                 ecs::NonSendMarker) {
   if (!console->is_open)
@@ -220,7 +227,7 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
       continue;
     }
 
-    DrawText(it->c_str(), 10, y, 20, rl::RAYWHITE);
+    rlDrawText(it->c_str(), 10, y, 20, rl::RAYWHITE);
     y -= 25;
     current_line++;
 
@@ -229,12 +236,14 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
   }
 
   DrawRectangle(0, console_h, screen_w, 30, Fade(DARKGRAY, 0.9f));
-  std::string display = "] " + console->current_input.substr(0, console->cursor_pos) + "|" +
+  std::string display =
+      "] " + console->current_input.substr(0, console->cursor_pos) + "|" +
       console->current_input.substr(console->cursor_pos);
-  DrawText(display.c_str(), 10, console_h + 5, 20, rl::GREEN);
+  rlDrawText(display.c_str(), 10, console_h + 5, 20, rl::GREEN);
 }
 
-//funkcja pluginu, która inicjalizuje zasób stanu konsoli i dodaje system aktualizacji do harmonogramu
+// funkcja pluginu, która inicjalizuje zasób stanu konsoli i dodaje system
+// aktualizacji do harmonogramu
 inline void console_plugin(ecs::App &app) {
   app.init_resource<ConsoleState>();
   app.add_systems(ecs::ScheduleLabel::Update, ConsoleUpdateSystem);
