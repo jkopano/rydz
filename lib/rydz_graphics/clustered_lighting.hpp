@@ -23,11 +23,11 @@ struct ClusterConfig {
   u32 max_point_lights = 1024;
   u32 max_lights_per_cluster = 128;
 
-  [[nodiscard]] u32 cluster_count() const {
+  [[nodiscard]] auto cluster_count() const -> u32 {
     return static_cast<u32>(tile_count_x * tile_count_y * slice_count_z);
   }
 
-  [[nodiscard]] u32 max_light_indices() const {
+  [[nodiscard]] auto max_light_indices() const -> u32 {
     return cluster_count() * max_lights_per_cluster;
   }
 };
@@ -49,9 +49,9 @@ static constexpr auto CLUSTER_RECORD_SIZE = 48;
 static_assert(sizeof(GpuPointLight) == POINT_LIGHT_SIZE);
 static_assert(sizeof(ClusterGpuRecord) == CLUSTER_RECORD_SIZE);
 
-inline f32 cluster_slice_distance(const ClusterConfig &config, f32 near_plane,
-                                  f32 far_plane, bool orthographic,
-                                  i32 slice_index) {
+inline auto cluster_slice_distance(const ClusterConfig &config, f32 near_plane,
+                                   f32 far_plane, bool orthographic,
+                                   i32 slice_index) -> f32 {
   constexpr auto MARGIN = 0.001F;
   f32 clamped_near = std::max(near_plane, MARGIN);
   f32 clamped_far = std::max(far_plane, clamped_near + MARGIN);
@@ -66,20 +66,20 @@ inline f32 cluster_slice_distance(const ClusterConfig &config, f32 near_plane,
   return clamped_near * std::pow(ratio, alpha);
 }
 
-inline math::Vec3 unproject_to_view(const math::Mat4 &inverse_projection,
-                                    f32 ndc_x, f32 ndc_y, f32 ndc_z) {
+inline auto unproject_to_view(const math::Mat4 &inverse_projection, f32 ndc_x,
+                              f32 ndc_y, f32 ndc_z) -> math::Vec3 {
   math::Vec4 clip(ndc_x, ndc_y, ndc_z, 1.0F);
   math::Vec4 view = inverse_projection * clip;
-  f32 w = view.GetW();
+  f32 w = view.w;
   f32 inv_w = std::abs(w) > 1e-6F ? 1.0F / w : 1.0F;
-  return {view.GetX() * inv_w, view.GetY() * inv_w, view.GetZ() * inv_w};
+  return {view.x * inv_w, view.y * inv_w, view.z * inv_w};
 }
 
-inline ClusterGpuRecord
-build_cluster_record(const ClusterConfig &config,
-                     const math::Mat4 &inverse_projection, bool orthographic,
-                     f32 near_plane, f32 far_plane, i32 tile_x, i32 tile_y,
-                     i32 tile_z) {
+inline auto build_cluster_record(const ClusterConfig &config,
+                                 const math::Mat4 &inverse_projection,
+                                 bool orthographic, f32 near_plane,
+                                 f32 far_plane, i32 tile_x, i32 tile_y,
+                                 i32 tile_z) -> ClusterGpuRecord {
   ClusterGpuRecord record{};
 
   const u32 cluster_index = static_cast<u32>(
@@ -122,8 +122,8 @@ build_cluster_record(const ClusterConfig &config,
       const math::Vec3 far_corner =
           unproject_to_view(inverse_projection, corner_x, corner_y, 1.0F);
       const math::Vec3 direction = far_corner - near_corner;
-      bbox.Encapsulate(near_corner + direction * t_near);
-      bbox.Encapsulate(near_corner + direction * t_far);
+      bbox.encapsulate(near_corner + direction * t_near);
+      bbox.encapsulate(near_corner + direction * t_far);
     }
   } else {
     const f32 camera_near = std::max(near_plane, 0.001F);
@@ -131,19 +131,15 @@ build_cluster_record(const ClusterConfig &config,
     for (const auto &[corner_x, corner_y] : corners) {
       const math::Vec3 near_corner =
           unproject_to_view(inverse_projection, corner_x, corner_y, -1.0F);
-      bbox.Encapsulate(near_corner * (slice_near / camera_near));
-      bbox.Encapsulate(near_corner * (slice_far / camera_near));
+      bbox.encapsulate(near_corner * (slice_near / camera_near));
+      bbox.encapsulate(near_corner * (slice_far / camera_near));
     }
   }
 
-  record.min_bounds = {.x = bbox.mMin.GetX(),
-                       .y = bbox.mMin.GetY(),
-                       .z = bbox.mMin.GetZ(),
-                       .w = 0.0F};
-  record.max_bounds = {.x = bbox.mMax.GetX(),
-                       .y = bbox.mMax.GetY(),
-                       .z = bbox.mMax.GetZ(),
-                       .w = 0.0F};
+  record.min_bounds = {
+      .x = bbox.mMin.x, .y = bbox.mMin.y, .z = bbox.mMin.z, .w = 0.0F};
+  record.max_bounds = {
+      .x = bbox.mMax.x, .y = bbox.mMax.y, .z = bbox.mMax.z, .w = 0.0F};
   return record;
 }
 
@@ -162,12 +158,13 @@ struct ClusteredLightingState {
 public:
   ClusteredLightingState() = default;
   ClusteredLightingState(const ClusteredLightingState &) = delete;
-  ClusteredLightingState &operator=(const ClusteredLightingState &) = delete;
+  auto operator=(const ClusteredLightingState &)
+      -> ClusteredLightingState & = delete;
   ClusteredLightingState(ClusteredLightingState &&) noexcept = default;
-  ClusteredLightingState &
-  operator=(ClusteredLightingState &&) noexcept = default;
+  auto operator=(ClusteredLightingState &&) noexcept
+      -> ClusteredLightingState & = default;
 
-  void ensure_buffers(const ClusterConfig &config) {
+  auto ensure_buffers(const ClusterConfig &config) -> void {
     if (!point_light_buffer.ready()) {
       point_light_buffer = SSBO(sizeof(GpuPointLight) * config.max_point_lights,
                                 nullptr, RL_DYNAMIC_DRAW);
@@ -185,7 +182,7 @@ public:
     }
   }
 
-  void reset_cpu_storage(const ClusterConfig &config) {
+  auto reset_cpu_storage(const ClusterConfig &config) -> void {
     point_lights_cpu.clear();
     point_lights_cpu.reserve(config.max_point_lights);
     clusters_cpu.clear();
@@ -194,10 +191,10 @@ public:
     light_indices_cpu.resize(config.max_light_indices(), 0);
   }
 
-  void build_cluster_buffers(ecs::NonSendMarker marker,
+  auto build_cluster_buffers(ecs::NonSendMarker marker,
                              const ecs::ExtractedView &view,
                              const ecs::ExtractedLights &lights,
-                             const ClusterConfig &config) {
+                             const ClusterConfig &config) -> void {
     static u32 last_reported_overflow = U32_MAX;
 
     ensure_buffers(config);
@@ -214,14 +211,14 @@ public:
     for (usize i = 0; i < point_light_count; ++i) {
       const auto &light = lights.point_lights[i];
       point_lights_cpu.push_back(GpuPointLight{
-          .position_range = {light.position.GetX(), light.position.GetY(),
-                             light.position.GetZ(), light.range},
+          .position_range = {light.position.x, light.position.y,
+                             light.position.z, light.range},
           .color_intensity = {light.color.r / 255.0f, light.color.g / 255.0f,
                               light.color.b / 255.0f, light.intensity},
       });
     }
 
-    const math::Mat4 inverse_projection = view.camera_view.proj.Inversed();
+    const math::Mat4 inverse_projection = view.camera_view.proj.inverse();
     for (i32 z = 0; z < config.slice_count_z; ++z) {
       for (i32 y = 0; y < config.tile_count_y; ++y) {
         for (i32 x = 0; x < config.tile_count_x; ++x) {
@@ -300,7 +297,8 @@ public:
   }
 };
 
-inline void bind_clustered_lighting(const ClusteredLightingState &state) {
+inline auto bind_clustered_lighting(const ClusteredLightingState &state)
+    -> void {
   if (state.point_light_buffer.ready()) {
     state.point_light_buffer.bind(0);
   }

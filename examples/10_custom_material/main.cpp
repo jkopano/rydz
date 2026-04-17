@@ -46,7 +46,7 @@ struct ToonMaterial : MaterialTrait<HasCamera> {
 void setup(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
            ResMut<Assets<ecs::Material>> materials, NonSendMarker) {
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
-            Transform::from_xyz(0, 3, 6).look_at(Vec3::sZero()));
+            Transform::from_xyz(0, 3, 6).look_at(Vec3::ZERO));
 
   auto sphere = meshes->add(mesh::sphere(1.0f));
   auto floor = meshes->add(mesh::plane(8.0f, 8.0f));

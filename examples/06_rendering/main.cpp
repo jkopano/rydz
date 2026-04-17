@@ -22,7 +22,7 @@ void setup(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
   // poprawy) (right/left/top/bottom/front/back.jpg) Skybox na razie musi być w
   // kamerze, chyba dobre rozwiązanie, ale do ugadania
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
-            ecs::Transform::from_xyz(0, 5, 12).look_at(Vec3::sZero()),
+            ecs::Transform::from_xyz(0, 5, 12).look_at(Vec3::ZERO),
             Skybox::from("res/hdri/skybox"));
 
   // cube - czerwona
@@ -72,7 +72,7 @@ void load_gltf_model(Cmd cmd, Res<AssetServer> asset_server) {
 
   cmd.spawn(SceneRoot{model_handle},
             ecs::Transform{.translation = Vec3(8, 0, 0),
-                           .scale = Vec3::sReplicate(0.02f)});
+                           .scale = Vec3::splat(0.02f)});
 }
 
 // ładowanie tekstur i nakładanie na materiał
@@ -97,7 +97,7 @@ void rotate_system(Query<Mut<Transform>, With<RotateTag>> query,
                    Res<Time> time) {
   for (auto [t] : query.iter()) {
     f32 angle = time->delta_seconds * 1.0f;
-    Quat rot = Quat::sEulerAngles(Vec3(0, angle, 0));
+    Quat rot = Quat::from_euler(Vec3(0, angle, 0));
     t->rotation = rot * t->rotation;
   }
 }

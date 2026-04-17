@@ -21,25 +21,24 @@ struct RayPlugin {
   i32 trace_log_level = LOG_NONE;
 
   static auto install(RayPlugin config) {
-    return [config = std::move(config)](ecs::App &app) mutable {
+    return [config = std::move(config)](ecs::App &app) mutable -> void {
       app.insert_resource(config.window);
       app.insert_resource(config);
       app.insert_resource(ecs::AppRunner{
-          .run =
-              [](ecs::App &app_ref) {
-                auto *runner = app_ref.world().get_resource<RayPlugin>();
-                if (!runner) {
-                  std::fputs("RayPlugin not installed.\n", stderr);
-                  return;
-                }
-                runner->run_app(app_ref);
-              },
+          .run = [](ecs::App &app_ref) -> void {
+            auto *runner = app_ref.world().get_resource<RayPlugin>();
+            if (!runner) {
+              std::fputs("RayPlugin not installed.\n", stderr);
+              return;
+            }
+            runner->run_app(app_ref);
+          },
       });
     };
   }
 
 private:
-  ecs::Window resolve_window(ecs::App &app) const {
+  auto resolve_window(ecs::App &app) const -> ecs::Window {
     if (auto *window = app.world().get_resource<ecs::Window>()) {
       return *window;
     }
@@ -48,7 +47,7 @@ private:
     return this->window;
   }
 
-  static void sync_window(ecs::App &app) {
+  static auto sync_window(ecs::App &app) -> void {
     auto *window = app.world().get_resource<ecs::Window>();
     if (window == nullptr) {
       return;
@@ -58,7 +57,7 @@ private:
     window->height = static_cast<u32>(rl::GetScreenHeight());
   }
 
-  void run_app(ecs::App &app) const {
+  auto run_app(ecs::App &app) const -> void {
     ecs::Window config = resolve_window(app);
 
     init_logging();

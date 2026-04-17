@@ -33,25 +33,25 @@ struct SetId {
 
   SetId(std::type_index t, i32 v) : type(t), value(v) {}
 
-  bool operator==(const SetId &o) const {
+  auto operator==(const SetId &o) const -> bool {
     return type == o.type && value == o.value;
   }
 };
 
-inline std::string set_name(const SetId &id) {
+inline auto set_name(const SetId &id) -> std::string {
   auto name = demangle(id.type.name());
   return name + "(" + std::to_string(id.value) + ")";
 }
 
 template <typename E>
   requires std::is_enum_v<E>
-SetId set(E value) {
+auto set(E value) -> SetId {
   return SetId{typeid(E), static_cast<i32>(value)};
 }
 
 template <typename S>
   requires detail::is_set_marker_v<S>
-SetId set() {
+auto set() -> SetId {
   return SetId{typeid(S), 0};
 }
 
@@ -62,7 +62,7 @@ struct SetList {
 } // namespace ecs
 
 template <> struct std::hash<ecs::SetId> {
-  usize operator()(const ecs::SetId &s) const noexcept {
+  auto operator()(const ecs::SetId &s) const noexcept -> usize {
     usize h1 = std::hash<std::type_index>{}(s.type);
     usize h2 = std::hash<i32>{}(s.value);
     return h1 ^ (h2 * 2654435761u);
@@ -71,7 +71,7 @@ template <> struct std::hash<ecs::SetId> {
 
 namespace ecs {
 
-template <typename H> H AbslHashValue(H h, const SetId &s) {
+template <typename H> auto AbslHashValue(H h, const SetId &s) -> H {
   return H::combine(std::move(h), s.type.hash_code(), s.value);
 }
 
@@ -87,25 +87,27 @@ struct is_set_argument<T> : std::true_type {};
 template <typename T>
 inline constexpr bool is_set_argument_v = is_set_argument<bare_t<T>>::value;
 
-inline SetId to_set_id(SetId id) { return id; }
+inline auto to_set_id(SetId id) -> SetId { return id; }
 
 template <typename E>
   requires std::is_enum_v<bare_t<E>>
-SetId to_set_id(E value) {
+auto to_set_id(E value) -> SetId {
   return set(value);
 }
 
 template <typename S>
   requires is_set_marker_v<S>
-SetId to_set_id(S &&) {
+auto to_set_id(S &&) -> SetId {
   return set<bare_t<S>>();
 }
 
-inline std::vector<SetId> to_set_ids(SetId id) { return {id}; }
+inline auto to_set_ids(SetId id) -> std::vector<SetId> { return {id}; }
 
-inline std::vector<SetId> to_set_ids(SetList ids) { return std::move(ids.ids); }
+inline auto to_set_ids(SetList ids) -> std::vector<SetId> {
+  return std::move(ids.ids);
+}
 
-inline std::string set_names(const std::vector<SetId> &ids) {
+inline auto set_names(const std::vector<SetId> &ids) -> std::string {
   std::string result;
   for (usize i = 0; i < ids.size(); ++i) {
     if (i != 0) {
@@ -116,15 +118,16 @@ inline std::string set_names(const std::vector<SetId> &ids) {
   return result;
 }
 
-template <typename... Args> std::vector<SetId> make_set_ids(Args &&...args) {
+template <typename... Args>
+auto make_set_ids(Args &&...args) -> std::vector<SetId> {
   std::vector<SetId> ids;
   ids.reserve(sizeof...(Args));
   (ids.push_back(to_set_id(std::forward<Args>(args))), ...);
   return ids;
 }
 
-inline void ensure_unique_sets(const std::vector<SetId> &ids,
-                               const std::string &context) {
+inline auto ensure_unique_sets(const std::vector<SetId> &ids,
+                               const std::string &context) -> void {
   for (usize i = 0; i < ids.size(); ++i) {
     for (usize j = i + 1; j < ids.size(); ++j) {
       if (ids[i] == ids[j]) {
@@ -148,11 +151,11 @@ public:
   ICondition() = default;
   ICondition(const ICondition &) = default;
   ICondition(ICondition &&) = delete;
-  ICondition &operator=(const ICondition &) = default;
-  ICondition &operator=(ICondition &&) = delete;
+  auto operator=(const ICondition &) -> ICondition & = default;
+  auto operator=(ICondition &&) -> ICondition & = delete;
   virtual ~ICondition() = default;
-  virtual bool is_true(World &world) = 0;
-  [[nodiscard]] virtual SystemAccess access() const = 0;
+  virtual auto is_true(World &world) -> bool = 0;
+  [[nodiscard]] virtual auto access() const -> SystemAccess = 0;
 };
 
 template <typename F> class FunctionCondition : public ICondition {
@@ -170,32 +173,32 @@ template <typename F> class FunctionCondition : public ICondition {
 public:
   explicit FunctionCondition(F func) : func_(std::move(func)) {}
 
-  bool is_true(World &world) override {
+  auto is_true(World &world) -> bool override {
     ensure_param_states(world);
 
     SystemContext ctx{.last_run = Tick{0},
                       .this_run = world.read_change_tick()};
-    return function_traits<F>::apply([&]<SystemParameter... Args>() {
+    return function_traits<F>::apply([&]<SystemParameter... Args>() -> auto {
       return evaluate_with_args<Args...>(world, ctx,
                                          std::index_sequence_for<Args...>{});
     });
   }
 
-  [[nodiscard]] SystemAccess access() const override {
+  [[nodiscard]] auto access() const -> SystemAccess override {
     SystemAccess acc;
-    function_traits<F>::apply([&]<SystemParameter... Args>() {
+    function_traits<F>::apply([&]<SystemParameter... Args>() -> auto {
       (SystemParamTraits<bare_t<Args>>::access(acc), ...);
     });
     return acc;
   }
 
 private:
-  void ensure_param_states(World &world) {
+  auto ensure_param_states(World &world) -> void {
     if (state_world_ == &world) {
       return;
     }
 
-    function_traits<F>::apply([&]<SystemParameter... Args>() {
+    function_traits<F>::apply([&]<SystemParameter... Args>() -> auto {
       param_states_ = Tuple<typename SystemParamTraits<bare_t<Args>>::State...>{
           SystemParamTraits<bare_t<Args>>::init_state(world)...};
     });
@@ -203,9 +206,10 @@ private:
   }
 
   template <SystemParameter Arg>
-  static decltype(auto)
+  static auto
   retrieve_param(World &world, const SystemContext &ctx,
-                 typename SystemParamTraits<bare_t<Arg>>::State &state) {
+                 typename SystemParamTraits<bare_t<Arg>>::State &state)
+      -> decltype(auto) {
     if constexpr (HasStatefulParamRetrieve<Arg>) {
       return SystemParamTraits<bare_t<Arg>>::retrieve(world, ctx, state);
     } else {
@@ -214,8 +218,8 @@ private:
   }
 
   template <SystemParameter... Args, std::size_t... I>
-  bool evaluate_with_args(World &world, const SystemContext &ctx,
-                          std::index_sequence<I...>) {
+  auto evaluate_with_args(World &world, const SystemContext &ctx,
+                          std::index_sequence<I...>) -> bool {
     return func_(
         retrieve_param<Args>(world, ctx, std::get<I>(param_states_))...);
   }
@@ -233,7 +237,7 @@ public:
   SharedConditionGate(std::shared_ptr<ICondition> condition, usize member_count)
       : condition_(std::move(condition)), member_count_(member_count) {}
 
-  bool is_true(World &world) {
+  auto is_true(World &world) -> bool {
     std::lock_guard lock(mutex_);
 
     const u64 run_id = world.read_schedule_run_id();
@@ -250,7 +254,7 @@ public:
     return cached_result_;
   }
 
-  SystemAccess access() const { return condition_->access(); }
+  auto access() const -> SystemAccess { return condition_->access(); }
 };
 
 class ConditionedSystem : public ISystem {
@@ -273,7 +277,7 @@ public:
       : system_(std::move(system)),
         shared_condition_(std::move(shared_condition)) {}
 
-  void run(World &world) override {
+  auto run(World &world) -> void override {
     const bool should_run = shared_condition_
                                 ? shared_condition_->is_true(world)
                                 : condition_->is_true(world);
@@ -283,9 +287,11 @@ public:
     }
   }
 
-  [[nodiscard]] std::string name() const override { return system_->name(); }
+  [[nodiscard]] auto name() const -> std::string override {
+    return system_->name();
+  }
 
-  [[nodiscard]] SystemAccess access() const override {
+  [[nodiscard]] auto access() const -> SystemAccess override {
     auto acc =
         shared_condition_ ? shared_condition_->access() : condition_->access();
     acc.merge(system_->access());
@@ -293,28 +299,29 @@ public:
   }
 };
 
-template <typename F> std::unique_ptr<ICondition> make_condition(F &&func) {
+template <typename F>
+auto make_condition(F &&func) -> std::unique_ptr<ICondition> {
   return std::make_unique<FunctionCondition<decay_t<F>>>(std::forward<F>(func));
 }
 
-inline std::unique_ptr<ICondition> run_once() {
+inline auto run_once() -> std::unique_ptr<ICondition> {
   struct RunOnceCondition : ICondition {
     bool fired{};
-    bool is_true(World & /*world*/) override {
+    auto is_true(World & /*world*/) -> bool override {
       if (!fired) {
         fired = true;
         return true;
       }
       return false;
     }
-    [[nodiscard]] SystemAccess access() const override { return {}; }
+    [[nodiscard]] auto access() const -> SystemAccess override { return {}; }
   };
   return std::make_unique<RunOnceCondition>();
 }
 
 template <typename F, typename Cond>
   requires SystemCallable<F>
-std::unique_ptr<ISystem> make_system_run_if(F &&func, Cond &&cond) {
+auto make_system_run_if(F &&func, Cond &&cond) -> std::unique_ptr<ISystem> {
   return std::make_unique<ConditionedSystem>(
       make_system(std::forward<F>(func)),
       make_condition(std::forward<Cond>(cond)));
@@ -328,29 +335,29 @@ template <SystemCallable F> class SystemDescriptor {
 public:
   explicit SystemDescriptor(F func) : func_(std::move(func)) {}
 
-  template <typename Cond> SystemDescriptor &&run_if(Cond &&cond) && {
+  template <typename Cond> auto run_if(Cond &&cond) && -> SystemDescriptor && {
     condition_ = make_condition(std::forward<Cond>(cond));
     return std::move(*this);
   }
 
-  SystemDescriptor &&run_if(std::unique_ptr<ICondition> cond) && {
+  auto run_if(std::unique_ptr<ICondition> cond) && -> SystemDescriptor && {
     condition_ = std::move(cond);
     return std::move(*this);
   }
 
-  template <typename Fn> SystemDescriptor &&after(Fn &&fn) && {
+  template <typename Fn> auto after(Fn &&fn) && -> SystemDescriptor && {
     ordering_.after.push_back(system_name_of(std::forward<Fn>(fn)));
     return std::move(*this);
   }
 
-  template <typename Fn> SystemDescriptor &&before(Fn &&fn) && {
+  template <typename Fn> auto before(Fn &&fn) && -> SystemDescriptor && {
     ordering_.before.push_back(system_name_of(std::forward<Fn>(fn)));
     return std::move(*this);
   }
 
-  SystemOrdering take_ordering() { return std::move(ordering_); }
+  auto take_ordering() -> SystemOrdering { return std::move(ordering_); }
 
-  std::unique_ptr<ISystem> build() {
+  auto build() -> std::unique_ptr<ISystem> {
     auto sys = make_system(std::move(func_));
     if (condition_) {
       return std::make_unique<ConditionedSystem>(std::move(sys),
@@ -391,32 +398,33 @@ public:
     (systems_.push_back(make_system(std::forward<Fs>(funcs))), ...);
   }
 
-  template <typename Cond> SystemGroupDescriptor &&run_if(Cond &&cond) && {
+  template <typename Cond>
+  auto run_if(Cond &&cond) && -> SystemGroupDescriptor && {
     condition_ = make_condition(std::forward<Cond>(cond));
     return std::move(*this);
   }
 
-  SystemGroupDescriptor &&run_if(std::unique_ptr<ICondition> cond) && {
+  auto run_if(std::unique_ptr<ICondition> cond) && -> SystemGroupDescriptor && {
     condition_ = std::move(cond);
     return std::move(*this);
   }
 
-  template <typename Fn> SystemGroupDescriptor &&after(Fn &&fn) && {
+  template <typename Fn> auto after(Fn &&fn) && -> SystemGroupDescriptor && {
     ordering_.after.push_back(system_name_of(std::forward<Fn>(fn)));
     return std::move(*this);
   }
 
-  template <typename Fn> SystemGroupDescriptor &&before(Fn &&fn) && {
+  template <typename Fn> auto before(Fn &&fn) && -> SystemGroupDescriptor && {
     ordering_.before.push_back(system_name_of(std::forward<Fn>(fn)));
     return std::move(*this);
   }
 
-  SystemGroupDescriptor &&chain() && {
+  auto chain() && -> SystemGroupDescriptor && {
     chained_ = true;
     return std::move(*this);
   }
 
-  std::vector<GroupSystemEntry> build() {
+  auto build() -> std::vector<GroupSystemEntry> {
     std::vector<GroupSystemEntry> result;
 
     std::shared_ptr<ICondition> shared_cond = std::move(condition_);
@@ -461,14 +469,15 @@ struct is_system_input_descriptor<SystemGroupDescriptor> : std::true_type {};
 
 } // namespace detail
 
-template <SystemCallable F> SystemDescriptor<decay_t<F>> group(F &&func) {
+template <SystemCallable F>
+auto group(F &&func) -> SystemDescriptor<decay_t<F>> {
   return SystemDescriptor<decay_t<F>>(std::forward<F>(func));
 }
 
 template <typename F1, typename F2, typename... Fs>
   requires(SystemCallable<F1> && SystemCallable<F2> &&
            (SystemCallable<Fs> && ...))
-SystemGroupDescriptor group(F1 &&f1, F2 &&f2, Fs &&...fs) {
+auto group(F1 &&f1, F2 &&f2, Fs &&...fs) -> SystemGroupDescriptor {
   return SystemGroupDescriptor(std::forward<F1>(f1), std::forward<F2>(f2),
                                std::forward<Fs>(fs)...);
 }
@@ -487,29 +496,30 @@ public:
   explicit SetConfigDescriptor(SetId id)
       : config_{.id = id, .after = {}, .before = {}, .condition = nullptr} {}
 
-  [[nodiscard]] const SetId &id() const { return config_.id; }
+  [[nodiscard]] auto id() const -> const SetId & { return config_.id; }
 
-  SetConfigDescriptor &&before(SetId id) && {
+  auto before(SetId id) && -> SetConfigDescriptor && {
     config_.before.push_back(id);
     return std::move(*this);
   }
 
-  SetConfigDescriptor &&after(SetId id) && {
+  auto after(SetId id) && -> SetConfigDescriptor && {
     config_.after.push_back(id);
     return std::move(*this);
   }
 
-  template <typename Cond> SetConfigDescriptor &&run_if(Cond &&cond) && {
+  template <typename Cond>
+  auto run_if(Cond &&cond) && -> SetConfigDescriptor && {
     config_.condition = make_condition(std::forward<Cond>(cond));
     return std::move(*this);
   }
 
-  SetConfigDescriptor &&run_if(std::unique_ptr<ICondition> cond) && {
+  auto run_if(std::unique_ptr<ICondition> cond) && -> SetConfigDescriptor && {
     config_.condition = std::move(cond);
     return std::move(*this);
   }
 
-  SetConfig take() { return std::move(config_); }
+  auto take() -> SetConfig { return std::move(config_); }
 };
 
 class ChainedSetConfigDescriptor {
@@ -520,14 +530,14 @@ public:
   explicit ChainedSetConfigDescriptor(std::vector<SetId> ids)
       : ids_(std::move(ids)) {}
 
-  [[nodiscard]] const std::vector<SetId> &ids() const { return ids_; }
+  [[nodiscard]] auto ids() const -> const std::vector<SetId> & { return ids_; }
 
-  ChainedSetConfigDescriptor &&chain() && {
+  auto chain() && -> ChainedSetConfigDescriptor && {
     chained_ = true;
     return std::move(*this);
   }
 
-  std::vector<SetConfig> take() {
+  auto take() -> std::vector<SetConfig> {
     if (!chained_) {
       throw std::runtime_error("configure(...) with multiple sets requires "
                                ".chain()");
@@ -551,20 +561,20 @@ public:
 
 template <typename E>
   requires std::is_enum_v<E>
-SetConfigDescriptor configure(E value) {
+auto configure(E value) -> SetConfigDescriptor {
   return SetConfigDescriptor(set(value));
 }
 
 template <typename S>
   requires std::is_same_v<typename S::T, Set> || std::is_base_of_v<Set, S>
-SetConfigDescriptor configure() {
+auto configure() -> SetConfigDescriptor {
   return SetConfigDescriptor(set<S>());
 }
 
 template <typename A, typename B, typename... Rest>
   requires(detail::is_set_argument_v<A> && detail::is_set_argument_v<B> &&
            (... && detail::is_set_argument_v<Rest>))
-ChainedSetConfigDescriptor configure(A &&a, B &&b, Rest &&...rest) {
+auto configure(A &&a, B &&b, Rest &&...rest) -> ChainedSetConfigDescriptor {
   return ChainedSetConfigDescriptor(detail::make_set_ids(
       std::forward<A>(a), std::forward<B>(b), std::forward<Rest>(rest)...));
 }
@@ -572,7 +582,7 @@ ChainedSetConfigDescriptor configure(A &&a, B &&b, Rest &&...rest) {
 template <typename A, typename B, typename... Rest>
   requires(detail::is_set_argument_v<A> && detail::is_set_argument_v<B> &&
            (... && detail::is_set_argument_v<Rest>))
-SetList sets(A &&a, B &&b, Rest &&...rest) {
+auto sets(A &&a, B &&b, Rest &&...rest) -> SetList {
   auto ids = detail::make_set_ids(std::forward<A>(a), std::forward<B>(b),
                                   std::forward<Rest>(rest)...);
   detail::ensure_unique_sets(ids, "sets(...)");

@@ -15,7 +15,7 @@ concept IComputeShader = requires {
 
 template <IComputeShader C> class ICompute {
   Handle<C> shader;
-  virtual void apply();
+  virtual auto apply() -> void;
 };
 
 } // namespace ecs

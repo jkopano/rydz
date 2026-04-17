@@ -18,7 +18,7 @@ namespace ecs {
 using namespace math;
 
 struct FrustumPlane {
-  Vec3 normal = Vec3::sZero();
+  Vec3 normal = Vec3::ZERO;
   float distance = 0.0f;
 };
 
@@ -26,7 +26,7 @@ struct ViewVisibility {
   bool visible = true;
 };
 
-inline AABox compute_local_bbox(const gl::Mesh &mesh) {
+inline auto compute_local_bbox(const gl::Mesh &mesh) -> AABox {
   if ((mesh.vertex_data() == nullptr) || mesh.vertex_count() <= 0) {
     return {};
   }
@@ -38,21 +38,21 @@ inline AABox compute_local_bbox(const gl::Mesh &mesh) {
     const float *vertices = mesh.vertex_data();
     Vec3 vec(vertices[(i * 3) + 0], vertices[(i * 3) + 1],
              vertices[(i * 3) + 2]);
-    bbox.Encapsulate(vec);
+    bbox.encapsulate(vec);
   }
   return bbox;
 }
 
-inline AABox transform_bbox(const AABox &local, Mat4 m) {
+inline auto transform_bbox(const AABox &local, Mat4 m) -> AABox {
   Vec3 corners[8] = {
-      Vec3(local.mMin.GetX(), local.mMin.GetY(), local.mMin.GetZ()),
-      Vec3(local.mMin.GetX(), local.mMin.GetY(), local.mMax.GetZ()),
-      Vec3(local.mMin.GetX(), local.mMax.GetY(), local.mMin.GetZ()),
-      Vec3(local.mMin.GetX(), local.mMax.GetY(), local.mMax.GetZ()),
-      Vec3(local.mMax.GetX(), local.mMin.GetY(), local.mMin.GetZ()),
-      Vec3(local.mMax.GetX(), local.mMin.GetY(), local.mMax.GetZ()),
-      Vec3(local.mMax.GetX(), local.mMax.GetY(), local.mMin.GetZ()),
-      Vec3(local.mMax.GetX(), local.mMax.GetY(), local.mMax.GetZ()),
+      Vec3(local.mMin.x, local.mMin.y, local.mMin.z),
+      Vec3(local.mMin.x, local.mMin.y, local.mMax.z),
+      Vec3(local.mMin.x, local.mMax.y, local.mMin.z),
+      Vec3(local.mMin.x, local.mMax.y, local.mMax.z),
+      Vec3(local.mMax.x, local.mMin.y, local.mMin.z),
+      Vec3(local.mMax.x, local.mMin.y, local.mMax.z),
+      Vec3(local.mMax.x, local.mMax.y, local.mMin.z),
+      Vec3(local.mMax.x, local.mMax.y, local.mMax.z),
   };
 
   AABox result;
@@ -60,19 +60,18 @@ inline AABox transform_bbox(const AABox &local, Mat4 m) {
   result.mMax = Vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
   for (auto &c : corners) {
     Vec3 p = m * c;
-    result.Encapsulate(p);
+    result.encapsulate(p);
   }
   return result;
 }
 
-inline bool aabb_in_frustum(const AABox &bbox,
-                            const std::array<FrustumPlane, 6> &planes) {
+inline auto aabb_in_frustum(const AABox &bbox,
+                            const std::array<FrustumPlane, 6> &planes) -> bool {
   for (const auto &plane : planes) {
-    Vec3 p_vertex(
-        plane.normal.GetX() >= 0 ? bbox.mMax.GetX() : bbox.mMin.GetX(),
-        plane.normal.GetY() >= 0 ? bbox.mMax.GetY() : bbox.mMin.GetY(),
-        plane.normal.GetZ() >= 0 ? bbox.mMax.GetZ() : bbox.mMin.GetZ());
-    float dist = plane.normal.Dot(p_vertex) + plane.distance;
+    Vec3 p_vertex(plane.normal.x >= 0 ? bbox.mMax.x : bbox.mMin.x,
+                  plane.normal.y >= 0 ? bbox.mMax.y : bbox.mMin.y,
+                  plane.normal.z >= 0 ? bbox.mMax.z : bbox.mMin.z);
+    float dist = plane.normal.dot(p_vertex) + plane.distance;
     if (dist < 0) {
       return false;
     }
@@ -80,7 +79,7 @@ inline bool aabb_in_frustum(const AABox &bbox,
   return true;
 }
 
-inline std::array<FrustumPlane, 6> extract_frustum_planes(Mat4 vp) {
+inline auto extract_frustum_planes(Mat4 vp) -> std::array<FrustumPlane, 6> {
   auto row = [&](int i) -> Vec4 {
     return Vec4(vp(i, 0), vp(i, 1), vp(i, 2), vp(i, 3));
   };
@@ -91,10 +90,10 @@ inline std::array<FrustumPlane, 6> extract_frustum_planes(Mat4 vp) {
   Vec4 r3 = row(3);
 
   auto normalize_plane = [](Vec4 v) -> FrustumPlane {
-    Vec3 n(v.GetX(), v.GetY(), v.GetZ());
-    float len = n.Length();
+    Vec3 n(v.x, v.y, v.z);
+    float len = n.length();
     if (len > 1e-8f) {
-      return {n / len, v.GetW() / len};
+      return {n / len, v.w / len};
     }
     return {};
   };
@@ -124,11 +123,11 @@ compute_mesh_bounds_system(Query<Entity, Mesh3d, Without<MeshBounds>> query,
   }
 }
 
-inline void frustum_cull_system(
+inline auto frustum_cull_system(
     Query<Camera3DComponent, GlobalTransform, With<ActiveCamera>> cam_query,
     Query<Entity, MeshBounds, GlobalTransform, Opt<ComputedVisibility>>
         mesh_query,
-    Res<Window> window, Cmd cmd) {
+    Res<Window> window, Cmd cmd) -> void {
   auto cam_result = cam_query.single();
   if (!cam_result) {
     return;
@@ -163,7 +162,7 @@ inline void frustum_cull_system(
 
   tf::Taskflow taskflow;
   taskflow.for_each_index(
-      size_t{0}, entries.size(), size_t{1}, [&](size_t idx) {
+      size_t{0}, entries.size(), size_t{1}, [&](size_t idx) -> void {
         auto &entry = entries[idx];
 
         if (entry.cv && !entry.cv->visible) {

@@ -31,17 +31,17 @@ struct RenderPlugin {
   template <MaterialValue M> static void register_material(App &) {}
 
   template <typename SlotT>
-  static void register_slot(App &app, SlotProvider provider) {
+  static auto register_slot(App &app, SlotProvider provider) -> void {
     app.init_resource<SlotProviderRegistry>();
     if (auto *registry = app.world().get_resource<SlotProviderRegistry>()) {
       registry->register_slot<SlotT>(std::move(provider));
     }
   }
 
-  static void install(App &app) {
-    app.init_resource<Assets<Mesh>>([](Mesh &mesh) { mesh.unload(); })
+  static auto install(App &app) -> void {
+    app.init_resource<Assets<Mesh>>([](Mesh &mesh) -> void { mesh.unload(); })
         .init_resource<Assets<Texture>>(
-            [](Texture &texture) { texture.unload(); })
+            [](Texture &texture) -> void { texture.unload(); })
         .init_resource<Assets<Material>>()
         .init_resource<Assets<Scene>>()
         .init_resource<AssetServer>()
@@ -67,7 +67,7 @@ struct RenderPlugin {
     register_slot<HasCamera>(app, make_has_camera_slot_provider());
     register_slot<HasPBR>(app, make_has_pbr_slot_provider());
 
-    app.add_systems(First, [](World &world) {
+    app.add_systems(First, [](World &world) -> void {
       if (auto *server = world.get_resource<AssetServer>()) {
         server->update(world);
       }

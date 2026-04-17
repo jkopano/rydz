@@ -19,14 +19,14 @@ struct ComputedVisibility {
   bool visible = true;
 };
 
-inline void compute_visibility(World &world) {
+inline auto compute_visibility(World &world) -> void {
   auto *vis_storage = world.get_storage<Visibility>();
 
   std::unordered_map<Entity, Visibility> visibilities;
   std::unordered_set<Entity> entity_set;
 
   if (vis_storage) {
-    vis_storage->for_each([&](Entity e, const Visibility &v) {
+    vis_storage->for_each([&](Entity e, const Visibility &v) -> void {
       visibilities[e] = v;
       entity_set.insert(e);
     });
@@ -36,7 +36,7 @@ inline void compute_visibility(World &world) {
 
   auto *parent_storage = world.get_storage<Parent>();
   if (parent_storage) {
-    parent_storage->for_each([&](Entity e, const Parent &p) {
+    parent_storage->for_each([&](Entity e, const Parent &p) -> void {
       parents[e] = p.entity;
       entity_set.insert(e);
       if (world.entities.is_alive(p.entity)) {

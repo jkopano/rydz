@@ -19,8 +19,8 @@ public:
     std::string front{};
     std::string back{};
 
-    static Config from_directory(const std::string &dir,
-                                 const std::string &ext = ".jpg") {
+    static auto from_directory(const std::string &dir,
+                               const std::string &ext = ".jpg") -> Config {
       return {.right = dir + "/right" + ext,
               .left = dir + "/left" + ext,
               .top = dir + "/top" + ext,
@@ -37,7 +37,7 @@ public:
 
   Skybox() = default;
 
-  static Skybox from(Config cfg) {
+  static auto from(Config cfg) -> Skybox {
     Skybox skybox{};
     const std::array<std::string, FACE_COUNT> paths = {
         cfg.right, cfg.left, cfg.top, cfg.bottom, cfg.front, cfg.back};
@@ -49,11 +49,11 @@ public:
     return skybox;
   }
 
-  static Skybox from(const std::string &directory_path) {
+  static auto from(const std::string &directory_path) -> Skybox {
     return Skybox::from(Config::from_directory(directory_path));
   }
 
-  void draw(math::Mat4 view, math::Mat4 proj) const {
+  auto draw(math::Mat4 view, math::Mat4 proj) const -> void {
     if (!loaded) {
       return;
     }
@@ -69,7 +69,7 @@ public:
     active_texture_slot(0);
     enable_texture_cubemap(cubemap_id);
 
-    shader.with_enabled([&] {
+    shader.with_enabled([&] -> void {
       vao.bind();
       vao.draw(0, 36);
       VAO::unbind();
@@ -80,7 +80,7 @@ public:
     rl::rlEnableBackfaceCulling();
   }
 
-  void unload() {
+  auto unload() -> void {
     if (cubemap_id != 0) {
       unload_texture_id(cubemap_id);
       cubemap_id = 0;
@@ -91,8 +91,8 @@ public:
   }
 
 private:
-  static ShaderProgram &get_skybox_shader() {
-    static ShaderProgram shader = [] {
+  static auto get_skybox_shader() -> ShaderProgram & {
+    static ShaderProgram shader = [] -> ShaderProgram {
       ShaderProgram program = ShaderProgram::load(ShaderSpec::from(
           "res/shaders/skybox.vert", "res/shaders/skybox.frag"));
       int value = 0;
@@ -102,7 +102,7 @@ private:
     return shader;
   }
 
-  void create_cube_vao() {
+  auto create_cube_vao() -> void {
     float vertices[] = {
         -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,
         -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f,
@@ -124,8 +124,9 @@ private:
     VAO::unbind();
   }
 
-  static unsigned int
-  load_cubemap_from_paths(const std::array<std::string, FACE_COUNT> &paths) {
+  static auto
+  load_cubemap_from_paths(const std::array<std::string, FACE_COUNT> &paths)
+      -> unsigned int {
     std::array<Image, FACE_COUNT> images;
 
     for (usize i = 0; i < images.size(); ++i) {

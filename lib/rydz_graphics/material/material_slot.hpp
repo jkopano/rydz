@@ -33,14 +33,14 @@ struct MaterialSlotRequirement {
   std::type_index type{typeid(void)};
   std::string debug_name;
 
-  bool operator==(const MaterialSlotRequirement &o) const {
+  auto operator==(const MaterialSlotRequirement &o) const -> bool {
     return type == o.type;
   }
 };
 
 namespace detail {
 
-inline bool is_reserved_uniform_name(std::string_view name) {
+inline auto is_reserved_uniform_name(std::string_view name) -> bool {
   static const std::unordered_set<std::string_view> reserved = {
       map_uniform_binding(StandardMaterialUniform::AlphaCutoff),
       map_uniform_binding(StandardMaterialUniform::RenderMethod),
@@ -59,9 +59,9 @@ inline bool is_reserved_uniform_name(std::string_view name) {
   return reserved.contains(name);
 }
 
-inline void validate_authored_uniforms(
+inline auto validate_authored_uniforms(
     const std::unordered_map<UniformName, gl::Uniform> &uniforms,
-    const std::string &material_type_name) {
+    const std::string &material_type_name) -> void {
   for (const auto &[name, uniform] : uniforms) {
     if (is_reserved_uniform_name(name)) {
       throw std::runtime_error("Material '" + material_type_name +
@@ -86,11 +86,11 @@ struct SlotGraphNode {
   std::vector<std::type_index> deps;
 };
 
-inline SlotGraphNode &find_or_add_slot_node(std::vector<SlotGraphNode> &nodes,
-                                            std::type_index type,
-                                            std::string debug_name) {
+inline auto find_or_add_slot_node(std::vector<SlotGraphNode> &nodes,
+                                  std::type_index type, std::string debug_name)
+    -> SlotGraphNode & {
   auto iter = std::ranges::find_if(
-      nodes, [&](const auto &node) { return node.type == type; });
+      nodes, [&](const auto &node) -> auto { return node.type == type; });
   if (iter != nodes.end()) {
     return *iter;
   }
@@ -103,10 +103,10 @@ inline SlotGraphNode &find_or_add_slot_node(std::vector<SlotGraphNode> &nodes,
   return nodes.back();
 }
 
-inline const SlotGraphNode &
-find_slot_node(const std::vector<SlotGraphNode> &nodes, std::type_index type) {
+inline auto find_slot_node(const std::vector<SlotGraphNode> &nodes,
+                           std::type_index type) -> const SlotGraphNode & {
   auto iter = std::ranges::find_if(
-      nodes, [&](const auto &node) { return node.type == type; });
+      nodes, [&](const auto &node) -> auto { return node.type == type; });
   if (iter == nodes.end()) {
     throw std::logic_error("Material slot graph is missing a dependency node");
   }
@@ -114,13 +114,13 @@ find_slot_node(const std::vector<SlotGraphNode> &nodes, std::type_index type) {
 }
 
 template <typename Tuple, std::size_t... I>
-void collect_tuple_slots(std::vector<SlotGraphNode> &nodes,
+auto collect_tuple_slots(std::vector<SlotGraphNode> &nodes,
                          std::vector<std::type_index> &visiting,
-                         std::index_sequence<I...>);
+                         std::index_sequence<I...>) -> void;
 
 template <typename Slot>
-void collect_slot_graph(std::vector<SlotGraphNode> &nodes,
-                        std::vector<std::type_index> &visiting) {
+auto collect_slot_graph(std::vector<SlotGraphNode> &nodes,
+                        std::vector<std::type_index> &visiting) -> void {
   const std::type_index slot_type = typeid(Slot);
   if (std::ranges::find(visiting, slot_type) != visiting.end()) {
     throw std::runtime_error("Slot dependency cycle detected at '" +
@@ -144,15 +144,16 @@ void collect_slot_graph(std::vector<SlotGraphNode> &nodes,
 
     std::vector<std::type_index> deps;
     deps.reserve(std::tuple_size_v<DependsTuple>);
-    [&]<std::size_t... I>(std::index_sequence<I...>) {
+    [&]<std::size_t... I>(std::index_sequence<I...>) -> auto {
       (deps.emplace_back(typeid(std::tuple_element_t<I, DependsTuple>)), ...);
     }(std::make_index_sequence<std::tuple_size_v<DependsTuple>>{});
 
-    std::sort(deps.begin(), deps.end(), [&](const auto &lhs, const auto &rhs) {
-      const auto &lhs_name = find_slot_node(nodes, lhs).debug_name;
-      const auto &rhs_name = find_slot_node(nodes, rhs).debug_name;
-      return lhs_name < rhs_name;
-    });
+    std::sort(deps.begin(), deps.end(),
+              [&](const auto &lhs, const auto &rhs) -> auto {
+                const auto &lhs_name = find_slot_node(nodes, lhs).debug_name;
+                const auto &rhs_name = find_slot_node(nodes, rhs).debug_name;
+                return lhs_name < rhs_name;
+              });
     deps.erase(std::unique(deps.begin(), deps.end()), deps.end());
     auto &node =
         find_or_add_slot_node(nodes, slot_type, demangle(typeid(Slot).name()));
@@ -162,14 +163,14 @@ void collect_slot_graph(std::vector<SlotGraphNode> &nodes,
 }
 
 template <typename Tuple, std::size_t... I>
-void collect_tuple_slots(std::vector<SlotGraphNode> &nodes,
+auto collect_tuple_slots(std::vector<SlotGraphNode> &nodes,
                          std::vector<std::type_index> &visiting,
-                         std::index_sequence<I...>) {
+                         std::index_sequence<I...>) -> void {
   (collect_slot_graph<std::tuple_element_t<I, Tuple>>(nodes, visiting), ...);
 }
 
-inline std::vector<MaterialSlotRequirement>
-topologically_sorted_slots(const std::vector<SlotGraphNode> &nodes) {
+inline auto topologically_sorted_slots(const std::vector<SlotGraphNode> &nodes)
+    -> std::vector<MaterialSlotRequirement> {
   std::unordered_map<std::type_index, usize> indegree;
   std::unordered_map<std::type_index, std::vector<std::type_index>> adjacency;
   std::unordered_map<std::type_index, const SlotGraphNode *> node_ptr;
@@ -182,7 +183,7 @@ topologically_sorted_slots(const std::vector<SlotGraphNode> &nodes) {
     }
   }
 
-  auto cmp = [&](std::type_index a, std::type_index b) {
+  auto cmp = [&](std::type_index a, std::type_index b) -> bool {
     return node_ptr[a]->debug_name < node_ptr[b]->debug_name;
   };
   std::set<std::type_index, decltype(cmp)> ready(cmp);
@@ -214,7 +215,8 @@ topologically_sorted_slots(const std::vector<SlotGraphNode> &nodes) {
   return result;
 }
 
-template <typename Tuple> std::vector<MaterialSlotRequirement> expand_slots() {
+template <typename Tuple>
+auto expand_slots() -> std::vector<MaterialSlotRequirement> {
   std::vector<SlotGraphNode> nodes;
   nodes.reserve(std::tuple_size_v<Tuple>);
   std::vector<std::type_index> visiting;
@@ -228,7 +230,8 @@ template <typename Tuple> std::vector<MaterialSlotRequirement> expand_slots() {
 
 namespace std {
 template <> struct hash<ecs::MaterialSlotRequirement> {
-  size_t operator()(const ecs::MaterialSlotRequirement &k) const noexcept {
+  auto operator()(const ecs::MaterialSlotRequirement &k) const noexcept
+      -> size_t {
     return std::hash<std::type_index>{}(k.type);
   }
 };

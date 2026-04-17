@@ -23,7 +23,7 @@ struct PipelineState {
 
   PipelineState() = default;
   PipelineState(const PipelineState &) = delete;
-  PipelineState &operator=(const PipelineState &) = delete;
+  auto operator=(const PipelineState &) -> PipelineState & = delete;
 
   PipelineState(PipelineState &&other) noexcept
       : world_target(other.world_target), width(other.width),
@@ -33,7 +33,7 @@ struct PipelineState {
     other.height = 0;
   }
 
-  PipelineState &operator=(PipelineState &&other) noexcept {
+  auto operator=(PipelineState &&other) noexcept -> PipelineState & {
     if (this == &other) {
       return *this;
     }
@@ -50,9 +50,9 @@ struct PipelineState {
 
   ~PipelineState() { unload(); }
 
-  [[nodiscard]] bool ready() const { return world_target.ready(); }
+  [[nodiscard]] auto ready() const -> bool { return world_target.ready(); }
 
-  void ensure_target(u32 target_width, u32 target_height) {
+  auto ensure_target(u32 target_width, u32 target_height) -> void {
     target_width = std::max(target_width, 1U);
     target_height = std::max(target_height, 1U);
 
@@ -70,7 +70,7 @@ struct PipelineState {
     }
   }
 
-  void unload() {
+  auto unload() -> void {
     if (world_target.id != 0) {
       world_target.unload();
       world_target = gl::RenderTarget{};

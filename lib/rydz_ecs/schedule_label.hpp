@@ -33,21 +33,21 @@ inline constexpr ScheduleLabel PostRender = ScheduleLabel::PostRender;
 inline constexpr ScheduleLabel Last = ScheduleLabel::Last;
 inline constexpr ScheduleLabel FixedUpdate = ScheduleLabel::FixedUpdate;
 
-template <typename H> H AbslHashValue(H h, ScheduleLabel l) {
+template <typename H> auto AbslHashValue(H h, ScheduleLabel l) -> H {
   return H::combine(std::move(h), static_cast<i32>(l));
 }
 
 } // namespace ecs
 
 template <> struct std::hash<ecs::ScheduleLabel> {
-  usize operator()(ecs::ScheduleLabel l) const noexcept {
+  auto operator()(ecs::ScheduleLabel l) const noexcept -> usize {
     return std::hash<i32>{}(static_cast<i32>(l));
   }
 };
 
 namespace ecs {
 
-inline constexpr const char *schedule_label_name(ScheduleLabel label) {
+inline constexpr auto schedule_label_name(ScheduleLabel label) -> const char * {
   switch (label) {
   case ScheduleLabel::PreStartup:
     return "PreStartup";

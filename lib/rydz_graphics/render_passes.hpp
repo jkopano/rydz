@@ -22,27 +22,27 @@ struct RenderExecutionState {
 };
 
 struct FramePass {
-  static void begin(Res<ExtractedView> view, ResMut<RenderExecutionState> state,
-                    ResMut<PipelineState> screen_pipeline,
-                    NonSendMarker marker);
+  static auto begin(Res<ExtractedView> view, ResMut<RenderExecutionState> state,
+                    ResMut<PipelineState> screen_pipeline, Res<Window> window,
+                    NonSendMarker marker) -> void;
 
-  static void end(ResMut<RenderExecutionState> state,
+  static auto end(ResMut<RenderExecutionState> state,
                   ResMut<PipelineState> screen_pipeline,
                   Res<DebugOverlaySettings> debug_settings,
-                  NonSendMarker marker);
+                  NonSendMarker marker) -> void;
 };
 
 struct WorldPass {
-  static void shadow(Res<RenderExecutionState>, Res<ShadowPhase>,
-                     NonSendMarker) {}
+  static auto shadow(Res<RenderExecutionState>, Res<ShadowPhase>, NonSendMarker)
+      -> void {}
 
-  static void depth_prepass(
+  static auto depth_prepass(
       Res<RenderExecutionState> state, Res<OpaquePhase> phase,
       Res<Assets<Mesh>> mesh_assets, Res<Assets<Texture>> texture_assets,
       ResMut<ShaderCache> shader_cache, Res<SlotProviderRegistry> slot_registry,
       Res<ExtractedView> view, Res<ExtractedLights> lights,
       Res<ClusterConfig> cluster_config,
-      Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
+      Res<ClusteredLightingState> cluster_state, NonSendMarker marker) -> void {
     if (!state->world_pass_active) {
       return;
     }
@@ -57,12 +57,12 @@ struct WorldPass {
     RenderConfig::post_depth_prepass()(marker);
   }
 
-  static void cluster_build(Res<RenderExecutionState> state,
+  static auto cluster_build(Res<RenderExecutionState> state,
                             Res<ExtractedView> view,
                             Res<ExtractedLights> lights,
                             Res<ClusterConfig> cluster_config,
                             ResMut<ClusteredLightingState> cluster_state,
-                            NonSendMarker marker) {
+                            NonSendMarker marker) -> void {
     if (!state->world_pass_active) {
       return;
     }
@@ -114,7 +114,7 @@ struct WorldPass {
     RenderConfig{}(marker);
   }
 
-  static void begin(NonSendMarker marker, const ExtractedView &view) {
+  static auto begin(NonSendMarker marker, const ExtractedView &view) -> void {
     gl::begin_world_pass(view.camera_view.view, view.camera_view.proj);
     RenderConfig::get_default()(marker);
 
@@ -123,20 +123,20 @@ struct WorldPass {
     }
   }
 
-  static void end(NonSendMarker marker) {
+  static auto end(NonSendMarker marker) -> void {
     gl::end_world_pass();
     RenderConfig::end_world_pass()(marker);
   }
 
 private:
-  static const ShaderSpec &depth_prepass_shader_spec() {
+  static auto depth_prepass_shader_spec() -> const ShaderSpec & {
     static const ShaderSpec spec =
         ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth.frag");
     return spec;
   }
 
   template <typename BatchT>
-  static void draw_batch_common(NonSendMarker marker, const BatchT &batch,
+  static auto draw_batch_common(NonSendMarker marker, const BatchT &batch,
                                 const Assets<Mesh> &mesh_assets,
                                 const Assets<Texture> &texture_assets,
                                 ShaderCache &shader_cache,
@@ -145,7 +145,7 @@ private:
                                 const ExtractedLights &lights,
                                 const ClusterConfig &cluster_config,
                                 const ClusteredLightingState &cluster_state,
-                                const ShaderSpec &shader_spec) {
+                                const ShaderSpec &shader_spec) -> void {
     const auto *mesh = mesh_assets.get(batch.key.mesh);
     if (!mesh) {
       return;
@@ -175,11 +175,11 @@ private:
 };
 
 struct PostProcessPass {
-  static void postprocess(ResMut<RenderExecutionState> state,
+  static auto postprocess(ResMut<RenderExecutionState> state,
                           Res<PipelineState> pipeline,
                           ResMut<ShaderCache> shader_cache,
                           Res<ExtractedView> view, Res<Time> time,
-                          NonSendMarker marker) {
+                          NonSendMarker marker) -> void {
     if (state->world_pass_active) {
       WorldPass::end(marker);
       state->world_pass_active = false;
@@ -205,7 +205,8 @@ struct PostProcessPass {
   }
 
 private:
-  static gl::Rectangle postprocess_source_rect(const gl::Texture &texture) {
+  static auto postprocess_source_rect(const gl::Texture &texture)
+      -> gl::Rectangle {
     return {
         0.0F,
         0.0F,
@@ -214,7 +215,7 @@ private:
     };
   }
 
-  static gl::Rectangle postprocess_dest_rect() {
+  static auto postprocess_dest_rect() -> gl::Rectangle {
     return {
         0.0F,
         0.0F,
@@ -223,15 +224,16 @@ private:
     };
   }
 
-  static void draw_world_target_to_screen(const gl::Texture &source_texture) {
+  static auto draw_world_target_to_screen(const gl::Texture &source_texture)
+      -> void {
     gl::draw_texture_pro(
         source_texture, postprocess_source_rect(source_texture),
         postprocess_dest_rect(), {0.0F, 0.0F}, 0.0F, gl::kWhite);
   }
 
-  static void apply_postprocess_uniforms(ShaderProgram &shader,
+  static auto apply_postprocess_uniforms(ShaderProgram &shader,
                                          const PostProcessDescriptor &effect,
-                                         const Time &time) {
+                                         const Time &time) -> void {
     const gl::Vec2 resolution = {
         static_cast<f32>(std::max(gl::screen_width(), 1)),
         static_cast<f32>(std::max(gl::screen_height(), 1)),
@@ -244,11 +246,11 @@ private:
     }
   }
 
-  static void draw_postprocess_pass(NonSendMarker marker,
+  static auto draw_postprocess_pass(NonSendMarker marker,
                                     const gl::Texture &source_texture,
                                     ShaderCache &shader_cache,
-                                    const ExtractedView &view,
-                                    const Time &time) {
+                                    const ExtractedView &view, const Time &time)
+      -> void {
     if (!view.has_postprocess || !view.postprocess.enabled) {
       draw_world_target_to_screen(source_texture);
       return;
@@ -259,13 +261,14 @@ private:
     apply_postprocess_uniforms(shader, view.postprocess, time);
     shader.set_texture(MaterialMap::Albedo, source_texture);
 
-    shader.with_bound([&] { draw_world_target_to_screen(source_texture); });
+    shader.with_bound(
+        [&] -> void { draw_world_target_to_screen(source_texture); });
   }
 };
 
 struct UiPass {
-  static void ui(Res<UiPhase> phase, Res<Assets<Texture>> texture_assets,
-                 ResMut<RenderExecutionState> state, NonSendMarker) {
+  static auto ui(Res<UiPhase> phase, Res<Assets<Texture>> texture_assets,
+                 ResMut<RenderExecutionState> state, NonSendMarker) -> void {
     if (!state->backbuffer_active) {
       gl::begin_drawing();
       state->backbuffer_active = true;
@@ -277,13 +280,13 @@ struct UiPass {
         continue;
       }
 
-      gl::Vec2 position = {item.transform.translation.GetX(),
-                           item.transform.translation.GetY()};
+      gl::Vec2 position = {item.transform.translation.x,
+                           item.transform.translation.y};
       gl::Rectangle source = {0, 0, static_cast<f32>(texture->width),
                               static_cast<f32>(texture->height)};
       gl::Rectangle dest = {position.x, position.y,
-                            texture->width * item.transform.scale.GetX(),
-                            texture->height * item.transform.scale.GetY()};
+                            texture->width * item.transform.scale.x,
+                            texture->height * item.transform.scale.y};
       gl::Vec2 origin = {0, 0};
 
       gl::draw_texture_pro(*texture, source, dest, origin,
@@ -292,21 +295,20 @@ struct UiPass {
   }
 
 private:
-  static f32 texture_rotation_degrees(const Transform &transform) {
-    f32 siny_cosp =
-        2.0F * (transform.rotation.GetW() * transform.rotation.GetZ() +
-                transform.rotation.GetX() * transform.rotation.GetY());
+  static auto texture_rotation_degrees(const Transform &transform) -> f32 {
+    f32 siny_cosp = 2.0F * (transform.rotation.w * transform.rotation.z +
+                            transform.rotation.x * transform.rotation.y);
     f32 cosy_cosp =
-        1.0f - 2.0f * (transform.rotation.GetY() * transform.rotation.GetY() +
-                       transform.rotation.GetZ() * transform.rotation.GetZ());
-    return std::atan2(siny_cosp, cosy_cosp) * (180.0f / 3.14159265f);
+        1.0F - (2.0F * (transform.rotation.y * transform.rotation.y +
+                        transform.rotation.z * transform.rotation.z));
+    return std::atan2(siny_cosp, cosy_cosp) * (180.0F / PI);
   }
 };
 
-inline void FramePass::begin(Res<ExtractedView> view,
+inline auto FramePass::begin(Res<ExtractedView> view,
                              ResMut<RenderExecutionState> state,
-                             ResMut<PipelineState> pipeline,
-                             NonSendMarker marker) {
+                             ResMut<PipelineState> pipeline, Res<Window> window,
+                             NonSendMarker marker) -> void {
   state->world_pass_active = false;
   state->world_target_active = false;
   state->backbuffer_active = false;
@@ -319,7 +321,7 @@ inline void FramePass::begin(Res<ExtractedView> view,
     return;
   }
 
-  pipeline->ensure_target(gl::screen_width(), gl::screen_height());
+  pipeline->ensure_target(window->width, window->height);
   pipeline->world_target.begin();
   gl::clear_background(view->clear_color);
   state->world_target_active = true;
@@ -327,10 +329,10 @@ inline void FramePass::begin(Res<ExtractedView> view,
   state->world_pass_active = true;
 }
 
-inline void FramePass::end(ResMut<RenderExecutionState> state,
+inline auto FramePass::end(ResMut<RenderExecutionState> state,
                            ResMut<PipelineState> pipeline,
                            Res<DebugOverlaySettings> debug_settings,
-                           NonSendMarker marker) {
+                           NonSendMarker marker) -> void {
   if (state->world_pass_active) {
     WorldPass::end(marker);
     state->world_pass_active = false;

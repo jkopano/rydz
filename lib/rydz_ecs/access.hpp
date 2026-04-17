@@ -39,24 +39,25 @@ struct SystemAccess {
     resources_write.insert(std::type_index(typeid(T)));
   }
 
-  void set_exclusive() { exclusive = true; }
-  void set_main_thread_only() { main_thread_only = true; }
+  auto set_exclusive() -> void { exclusive = true; }
+  auto set_main_thread_only() -> void { main_thread_only = true; }
 
-  [[nodiscard]] bool has_data_access() const {
+  [[nodiscard]] auto has_data_access() const -> bool {
     return !components_read.empty() || !components_write.empty() ||
            !resources_read.empty() || !resources_write.empty() ||
            !archetype_required.empty() || !archetype_excluded.empty();
   }
 
-  [[nodiscard]] bool is_empty() const {
+  [[nodiscard]] auto is_empty() const -> bool {
     return components_read.empty() && components_write.empty() &&
            resources_read.empty() && resources_write.empty() && !exclusive;
   }
 
   // Not 100% sure it works as it should, tbh
-  [[nodiscard]] bool is_archetype_disjoint(const SystemAccess &other) const {
-    const bool we_are_excluded_by_other =
-        std::ranges::any_of(archetype_required, [&](const auto &component_id) {
+  [[nodiscard]] auto is_archetype_disjoint(const SystemAccess &other) const
+      -> bool {
+    const bool we_are_excluded_by_other = std::ranges::any_of(
+        archetype_required, [&](const auto &component_id) -> auto {
           return other.archetype_excluded.contains(component_id);
         });
 
@@ -65,12 +66,12 @@ struct SystemAccess {
     }
 
     return std::ranges::any_of(
-        other.archetype_required, [&](const auto &other_component_id) {
+        other.archetype_required, [&](const auto &other_component_id) -> auto {
           return archetype_excluded.contains(other_component_id);
         });
   }
 
-  void merge(const SystemAccess &other) {
+  auto merge(const SystemAccess &other) -> void {
     exclusive |= other.exclusive;
     main_thread_only |= other.main_thread_only;
     components_read.insert(other.components_read.begin(),
@@ -87,15 +88,16 @@ struct SystemAccess {
                               other.archetype_excluded.end());
   }
 
-  [[nodiscard]] bool is_compatible(const SystemAccess &other) const {
+  [[nodiscard]] auto is_compatible(const SystemAccess &other) const -> bool {
     if (exclusive || other.exclusive) {
       return false;
     }
 
     auto are_disjoint = [](const std::set<std::type_index> &set_a,
-                           const std::set<std::type_index> &set_b) {
-      return std::ranges::all_of(
-          set_a, [&](const auto &type_id) { return !set_b.contains(type_id); });
+                           const std::set<std::type_index> &set_b) -> bool {
+      return std::ranges::all_of(set_a, [&](const auto &type_id) -> auto {
+        return !set_b.contains(type_id);
+      });
     };
 
     return are_disjoint(components_write, other.components_write) &&

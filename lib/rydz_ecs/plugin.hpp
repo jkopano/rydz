@@ -10,10 +10,10 @@ public:
   IPlugin() = default;
   IPlugin(const IPlugin &) = default;
   IPlugin(IPlugin &&) = delete;
-  IPlugin &operator=(const IPlugin &) = default;
-  IPlugin &operator=(IPlugin &&) = delete;
+  auto operator=(const IPlugin &) -> IPlugin & = default;
+  auto operator=(IPlugin &&) -> IPlugin & = delete;
   virtual ~IPlugin() = default;
-  virtual void build(App &app) = 0;
+  virtual auto build(App &app) -> void = 0;
 };
 
 class FunctionPlugin : public IPlugin {
@@ -23,7 +23,7 @@ public:
   explicit FunctionPlugin(std::function<void(App &)> func)
       : func_(std::move(func)) {}
 
-  void build(App &app) override { func_(app); }
+  auto build(App &app) -> void override { func_(app); }
 };
 
 } // namespace ecs

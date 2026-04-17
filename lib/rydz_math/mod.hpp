@@ -22,79 +22,76 @@ struct Vec2 : public glm::vec2 {
   using Base = glm::vec2;
   using Base::Base;
 
-  Vec2() : Base(0.0f) {}
+  Vec2() : Base(0.0F) {}
   Vec2(const Base &value) : Base(value) {}
 
-  static Vec2 sZero() { return Vec2(0.0f); }
-  static Vec2 sReplicate(f32 value) { return Vec2(value); }
+  static const Vec2 ZERO;
+  static auto splat(f32 value) -> Vec2 { return Vec2{value}; }
 
-  [[nodiscard]] f32 GetX() const { return x; }
-  [[nodiscard]] f32 GetY() const { return y; }
-
-  [[nodiscard]] f32 LengthSq() const {
+  [[nodiscard]] auto length_sq() const -> f32 {
     return glm::dot(static_cast<const Base &>(*this),
                     static_cast<const Base &>(*this));
   }
 
-  [[nodiscard]] f32 Length() const {
+  [[nodiscard]] auto length() const -> f32 {
     return glm::length(static_cast<const Base &>(*this));
   }
 
-  [[nodiscard]] Vec2 Normalized() const {
-    const f32 len = Length();
+  [[nodiscard]] auto normalized() const -> Vec2 {
+    const f32 len = length();
     if (len <= 1e-8f) {
-      return sZero();
+      return ZERO;
     }
-    return Vec2(glm::normalize(static_cast<const Base &>(*this)));
+    return {glm::normalize(static_cast<const Base &>(*this))};
   }
 
-  [[nodiscard]] f32 Dot(const Vec2 &other) const {
+  [[nodiscard]] auto dot(const Vec2 &other) const -> f32 {
     return glm::dot(static_cast<const Base &>(*this),
                     static_cast<const Base &>(other));
   }
 };
+
+inline constexpr Vec2 Vec2::ZERO{0.0f, 0.0f};
 
 struct Vec3 : public glm::vec3 {
   using Base = glm::vec3;
   using Base::Base;
 
-  Vec3() : Base(0.0f) {}
+  Vec3() : Base(0.0F) {}
   Vec3(const Base &value) : Base(value) {}
 
-  static Vec3 sZero() { return Vec3(0.0f); }
-  static Vec3 sReplicate(f32 value) { return Vec3(value); }
+  static const Vec3 ZERO;
+  static auto splat(f32 value) -> Vec3 { return Vec3{value}; }
 
-  [[nodiscard]] f32 GetX() const { return x; }
-  [[nodiscard]] f32 GetY() const { return y; }
-  [[nodiscard]] f32 GetZ() const { return z; }
-
-  [[nodiscard]] f32 LengthSq() const {
+  [[nodiscard]] auto length_sq() const -> f32 {
     return glm::dot(static_cast<const Base &>(*this),
                     static_cast<const Base &>(*this));
   }
 
-  [[nodiscard]] f32 Length() const {
+  [[nodiscard]] auto length() const -> f32 {
     return glm::length(static_cast<const Base &>(*this));
   }
 
-  [[nodiscard]] Vec3 Normalized() const {
-    const f32 len = Length();
-    if (len <= 1e-8f) {
-      return sZero();
+  [[nodiscard]] auto normalized() const -> Vec3 {
+    const f32 len = length();
+    if (len <= 1e-8F) {
+      return ZERO;
     }
-    return Vec3(glm::normalize(static_cast<const Base &>(*this)));
+    return {glm::normalize(static_cast<const Base &>(*this))};
   }
 
-  [[nodiscard]] f32 Dot(const Vec3 &other) const {
+  [[nodiscard]] auto dot(const Vec3 &other) const -> f32 {
     return glm::dot(static_cast<const Base &>(*this),
                     static_cast<const Base &>(other));
   }
 
-  [[nodiscard]] Vec3 Cross(const Vec3 &other) const {
-    return Vec3(glm::cross(static_cast<const Base &>(*this),
-                           static_cast<const Base &>(other)));
+  [[nodiscard]] auto cross(const Vec3 &other) const -> Vec3 {
+    return {glm::cross(static_cast<const Base &>(*this),
+                       static_cast<const Base &>(other))};
   }
 };
+
+inline constexpr Vec3 Vec3::ZERO{0.0F, 0.0F, 0.0F};
 
 struct Vec4 : public glm::vec4 {
   using Base = glm::vec4;
@@ -103,14 +100,33 @@ struct Vec4 : public glm::vec4 {
   Vec4() : Base(0.0F) {}
   Vec4(const Base &value) : Base(value) {}
 
-  static Vec4 sZero() { return Vec4{0.0F}; }
-  static Vec4 sReplicate(f32 value) { return Vec4{value}; }
+  static const Vec4 ZERO;
+  static auto splat(f32 value) -> Vec4 { return Vec4{value}; }
 
-  [[nodiscard]] f32 GetX() const { return x; }
-  [[nodiscard]] f32 GetY() const { return y; }
-  [[nodiscard]] f32 GetZ() const { return z; }
-  [[nodiscard]] f32 GetW() const { return w; }
+  [[nodiscard]] auto length_sq() const -> f32 {
+    return glm::dot(static_cast<const Base &>(*this),
+                    static_cast<const Base &>(*this));
+  }
+
+  [[nodiscard]] auto length() const -> f32 {
+    return glm::length(static_cast<const Base &>(*this));
+  }
+
+  [[nodiscard]] auto normalized() const -> Vec4 {
+    const f32 len = length();
+    if (len <= 1e-8F) {
+      return ZERO;
+    }
+    return {glm::normalize(static_cast<const Base &>(*this))};
+  }
+
+  [[nodiscard]] auto dot(const Vec4 &other) const -> f32 {
+    return glm::dot(static_cast<const Base &>(*this),
+                    static_cast<const Base &>(other));
+  }
 };
+
+inline constexpr Vec4 Vec4::ZERO{0.0F, 0.0F, 0.0F, 0.0F};
 
 struct Quat : public glm::quat {
   using Base = glm::quat;
@@ -119,21 +135,18 @@ struct Quat : public glm::quat {
   Quat(const Base &value) : Base(value) {}
   Quat(f32 x, f32 y, f32 z, f32 w) : Base(w, x, y, z) {}
 
-  static Quat sIdentity() { return {0.0F, 0.0F, 0.0F, 1.0F}; }
+  static const Quat IDENTITY;
 
-  static Quat sEulerAngles(const Vec3 &angles) {
+  static auto from_euler(Vec3 angles) -> Quat {
     return {glm::quat(static_cast<const Vec3::Base &>(angles))};
   }
 
-  [[nodiscard]] f32 GetX() const { return x; }
-  [[nodiscard]] f32 GetY() const { return y; }
-  [[nodiscard]] f32 GetZ() const { return z; }
-  [[nodiscard]] f32 GetW() const { return w; }
-
-  [[nodiscard]] Quat Normalized() const {
+  [[nodiscard]] auto normalized() const -> Quat {
     return {glm::normalize(static_cast<const Base &>(*this))};
   }
 };
+
+inline const Quat Quat::IDENTITY{0.0F, 0.0F, 0.0F, 1.0F};
 
 struct Mat4 : public glm::mat4 {
 public:
@@ -149,161 +162,167 @@ public:
              static_cast<const Vec4::Base &>(column2),
              static_cast<const Vec4::Base &>(column3)) {}
 
-  static Mat4 sIdentity() { return Mat4(1.0F); }
+  static const Mat4 IDENTITY;
 
-  static Mat4 sPerspective(f32 fov_y_radians, f32 aspect, f32 near_plane,
-                           f32 far_plane) {
+  static auto perspective_rh(f32 fov_y_radians, f32 aspect, f32 near_plane,
+                             f32 far_plane) -> Mat4 {
     return {
         glm::perspectiveRH_NO(fov_y_radians, aspect, near_plane, far_plane)};
   }
 
-  static Mat4 sOrthographic(f32 left, f32 right, f32 bottom, f32 top,
-                            f32 near_plane, f32 far_plane) {
+  static auto orthographic_rh(f32 left, f32 right, f32 bottom, f32 top,
+                              f32 near_plane, f32 far_plane) -> Mat4 {
     return {glm::orthoRH_NO(left, right, bottom, top, near_plane, far_plane)};
   }
 
-  static Mat4 sLookAt(const Vec3 &position, const Vec3 &target,
-                      const Vec3 &up) {
+  static auto look_at_rh(Vec3 position, Vec3 target, Vec3 up) -> Mat4 {
     return {glm::lookAtRH(static_cast<const Vec3::Base &>(position),
                           static_cast<const Vec3::Base &>(target),
                           static_cast<const Vec3::Base &>(up))};
   }
 
-  static Mat4 sRotationTranslation(const Quat &rotation,
-                                   const Vec3 &translation) {
+  static auto from_rotation_translation(Quat rotation, Vec3 translation)
+      -> Mat4 {
     glm::mat4 matrix =
         glm::mat4_cast(static_cast<const Quat::Base &>(rotation));
     matrix[3] = glm::vec4(static_cast<const Vec3::Base &>(translation), 1.0F);
     return {matrix};
   }
 
-  [[nodiscard]] Mat4 PreScaled(const Vec3 &scale) const {
+  [[nodiscard]] auto pre_scaled(Vec3 scale) const -> Mat4 {
     return {glm::scale(static_cast<const Base &>(*this),
                        static_cast<const Vec3::Base &>(scale))};
   }
 
-  [[nodiscard]] Mat4 Inversed() const {
+  [[nodiscard]] auto inverse() const -> Mat4 {
     return {glm::inverse(static_cast<const Base &>(*this))};
   }
 
-  void SetTranslation(const Vec3 &translation) {
+  auto set_translation(Vec3 translation) -> void {
     (*this)[3] = glm::vec4(static_cast<const Vec3::Base &>(translation), 1.0F);
   }
 
-  [[nodiscard]] Quat GetQuaternion() const {
+  [[nodiscard]] auto to_quat() const -> Quat {
     return (glm::quat_cast(glm::mat3(static_cast<const Base &>(*this))));
   }
 
-  [[nodiscard]] Vec3 GetTranslation() const {
+  [[nodiscard]] auto translation() const -> Vec3 {
     const glm::vec4 column = (*this)[3];
     return {column.x, column.y, column.z};
   }
 
-  [[nodiscard]] Vec3 GetAxisX() const {
+  [[nodiscard]] auto x_axis() const -> Vec3 {
     const glm::vec4 column = (*this)[0];
     return {column.x, column.y, column.z};
   }
 
-  [[nodiscard]] Vec3 GetAxisY() const {
+  [[nodiscard]] auto y_axis() const -> Vec3 {
     const glm::vec4 column = (*this)[1];
     return {column.x, column.y, column.z};
   }
 
-  [[nodiscard]] Vec3 GetAxisZ() const {
+  [[nodiscard]] auto z_axis() const -> Vec3 {
     const glm::vec4 column = (*this)[2];
     return {column.x, column.y, column.z};
   }
 
-  [[nodiscard]] Vec3 Multiply3x3(const Vec3 &value) const {
+  [[nodiscard]] auto transform_vector3(Vec3 value) const -> Vec3 {
     return {glm::mat3(static_cast<const Base &>(*this)) *
             static_cast<const Vec3::Base &>(value)};
   }
 
-  [[nodiscard]] f32 operator()(i32 row, i32 column) const {
+  [[nodiscard]] auto operator()(i32 row, i32 column) const -> f32 {
     return (*this)[column][row];
   }
 
-  [[nodiscard]] f32 &operator()(i32 row, i32 column) {
+  [[nodiscard]] auto operator()(i32 row, i32 column) -> f32 & {
     return (*this)[column][row];
   }
 
-  [[nodiscard]] Transform decompose() const;
+  [[nodiscard]] auto decompose() const -> Transform;
 };
+
+inline const Mat4 Mat4::IDENTITY{1.0F};
 
 struct GlobalTransform;
 
 struct Transform {
   using Required = ecs::Requires<GlobalTransform>;
 
-  Vec3 translation = Vec3::sZero();
-  Quat rotation = Quat::sIdentity();
-  Vec3 scale = Vec3::sReplicate(1.0F);
+  Vec3 translation = Vec3::ZERO;
+  Quat rotation = Quat::IDENTITY;
+  Vec3 scale = Vec3::splat(1.0F);
 
-  static Transform from_xyz(f32 x, f32 y, f32 z) {
+  static auto from_xyz(f32 x, f32 y, f32 z) -> Transform {
     return Transform{.translation = {Vec3(x, y, z)},
-                     .rotation = Quat::sIdentity(),
-                     .scale = Vec3::sReplicate(1.0F)};
+                     .rotation = Quat::IDENTITY,
+                     .scale = Vec3::splat(1.0F)};
   }
 
-  static Transform from_translation(Vec3 pos) {
+  static auto from_translation(Vec3 pos) -> Transform {
     return Transform{.translation = pos,
-                     .rotation = Quat::sIdentity(),
-                     .scale = Vec3::sReplicate(1.0F)};
+                     .rotation = Quat::IDENTITY,
+                     .scale = Vec3::splat(1.0F)};
   }
 
-  static Transform from_rotation(Quat q) {
-    return Transform{.translation = Vec3::sZero(),
-                     .rotation = q,
-                     .scale = Vec3::sReplicate(1.0F)};
+  static auto from_rotation(Quat q) -> Transform {
+    return Transform{
+        .translation = Vec3::ZERO, .rotation = q, .scale = Vec3::splat(1.0F)};
   }
 
-  static Transform from_scale(Vec3 s) {
-    return Transform{.translation = Vec3::sZero(),
-                     .rotation = Quat::sIdentity(),
-                     .scale = s};
+  static auto from_scale(Vec3 s) -> Transform {
+    return Transform{
+        .translation = Vec3::ZERO, .rotation = Quat::IDENTITY, .scale = s};
   }
 
-  [[nodiscard]] Mat4 compute_matrix() const {
-    return Mat4::sRotationTranslation(rotation, translation).PreScaled(scale);
+  [[nodiscard]] auto compute_matrix() const -> Mat4 {
+    return Mat4::from_rotation_translation(rotation, translation)
+        .pre_scaled(scale);
   }
 
-  [[nodiscard]] Mat4 to_matrix() const { return compute_matrix(); }
+  [[nodiscard]] auto to_matrix() const -> Mat4 { return compute_matrix(); }
 
-  [[nodiscard]] Vec3 forward() const { return rotation * Vec3(0, 0, -1); }
+  [[nodiscard]] auto forward() const -> Vec3 {
+    return rotation * Vec3(0, 0, -1);
+  }
 
-  [[nodiscard]] Vec3 right() const { return rotation * Vec3(1, 0, 0); }
+  [[nodiscard]] auto right() const -> Vec3 { return rotation * Vec3(1, 0, 0); }
 
-  [[nodiscard]] Vec3 up() const { return rotation * Vec3(0, 1, 0); }
+  [[nodiscard]] auto up() const -> Vec3 { return rotation * Vec3(0, 1, 0); }
 
-  Transform &look_at(Vec3 target, Vec3 world_up = Vec3(0, 1, 0)) {
+  auto look_at(Vec3 target, Vec3 world_up = Vec3(0, 1, 0)) -> Transform & {
     Vec3 dir = target - translation;
-    if (dir.LengthSq() < 1e-10F) {
+    if (dir.length_sq() < 1e-10F) {
       return *this;
     }
 
-    Mat4 look = Mat4::sLookAt(translation, target, world_up);
-    Mat4 inv = look.Inversed();
-    inv.SetTranslation(Vec3::sZero());
-    rotation = inv.GetQuaternion().Normalized();
+    Mat4 look = Mat4::look_at_rh(translation, target, world_up);
+    Mat4 inv = look.inverse();
+    inv.set_translation(Vec3::ZERO);
+    rotation = inv.to_quat().normalized();
     return *this;
   }
 };
 
 struct GlobalTransform {
-  Mat4 matrix = Mat4::sIdentity();
+  Mat4 matrix = Mat4::IDENTITY;
 
-  static GlobalTransform from_matrix(Mat4 m) { return {m}; }
+  static auto from_matrix(Mat4 m) -> GlobalTransform { return {m}; }
 
-  [[nodiscard]] Vec3 translation() const { return matrix.GetTranslation(); }
-  [[nodiscard]] Vec3 forward() const {
-    return Vec3(-matrix.GetAxisZ()).Normalized();
+  [[nodiscard]] auto translation() const -> Vec3 {
+    return matrix.translation();
+  }
+  [[nodiscard]] auto forward() const -> Vec3 {
+    return Vec3(-matrix.z_axis()).normalized();
   }
 
-  [[nodiscard]] Vec3 right() const { return matrix.GetAxisX().Normalized(); }
-  [[nodiscard]] Vec3 up() const { return matrix.GetAxisY().Normalized(); }
+  [[nodiscard]] auto right() const -> Vec3 {
+    return matrix.x_axis().normalized();
+  }
+  [[nodiscard]] auto up() const -> Vec3 { return matrix.y_axis().normalized(); }
 };
 
-inline Transform Mat4::decompose() const {
+inline auto Mat4::decompose() const -> Transform {
   glm::vec3 scale{};
   glm::quat rotation{};
   glm::vec3 translation{};
@@ -315,110 +334,110 @@ inline Transform Mat4::decompose() const {
 
   return Transform{
       .translation = Vec3(translation),
-      .rotation = Quat(rotation).Normalized(),
+      .rotation = Quat(rotation).normalized(),
       .scale = Vec3(scale),
   };
 }
 
-inline Vec2 operator+(Vec2 lhs, const Vec2 &rhs) {
+inline auto operator+(Vec2 lhs, const Vec2 &rhs) -> Vec2 {
   return {static_cast<const Vec2::Base &>(lhs) +
           static_cast<const Vec2::Base &>(rhs)};
 }
 
-inline Vec2 operator-(Vec2 lhs, const Vec2 &rhs) {
+inline auto operator-(Vec2 lhs, const Vec2 &rhs) -> Vec2 {
   return {static_cast<const Vec2::Base &>(lhs) -
           static_cast<const Vec2::Base &>(rhs)};
 }
 
-inline Vec2 operator-(const Vec2 &value) {
+inline auto operator-(const Vec2 &value) -> Vec2 {
   return {-static_cast<const Vec2::Base &>(value)};
 }
 
-inline Vec2 operator*(Vec2 lhs, f32 rhs) {
+inline auto operator*(Vec2 lhs, f32 rhs) -> Vec2 {
   return {static_cast<const Vec2::Base &>(lhs) * rhs};
 }
 
-inline Vec2 operator*(f32 lhs, Vec2 rhs) {
+inline auto operator*(f32 lhs, Vec2 rhs) -> Vec2 {
   return {lhs * static_cast<const Vec2::Base &>(rhs)};
 }
 
-inline Vec2 operator/(Vec2 lhs, f32 rhs) {
+inline auto operator/(Vec2 lhs, f32 rhs) -> Vec2 {
   return {static_cast<const Vec2::Base &>(lhs) / rhs};
 }
 
-inline Vec3 operator+(Vec3 lhs, const Vec3 &rhs) {
+inline auto operator+(Vec3 lhs, const Vec3 &rhs) -> Vec3 {
   return {static_cast<const Vec3::Base &>(lhs) +
           static_cast<const Vec3::Base &>(rhs)};
 }
 
-inline Vec3 operator-(Vec3 lhs, const Vec3 &rhs) {
+inline auto operator-(Vec3 lhs, const Vec3 &rhs) -> Vec3 {
   return {static_cast<const Vec3::Base &>(lhs) -
           static_cast<const Vec3::Base &>(rhs)};
 }
 
-inline Vec3 operator-(const Vec3 &value) {
+inline auto operator-(const Vec3 &value) -> Vec3 {
   return {-static_cast<const Vec3::Base &>(value)};
 }
 
-inline Vec3 operator*(Vec3 lhs, f32 rhs) {
+inline auto operator*(Vec3 lhs, f32 rhs) -> Vec3 {
   return {static_cast<const Vec3::Base &>(lhs) * rhs};
 }
 
-inline Vec3 operator*(f32 lhs, Vec3 rhs) {
+inline auto operator*(f32 lhs, Vec3 rhs) -> Vec3 {
   return {lhs * static_cast<const Vec3::Base &>(rhs)};
 }
 
-inline Vec3 operator/(Vec3 lhs, f32 rhs) {
+inline auto operator/(Vec3 lhs, f32 rhs) -> Vec3 {
   return {static_cast<const Vec3::Base &>(lhs) / rhs};
 }
 
-inline Vec4 operator+(Vec4 lhs, const Vec4 &rhs) {
+inline auto operator+(Vec4 lhs, const Vec4 &rhs) -> Vec4 {
   return {static_cast<const Vec4::Base &>(lhs) +
           static_cast<const Vec4::Base &>(rhs)};
 }
 
-inline Vec4 operator-(Vec4 lhs, const Vec4 &rhs) {
+inline auto operator-(Vec4 lhs, const Vec4 &rhs) -> Vec4 {
   return {static_cast<const Vec4::Base &>(lhs) -
           static_cast<const Vec4::Base &>(rhs)};
 }
 
-inline Vec4 operator-(const Vec4 &value) {
+inline auto operator-(const Vec4 &value) -> Vec4 {
   return {-static_cast<const Vec4::Base &>(value)};
 }
 
-inline Vec4 operator*(Vec4 lhs, f32 rhs) {
+inline auto operator*(Vec4 lhs, f32 rhs) -> Vec4 {
   return {static_cast<const Vec4::Base &>(lhs) * rhs};
 }
 
-inline Vec4 operator*(f32 lhs, Vec4 rhs) {
+inline auto operator*(f32 lhs, Vec4 rhs) -> Vec4 {
   return {lhs * static_cast<const Vec4::Base &>(rhs)};
 }
 
-inline Vec4 operator/(Vec4 lhs, f32 rhs) {
+inline auto operator/(Vec4 lhs, f32 rhs) -> Vec4 {
   return {static_cast<const Vec4::Base &>(lhs) / rhs};
 }
 
-inline Quat operator*(const Quat &lhs, const Quat &rhs) {
+inline auto operator*(const Quat &lhs, const Quat &rhs) -> Quat {
   return {static_cast<const Quat::Base &>(lhs) *
           static_cast<const Quat::Base &>(rhs)};
 }
 
-inline Vec3 operator*(const Quat &rotation, const Vec3 &value) {
+inline auto operator*(const Quat &rotation, const Vec3 &value) -> Vec3 {
   return {static_cast<const Quat::Base &>(rotation) *
           static_cast<const Vec3::Base &>(value)};
 }
 
-inline Mat4 operator*(const Mat4 &lhs, const Mat4 &rhs) {
+inline auto operator*(const Mat4 &lhs, const Mat4 &rhs) -> Mat4 {
   return {static_cast<const Mat4::Base &>(lhs) *
           static_cast<const Mat4::Base &>(rhs)};
 }
 
-inline Vec4 operator*(const Mat4 &lhs, const Vec4 &rhs) {
+inline auto operator*(const Mat4 &lhs, const Vec4 &rhs) -> Vec4 {
   return (static_cast<const Mat4::Base &>(lhs) *
           static_cast<const Vec4::Base &>(rhs));
 }
 
-inline Vec3 operator*(const Mat4 &lhs, const Vec3 &rhs) {
+inline auto operator*(const Mat4 &lhs, const Vec3 &rhs) -> Vec3 {
   const glm::vec4 transformed =
       static_cast<const Mat4::Base &>(lhs) *
       glm::vec4(static_cast<const Vec3::Base &>(rhs), 1.0f);
@@ -426,10 +445,10 @@ inline Vec3 operator*(const Mat4 &lhs, const Vec3 &rhs) {
 }
 
 struct AABox {
-  Vec3 mMin = Vec3::sReplicate(std::numeric_limits<f32>::max());
-  Vec3 mMax = Vec3::sReplicate(-std::numeric_limits<f32>::max());
+  Vec3 mMin = Vec3::splat(std::numeric_limits<f32>::max());
+  Vec3 mMax = Vec3::splat(-std::numeric_limits<f32>::max());
 
-  void Encapsulate(const Vec3 &value) {
+  auto encapsulate(const Vec3 &value) -> void {
     mMin = Vec3(glm::min(static_cast<const Vec3::Base &>(mMin),
                          static_cast<const Vec3::Base &>(value)));
     mMax = Vec3(glm::max(static_cast<const Vec3::Base &>(mMax),
@@ -437,27 +456,31 @@ struct AABox {
   }
 };
 
-inline ::Vector2 to_rl(Vec2 value) { return {value.x, value.y}; }
+inline auto to_rl(Vec2 value) -> ::Vector2 { return {value.x, value.y}; }
 
-inline Vec2 from_rl(::Vector2 value) { return Vec2(value.x, value.y); }
+inline auto from_rl(::Vector2 value) -> Vec2 { return Vec2(value.x, value.y); }
 
-inline ::Vector3 to_rl(Vec3 value) { return {value.x, value.y, value.z}; }
+inline auto to_rl(Vec3 value) -> ::Vector3 {
+  return {value.x, value.y, value.z};
+}
 
-inline Vec3 from_rl(::Vector3 value) { return Vec3(value.x, value.y, value.z); }
+inline auto from_rl(::Vector3 value) -> Vec3 {
+  return Vec3(value.x, value.y, value.z);
+}
 
-inline ::Vector4 to_rl(Vec4 value) {
+inline auto to_rl(Vec4 value) -> ::Vector4 {
   return {value.x, value.y, value.z, value.w};
 }
 
-inline Vec4 from_rl(::Vector4 value) {
+inline auto from_rl(::Vector4 value) -> Vec4 {
   return Vec4(value.x, value.y, value.z, value.w);
 }
 
-inline ::Vector4 to_rl(Quat value) {
+inline auto to_rl(Quat value) -> ::Vector4 {
   return {value.x, value.y, value.z, value.w};
 }
 
-inline ::Matrix to_rl(Mat4 value) {
+inline auto to_rl(Mat4 value) -> ::Matrix {
   ::Matrix result{};
   result.m0 = value(0, 0);
   result.m4 = value(0, 1);
@@ -478,7 +501,7 @@ inline ::Matrix to_rl(Mat4 value) {
   return result;
 }
 
-inline Mat4 from_rl(const ::Matrix &value) {
+inline auto from_rl(const ::Matrix &value) -> Mat4 {
   return Mat4(Vec4(value.m0, value.m1, value.m2, value.m3),
               Vec4(value.m4, value.m5, value.m6, value.m7),
               Vec4(value.m8, value.m9, value.m10, value.m11),

@@ -16,8 +16,9 @@ struct ScheduleDebug {
     std::string placement;
   };
 
-  static std::string wrap_commas(const std::string &text,
-                                 const std::string &continuation_indent) {
+  static auto wrap_commas(const std::string &text,
+                          const std::string &continuation_indent)
+      -> std::string {
     std::string result;
     result.reserve(text.size());
 
@@ -33,12 +34,12 @@ struct ScheduleDebug {
     return result;
   }
 
-  static std::string debug_item(const std::string &prefix,
-                                const std::string &text) {
+  static auto debug_item(const std::string &prefix, const std::string &text)
+      -> std::string {
     return prefix + wrap_commas(text, std::string(prefix.size(), ' ')) + "\n";
   }
 
-  static usize max_concurrency(const Schedule &schedule) {
+  static auto max_concurrency(const Schedule &schedule) -> usize {
     usize max_concurrency = schedule.entries_.empty() ? 0 : 1;
     for (const auto &step : schedule.steps_) {
       if (const auto *parallel = std::get_if<Schedule::ParallelStep>(&step)) {
@@ -50,8 +51,8 @@ struct ScheduleDebug {
     return max_concurrency;
   }
 
-  static std::string step_summary(const Schedule &schedule,
-                                  const Schedule::ExecutionStep &step) {
+  static auto step_summary(const Schedule &schedule,
+                           const Schedule::ExecutionStep &step) -> std::string {
     if (const auto *inline_step = std::get_if<Schedule::InlineStep>(&step)) {
       std::ostringstream out;
       out << "      MODE: inline\n";
@@ -84,14 +85,15 @@ struct ScheduleDebug {
       out << "        BATCH[" << batch_index
           << "] SIZE=" << (batch.end - batch.start) << "\n";
       for (usize idx : range(batch.start, batch.end)) {
-        out << debug_item("          - ", schedule.entries_[idx].system->name());
+        out << debug_item("          - ",
+                          schedule.entries_[idx].system->name());
       }
     }
     return out.str();
   }
 
-  static std::vector<DebugPlacement>
-  system_placements(const Schedule &schedule) {
+  static auto system_placements(const Schedule &schedule)
+      -> std::vector<DebugPlacement> {
     std::vector<DebugPlacement> placements(schedule.entries_.size());
 
     for (usize step_index = 0; step_index < schedule.steps_.size();
@@ -131,9 +133,9 @@ struct ScheduleDebug {
     return placements;
   }
 
-  static void append_names(std::ostringstream &out, const char *label,
+  static auto append_names(std::ostringstream &out, const char *label,
                            const std::vector<std::string> &names,
-                           const char *indent) {
+                           const char *indent) -> void {
     if (names.empty()) {
       out << label << ": none\n";
       return;
@@ -145,8 +147,9 @@ struct ScheduleDebug {
     }
   }
 
-  static std::vector<std::string>
-  ordered_systems_in_set(const Schedule &schedule, const SetId &set_id) {
+  static auto ordered_systems_in_set(const Schedule &schedule,
+                                     const SetId &set_id)
+      -> std::vector<std::string> {
     std::vector<std::string> systems;
     for (const auto &entry : schedule.entries_) {
       if (std::ranges::contains(entry.in_sets, set_id)) {
@@ -156,7 +159,7 @@ struct ScheduleDebug {
     return systems;
   }
 
-  static std::string inline_set_ids(const std::vector<SetId> &sets) {
+  static auto inline_set_ids(const std::vector<SetId> &sets) -> std::string {
     if (sets.empty()) {
       return "none";
     }
@@ -171,10 +174,10 @@ struct ScheduleDebug {
     return out.str();
   }
 
-  static void append_system_metadata(std::ostringstream &out, usize order,
+  static auto append_system_metadata(std::ostringstream &out, usize order,
                                      const Schedule::SystemEntry &entry,
                                      const std::string &step,
-                                     const std::string &placement) {
+                                     const std::string &placement) -> void {
     out << "      ORDER: " << order
         << ", SETS: " << inline_set_ids(entry.in_sets) << ", MAIN_THREAD_ONLY: "
         << (entry.access.main_thread_only ? "yes" : "no")
@@ -182,8 +185,8 @@ struct ScheduleDebug {
         << ", STEP: " << step << ", PLACEMENT: " << placement << "\n";
   }
 
-  static std::string dump(const Schedule &schedule,
-                          const std::string &schedule_name) {
+  static auto dump(const Schedule &schedule, const std::string &schedule_name)
+      -> std::string {
     std::ostringstream out;
 
     std::unordered_map<SetId, usize> set_counts;
@@ -238,7 +241,7 @@ struct ScheduleDebug {
     return out.str();
   }
 
-  static std::string dump(const Schedules &schedules) {
+  static auto dump(const Schedules &schedules) -> std::string {
     constexpr std::array labels{
         ScheduleLabel::PreStartup,  ScheduleLabel::Startup,
         ScheduleLabel::PostStartup, ScheduleLabel::First,

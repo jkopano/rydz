@@ -17,7 +17,7 @@ void setup(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
            ResMut<Assets<ecs::Material>> materials, NonSendMarker) {
   // kamera
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
-            Transform::from_xyz(0, 8, 15).look_at(Vec3::sZero()));
+            Transform::from_xyz(0, 8, 15).look_at(Vec3::ZERO));
 
   // podłoga
   auto floor_h = meshes->add(mesh::plane(20, 20));
@@ -87,7 +87,7 @@ void system(Query<Transform, Opt<Parent>> query) {
 void rotate_pivot(Query<Mut<Transform>, PivotTag> query, Res<Time> time) {
   for (auto [t, _] : query.iter()) {
     f32 angle = time->delta_seconds * 1.0f;
-    t->rotation = Quat::sEulerAngles(Vec3(0, angle, 0)) * t->rotation;
+    t->rotation = Quat::from_euler(Vec3(0, angle, 0)) * t->rotation;
   }
 }
 

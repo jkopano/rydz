@@ -17,7 +17,7 @@ namespace ecs {
 
 namespace detail {
 
-inline std::string strip_gltf_fragment(const std::string &path) {
+inline auto strip_gltf_fragment(const std::string &path) -> std::string {
   auto hash = path.find('#');
   if (hash == std::string::npos) {
     return path;
@@ -25,7 +25,7 @@ inline std::string strip_gltf_fragment(const std::string &path) {
   return path.substr(0, hash);
 }
 
-inline Transform transform_from_cgltf_node(const cgltf_node &node) {
+inline auto transform_from_cgltf_node(const cgltf_node &node) -> Transform {
   Transform transform{};
 
   if (node.has_translation != 0) {
@@ -56,12 +56,13 @@ inline Transform transform_from_cgltf_node(const cgltf_node &node) {
   return transform;
 }
 
-inline Transform transform_from_matrix(const Mat4 &matrix) {
+inline auto transform_from_matrix(const Mat4 &matrix) -> Transform {
   return matrix.decompose();
 }
 
-inline void apply_gltf_material_properties(CompiledMaterial &material_desc,
-                                           const cgltf_material *material) {
+inline auto apply_gltf_material_properties(CompiledMaterial &material_desc,
+                                           const cgltf_material *material)
+    -> void {
   static constexpr auto DEFAULT_TRANSPARENT_MARGIN = 0.001F;
   static constexpr auto DEFAULT_ALPHACUTOFF = 0.5F;
 
@@ -98,9 +99,10 @@ inline void apply_gltf_material_properties(CompiledMaterial &material_desc,
   }
 }
 
-inline Handle<Texture> transfer_texture(
+inline auto transfer_texture(
     Assets<Texture> &textures, const gl::Texture &texture,
-    std::unordered_map<unsigned int, Handle<Texture>> &texture_cache) {
+    std::unordered_map<unsigned int, Handle<Texture>> &texture_cache)
+    -> Handle<Texture> {
   if (!texture.ready()) {
     return {};
   }
@@ -115,12 +117,12 @@ inline Handle<Texture> transfer_texture(
   return handle;
 }
 
-inline SceneMaterial material_from_backend_material(
+inline auto material_from_backend_material(
     const gl::Material &material, Assets<Texture> &textures,
     Assets<Material> &materials,
     std::unordered_map<unsigned int, Handle<Texture>> &texture_cache,
-    const std::string &name = {},
-    const cgltf_material *gltf_material = nullptr) {
+    const std::string &name = {}, const cgltf_material *gltf_material = nullptr)
+    -> SceneMaterial {
   SceneMaterial scene_material;
   scene_material.name = name;
   StandardMaterial material_value;
@@ -170,19 +172,19 @@ inline SceneMaterial material_from_backend_material(
 
 class SceneLoader : public IAssetLoader {
 public:
-  std::vector<std::string> extensions() const override {
+  auto extensions() const -> std::vector<std::string> override {
     return {"gltf", "glb"};
   }
 
-  bool is_async() const override { return false; }
+  auto is_async() const -> bool override { return false; }
 
-  std::any load(const std::vector<uint8_t> & /*data*/,
-                const std::string &path) override {
+  auto load(const std::vector<uint8_t> & /*data*/, const std::string &path)
+      -> std::any override {
     return {std::string(path)};
   }
 
-  void insert_into_world(World &world, uint32_t handle_id,
-                         std::any asset) override {
+  auto insert_into_world(World &world, uint32_t handle_id, std::any asset)
+      -> void override {
     auto path_with_fragment = std::any_cast<std::string>(std::move(asset));
     std::string file_path = detail::strip_gltf_fragment(path_with_fragment);
 
@@ -354,10 +356,10 @@ public:
       }
     }
 
-    std::vector<Mat4> node_world_transforms(scene.nodes.size(),
-                                            Mat4::sIdentity());
+    std::vector<Mat4> node_world_transforms(scene.nodes.size(), Mat4::IDENTITY);
     std::vector<bool> node_world_ready(scene.nodes.size(), false);
-    std::function<Mat4(usize)> compute_node_world = [&](usize node_index) {
+    std::function<Mat4(usize)> compute_node_world =
+        [&](usize node_index) -> rydz_math::Mat4 {
       if (node_world_ready[node_index]) {
         return node_world_transforms[node_index];
       }
@@ -377,7 +379,7 @@ public:
     for (usize node_index = 0; node_index < scene.nodes.size(); ++node_index) {
       Mat4 node_world = compute_node_world(node_index);
       Transform primitive_local =
-          detail::transform_from_matrix(node_world.Inversed());
+          detail::transform_from_matrix(node_world.inverse());
 
       for (auto &primitive : scene.nodes[node_index].primitives) {
         primitive.local_transform = primitive_local;

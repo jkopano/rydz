@@ -34,24 +34,24 @@ private:
     }
   }
 
-  void despawn_immediate(Entity entity);
-  ObserverRegistry &ensure_observer_registry();
-  const ObserverRegistry *observer_registry() const;
+  auto despawn_immediate(Entity entity) -> void;
+  auto ensure_observer_registry() -> ObserverRegistry &;
+  auto observer_registry() const -> const ObserverRegistry *;
 
 public:
   World() = default;
 
-  bool multithreaded() const { return multithreaded_; }
-  void set_multithreaded(bool v) { multithreaded_ = v; }
+  auto multithreaded() const -> bool { return multithreaded_; }
+  auto set_multithreaded(bool v) -> void { multithreaded_ = v; }
 
-  Tick read_change_tick() const { return change_tick_; }
-  u64 read_schedule_run_id() const {
+  auto read_change_tick() const -> Tick { return change_tick_; }
+  auto read_schedule_run_id() const -> u64 {
     return schedule_run_id_.load(std::memory_order_relaxed);
   }
-  u64 begin_schedule_run() {
+  auto begin_schedule_run() -> u64 {
     return schedule_run_id_.fetch_add(1, std::memory_order_relaxed) + 1;
   }
-  Tick increment_change_tick() {
+  auto increment_change_tick() -> Tick {
     change_tick_.value++;
     return change_tick_;
   }
@@ -65,37 +65,41 @@ public:
     resources.insert<T>(std::move(resource));
   }
 
-  template <typename T> T *get_resource() { return resources.get<T>(); }
-
-  template <typename T> const T *get_resource() const {
+  template <typename T> auto get_resource() -> T * {
     return resources.get<T>();
   }
 
-  template <typename T> bool has_resource() const { return resources.has<T>(); }
+  template <typename T> auto get_resource() const -> const T * {
+    return resources.get<T>();
+  }
 
-  template <typename T> std::optional<T> remove_resource() {
+  template <typename T> auto has_resource() const -> bool {
+    return resources.has<T>();
+  }
+
+  template <typename T> auto remove_resource() -> std::optional<T> {
     return resources.remove<T>();
   }
 
   // </RESOURCY>
 
-  Entity spawn() { return entities.create(); }
+  auto spawn() -> Entity { return entities.create(); }
 
-  void despawn(Entity entity);
-
-  template <typename E>
-    requires IsEvent<bare_t<E>>
-  void add_event();
-
-  template <typename F> Entity add_observer(F &&func);
-
-  template <typename F> Entity add_observer(Entity target, F &&func);
+  auto despawn(Entity entity) -> void;
 
   template <typename E>
     requires IsEvent<bare_t<E>>
-  void trigger(E &&event);
+  auto add_event() -> void;
 
-  template <typename T> auto &ensure_storage_exist() {
+  template <typename F> auto add_observer(F &&func) -> Entity;
+
+  template <typename F> auto add_observer(Entity target, F &&func) -> Entity;
+
+  template <typename E>
+    requires IsEvent<bare_t<E>>
+  auto trigger(E &&event) -> void;
+
+  template <typename T> auto ensure_storage_exist() -> auto & {
     using TargetStorage = storage_t<T>;
 
     auto key = std::type_index(typeid(T));
@@ -118,7 +122,7 @@ public:
     if constexpr (ecs::HasRequired<T>) {
       using ReqTuple = typename T::Required::as_tuple;
       std::apply(
-          [this, entity](auto... args) {
+          [this, entity](auto... args) -> auto {
             (this->insert_if_missing<decltype(args)>(entity), ...);
           },
           ReqTuple{});
@@ -126,7 +130,7 @@ public:
   }
 
   template <typename T, typename Self>
-  auto *get_component(this Self &self, Entity entity) {
+  auto get_component(this Self &self, Entity entity) -> auto * {
     auto *storage = self.template get_storage<T>();
     return (storage == nullptr) ? nullptr : storage->get(entity);
   }
@@ -141,7 +145,7 @@ public:
     iter->second->remove(entity);
   }
 
-  template <typename T> bool has_component(Entity entity) const {
+  template <typename T> auto has_component(Entity entity) const -> bool {
     auto key = std::type_index(typeid(T));
     auto iter = storages_.find(key);
     if (iter == storages_.end()) {
@@ -151,7 +155,8 @@ public:
   }
 
   template <typename T>
-  std::optional<ComponentTicks> get_component_ticks(Entity entity) const {
+  auto get_component_ticks(Entity entity) const
+      -> std::optional<ComponentTicks> {
     auto key = std::type_index(typeid(T));
     auto iter = storages_.find(key);
     if (iter == storages_.end()) {
@@ -160,7 +165,8 @@ public:
     return iter->second->get_ticks(entity);
   }
 
-  template <typename T, typename Self> auto *get_storage(this Self &self) {
+  template <typename T, typename Self>
+  auto get_storage(this Self &self) -> auto * {
     using StripT = std::remove_cv_t<T>;
     using ReturnT = copy_const_t<Self, storage_t<StripT>>;
 
@@ -174,7 +180,7 @@ public:
 namespace detail {
 
 template <typename T>
-void insert_single(World &world, Entity entity, T &&item) {
+auto insert_single(World &world, Entity entity, T &&item) -> void {
   using Raw = bare_t<T>;
   if constexpr (IsBundle<Raw>) {
     insert_tuple_items(world, entity, to_tuple(std::forward<T>(item)));
@@ -192,7 +198,7 @@ void insert_single(World &world, Entity entity, T &&item) {
 
 template <std::ranges::input_range R>
   requires Spawnable<std::ranges::range_value_t<R>>
-std::vector<Entity> spawn_batch(World &world, R &&_range) {
+auto spawn_batch(World &world, R &&_range) -> std::vector<Entity> {
   std::vector<Entity> spawned;
   if constexpr (std::ranges::sized_range<R>) {
     spawned.reserve(std::ranges::size(_range));

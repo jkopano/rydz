@@ -10,7 +10,7 @@ struct Tick {
   Tick() = default;
   explicit Tick(u32 v) : value(v) {}
 
-  [[nodiscard]] bool is_newer_than(Tick last_run, Tick this_run) const {
+  [[nodiscard]] auto is_newer_than(Tick last_run, Tick this_run) const -> bool {
     u32 ticks_since_last_run = this_run.value - last_run.value;
     u32 ticks_since_self = this_run.value - value;
     return ticks_since_self < ticks_since_last_run;

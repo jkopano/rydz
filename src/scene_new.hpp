@@ -32,14 +32,14 @@ static const float kCamOffZ = 10.0f;
 inline void player_movement_system(Query<Mut<Transform>, Player> query,
                                    Res<Time> time, Res<Input> input) {
   // Isometric forward/right vectors (top-down, ignoring Y)
-  const Vec3 iso_forward = Vec3(-1.0f, 0.0f, -1.0f).Normalized(); // W
-  const Vec3 iso_right = Vec3(1.0f, 0.0f, -1.0f).Normalized();    // D
+  const Vec3 iso_forward = Vec3(-1.0f, 0.0f, -1.0f).normalized(); // W
+  const Vec3 iso_right = Vec3(1.0f, 0.0f, -1.0f).normalized();    // D
 
   for (auto [t, player] : query.iter()) {
     f32 dt = time->delta_seconds;
     f32 speed = player->move_speed;
 
-    Vec3 move = Vec3::sZero();
+    Vec3 move = Vec3::ZERO;
 
     if (input->key_down(KEY_W))
       move += iso_forward;
@@ -50,8 +50,8 @@ inline void player_movement_system(Query<Mut<Transform>, Player> query,
     if (input->key_down(KEY_A))
       move -= iso_right;
 
-    if (move.LengthSq() > 0.0f) {
-      move = move.Normalized();
+    if (move.length_sq() > 0.0f) {
+      move = move.normalized();
       t->translation = t->translation + move * (speed * dt);
     }
   }
@@ -62,7 +62,7 @@ inline void
 update_isometric_camera_target_system(Query<Mut<IsometricCamera>> cam_query,
                                       Query<Transform, Player> player_query) {
 
-  Vec3 player_pos = Vec3::sZero();
+  Vec3 player_pos = Vec3::ZERO;
   bool found = false;
   for (auto [pt, _] : player_query.iter()) {
     player_pos = pt->translation;
@@ -81,7 +81,7 @@ update_isometric_camera_target_system(Query<Mut<IsometricCamera>> cam_query,
 
 inline void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(IsometricCameraBundle::setup(
-      Vec3::sZero(), Vec3(kCamOffX, kCamOffY, kCamOffZ), 20.0f, 12.0f));
+      Vec3::ZERO, Vec3(kCamOffX, kCamOffY, kCamOffZ), 20.0f, 12.0f));
 }
 
 inline void setup_lighting(Cmd cmd, NonSendMarker,
@@ -93,7 +93,7 @@ inline void setup_lighting(Cmd cmd, NonSendMarker,
 
   cmd.spawn(DirectionalLight{
       .color = {255, 244, 220, 255},
-      .direction = Vec3(-0.6f, -1.0f, -0.4f).Normalized(),
+      .direction = Vec3(-0.6f, -1.0f, -0.4f).normalized(),
       .intensity = 0.9f,
   });
 

@@ -14,12 +14,11 @@ struct Color {
   constexpr Color() = default;
   constexpr Color(u8 red, u8 green, u8 blue, u8 alpha = 255)
       : r(red), g(green), b(blue), a(alpha) {}
-  constexpr Color(gl::Color raw)
-      : r(raw.r), g(raw.g), b(raw.b), a(raw.a) {}
+  constexpr Color(gl::Color raw) : r(raw.r), g(raw.g), b(raw.b), a(raw.a) {}
 
   constexpr operator gl::Color() const { return {r, g, b, a}; }
 
-  bool operator==(const Color &) const = default;
+  auto operator==(const Color &) const -> bool = default;
 };
 
 inline constexpr Color kWhite = {255, 255, 255, 255};
@@ -32,7 +31,7 @@ inline constexpr Color kPurple = {200, 122, 255, 255};
 inline constexpr Color kDarkGray = {80, 80, 80, 255};
 inline constexpr Color kOrange = {255, 161, 0, 255};
 
-inline gl::Vec3 color_to_vec3(Color color) {
+inline auto color_to_vec3(Color color) -> gl::Vec3 {
   return {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f};
 }
 

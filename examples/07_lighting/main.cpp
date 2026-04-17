@@ -20,7 +20,7 @@ void setup(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
   // kamera
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
             ClearColor{{15, 15, 25, 255}},
-            Transform::from_xyz(0, 8, 15).look_at(Vec3::sZero()));
+            Transform::from_xyz(0, 8, 15).look_at(Vec3::ZERO));
 
   // podłoga
   auto floor_h = meshes->add(mesh::plane(30, 30));
@@ -77,7 +77,7 @@ void orbit_system(Query<Mut<Transform>, OrbitLight> query, Res<Time> time) {
   f32 t = time->elapsed_seconds;
   for (auto [tx, orbit] : query.iter()) {
     f32 angle = t * orbit->speed + orbit->phase;
-    tx->translation = Vec3(cosf(angle) * orbit->radius, tx->translation.GetY(),
+    tx->translation = Vec3(cosf(angle) * orbit->radius, tx->translation.y,
                            sinf(angle) * orbit->radius);
   }
 }

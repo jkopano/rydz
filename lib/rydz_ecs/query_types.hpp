@@ -13,23 +13,23 @@ template <typename T> struct Mut {
   Mut(T *p, ComponentTicks *t, Tick current_tick)
       : ptr(p), ticks(t), tick(current_tick) {}
 
-  T &get() {
+  auto get() -> T & {
     mark();
     return *ptr;
   }
-  const T &get() const { return *ptr; }
+  auto get() const -> const T & { return *ptr; }
 
-  T *operator->() {
+  auto operator->() -> T * {
     mark();
     return ptr;
   }
-  const T *operator->() const { return ptr; }
+  auto operator->() const -> const T * { return ptr; }
 
-  T &operator*() {
+  auto operator*() -> T & {
     mark();
     return *ptr;
   }
-  const T &operator*() const { return *ptr; }
+  auto operator*() const -> const T & { return *ptr; }
 
   explicit operator bool() const { return ptr != nullptr; }
 
@@ -39,10 +39,10 @@ template <typename T> struct Mut {
   }
   operator const T *() const { return ptr; }
 
-  T &bypass_change_detection() { return *ptr; }
+  auto bypass_change_detection() -> T & { return *ptr; }
 
 private:
-  void mark() {
+  auto mark() -> void {
     if (!marked && (ticks != nullptr)) {
       ticks->changed = tick;
       marked = true;

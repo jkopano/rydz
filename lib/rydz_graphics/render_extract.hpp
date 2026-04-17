@@ -34,8 +34,8 @@ concept IsExtracted = requires(const M &m) {
 struct ExtractedView {
   using T = Resource;
   CameraView camera_view{
-      .view = Mat4::sIdentity(),
-      .proj = Mat4::sIdentity(),
+      .view = Mat4::IDENTITY,
+      .proj = Mat4::IDENTITY,
       .position = Vec3{},
   };
   Color clear_color = ClearColor{}.color;
@@ -47,7 +47,7 @@ struct ExtractedView {
   float near_plane{0.1f};
   float far_plane{1000.0f};
 
-  void clear() { *this = ExtractedView{}; }
+  auto clear() -> void { *this = ExtractedView{}; }
 };
 
 struct ExtractedLights {
@@ -64,7 +64,7 @@ struct ExtractedLights {
   DirectionalLight dir_light{};
   bool has_directional{};
 
-  void clear() { *this = ExtractedLights{}; }
+  auto clear() -> void { *this = ExtractedLights{}; }
 };
 
 struct ExtractedMeshes {
@@ -73,14 +73,14 @@ struct ExtractedMeshes {
   struct Item {
     Handle<Mesh> mesh{};
     CompiledMaterial material{};
-    Mat4 world_transform{Mat4::sIdentity()};
+    Mat4 world_transform{Mat4::IDENTITY};
     float distance_to_camera{0.0F};
     bool transparent{};
     bool casts_shadows{true};
   };
 
   std::vector<Item> items;
-  void clear() { *this = ExtractedMeshes{}; }
+  auto clear() -> void { *this = ExtractedMeshes{}; }
 };
 
 struct ExtractedUi {
@@ -94,7 +94,7 @@ struct ExtractedUi {
   };
 
   std::vector<Item> items{};
-  void clear() { *this = ExtractedUi{}; }
+  auto clear() -> void { *this = ExtractedUi{}; }
 };
 
 struct Extract {
@@ -126,9 +126,9 @@ struct Extract {
     }
   }
 
-  static void lighting(Query<DirectionalLight> dir_query,
+  static auto lighting(Query<DirectionalLight> dir_query,
                        Query<PointLight, GlobalTransform> point_query,
-                       ResMut<ExtractedLights> lights) {
+                       ResMut<ExtractedLights> lights) -> void {
     lights->clear();
 
     for (auto [dir] : dir_query.iter()) {
@@ -147,12 +147,14 @@ struct Extract {
     }
   }
 
-  static void clear_meshes(ResMut<ExtractedMeshes> meshes) { meshes->clear(); }
+  static auto clear_meshes(ResMut<ExtractedMeshes> meshes) -> void {
+    meshes->clear();
+  }
 
-  static void meshes(
+  static auto meshes(
       Query<Mesh3d, GlobalTransform, MeshMaterial3d, Opt<ViewVisibility>> query,
       Res<ExtractedView> view, Res<Assets<Material>> material_assets,
-      ResMut<ExtractedMeshes> meshes) {
+      ResMut<ExtractedMeshes> meshes) -> void {
     for (auto [mesh3d, global, material, visibility] : query.iter()) {
       if (!mesh3d->mesh.is_valid() || !material->material.is_valid()) {
         continue;
@@ -176,14 +178,15 @@ struct Extract {
           .mesh = mesh3d->mesh,
           .material = std::move(compiled),
           .world_transform = global->matrix,
-          .distance_to_camera = camera_offset.LengthSq(),
+          .distance_to_camera = camera_offset.length_sq(),
           .transparent = transparent,
           .casts_shadows = casts_shadows,
       });
     }
   }
 
-  static void ui(Query<Sprite, Transform> textures, ResMut<ExtractedUi> ui) {
+  static auto ui(Query<Sprite, Transform> textures, ResMut<ExtractedUi> ui)
+      -> void {
     ui->clear();
 
     for (auto [texture, transform] : textures.iter()) {
@@ -200,15 +203,15 @@ struct Extract {
     }
   }
 
-  static void overlay(Query<Sprite, Transform> textures,
-                      ResMut<ExtractedUi> overlay) {
+  static auto overlay(Query<Sprite, Transform> textures,
+                      ResMut<ExtractedUi> overlay) -> void {
     ui(textures, overlay);
   }
 };
 
 struct Queue {
   template <typename M, typename P>
-  static void queue(Res<M> meshes, ResMut<P> phase) {
+  static auto queue(Res<M> meshes, ResMut<P> phase) -> void {
     phase->queue(*meshes);
   };
 };

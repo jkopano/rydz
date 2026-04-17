@@ -19,16 +19,19 @@ struct ShaderSpec {
   std::string vertex_path;
   std::string fragment_path;
 
-  bool operator==(const ShaderSpec &other) const = default;
+  auto operator==(const ShaderSpec &other) const -> bool = default;
 
-  static ShaderSpec from(std::string vertex_path, std::string fragment_path) {
+  static auto from(std::string vertex_path, std::string fragment_path)
+      -> ShaderSpec {
     return {
         .vertex_path = std::move(vertex_path),
         .fragment_path = std::move(fragment_path),
     };
   }
 
-  bool empty() const { return vertex_path.empty() || fragment_path.empty(); }
+  auto empty() const -> bool {
+    return vertex_path.empty() || fragment_path.empty();
+  }
 };
 
 enum class UniformType {
@@ -109,8 +112,8 @@ struct Uniform {
   explicit Uniform(const std::array<float, 16> &mat)
       : type(UniformType::Mat4), float_data(mat) {}
 
-  Uniform(const math::Vec3 &v) : Uniform(v.GetX(), v.GetY(), v.GetZ()) {}
-  bool operator==(const Uniform &other) const {
+  Uniform(const math::Vec3 &v) : Uniform(v.x, v.y, v.z) {}
+  auto operator==(const Uniform &other) const -> bool {
     if (type != other.type || count != other.count)
       return false;
 
@@ -134,7 +137,7 @@ public:
       : shader_(shader), owns_resource_(owns_resource) {}
 
   ShaderProgram(const ShaderProgram &) = delete;
-  ShaderProgram &operator=(const ShaderProgram &) = delete;
+  auto operator=(const ShaderProgram &) -> ShaderProgram & = delete;
 
   ShaderProgram(ShaderProgram &&other) noexcept
       : shader_(other.shader_),
@@ -145,7 +148,7 @@ public:
     other.owns_resource_ = false;
   }
 
-  ShaderProgram &operator=(ShaderProgram &&other) noexcept {
+  auto operator=(ShaderProgram &&other) noexcept -> ShaderProgram & {
     if (this == &other) {
       return *this;
     }
@@ -162,7 +165,7 @@ public:
 
   ~ShaderProgram() { unload(); }
 
-  static ShaderProgram load(const ShaderSpec &spec) {
+  static auto load(const ShaderSpec &spec) -> ShaderProgram {
     if (spec.empty()) {
       return default_shader();
     }
@@ -171,121 +174,115 @@ public:
         rl::LoadShader(spec.vertex_path.c_str(), spec.fragment_path.c_str()));
   }
 
-  static ShaderProgram default_shader() {
+  static auto default_shader() -> ShaderProgram {
     Shader shader{};
     shader.id = Shader::default_id();
     shader.locs = Shader::default_locs();
     return ShaderProgram(shader, false);
   }
 
-  Shader &raw() { return shader_; }
-  const Shader &raw() const { return shader_; }
+  auto raw() -> Shader & { return shader_; }
+  auto raw() const -> const Shader & { return shader_; }
 
-  int uniform_location(const std::string_view name) {
+  auto uniform_location(const std::string_view name) -> int {
     std::string owned_name{name};
     auto iter = uniform_locations_.find(owned_name);
     if (iter != uniform_locations_.end()) {
       return iter->second;
     }
 
-    const int location =
-        rl::rlGetLocationUniform(shader_.id, owned_name.c_str());
+    const int location = rl::GetShaderLocation(shader_, owned_name.c_str());
     uniform_locations_.emplace(std::move(owned_name), location);
     return location;
   }
 
-  int attribute_location(const char *name) {
+  auto attribute_location(const char *name) -> int {
     auto iter = attribute_locations_.find(name);
     if (iter != attribute_locations_.end()) {
       return iter->second;
     }
 
-    const int location = rl::rlGetLocationAttrib(shader_.id, name);
+    const int location = rl::GetShaderLocationAttrib(shader_, name);
     attribute_locations_.emplace(name, location);
     return location;
   }
 
-  void set(const std::string_view name, float value) {
+  auto set(const std::string_view name, float value) -> void {
     set_value(name, &value, SHADER_UNIFORM_FLOAT);
   }
 
-  void set(const std::string_view name, int value) {
+  auto set(const std::string_view name, int value) -> void {
     set_value(name, &value, SHADER_UNIFORM_INT);
   }
 
-  void set(const std::string_view name, const Vec2 &value) {
+  auto set(const std::string_view name, const Vec2 &value) -> void {
     set_value(name, &value, SHADER_UNIFORM_VEC2);
   }
 
-  void set(const std::string_view name, const Vec3 &value) {
+  auto set(const std::string_view name, const Vec3 &value) -> void {
     set_value(name, &value, SHADER_UNIFORM_VEC3);
   }
 
-  void set(const std::string_view name, const Vec4 &value) {
+  auto set(const std::string_view name, const Vec4 &value) -> void {
     set_value(name, &value, SHADER_UNIFORM_VEC4);
   }
 
-  void set(const std::string_view name, const std::array<int, 2> &vec) {
+  auto set(const std::string_view name, const std::array<int, 2> &vec) -> void {
     set_value(name, vec.data(), SHADER_UNIFORM_IVEC2);
   }
 
-  void set(const std::string_view name, const std::array<int, 3> &vec) {
+  auto set(const std::string_view name, const std::array<int, 3> &vec) -> void {
     set_value(name, vec.data(), SHADER_UNIFORM_IVEC3);
   }
 
-  void set(const std::string_view name, const std::array<int, 4> &vec) {
+  auto set(const std::string_view name, const std::array<int, 4> &vec) -> void {
     set_value(name, vec.data(), SHADER_UNIFORM_IVEC4);
   }
 
-  void set(const std::string_view name, const Matrix &value) {
+  auto set(const std::string_view name, const Matrix &value) -> void {
     const int location = uniform_location(name);
     if (location >= 0) {
-      rl::rlSetUniformMatrix(location, value);
+      rl::SetShaderValueMatrix(shader_, location, value);
     }
   }
 
-  void set(const std::string_view name, const math::Mat4 &value) {
+  auto set(const std::string_view name, const math::Mat4 &value) -> void {
     set(name, math::to_rl(value));
   }
 
-  void set(std::string_view name, std::span<const float> values) {
+  auto set(std::string_view name, std::span<const float> values) -> void {
     const int location = uniform_location(name);
     if (location >= 0) {
-      rl::rlSetUniform(location, values.data(), SHADER_UNIFORM_FLOAT,
-                       static_cast<int>(values.size()));
+      rl::SetShaderValueV(shader_, location, values.data(),
+                          SHADER_UNIFORM_FLOAT,
+                          static_cast<int>(values.size()));
     }
   }
 
-  void set(const std::string_view name, const Texture &texture) {
+  auto set(const std::string_view name, const Texture &texture) -> void {
     const int location = uniform_location(name);
     if (location >= 0) {
-      int texture_slot = 0;
-      rl::rlActiveTextureSlot(texture_slot);
-      rl::rlEnableTexture(texture.id);
-      rl::rlSetUniform(location, &texture_slot, RL_SHADER_UNIFORM_SAMPLER2D, 1);
+      rl::SetShaderValueTexture(shader_, location, texture);
     }
   }
 
   template <ecs::ShaderUniformBinding Binding, typename T>
-  void set(Binding binding, T &&value) {
+  auto set(Binding binding, T &&value) -> void {
     set(map_uniform_binding(binding), std::forward<T>(value));
   }
 
   template <ecs::ShaderTextureBinding Binding>
-  void set_texture(Binding binding, const Texture &texture) {
+  auto set_texture(Binding binding, const Texture &texture) -> void {
     set(map_texture_binding(binding), texture);
   }
 
-  void set(int location, const Texture &texture) {
+  auto set(int location, const Texture &texture) -> void {
     if (location >= 0) {
-      int texture_slot = 0;
-      rl::rlActiveTextureSlot(texture_slot);
-      rl::rlEnableTexture(texture.id);
-      rl::rlSetUniform(location, &texture_slot, RL_SHADER_UNIFORM_SAMPLER2D, 1);
+      rl::SetShaderValueTexture(shader_, location, texture);
     }
   }
 
-  void apply(const std::string &name, const Uniform &uniform) {
+  auto apply(const std::string &name, const Uniform &uniform) -> void {
     switch (uniform.type) {
     case UniformType::Float:
       if (uniform.count > 1) {
@@ -341,40 +338,40 @@ public:
   }
 
   template <ecs::ShaderUniformBinding Binding>
-  void apply(Binding binding, const Uniform &uniform) {
+  auto apply(Binding binding, const Uniform &uniform) -> void {
     apply(std::string{map_uniform_binding(binding)}, uniform);
   }
 
-  template <typename F> decltype(auto) with_bound(F &&fn) {
-    rl::rlEnableShader(shader_.id);
+  template <typename F> auto with_bound(F &&fn) -> decltype(auto) {
+    rl::BeginShaderMode(shader_);
     try {
       if constexpr (std::is_void_v<std::invoke_result_t<F>>) {
         std::invoke(std::forward<F>(fn));
-        rl::rlDisableShader();
+        rl::EndShaderMode();
       } else {
         decltype(auto) result = std::invoke(std::forward<F>(fn));
-        rl::rlDisableShader();
+        rl::EndShaderMode();
         return result;
       }
     } catch (...) {
-      rl::rlDisableShader();
+      rl::EndShaderMode();
       throw;
     }
   }
 
-  template <typename F> decltype(auto) with_enabled(F &&fn) {
-    rl::rlEnableShader(shader_.id);
+  template <typename F> auto with_enabled(F &&fn) -> decltype(auto) {
+    rl::BeginShaderMode(shader_);
     try {
       if constexpr (std::is_void_v<std::invoke_result_t<F>>) {
         std::invoke(std::forward<F>(fn));
-        rl::rlDisableShader();
+        rl::EndShaderMode();
       } else {
         decltype(auto) result = std::invoke(std::forward<F>(fn));
-        rl::rlDisableShader();
+        rl::EndShaderMode();
         return result;
       }
     } catch (...) {
-      rl::rlDisableShader();
+      rl::EndShaderMode();
       throw;
     }
   }
@@ -385,7 +382,7 @@ private:
   std::unordered_map<std::string, int> attribute_locations_;
   bool owns_resource_ = false;
 
-  void unload() {
+  auto unload() -> void {
     if (owns_resource_ && shader_.id != 0 &&
         shader_.id != Shader::default_id()) {
       ::UnloadShader(shader_);
@@ -394,27 +391,29 @@ private:
     owns_resource_ = false;
   }
 
-  void set_value(const std::string_view name, const void *value, int type) {
+  auto set_value(const std::string_view name, const void *value, int type)
+      -> void {
     const int location = uniform_location(name);
     if (location >= 0) {
-      rl::rlSetUniform(location, value, type, 1);
+      rl::SetShaderValue(shader_, location, value, type);
     }
   }
 };
 
-inline int shader_location(const Shader &shader, const char *name) {
-  return rl::rlGetLocationUniform(shader.id, name);
+inline auto shader_location(const Shader &shader, const char *name) -> int {
+  return rl::GetShaderLocation(shader, name);
 }
 
-inline int shader_location_attrib(const Shader &shader, const char *name) {
-  return rl::rlGetLocationAttrib(shader.id, name);
+inline auto shader_location_attrib(const Shader &shader, const char *name)
+    -> int {
+  return rl::GetShaderLocationAttrib(shader, name);
 }
 
 } // namespace gl
 
 namespace std {
 template <> struct hash<gl::ShaderSpec> {
-  size_t operator()(const gl::ShaderSpec &k) const noexcept {
+  auto operator()(const gl::ShaderSpec &k) const noexcept -> size_t {
     size_t seed = 0;
     rydz::hash_combine(seed, std::hash<std::string>{}(k.vertex_path));
     rydz::hash_combine(seed, std::hash<std::string>{}(k.fragment_path));
@@ -423,7 +422,7 @@ template <> struct hash<gl::ShaderSpec> {
 };
 
 template <> struct hash<gl::Uniform> {
-  size_t operator()(const gl::Uniform &k) const noexcept {
+  auto operator()(const gl::Uniform &k) const noexcept -> size_t {
     size_t seed = 0;
     rydz::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.type)));
     rydz::hash_combine(seed, std::hash<int>{}(k.count));

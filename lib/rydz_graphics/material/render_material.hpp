@@ -24,7 +24,7 @@ struct SlotPrepareContext {
   const Assets<Texture> *texture_assets = nullptr;
   bool instanced = false;
 
-  [[nodiscard]] const Assets<Texture> &textures() const {
+  [[nodiscard]] auto textures() const -> const Assets<Texture> & {
     return *texture_assets;
   }
 };
@@ -36,12 +36,17 @@ struct RenderSlotContext {
   const ClusteredLightingState *cluster_state_data = nullptr;
   bool instanced = false;
 
-  [[nodiscard]] const ExtractedView &view() const { return *view_data; }
-  [[nodiscard]] const ExtractedLights &lights() const { return *lights_data; }
-  [[nodiscard]] const ClusterConfig &cluster_config() const {
+  [[nodiscard]] auto view() const -> const ExtractedView & {
+    return *view_data;
+  }
+  [[nodiscard]] auto lights() const -> const ExtractedLights & {
+    return *lights_data;
+  }
+  [[nodiscard]] auto cluster_config() const -> const ClusterConfig & {
     return *cluster_config_data;
   }
-  [[nodiscard]] const ClusteredLightingState &clustered_lighting() const {
+  [[nodiscard]] auto clustered_lighting() const
+      -> const ClusteredLightingState & {
     return *cluster_state_data;
   }
 };
@@ -77,9 +82,9 @@ struct ShaderCache {
   std::unordered_map<ShaderSpec, ShaderProgram> shaders;
 };
 
-inline PbrFallbackTextures &pbr_fallback_textures() {
-  static PbrFallbackTextures textures = [] {
-    auto make_texture = [](gl::Color color) {
+inline auto pbr_fallback_textures() -> PbrFallbackTextures & {
+  static PbrFallbackTextures textures = [] -> PbrFallbackTextures {
+    auto make_texture = [](gl::Color color) -> gl::Texture {
       gl::Image image = gl::gen_image_with_color(1, 1, color);
       gl::Texture texture = image.load_texture();
       gl::unload_image(image);
@@ -97,7 +102,7 @@ inline PbrFallbackTextures &pbr_fallback_textures() {
   return textures;
 }
 
-inline void apply_pbr_defaults(gl::Material &material) {
+inline auto apply_pbr_defaults(gl::Material &material) -> void {
   auto *maps = material.maps;
   if (maps[material_map_index(MaterialMap::Albedo)].color.a == 0) {
     maps[material_map_index(MaterialMap::Albedo)].color = gl::kWhite;
@@ -114,7 +119,7 @@ inline void apply_pbr_defaults(gl::Material &material) {
   }
 }
 
-inline void apply_pbr_fallback_textures(gl::Material &material) {
+inline auto apply_pbr_fallback_textures(gl::Material &material) -> void {
   auto &fallbacks = pbr_fallback_textures();
 
   auto *maps = material.maps;
@@ -140,8 +145,8 @@ inline void apply_pbr_fallback_textures(gl::Material &material) {
   }
 }
 
-inline ShaderProgram &resolve_shader(NonSendMarker, ShaderCache &cache,
-                                     const ShaderSpec &spec) {
+inline auto resolve_shader(NonSendMarker, ShaderCache &cache,
+                           const ShaderSpec &spec) -> ShaderProgram & {
   auto [it, inserted] = cache.shaders.try_emplace(spec);
   if (inserted) {
     it->second = ShaderProgram::load(spec);
@@ -149,8 +154,8 @@ inline ShaderProgram &resolve_shader(NonSendMarker, ShaderCache &cache,
   return it->second;
 }
 
-inline void initialize_material_map_location(ShaderProgram &shader,
-                                             MaterialMap map) {
+inline auto initialize_material_map_location(ShaderProgram &shader,
+                                             MaterialMap map) -> void {
   auto &raw = shader.raw();
   if (raw.locs == nullptr) {
     return;
@@ -163,7 +168,7 @@ inline void initialize_material_map_location(ShaderProgram &shader,
   }
 }
 
-inline void initialize_material_map_locations(ShaderProgram &shader) {
+inline auto initialize_material_map_locations(ShaderProgram &shader) -> void {
   initialize_material_map_location(shader, MaterialMap::Albedo);
   initialize_material_map_location(shader, MaterialMap::Metalness);
   initialize_material_map_location(shader, MaterialMap::Normal);
@@ -172,9 +177,10 @@ inline void initialize_material_map_locations(ShaderProgram &shader) {
   initialize_material_map_location(shader, MaterialMap::Emission);
 }
 
-inline void apply_material_map_binding(gl::Material &material,
+inline auto apply_material_map_binding(gl::Material &material,
                                        const MaterialMapBinding &binding,
-                                       const Assets<Texture> &textures) {
+                                       const Assets<Texture> &textures)
+    -> void {
   const int map_index = material_map_index(binding.map_type);
   if (map_index < 0 || map_index >= kMaterialMapCount) {
     return;
@@ -194,10 +200,10 @@ inline void apply_material_map_binding(gl::Material &material,
   }
 }
 
-inline const SlotProvider &
-lookup_slot_provider(const SlotProviderRegistry &registry,
-                     const MaterialSlotRequirement &slot,
-                     const CompiledMaterial &material) {
+inline auto lookup_slot_provider(const SlotProviderRegistry &registry,
+                                 const MaterialSlotRequirement &slot,
+                                 const CompiledMaterial &material)
+    -> const SlotProvider & {
   auto iter = registry.providers.find(slot.type);
   if (iter != registry.providers.end()) {
     return iter->second;
@@ -209,13 +215,14 @@ lookup_slot_provider(const SlotProviderRegistry &registry,
       material.shader.vertex_path + ", " + material.shader.fragment_path + ")");
 }
 
-inline ShaderProgram &
-prepare_material(NonSendMarker marker, const CompiledMaterial &material,
-                 const Assets<Texture> &texture_assets,
-                 ShaderCache &shader_cache,
-                 const SlotProviderRegistry &slot_registry,
-                 const SlotPrepareContext &prepare_ctx,
-                 const ShaderSpec &shader_spec, PreparedMaterial &prepared) {
+inline auto prepare_material(NonSendMarker marker,
+                             const CompiledMaterial &material,
+                             const Assets<Texture> &texture_assets,
+                             ShaderCache &shader_cache,
+                             const SlotProviderRegistry &slot_registry,
+                             const SlotPrepareContext &prepare_ctx,
+                             const ShaderSpec &shader_spec,
+                             PreparedMaterial &prepared) -> ShaderProgram & {
   const auto &src_mat = gl::Material::fallback_material(marker);
   prepared.material = src_mat;
   std::memcpy(prepared.local_maps.data(), src_mat.maps,
@@ -240,11 +247,11 @@ prepare_material(NonSendMarker marker, const CompiledMaterial &material,
   return shader;
 }
 
-inline void apply_slot_uniforms(const SlotProviderRegistry &slot_registry,
+inline auto apply_slot_uniforms(const SlotProviderRegistry &slot_registry,
                                 const RenderSlotContext &render_ctx,
                                 const CompiledMaterial &material,
                                 const PreparedMaterial &prepared,
-                                ShaderProgram &shader) {
+                                ShaderProgram &shader) -> void {
   for (const auto &slot : material.slots) {
     const auto &provider = lookup_slot_provider(slot_registry, slot, material);
     if (provider.apply) {
@@ -253,10 +260,10 @@ inline void apply_slot_uniforms(const SlotProviderRegistry &slot_registry,
   }
 }
 
-inline SlotProvider make_has_camera_slot_provider() {
+inline auto make_has_camera_slot_provider() -> SlotProvider {
   SlotProvider provider;
   provider.apply = [](const RenderSlotContext &ctx, const CompiledMaterial &,
-                      const PreparedMaterial &, ShaderProgram &shader) {
+                      const PreparedMaterial &, ShaderProgram &shader) -> void {
     shader.set(CameraUniform::Position,
                math::to_rl(ctx.view().camera_view.position));
     shader.set(CameraUniform::ViewMatrix, ctx.view().camera_view.view);
@@ -264,22 +271,22 @@ inline SlotProvider make_has_camera_slot_provider() {
   return provider;
 }
 
-inline SlotProvider make_has_pbr_slot_provider() {
+inline auto make_has_pbr_slot_provider() -> SlotProvider {
   SlotProvider provider;
   provider.prepare = [](const SlotPrepareContext &, const CompiledMaterial &,
-                        PreparedMaterial &prepared, ShaderProgram &) {
+                        PreparedMaterial &prepared, ShaderProgram &) -> void {
     apply_pbr_defaults(prepared.material);
     apply_pbr_fallback_textures(prepared.material);
   };
   provider.apply = [](const RenderSlotContext &ctx, const CompiledMaterial &,
-                      const PreparedMaterial &, ShaderProgram &shader) {
+                      const PreparedMaterial &, ShaderProgram &shader) -> void {
     const auto &view = ctx.view();
     const auto &lights = ctx.lights();
     const auto &cluster_config = ctx.cluster_config();
 
     int has_directional = lights.has_directional ? 1 : 0;
     gl::Vec3 dir_color = color_to_vec3(lights.dir_light.color);
-    gl::Vec3 dir_dir = math::to_rl(lights.dir_light.direction.Normalized());
+    gl::Vec3 dir_dir = math::to_rl(lights.dir_light.direction.normalized());
     float dir_intensity = lights.dir_light.intensity;
     gl::Vec2 cluster_screen_size = {
         static_cast<float>(std::max(gl::screen_width(), 1)),
@@ -311,10 +318,11 @@ inline SlotProvider make_has_pbr_slot_provider() {
 }
 
 template <typename BatchT>
-inline void draw_batch(ShaderProgram &shader, const gl::Mesh &mesh,
-                       gl::Material &material, const BatchT &batch) {
-  gl::draw_mesh_instanced(shader, mesh, material, batch.transforms.data(),
-                          static_cast<i32>(batch.transforms.size()));
+inline auto draw_batch(ShaderProgram &shader, const gl::Mesh &mesh,
+                       gl::Material &material, const BatchT &batch) -> void {
+  (void)shader;
+  mesh.draw_instanced(material, batch.transforms.data(),
+                      static_cast<i32>(batch.transforms.size()));
 }
 
 } // namespace ecs

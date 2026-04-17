@@ -11,9 +11,15 @@ Checks: >
   concurrency-*,
   misc-*,
   cert-*,
+  google-readability-casting,
   -cppcoreguidelines-owning-memory,
-  -modernize-use-trailing-return-type
+  -readability-magic-numbers
 
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*'
+CheckOptions:
+  - key:             performance-for-range-copy.WarnOnAllAutoCopies
+    value:           true
+  - key:             readability-static-accessed-through-instance.Name
+    value:           true
 ...

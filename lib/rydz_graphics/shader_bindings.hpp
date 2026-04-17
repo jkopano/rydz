@@ -23,15 +23,15 @@ enum class MaterialMap : int {
 inline constexpr int kMaterialMapCount = 12;
 inline constexpr int kRaylibMapLocationBase = 15;
 
-inline constexpr int material_map_index(MaterialMap map) {
+inline constexpr auto material_map_index(MaterialMap map) -> int {
   return static_cast<int>(map);
 }
 
-inline constexpr int shader_location_index(MaterialMap map) {
+inline constexpr auto shader_location_index(MaterialMap map) -> int {
   return kRaylibMapLocationBase + material_map_index(map);
 }
 
-inline std::string_view map_texture_binding(MaterialMap map) {
+inline auto map_texture_binding(MaterialMap map) -> std::string_view {
   switch (map) {
   case MaterialMap::Albedo:
     return "texture0";
@@ -59,7 +59,7 @@ inline std::string_view map_texture_binding(MaterialMap map) {
   return "";
 }
 
-inline std::string_view map_uniform_binding(MaterialMap map) {
+inline auto map_uniform_binding(MaterialMap map) -> std::string_view {
   switch (map) {
   case MaterialMap::Albedo:
     return "u_color";
@@ -92,7 +92,8 @@ enum class StandardMaterialUniform {
   RenderMethod,
 };
 
-inline std::string_view map_uniform_binding(StandardMaterialUniform uniform) {
+inline auto map_uniform_binding(StandardMaterialUniform uniform)
+    -> std::string_view {
   switch (uniform) {
   case StandardMaterialUniform::AlphaCutoff:
     return "alphaCutoff";
@@ -107,7 +108,7 @@ enum class CameraUniform {
   ViewMatrix,
 };
 
-inline std::string_view map_uniform_binding(CameraUniform uniform) {
+inline auto map_uniform_binding(CameraUniform uniform) -> std::string_view {
   switch (uniform) {
   case CameraUniform::Position:
     return "cameraPos";
@@ -129,7 +130,8 @@ enum class PbrLightingUniform {
   IsOrthographic,
 };
 
-inline std::string_view map_uniform_binding(PbrLightingUniform uniform) {
+inline auto map_uniform_binding(PbrLightingUniform uniform)
+    -> std::string_view {
   switch (uniform) {
   case PbrLightingUniform::HasDirectional:
     return "u_has_directional";
@@ -154,18 +156,14 @@ inline std::string_view map_uniform_binding(PbrLightingUniform uniform) {
 }
 
 template <typename T>
-concept ShaderTextureBinding =
-    std::is_enum_v<T> &&
-    requires(T value) {
-      { map_texture_binding(value) } -> std::convertible_to<std::string_view>;
-    };
+concept ShaderTextureBinding = std::is_enum_v<T> && requires(T value) {
+  { map_texture_binding(value) } -> std::convertible_to<std::string_view>;
+};
 
 template <typename T>
-concept ShaderUniformBinding =
-    std::is_enum_v<T> &&
-    requires(T value) {
-      { map_uniform_binding(value) } -> std::convertible_to<std::string_view>;
-    };
+concept ShaderUniformBinding = std::is_enum_v<T> && requires(T value) {
+  { map_uniform_binding(value) } -> std::convertible_to<std::string_view>;
+};
 
 template <typename T>
 concept ShaderBindings = ShaderTextureBinding<T> || ShaderUniformBinding<T>;

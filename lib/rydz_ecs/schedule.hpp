@@ -15,7 +15,7 @@
 
 namespace ecs {
 
-inline tf::Executor &global_executor() {
+inline auto global_executor() -> tf::Executor & {
   static tf::Executor executor;
   return executor;
 }
@@ -39,8 +39,8 @@ inline constexpr bool is_chained_systems_v = is_chained_systems<T>::value;
 
 namespace detail {
 
-template <> struct is_system_input_descriptor<ChainedSystems> : std::true_type {
-};
+template <>
+struct is_system_input_descriptor<ChainedSystems> : std::true_type {};
 
 template <typename T>
 concept ChainSystemInput =
@@ -48,7 +48,8 @@ concept ChainSystemInput =
 
 template <typename Func>
   requires ChainSystemInput<Func>
-ChainedSystems::Entry make_chain_entry(Func &&func, const std::string &prev) {
+auto make_chain_entry(Func &&func, const std::string &prev)
+    -> ChainedSystems::Entry {
   SystemOrdering ordering;
   std::unique_ptr<ISystem> sys;
 
@@ -70,11 +71,11 @@ ChainedSystems::Entry make_chain_entry(Func &&func, const std::string &prev) {
 
 template <typename... Fs>
   requires(detail::ChainSystemInput<Fs> && ...)
-ChainedSystems chain(Fs &&...funcs) {
+auto chain(Fs &&...funcs) -> ChainedSystems {
   ChainedSystems result;
   std::string prev_name;
 
-  auto process = [&](auto &&func) {
+  auto process = [&](auto &&func) -> auto {
     auto entry =
         detail::make_chain_entry(std::forward<decltype(func)>(func), prev_name);
     prev_name = entry.system->name();
@@ -118,12 +119,12 @@ public:
   Schedule() = default;
   ~Schedule() = default;
   Schedule(Schedule &&) = default;
-  Schedule &operator=(Schedule &&) = default;
+  auto operator=(Schedule &&) -> Schedule & = default;
   Schedule(const Schedule &) = delete;
-  Schedule &operator=(const Schedule &) = delete;
+  auto operator=(const Schedule &) -> Schedule & = delete;
 
-  void add_system(std::unique_ptr<ISystem> system,
-                  SystemOrdering ordering = {}) {
+  auto add_system(std::unique_ptr<ISystem> system, SystemOrdering ordering = {})
+      -> void {
     SystemEntry entry;
     entry.system = std::move(system);
     entry.access = entry.system->access();
@@ -133,46 +134,46 @@ public:
     needs_rebuild_ = true;
   }
 
-  void add_set_config(SetConfig config) {
+  auto add_set_config(SetConfig config) -> void {
     set_configs_.push_back(std::move(config));
     needs_rebuild_ = true;
   }
 
   template <typename F>
     requires SystemInput<F>
-  void add_system_fn(F &&func) {
+  auto add_system_fn(F &&func) -> void {
     add_system_fn_with_ordering(std::forward<F>(func), {});
   }
 
   template <typename F>
     requires(!SystemInput<F>)
-  void add_system_fn(F && /*func*/) {
+  auto add_system_fn(F && /*func*/) -> void {
     detail::static_assert_valid_system_callable<F>();
   }
 
   template <typename E, typename F>
     requires(std::is_enum_v<bare_t<E>> &&
              !std::same_as<bare_t<E>, ScheduleLabel> && SystemInput<F>)
-  void add_system_fn(E set_id, F &&func) {
+  auto add_system_fn(E set_id, F &&func) -> void {
     add_system_fn(set(set_id), std::forward<F>(func));
   }
 
   template <typename E, typename F>
     requires(std::is_enum_v<bare_t<E>> &&
              !std::same_as<bare_t<E>, ScheduleLabel> && !SystemInput<F>)
-  void add_system_fn(E /*set_id*/, F && /*func*/) {
+  auto add_system_fn(E /*set_id*/, F && /*func*/) -> void {
     detail::static_assert_valid_system_callable<F>();
   }
 
   template <typename S, typename F>
     requires(detail::is_set_marker_v<S> && SystemInput<F>)
-  void add_system_fn(S &&, F &&func) {
+  auto add_system_fn(S &&, F &&func) -> void {
     add_system_fn(set<bare_t<S>>(), std::forward<F>(func));
   }
 
   template <typename S, typename F>
     requires(detail::is_set_marker_v<S> && !SystemInput<F>)
-  void add_system_fn(S &&, F && /*func*/) {
+  auto add_system_fn(S &&, F && /*func*/) -> void {
     detail::static_assert_valid_system_callable<F>();
   }
 
@@ -180,7 +181,7 @@ public:
     requires((std::same_as<bare_t<S>, SetId> ||
               std::same_as<bare_t<S>, SetList>) &&
              SystemInput<F>)
-  void add_system_fn(S &&selector, F &&func) {
+  auto add_system_fn(S &&selector, F &&func) -> void {
     SystemOrdering ordering;
     ordering.in_sets = detail::to_set_ids(std::forward<S>(selector));
     detail::ensure_unique_sets(ordering.in_sets, "add_system_fn(...)");
@@ -191,11 +192,11 @@ public:
     requires((std::same_as<bare_t<S>, SetId> ||
               std::same_as<bare_t<S>, SetList>) &&
              !SystemInput<F>)
-  void add_system_fn(S && /*selector*/, F && /*func*/) {
+  auto add_system_fn(S && /*selector*/, F && /*func*/) -> void {
     detail::static_assert_valid_system_callable<F>();
   }
 
-  void run(World &world) {
+  auto run(World &world) -> void {
     if (entries_.empty()) {
       return;
     }
@@ -223,13 +224,13 @@ public:
     }
   }
 
-  [[nodiscard]] usize system_count() const { return entries_.size(); }
-  [[nodiscard]] usize configured_set_count() const {
+  [[nodiscard]] auto system_count() const -> usize { return entries_.size(); }
+  [[nodiscard]] auto configured_set_count() const -> usize {
     return set_configs_.size();
   }
-  [[nodiscard]] bool empty() const { return entries_.empty(); }
+  [[nodiscard]] auto empty() const -> bool { return entries_.empty(); }
 
-  void prepare() {
+  auto prepare() -> void {
     if (needs_rebuild_) {
       rebuild();
       needs_rebuild_ = false;
@@ -237,7 +238,8 @@ public:
   }
 
 #ifndef NDEBUG
-  [[nodiscard]] std::string debug_dump(const std::string &schedule_name) const;
+  [[nodiscard]] auto debug_dump(const std::string &schedule_name) const
+      -> std::string;
 #endif
 
 private:
@@ -245,7 +247,8 @@ private:
 
   template <typename F>
     requires SystemInput<F>
-  void add_system_fn_with_ordering(F &&func, SystemOrdering base_ordering) {
+  auto add_system_fn_with_ordering(F &&func, SystemOrdering base_ordering)
+      -> void {
     if constexpr (is_chained_systems_v<bare_t<F>>) {
       for (auto &e : func.systems) {
         merge_ordering(e.ordering, base_ordering);
@@ -268,8 +271,8 @@ private:
     }
   }
 
-  static void merge_ordering(SystemOrdering &target,
-                             const SystemOrdering &extra) {
+  static auto merge_ordering(SystemOrdering &target,
+                             const SystemOrdering &extra) -> void {
     target.after.insert(target.after.end(), extra.after.begin(),
                         extra.after.end());
     target.before.insert(target.before.end(), extra.before.begin(),
@@ -278,7 +281,7 @@ private:
                           extra.in_sets.end());
   }
 
-  void rebuild() {
+  auto rebuild() -> void {
     steps_.clear();
 
     const usize count = entries_.size();
@@ -291,7 +294,7 @@ private:
     build_execution_steps();
   }
 
-  void apply_set_configs() {
+  auto apply_set_configs() -> void {
     std::unordered_map<SetId, std::vector<usize>> set_members;
     for (usize i = 0; i < entries_.size(); ++i) {
       for (const auto &sid : entries_[i].in_sets) {
@@ -300,8 +303,8 @@ private:
     }
 
     for (const auto &[sid, _] : set_members) {
-      auto it = std::ranges::find_if(set_configs_,
-                                     [&](auto &c) { return c.id == sid; });
+      auto it = std::ranges::find_if(
+          set_configs_, [&](auto &c) -> auto { return c.id == sid; });
       if (it == set_configs_.end()) {
         throw std::runtime_error(
             std::format("Set '{}' used but never configured", set_name(sid)));
@@ -325,7 +328,7 @@ private:
       }
 
       // CACHING
-      auto get_names = [&](SetId set_id) {
+      auto get_names = [&](SetId set_id) -> std::vector<std::string> {
         std::vector<std::string> names;
         if (auto iter = set_members.find(set_id); iter != set_members.end()) {
           for (usize idx : iter->second) {
@@ -363,7 +366,7 @@ private:
     }
   }
 
-  void topological_sort() {
+  auto topological_sort() -> void {
     const usize n = entries_.size();
 
     std::unordered_map<std::string, usize> name_to_idx;
@@ -374,7 +377,8 @@ private:
     std::vector<std::vector<usize>> adj(n);
     std::vector<usize> in_degree(n, 0);
 
-    auto resolve = [&](const std::string &dep, const std::string &owner) {
+    auto resolve = [&](const std::string &dep,
+                       const std::string &owner) -> unsigned long {
       auto it = name_to_idx.find(dep);
       if (it == name_to_idx.end())
         throw std::runtime_error("System '" + owner + "' references '" + dep +
@@ -383,7 +387,7 @@ private:
     };
 
     // Deduplicate edges to avoid double-counting in_degree
-    auto add_edge = [&](usize from, usize to) {
+    auto add_edge = [&](usize from, usize to) -> void {
       if (std::ranges::find(adj[from], to) == adj[from].end()) {
         adj[from].push_back(to);
         in_degree[to]++;
@@ -443,7 +447,7 @@ private:
     entries_ = std::move(sorted);
   }
 
-  void build_execution_steps() {
+  auto build_execution_steps() -> void {
     usize start = 0;
     while (start < entries_.size()) {
       if (entries_[start].access.exclusive) {
@@ -467,7 +471,7 @@ private:
     }
   }
 
-  [[nodiscard]] bool systems_conflict(usize i, usize j) const {
+  [[nodiscard]] auto systems_conflict(usize i, usize j) const -> bool {
     const auto &a = entries_[i];
     const auto &b = entries_[j];
 
@@ -480,12 +484,12 @@ private:
 
   using Batch = std::vector<usize>;
 
-  [[nodiscard]] std::vector<Batch> batch_compatible_systems(usize start,
-                                                            usize end) const {
+  [[nodiscard]] auto batch_compatible_systems(usize start, usize end) const
+      -> std::vector<Batch> {
     std::vector<Batch> batches;
     for (usize offset = 0; offset < (end - start); ++offset) {
-      auto iter = std::ranges::find_if(batches, [&](const auto &batch) {
-        return std::ranges::none_of(batch, [&](auto member) {
+      auto iter = std::ranges::find_if(batches, [&](const auto &batch) -> auto {
+        return std::ranges::none_of(batch, [&](auto member) -> auto {
           return systems_conflict(start + offset, start + member);
         });
       });
@@ -499,8 +503,8 @@ private:
     return batches;
   }
 
-  void reorder_entries_by_batches(usize start,
-                                  const std::vector<Batch> &batches) {
+  auto reorder_entries_by_batches(usize start,
+                                  const std::vector<Batch> &batches) -> void {
     std::vector<SystemEntry> reordered;
     reordered.reserve(batches.size());
 
@@ -515,12 +519,12 @@ private:
     }
   }
 
-  ExecutionStep build_parallel_step(usize start, usize end) {
+  auto build_parallel_step(usize start, usize end) -> ExecutionStep {
     auto batches = batch_compatible_systems(start, end);
     reorder_entries_by_batches(start, batches);
 
-    bool any_parallel =
-        std::ranges::any_of(batches, [](auto &b) { return b.size() > 1; });
+    bool any_parallel = std::ranges::any_of(
+        batches, [](auto &b) -> auto { return b.size() > 1; });
     if (!any_parallel) {
       return InlineStep{.start = start, .end = end};
     }
@@ -537,7 +541,7 @@ private:
     return step;
   }
 
-  void run_parallel_step(const ParallelStep &step, World &world) {
+  auto run_parallel_step(const ParallelStep &step, World &world) -> void {
     for (const auto &batch : step.batches) {
       tf::Taskflow taskflow;
       bool has_worker_tasks = false;
@@ -548,7 +552,8 @@ private:
         }
 
         has_worker_tasks = true;
-        taskflow.emplace([this, idx, &world] { run_entry(idx, world); });
+        taskflow.emplace(
+            [this, idx, &world] -> void { run_entry(idx, world); });
       }
 
       if (!has_worker_tasks) {
@@ -571,7 +576,7 @@ private:
     }
   }
 
-  void run_entry(usize index, World &world) {
+  auto run_entry(usize index, World &world) -> void {
 #ifdef TRACY_ENABLE
     const auto sys_name = entries_[index].system->name();
     ZoneScopedTransient(sys_name.c_str());
@@ -579,8 +584,8 @@ private:
     entries_[index].system->run(world);
   }
 
-  static bool have_ordering_dependency(const SystemEntry &a,
-                                       const SystemEntry &b) {
+  static auto have_ordering_dependency(const SystemEntry &a,
+                                       const SystemEntry &b) -> bool {
     const auto &a_name = a.system->name();
     const auto &b_name = b.system->name();
 
@@ -595,14 +600,14 @@ class Schedules {
   std::unordered_map<ScheduleLabel, Schedule> schedules_;
 
 public:
-  Schedule &entry(ScheduleLabel label) { return schedules_[label]; }
+  auto entry(ScheduleLabel label) -> Schedule & { return schedules_[label]; }
 
-  Schedule *get(ScheduleLabel label) {
+  auto get(ScheduleLabel label) -> Schedule * {
     auto iter = schedules_.find(label);
     return iter != schedules_.end() ? &iter->second : nullptr;
   }
 
-  void run(ScheduleLabel label, World &world) {
+  auto run(ScheduleLabel label, World &world) -> void {
     auto *schedule = get(label);
     if (schedule != nullptr) {
       ZoneScopedN("Schedule");
@@ -614,14 +619,14 @@ public:
     }
   }
 
-  void prepare_all() {
+  auto prepare_all() -> void {
     for (auto &[_, schedule] : schedules_) {
       schedule.prepare();
     }
   }
 
 #ifndef NDEBUG
-  std::string debug_dump() const;
+  auto debug_dump() const -> std::string;
 #endif
 
 private:
@@ -631,15 +636,16 @@ private:
 namespace detail {
 
 template <typename F>
-void add_system_to_schedule(Schedule &schedule, F &&func) {
+auto add_system_to_schedule(Schedule &schedule, F &&func) -> void {
   schedule.add_system_fn(std::forward<F>(func));
 }
 
 } // namespace detail
 
 inline auto system_multithreading(TaskPoolOptions opts = {}) {
-  return
-      [opts](auto &app) { app.world().set_multithreaded(opts.multithreaded); };
+  return [opts](auto &app) -> auto {
+    app.world().set_multithreaded(opts.multithreaded);
+  };
 }
 
 } // namespace ecs
@@ -648,12 +654,12 @@ inline auto system_multithreading(TaskPoolOptions opts = {}) {
 #include "schedule_debug.hpp"
 
 namespace ecs {
-inline std::string
-Schedule::debug_dump(const std::string &schedule_name) const {
+inline auto Schedule::debug_dump(const std::string &schedule_name) const
+    -> std::string {
   return ScheduleDebug::dump(*this, schedule_name);
 }
 
-inline std::string Schedules::debug_dump() const {
+inline auto Schedules::debug_dump() const -> std::string {
   return ScheduleDebug::dump(*this);
 }
 } // namespace ecs

@@ -21,7 +21,7 @@ struct RenderConfig {
   bool color_blend = true;
   bool wireframe = false;
 
-  void operator()(NonSendMarker) const {
+  auto operator()(NonSendMarker) const -> void {
     gl::draw_render_batch_active();
     gl::color_mask(color_mask.r, color_mask.g, color_mask.b, color_mask.a);
 
@@ -78,9 +78,9 @@ struct RenderConfig {
     }
   }
 
-  static RenderConfig get_default() { return {}; }
+  static auto get_default() -> RenderConfig { return {}; }
 
-  static RenderConfig depth_prepass() {
+  static auto depth_prepass() -> RenderConfig {
     return {
         .depth = {.test = true, .write = true},
         .blend = gl::BlendMode::Alpha,
@@ -91,9 +91,9 @@ struct RenderConfig {
     };
   }
 
-  static RenderConfig post_depth_prepass() { return get_default(); }
+  static auto post_depth_prepass() -> RenderConfig { return get_default(); }
 
-  static RenderConfig opaque() {
+  static auto opaque() -> RenderConfig {
     return {
         .depth = {.test = true, .write = true},
         .blend = gl::BlendMode::Alpha,
@@ -104,7 +104,7 @@ struct RenderConfig {
     };
   }
 
-  static RenderConfig transparent() {
+  static auto transparent() -> RenderConfig {
     return {
         .depth = {.test = true, .write = false},
         .blend = gl::BlendMode::Alpha,
@@ -115,7 +115,7 @@ struct RenderConfig {
     };
   }
 
-  static RenderConfig end_world_pass() {
+  static auto end_world_pass() -> RenderConfig {
     return {
         .depth = {.test = false, .write = true},
         .blend = gl::BlendMode::Alpha,

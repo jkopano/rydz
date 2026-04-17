@@ -16,7 +16,7 @@ struct PostProcessDescriptor {
   std::unordered_map<std::string, Uniform> _uniforms;
   bool enabled = true;
 
-  bool operator==(const PostProcessDescriptor &o) const = default;
+  auto operator==(const PostProcessDescriptor &o) const -> bool = default;
 };
 
 template <typename M>
@@ -44,7 +44,7 @@ struct DefaultPostProcessMaterial {
   float grain = 0.015F;
 
   [[nodiscard]]
-  PostProcessDescriptor describe() const {
+  auto describe() const -> PostProcessDescriptor {
     PostProcessDescriptor descriptor;
     descriptor.shader = ShaderSpec::from("res/shaders/postprocess.vert",
                                          "res/shaders/postprocess.frag");

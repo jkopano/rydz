@@ -11,8 +11,8 @@ class Resources {
     IResource() = default;
     IResource(const IResource &) = default;
     IResource(IResource &&) = delete;
-    IResource &operator=(const IResource &) = default;
-    IResource &operator=(IResource &&) = delete;
+    auto operator=(const IResource &) -> IResource & = default;
+    auto operator=(IResource &&) -> IResource & = delete;
     virtual ~IResource() = default;
   };
 
@@ -29,7 +29,7 @@ public:
         std::make_unique<ResourceImpl<T>>(std::move(resource));
   }
 
-  template <typename T> T *get() {
+  template <typename T> auto get() -> T * {
     auto iter = data_.find(std::type_index(typeid(T)));
     if (iter == data_.end()) {
       return nullptr;
@@ -38,7 +38,7 @@ public:
     return &impl->data;
   }
 
-  template <typename T> const T *get() const {
+  template <typename T> auto get() const -> const T * {
     auto iter = data_.find(std::type_index(typeid(T)));
     if (iter == data_.end()) {
       return nullptr;
@@ -47,13 +47,13 @@ public:
     return &impl->data;
   }
 
-  template <typename T> bool has() const {
+  template <typename T> auto has() const -> bool {
     return data_.contains(std::type_index(typeid(T)));
   }
 
-  void clear() { data_.clear(); }
+  auto clear() -> void { data_.clear(); }
 
-  template <typename T> std::optional<T> remove() {
+  template <typename T> auto remove() -> std::optional<T> {
     auto iter = data_.find(std::type_index(typeid(T)));
     if (iter == data_.end()) {
       return std::nullopt;

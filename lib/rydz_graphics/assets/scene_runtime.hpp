@@ -10,21 +10,22 @@
 namespace ecs {
 
 struct SceneRuntimeSystems {
-  static void cleanup_orphan_scene_entities_system(World &world) {
+  static auto cleanup_orphan_scene_entities_system(World &world) -> void {
     auto *owned_storage = world.get_storage<SceneOwned>();
     if (owned_storage == nullptr) {
       return;
     }
 
     std::vector<Entity> to_remove;
-    owned_storage->for_each([&](Entity entity, const SceneOwned &owned) {
-      if (!world.entities.is_alive(owned.root) ||
-          !world.has_component<SceneRoot>(owned.root)) {
-        to_remove.push_back(entity);
-      }
-    });
+    owned_storage->for_each(
+        [&](Entity entity, const SceneOwned &owned) -> void {
+          if (!world.entities.is_alive(owned.root) ||
+              !world.has_component<SceneRoot>(owned.root)) {
+            to_remove.push_back(entity);
+          }
+        });
 
-    std::ranges::sort(to_remove, [](Entity lhs, Entity rhs) {
+    std::ranges::sort(to_remove, [](Entity lhs, Entity rhs) -> bool {
       return lhs.index() > rhs.index();
     });
 
@@ -38,7 +39,7 @@ struct SceneRuntimeSystems {
     }
   }
 
-  static void sync_scene_roots_system(World &world) {
+  static auto sync_scene_roots_system(World &world) -> void {
     auto *scene_roots = world.get_storage<SceneRoot>();
     auto *scene_assets = world.get_resource<Assets<Scene>>();
     if ((scene_roots == nullptr) || (scene_assets == nullptr)) {
@@ -46,8 +47,9 @@ struct SceneRuntimeSystems {
     }
 
     std::vector<Entity> roots;
-    scene_roots->for_each(
-        [&](Entity entity, const SceneRoot &) { roots.push_back(entity); });
+    scene_roots->for_each([&](Entity entity, const SceneRoot &) -> void {
+      roots.push_back(entity);
+    });
 
     for (Entity root_entity : roots) {
       auto *root = world.get_component<SceneRoot>(root_entity);
@@ -95,15 +97,16 @@ struct SceneRuntimeSystems {
 
 private:
   struct detail {
-    static bool scene_instance_alive(const World &world,
-                                     const SceneInstance &inst) {
-      return std::ranges::all_of(inst.owned_entities, [&](Entity entity) {
-        return world.entities.is_alive(entity);
-      });
+    static auto scene_instance_alive(const World &world,
+                                     const SceneInstance &inst) -> bool {
+      return std::ranges::all_of(inst.owned_entities,
+                                 [&](Entity entity) -> bool {
+                                   return world.entities.is_alive(entity);
+                                 });
     }
 
-    static void ensure_transform(World &world, Entity entity,
-                                 const Transform &transform) {
+    static auto ensure_transform(World &world, Entity entity,
+                                 const Transform &transform) -> void {
       if (auto *existing = world.get_component<Transform>(entity)) {
         *existing = transform;
       } else {
@@ -111,8 +114,8 @@ private:
       }
     }
 
-    static void ensure_parent(World &world, Entity entity,
-                              Entity parent_entity) {
+    static auto ensure_parent(World &world, Entity entity, Entity parent_entity)
+        -> void {
       if (auto *existing = world.get_component<Parent>(entity)) {
         existing->entity = parent_entity;
       } else {
@@ -120,7 +123,7 @@ private:
       }
     }
 
-    static void ensure_visibility(World &world, Entity entity) {
+    static auto ensure_visibility(World &world, Entity entity) -> void {
       if (!world.has_component<Visibility>(entity)) {
         world.insert_component(entity, Visibility::Inherited);
       } else if (auto *visibility = world.get_component<Visibility>(entity)) {
@@ -128,7 +131,8 @@ private:
       }
     }
 
-    static void ensure_scene_owned(World &world, Entity entity, Entity root) {
+    static auto ensure_scene_owned(World &world, Entity entity, Entity root)
+        -> void {
       if (auto *owned = world.get_component<SceneOwned>(entity)) {
         owned->root = root;
       } else {
@@ -136,8 +140,8 @@ private:
       }
     }
 
-    static void ensure_node_instance(World &world, Entity entity, Entity root,
-                                     usize node_index, i32 bone_index) {
+    static auto ensure_node_instance(World &world, Entity entity, Entity root,
+                                     usize node_index, i32 bone_index) -> void {
       if (auto *node = world.get_component<SceneNodeInstance>(entity)) {
         node->root = root;
         node->node_index = node_index;
@@ -158,10 +162,10 @@ private:
       }
     }
 
-    static void ensure_primitive_instance(World &world, Entity entity,
+    static auto ensure_primitive_instance(World &world, Entity entity,
                                           Entity root, usize node_index,
-                                          usize primitive_index,
-                                          i32 skin_index) {
+                                          usize primitive_index, i32 skin_index)
+        -> void {
       if (auto *primitive =
               world.get_component<ScenePrimitiveInstance>(entity)) {
         primitive->root = root;
@@ -185,7 +189,8 @@ private:
       }
     }
 
-    static void ensure_mesh(World &world, Entity entity, Handle<Mesh> mesh) {
+    static auto ensure_mesh(World &world, Entity entity, Handle<Mesh> mesh)
+        -> void {
       if (auto *existing = world.get_component<Mesh3d>(entity)) {
         existing->mesh = mesh;
       } else {
@@ -193,8 +198,8 @@ private:
       }
     }
 
-    static void ensure_material(World &world, Entity entity,
-                                Handle<Material> material) {
+    static auto ensure_material(World &world, Entity entity,
+                                Handle<Material> material) -> void {
       if (auto *existing = world.get_component<MeshMaterial3d>(entity)) {
         existing->material = material;
       } else {
@@ -202,8 +207,8 @@ private:
       }
     }
 
-    static void destroy_scene_instance(World &world,
-                                       const SceneInstance &inst) {
+    static auto destroy_scene_instance(World &world, const SceneInstance &inst)
+        -> void {
       for (auto owned_entitie :
            std::ranges::reverse_view(inst.owned_entities)) {
         if (world.entities.is_alive(owned_entitie)) {
@@ -212,9 +217,10 @@ private:
       }
     }
 
-    static SceneInstance build_scene_instance(World &world, Entity root_entity,
-                                              const Scene &scene,
-                                              Handle<Scene> scene_handle) {
+    static auto build_scene_instance(World &world, Entity root_entity,
+                                     const Scene &scene,
+                                     Handle<Scene> scene_handle)
+        -> SceneInstance {
       SceneInstance instance;
       instance.scene = scene_handle;
       instance.node_entities.resize(scene.nodes.size());
@@ -274,8 +280,9 @@ private:
       return instance;
     }
 
-    static bool scene_instance_matches_shape(const Scene &scene,
-                                             const SceneInstance &instance) {
+    static auto scene_instance_matches_shape(const Scene &scene,
+                                             const SceneInstance &instance)
+        -> bool {
       if (instance.node_entities.size() != scene.nodes.size()) {
         return false;
       }
@@ -293,9 +300,9 @@ private:
       return true;
     }
 
-    static void sync_scene_instance(World &world, Entity root_entity,
-                                    const Scene &scene,
-                                    SceneInstance &instance) {
+    static auto sync_scene_instance(World &world, Entity root_entity,
+                                    const Scene &scene, SceneInstance &instance)
+        -> void {
       for (usize node_index = 0; node_index < scene.nodes.size();
            ++node_index) {
         const auto &node = scene.nodes[node_index];

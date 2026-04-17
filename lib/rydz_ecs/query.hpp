@@ -28,11 +28,11 @@ template <typename... Qs> class Query {
 
     explicit operator bool() const { return value_.has_value(); }
 
-    T &operator*() { return *value_; }
-    const T &operator*() const { return *value_; }
+    auto operator*() -> T & { return *value_; }
+    auto operator*() const -> const T & { return *value_; }
 
-    T operator->() { return *value_; }
-    T operator->() const { return *value_; }
+    auto operator->() -> T { return *value_; }
+    auto operator->() const -> T { return *value_; }
   };
 
   template <typename... Items> struct ResultTypeFor;
@@ -72,15 +72,15 @@ public:
 
   auto iter() const { return make_iter(ItemTuple{}); }
 
-  bool empty() const { return is_empty(); }
+  auto empty() const -> bool { return is_empty(); }
 
-  bool is_empty() const { return is_empty_impl(ItemTuple{}); }
+  auto is_empty() const -> bool { return is_empty_impl(ItemTuple{}); }
 
   auto get(Entity entity) const { return get_impl(ItemTuple{}, entity); }
 
   auto single() const { return single_impl(ItemTuple{}); }
 
-  static void access(SystemAccess &acc) {
+  static auto access(SystemAccess &acc) -> void {
     access_items(acc, ItemTuple{});
     QueryFilterTraits<FilterT>::access(acc);
   }
@@ -92,7 +92,7 @@ private:
     return fetcher;
   }
 
-  const CachedState &prepared_query() const {
+  auto prepared_query() const -> const CachedState & {
     if (!cached_state_.has_value()) {
       cached_state_.emplace(prepare_query(ItemTuple{}));
     }
@@ -101,14 +101,14 @@ private:
   }
 
   template <typename... Items>
-  std::span<const Entity> find_smallest_entities_group(
-      const Tuple<typename WorldQueryTraits<Items>::Fetcher...> &fetchers)
-      const {
+  auto find_smallest_entities_group(
+      const Tuple<typename WorldQueryTraits<Items>::Fetcher...> &fetchers) const
+      -> std::span<const Entity> {
     usize min_size = SIZE_MAX;
     std::span<const Entity> result;
     std::apply(
-        [&](const auto &...f) {
-          auto check = [&](const auto &fetcher) {
+        [&](const auto &...f) -> auto {
+          auto check = [&](const auto &fetcher) -> auto {
             if (fetcher.is_required() && fetcher.size() < min_size) {
               min_size = fetcher.size();
               result = fetcher.entities();
@@ -129,7 +129,7 @@ private:
   }
 
   template <typename... Items>
-  PreparedState<Items...> prepare_query(Tuple<Items...>) const {
+  auto prepare_query(Tuple<Items...>) const -> PreparedState<Items...> {
     auto fetchers = std::make_tuple(make_fetcher<Items>()...);
     auto candidates = find_smallest_entities_group<Items...>(fetchers);
     return {
@@ -141,21 +141,23 @@ private:
   template <typename... Items, typename Fetchers>
   static auto fetch_all(const Fetchers &fetchers, Entity entity) {
     return std::apply(
-        [&](const auto &...f) { return Tuple{f.fetch(entity)...}; }, fetchers);
+        [&](const auto &...f) -> auto { return Tuple{f.fetch(entity)...}; },
+        fetchers);
   }
 
   template <typename... Items>
-  static bool
-  all_valid(const Tuple<typename WorldQueryTraits<Items>::Item...> &items) {
-    return [&]<size_t... I>(std::index_sequence<I...>) {
+  static auto
+  all_valid(const Tuple<typename WorldQueryTraits<Items>::Item...> &items)
+      -> bool {
+    return [&]<size_t... I>(std::index_sequence<I...>) -> auto {
       return (WorldQueryTraits<Items>::is_valid(std::get<I>(items)) && ...);
     }(std::index_sequence_for<Items...>{});
   }
 
   template <typename... Items>
-  static std::optional<Tuple<typename WorldQueryTraits<Items>::Item...>>
-  try_fetch(const auto &fetchers, Entity entity, const World &world,
-            Tick last_run, Tick this_run) {
+  static auto try_fetch(const auto &fetchers, Entity entity, const World &world,
+                        Tick last_run, Tick this_run)
+      -> std::optional<Tuple<typename WorldQueryTraits<Items>::Item...>> {
     auto items = fetch_all<Items...>(fetchers, entity);
     if (!all_valid<Items...>(items) || !QueryFilterTraits<FilterT>::matches(
                                            world, entity, last_run, this_run)) {
@@ -190,7 +192,8 @@ private:
     return result;
   }
 
-  template <typename... Items> bool is_empty_impl(Tuple<Items...>) const {
+  template <typename... Items>
+  auto is_empty_impl(Tuple<Items...>) const -> bool {
     const auto &prepared = prepared_query();
 
     for (Entity entity : prepared.candidates) {
@@ -223,16 +226,18 @@ private:
 
     return candidates |
            std::views::transform([fetchers, world = world_, lr = last_run_,
-                                  tr = this_run_](Entity entity) {
+                                  tr = this_run_](Entity entity) -> auto {
              return try_fetch<Items...>(fetchers, entity, *world, lr, tr);
            }) |
-           std::views::filter([](const auto &opt) { return opt.has_value(); }) |
-           std::views::transform(
-               [](auto &&opt) { return *std::forward<decltype(opt)>(opt); });
+           std::views::filter(
+               [](const auto &opt) -> auto { return opt.has_value(); }) |
+           std::views::transform([](auto &&opt) -> auto {
+             return *std::forward<decltype(opt)>(opt);
+           });
   }
 
   template <typename Func, typename... Items>
-  void for_each_impl(Func &&func, Tuple<Items...>) const {
+  auto for_each_impl(Func &&func, Tuple<Items...>) const -> void {
     const auto &prepared = prepared_query();
 
     for (Entity entity : prepared.candidates) {
@@ -246,7 +251,7 @@ private:
   }
 
   template <typename... Items>
-  static void access_items(SystemAccess &acc, Tuple<Items...>) {
+  static auto access_items(SystemAccess &acc, Tuple<Items...>) -> void {
     (WorldQueryTraits<Items>::access(acc), ...);
   }
 
@@ -264,12 +269,12 @@ template <typename... Qs>
 struct SystemParamTraits<Query<Qs...>> : DefaultSystemParamState<Query<Qs...>> {
   using Item = Query<Qs...>;
 
-  static void access(SystemAccess &acc) { Query<Qs...>::access(acc); }
+  static auto access(SystemAccess &acc) -> void { Query<Qs...>::access(acc); }
 
-  static Item retrieve(World &world, const SystemContext &ctx) {
+  static auto retrieve(World &world, const SystemContext &ctx) -> Item {
     return Query<Qs...>(world, ctx.last_run, ctx.this_run);
   }
-  static bool available(const World &) { return true; }
+  static auto available(const World &) -> bool { return true; }
 };
 
 } // namespace ecs

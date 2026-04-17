@@ -16,7 +16,7 @@
 
 namespace ecs {
 
-inline std::string demangle(const char *mangled) {
+inline auto demangle(const char *mangled) -> std::string {
 #if defined(_MSC_VER)
   return mangled;
 #else
@@ -39,7 +39,7 @@ using copy_const_t =
     std::conditional_t<std::is_const_v<std::remove_reference_t<From>>, const To,
                        To>;
 
-template <typename Fn> std::string system_name_of(Fn &&fn) {
+template <typename Fn> auto system_name_of(Fn &&fn) -> std::string {
   using D = decay_t<Fn>;
   if constexpr (std::is_pointer_v<D> &&
                 std::is_function_v<std::remove_pointer_t<D>>) {

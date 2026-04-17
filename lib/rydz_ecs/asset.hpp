@@ -19,9 +19,9 @@ namespace ecs {
 template <typename T> struct Handle {
   u32 id = UINT32_MAX;
 
-  [[nodiscard]] bool is_valid() const { return id != UINT32_MAX; }
-  bool operator==(const Handle &o) const { return id == o.id; }
-  bool operator!=(const Handle &o) const { return id != o.id; }
+  [[nodiscard]] auto is_valid() const -> bool { return id != UINT32_MAX; }
+  auto operator==(const Handle &o) const -> bool { return id == o.id; }
+  auto operator!=(const Handle &o) const -> bool { return id != o.id; }
 };
 
 template <typename AssetT> class Assets {
@@ -53,7 +53,7 @@ public:
     other.items_.clear();
   }
 
-  Assets &operator=(Assets &&other) noexcept {
+  auto operator=(Assets &&other) noexcept -> Assets & {
     if (this != &other) {
       if (deleter_) {
         for (auto &item : items_) {
@@ -69,17 +69,19 @@ public:
   }
 
   Assets(const Assets &) = delete;
-  Assets &operator=(const Assets &) = delete;
+  auto operator=(const Assets &) -> Assets & = delete;
 
-  void set_deleter(std::function<void(AssetT &)> d) { deleter_ = std::move(d); }
+  auto set_deleter(std::function<void(AssetT &)> d) -> void {
+    deleter_ = std::move(d);
+  }
 
-  Handle<AssetT> add(AssetT item) {
+  auto add(AssetT item) -> Handle<AssetT> {
     u32 idx = static_cast<u32>(items_.size());
     items_.push_back(std::move(item));
     return Handle<AssetT>{idx};
   }
 
-  void set(Handle<AssetT> handle, AssetT item) {
+  auto set(Handle<AssetT> handle, AssetT item) -> void {
     if (handle.id >= items_.size()) {
       items_.resize(handle.id + 1, std::nullopt);
     }
@@ -89,7 +91,7 @@ public:
     items_[handle.id] = std::move(item);
   }
 
-  AssetT *get(Handle<AssetT> handle) {
+  auto get(Handle<AssetT> handle) -> AssetT * {
     if (!handle.is_valid() || handle.id >= items_.size() ||
         !items_[handle.id].has_value()) {
       return nullptr;
@@ -97,7 +99,7 @@ public:
     return &items_[handle.id].value();
   }
 
-  const AssetT *get(Handle<AssetT> handle) const {
+  auto get(Handle<AssetT> handle) const -> const AssetT * {
     if (!handle.is_valid() || handle.id >= items_.size() ||
         !items_[handle.id].has_value()) {
       return nullptr;
@@ -105,12 +107,12 @@ public:
     return &items_[handle.id].value();
   }
 
-  bool contains(Handle<AssetT> handle) const {
+  auto contains(Handle<AssetT> handle) const -> bool {
     return handle.is_valid() && handle.id < items_.size() &&
            items_[handle.id].has_value();
   }
 
-  [[nodiscard]] size_t count() const {
+  [[nodiscard]] auto count() const -> size_t {
     size_t n = 0;
     for (auto &s : items_)
       if (s.has_value())
@@ -118,30 +120,32 @@ public:
     return n;
   }
 
-  [[nodiscard]] bool empty() const { return count() == 0; }
+  [[nodiscard]] auto empty() const -> bool { return count() == 0; }
 };
 
 class IAssetLoader {
 public:
   virtual ~IAssetLoader() = default;
-  [[nodiscard]] virtual std::vector<std::string> extensions() const = 0;
-  [[nodiscard]] virtual bool is_async() const = 0;
-  virtual std::any load(const std::vector<u8> &data,
-                        const std::string &path) = 0;
-  virtual void insert_into_world(World &world, u32 handle_id,
-                                 std::any asset) = 0;
+  [[nodiscard]] virtual auto extensions() const -> std::vector<std::string> = 0;
+  [[nodiscard]] virtual auto is_async() const -> bool = 0;
+  virtual auto load(const std::vector<u8> &data, const std::string &path)
+      -> std::any = 0;
+  virtual auto insert_into_world(World &world, u32 handle_id, std::any asset)
+      -> void = 0;
 };
 
 template <typename Derived, typename T>
 class AssetLoader : public IAssetLoader {
 public:
-  [[nodiscard]] bool is_async() const override { return true; }
+  [[nodiscard]] auto is_async() const -> bool override { return true; }
 
-  std::any load(const std::vector<u8> &data, const std::string &path) override {
+  auto load(const std::vector<u8> &data, const std::string &path)
+      -> std::any override {
     return std::any(static_cast<Derived *>(this)->load_asset(data, path));
   }
 
-  void insert_into_world(World &world, u32 handle_id, std::any asset) override {
+  auto insert_into_world(World &world, u32 handle_id, std::any asset)
+      -> void override {
     auto *assets = world.get_resource<Assets<T>>();
     if (assets) {
       assets->set(Handle<T>{handle_id}, std::any_cast<T>(std::move(asset)));
@@ -178,7 +182,7 @@ public:
         path_cache_(std::move(other.path_cache_)),
         root_path_(std::move(other.root_path_)) {}
 
-  AssetServer &operator=(AssetServer &&other) noexcept {
+  auto operator=(AssetServer &&other) noexcept -> AssetServer & {
     loaders_ = std::move(other.loaders_);
     completed_ = std::move(other.completed_);
     next_id_.store(other.next_id_.load());
@@ -187,7 +191,7 @@ public:
     return *this;
   }
 
-  void register_loader(const std::shared_ptr<IAssetLoader> &loader) {
+  auto register_loader(const std::shared_ptr<IAssetLoader> &loader) -> void {
     for (auto &ext : loader->extensions()) {
       loaders_[ext] = loader;
     }
@@ -197,7 +201,7 @@ public:
     register_loader(std::make_shared<L>(std::forward<Args>(args)...));
   }
 
-  template <typename T> Handle<T> load(const std::string &path) const {
+  template <typename T> auto load(const std::string &path) const -> Handle<T> {
     {
       std::lock_guard<std::mutex> lock(completed_mutex_);
       auto cached = path_cache_.find(path);
@@ -228,7 +232,7 @@ public:
       completed_.push_back(
           {id, std::any(std::string(full_path + get_fragment(path))), loader});
     } else {
-      std::thread([this, id, full_path, path, loader]() {
+      std::thread([this, id, full_path, path, loader]() -> auto {
         auto data = read_file(full_path);
         if (data.empty())
           return;
@@ -245,7 +249,7 @@ public:
     return handle;
   }
 
-  void update(World &world) {
+  auto update(World &world) -> void {
     std::vector<LoadedAsset> assets;
     {
       std::lock_guard<std::mutex> lock(completed_mutex_);
@@ -257,12 +261,12 @@ public:
     }
   }
 
-  bool has_loader(const std::string &ext) const {
+  auto has_loader(const std::string &ext) const -> bool {
     return loaders_.contains(ext);
   }
 
 private:
-  static std::string strip_fragment(const std::string &path) {
+  static auto strip_fragment(const std::string &path) -> std::string {
     auto hash = path.find('#');
     if (hash == std::string::npos) {
       return path;
@@ -270,14 +274,14 @@ private:
     return path.substr(0, hash);
   }
 
-  static std::string get_fragment(const std::string &path) {
+  static auto get_fragment(const std::string &path) -> std::string {
     auto hash = path.find('#');
     if (hash == std::string::npos)
       return "";
     return path.substr(hash);
   }
 
-  static std::string get_extension(const std::string &path) {
+  static auto get_extension(const std::string &path) -> std::string {
     auto clean = strip_fragment(path);
     auto pos = clean.rfind('.');
     if (pos == std::string::npos) {
@@ -286,7 +290,7 @@ private:
     return clean.substr(pos + 1);
   }
 
-  static std::vector<u8> read_file(const std::string &path) {
+  static auto read_file(const std::string &path) -> std::vector<u8> {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
       return {};

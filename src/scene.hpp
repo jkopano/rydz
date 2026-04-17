@@ -50,7 +50,7 @@ camera_controller_system(Query<Mut<Transform>, CameraController> query,
     f32 dt = time->delta_seconds;
     f32 speed = ctrl->move_speed;
 
-    Vec3 move = Vec3::sZero();
+    Vec3 move = Vec3::ZERO;
     Vec3 forward = t->forward();
     Vec3 right = t->right();
 
@@ -69,8 +69,8 @@ camera_controller_system(Query<Mut<Transform>, CameraController> query,
     if (input->key_down(KEY_LEFT_SHIFT))
       move -= Vec3(0, 1, 0);
 
-    if (move.LengthSq() > 0.0f) {
-      move = move.Normalized();
+    if (move.length_sq() > 0.0f) {
+      move = move.normalized();
       t->translation = t->translation + move * (speed * dt);
     }
   }
@@ -93,7 +93,7 @@ camera_mouse_system(Query<Mut<CameraController>, Mut<Transform>> query,
     if (ctrl->pitch < -89.0f)
       ctrl->pitch = -89.0f;
 
-    t->rotation = Quat::sEulerAngles(
+    t->rotation = Quat::from_euler(
         Vec3(ctrl->pitch * DEG2RAD, ctrl->yaw * DEG2RAD, 0.0f));
   }
 }
@@ -131,7 +131,7 @@ inline void spawn_some_texture(Cmd cmd, ResMut<Assets<ecs::Texture>> textures,
   auto stone_tex = textures->add(gl::load_texture("res/textures/stone.jpg"));
   cmd.spawn(ecs::Sprite{stone_tex}, Transform{
                                         .translation = Vec3(10.0f, 10.0f, 0.0f),
-                                        .scale = Vec3::sReplicate(1.0f),
+                                        .scale = Vec3::splat(1.0f),
                                     });
 }
 
@@ -181,7 +181,7 @@ inline void spawn_lights_on_input(Cmd cmd,
 
 inline void setup_camera(Cmd cmd, NonSendMarker) {
   cmd.spawn(Camera3DComponent::perspective(), ActiveCamera{},
-            Transform::from_xyz(8, 6, 8).look_at(Vec3::sZero()),
+            Transform::from_xyz(8, 6, 8).look_at(Vec3::ZERO),
             CameraController{},
             PostProcessMaterial{DefaultPostProcessMaterial{}},
             Skybox::from("res/hdri/skybox"));

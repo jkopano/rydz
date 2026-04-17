@@ -26,23 +26,27 @@ public:
     explicit iterator(typename std::vector<const E *>::const_iterator iter)
         : it_(iter) {}
 
-    const E &operator*() const { return **it_; }
-    const E *operator->() const { return *it_; }
+    auto operator*() const -> const E & { return **it_; }
+    auto operator->() const -> const E * { return *it_; }
 
-    iterator &operator++() {
+    auto operator++() -> iterator & {
       ++it_;
       return *this;
     }
 
-    bool operator==(const iterator &other) const { return it_ == other.it_; }
-    bool operator!=(const iterator &other) const { return it_ != other.it_; }
+    auto operator==(const iterator &other) const -> bool {
+      return it_ == other.it_;
+    }
+    auto operator!=(const iterator &other) const -> bool {
+      return it_ != other.it_;
+    }
   };
 
-  iterator begin() const { return iterator{messages_.begin()}; }
-  iterator end() const { return iterator{messages_.end()}; }
+  auto begin() const -> iterator { return iterator{messages_.begin()}; }
+  auto end() const -> iterator { return iterator{messages_.end()}; }
 
-  [[nodiscard]] bool empty() const { return messages_.empty(); }
-  [[nodiscard]] usize size() const { return messages_.size(); }
+  [[nodiscard]] auto empty() const -> bool { return messages_.empty(); }
+  [[nodiscard]] auto size() const -> usize { return messages_.size(); }
 };
 
 template <typename E> class Messages {
@@ -56,7 +60,7 @@ private:
     std::vector<MessageInstance> current;
     std::vector<MessageInstance> prev;
 
-    void swap() { std::swap(current, prev); }
+    auto swap() -> void { std::swap(current, prev); }
   };
 
   MessageBuffers buffers_;
@@ -66,36 +70,36 @@ private:
   usize next_reader_id_ = 0;
 
 public:
-  void send(const E &message) {
+  auto send(const E &message) -> void {
     MessageId id{message_count_++};
     buffers_.current.push_back({message, id});
   }
 
-  void send(E &&message) {
+  auto send(E &&message) -> void {
     MessageId id{message_count_++};
     buffers_.current.push_back({std::move(message), id});
   }
 
-  usize total_count() const {
+  auto total_count() const -> usize {
     return buffers_.current.size() + buffers_.prev.size();
   }
 
-  bool is_empty() const {
+  auto is_empty() const -> bool {
     return buffers_.current.empty() && buffers_.prev.empty();
   }
 
-  void update() {
+  auto update() -> void {
     buffers_.prev.clear();
     buffers_.swap();
   }
 
-  void clear() {
+  auto clear() -> void {
     buffers_.current.clear();
     buffers_.prev.clear();
     message_count_ = 0;
   }
 
-  usize register_reader() {
+  auto register_reader() -> usize {
     usize idx = next_reader_id_++;
     usize start = buffers_.prev.empty() ? message_count_
                                         : buffers_.prev.front().second.id;
@@ -103,7 +107,7 @@ public:
     return idx;
   }
 
-  MessageRange<E> iter(usize reader_id) {
+  auto iter(usize reader_id) -> MessageRange<E> {
     auto &cursor = reader_cursors_[reader_id];
     usize start_id = cursor.id;
     std::vector<const E *> unread;
@@ -124,7 +128,7 @@ public:
     return MessageRange<E>{std::move(unread)};
   }
 
-  bool has_unread(usize reader_id) const {
+  auto has_unread(usize reader_id) const -> bool {
     auto iter = reader_cursors_.find(reader_id);
     if (iter == reader_cursors_.end()) {
       return !is_empty();

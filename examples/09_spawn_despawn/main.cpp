@@ -19,7 +19,7 @@ struct Lifetime {
 void setup(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
            ResMut<Assets<ecs::Material>> materials, NonSendMarker) {
   cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
-            Transform::from_xyz(0, 15, 20).look_at(Vec3::sZero()));
+            Transform::from_xyz(0, 15, 20).look_at(Vec3::ZERO));
 
   cmd.spawn(DirectionalLight{
       .color = kWhite,
@@ -79,10 +79,10 @@ void lifetime_system(Query<Entity, Mut<Lifetime>> query, Res<Time> time,
 void gravity_system(Query<Mut<Transform>, With<BulletTag>> query,
                     Res<Time> time) {
   for (auto [t] : query.iter()) {
-    f32 y = t->translation.GetY() - 3.0f * time->delta_seconds;
+    f32 y = t->translation.y - 3.0f * time->delta_seconds;
     if (y < 0.3f)
       y = 0.3f;
-    t->translation = Vec3(t->translation.GetX(), y, t->translation.GetZ());
+    t->translation = Vec3(t->translation.x, y, t->translation.z);
   }
 }
 

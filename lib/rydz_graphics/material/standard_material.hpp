@@ -21,25 +21,29 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
   f32 normal_scale = -1.0f;
   f32 occlusion_strength = -1.0f;
 
-  static StandardMaterial from_color(Color c) { return {.base_color = c}; }
-  static StandardMaterial from_texture(Handle<Texture> tex,
-                                       Color tint = kWhite) {
+  static auto from_color(Color c) -> StandardMaterial {
+    return {.base_color = c};
+  }
+  static auto from_texture(Handle<Texture> tex, Color tint = kWhite)
+      -> StandardMaterial {
     return {.base_color = tint, .texture = tex};
   }
 
-  static ShaderRef vertex_shader() { return "res/shaders/pbr.vert"; }
-  static ShaderRef fragment_shader() { return "res/shaders/pbr.frag"; }
+  static auto vertex_shader() -> ShaderRef { return "res/shaders/pbr.vert"; }
+  static auto fragment_shader() -> ShaderRef { return "res/shaders/pbr.frag"; }
 
-  [[nodiscard]] RenderMethod render_method() const {
+  [[nodiscard]] auto render_method() const -> RenderMethod {
     return base_color.a < 255 ? RenderMethod::Transparent
                               : RenderMethod::Opaque;
   }
 
-  [[nodiscard]] bool enable_shadows() const { return base_color.a == 255; }
-  [[nodiscard]] bool double_sided() const { return false; }
-  [[nodiscard]] float alpha_cutoff() const { return 0.1F; }
+  [[nodiscard]] auto enable_shadows() const -> bool {
+    return base_color.a == 255;
+  }
+  [[nodiscard]] auto double_sided() const -> bool { return false; }
+  [[nodiscard]] auto alpha_cutoff() const -> float { return 0.1F; }
 
-  void bind(MaterialBuilder &builder) const {
+  auto bind(MaterialBuilder &builder) const -> void {
     builder.color(MaterialMap::Albedo, base_color);
     if (texture.is_valid()) {
       builder.texture(MaterialMap::Albedo, texture);
@@ -77,8 +81,7 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
       builder.uniform(MaterialMap::Emission,
                       math::Vec3(emissive.x, emissive.y, emissive.z));
     }
-    builder.uniform(MaterialMap::Albedo,
-                    gl::Uniform{1.0F, 1.0F, 1.0F, 0.0F});
+    builder.uniform(MaterialMap::Albedo, gl::Uniform{1.0F, 1.0F, 1.0F, 0.0F});
   }
 };
 

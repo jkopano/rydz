@@ -13,7 +13,7 @@ template <typename S> struct State {
 
   explicit State(S v) : value(std::move(v)) {}
 
-  const S &get() const { return value; }
+  auto get() const -> const S & { return value; }
 };
 
 template <typename S> struct NextState {
@@ -22,8 +22,8 @@ template <typename S> struct NextState {
 
   NextState() = default;
 
-  void set(S state) { pending = std::move(state); }
-  void clear() { pending = std::nullopt; }
+  auto set(S state) -> void { pending = std::move(state); }
+  auto clear() -> void { pending = std::nullopt; }
 };
 
 template <typename S> struct OnEnter {
