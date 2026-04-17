@@ -476,8 +476,9 @@ private:
     const auto &b = entries_[j];
 
     if (a.access.exclusive || b.access.exclusive ||
-        !a.access.is_compatible(b.access))
+        !a.access.is_compatible(b.access)) {
       return true;
+    }
 
     return have_ordering_dependency(a, b);
   }

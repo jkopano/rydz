@@ -155,7 +155,7 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
       continue;
     }
 
-    DrawText(it->c_str(), 10, y, 20, rl::RAYWHITE);
+    rlDrawText(it->c_str(), 10, y, 20, rl::RAYWHITE);
     y -= 25;
     current_line++;
 
@@ -164,8 +164,8 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
   }
 
   DrawRectangle(0, console_h, screen_w, 30, Fade(DARKGRAY, 0.9f));
-  DrawText(("] " + console->current_input + "_").c_str(), 10, console_h + 5, 20,
-           rl::GREEN);
+  rlDrawText(("] " + console->current_input + "_").c_str(), 10, console_h + 5,
+             20, rl::GREEN);
 }
 
 inline void console_plugin(ecs::App &app) {

@@ -19,7 +19,7 @@ using namespace math;
 
 struct FrustumPlane {
   Vec3 normal = Vec3::ZERO;
-  float distance = 0.0f;
+  float distance = 0.0F;
 };
 
 struct ViewVisibility {
@@ -44,7 +44,7 @@ inline auto compute_local_bbox(const gl::Mesh &mesh) -> AABox {
 }
 
 inline auto transform_bbox(const AABox &local, Mat4 m) -> AABox {
-  Vec3 corners[8] = {
+  std::array<Vec3, 8> corners{
       Vec3(local.mMin.x, local.mMin.y, local.mMin.z),
       Vec3(local.mMin.x, local.mMin.y, local.mMax.z),
       Vec3(local.mMin.x, local.mMax.y, local.mMin.z),
@@ -58,30 +58,26 @@ inline auto transform_bbox(const AABox &local, Mat4 m) -> AABox {
   AABox result;
   result.mMin = Vec3(FLT_MAX, FLT_MAX, FLT_MAX);
   result.mMax = Vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-  for (auto &c : corners) {
-    Vec3 p = m * c;
-    result.encapsulate(p);
+  for (auto &corner : corners) {
+    result.encapsulate(m * corner);
   }
   return result;
 }
 
 inline auto aabb_in_frustum(const AABox &bbox,
                             const std::array<FrustumPlane, 6> &planes) -> bool {
-  for (const auto &plane : planes) {
-    Vec3 p_vertex(plane.normal.x >= 0 ? bbox.mMax.x : bbox.mMin.x,
-                  plane.normal.y >= 0 ? bbox.mMax.y : bbox.mMin.y,
-                  plane.normal.z >= 0 ? bbox.mMax.z : bbox.mMin.z);
-    float dist = plane.normal.dot(p_vertex) + plane.distance;
-    if (dist < 0) {
-      return false;
-    }
-  }
-  return true;
+  return std::ranges::all_of(planes, [&](const auto &plane) -> auto {
+    const Vec3 p_vertex(plane.normal.x >= 0 ? bbox.mMax.x : bbox.mMin.x,
+                        plane.normal.y >= 0 ? bbox.mMax.y : bbox.mMin.y,
+                        plane.normal.z >= 0 ? bbox.mMax.z : bbox.mMin.z);
+
+    return (plane.normal.dot(p_vertex) + plane.distance) >= 0;
+  });
 }
 
 inline auto extract_frustum_planes(Mat4 vp) -> std::array<FrustumPlane, 6> {
   auto row = [&](int i) -> Vec4 {
-    return Vec4(vp(i, 0), vp(i, 1), vp(i, 2), vp(i, 3));
+    return {vp(i, 0), vp(i, 1), vp(i, 2), vp(i, 3)};
   };
 
   Vec4 r0 = row(0);
@@ -92,8 +88,8 @@ inline auto extract_frustum_planes(Mat4 vp) -> std::array<FrustumPlane, 6> {
   auto normalize_plane = [](Vec4 v) -> FrustumPlane {
     Vec3 n(v.x, v.y, v.z);
     float len = n.length();
-    if (len > 1e-8f) {
-      return {n / len, v.w / len};
+    if (len > 1e-8F) {
+      return {.normal = n / len, .distance = v.w / len};
     }
     return {};
   };
