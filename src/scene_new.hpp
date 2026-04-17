@@ -2,14 +2,14 @@
 #include "math.hpp"
 #include "rl.hpp"
 #include "rydz_camera/mod.hpp"
+#include "rydz_console/console.hpp"
+#include "rydz_console/scripting.hpp"
 #include "rydz_ecs/fwd.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
-#include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_console/scripting.hpp"
-#include "rydz_console/console.hpp"
+#include "rydz_graphics/render_plugin.hpp"
 #include <algorithm>
 #include <print>
 
@@ -30,10 +30,10 @@ static const float kCamOffZ = 10.0f;
 
 // ── Systems ──────────────────────────────────────────────────────────────────
 
-//Run condition - Only run gameplay systems when console is closed
+// Run condition - Only run gameplay systems when console is closed
 
 inline bool is_gameplay_active(Res<engine::ConsoleState> console) {
-    return !console->is_open;
+  return !console->is_open;
 }
 
 // Move the player using WSAD relative to the isometric view direction
@@ -122,9 +122,7 @@ inline void spawn_ground(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
   auto plane_mat = materials->add(StandardMaterial::from_texture(
       textures->add(gl::load_texture("res/textures/brick.png"))));
 
-  cmd.spawn(Mesh3d{plane_h},
-            MeshMaterial3d{plane_mat},
-            Transform{});
+  cmd.spawn(Mesh3d{plane_h}, MeshMaterial3d{plane_mat}, Transform{});
 }
 
 inline void spawn_player(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
@@ -152,7 +150,10 @@ inline void scene_plugin(App &app) {
   app.add_systems(Startup, spawn_ground);
   app.add_systems(Startup, spawn_player);
 
-  app.add_systems(Update, group(player_movement_system, update_isometric_camera_target_system).run_if(is_gameplay_active));
+  app.add_systems(Update, group(player_movement_system,
+                                update_isometric_camera_target_system)
+                              .run_if(is_gameplay_active));
   app.add_systems(Update, isometric_camera_system);
-  app.add_systems(RenderPassSet::Cleanup, group(engine::ConsoleRenderSystem).before(RenderPassSystems::Frame::end_frame));
+  app.add_systems(RenderPassSet::Cleanup,
+                  group(engine::ConsoleRenderSystem).before(FramePass::end));
 }
