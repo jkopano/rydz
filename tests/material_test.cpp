@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "rydz_graphics/material/material3d.hpp"
+#include "rydz_graphics/material/postprocess_material.hpp"
 
 namespace {
 
@@ -18,7 +19,13 @@ struct DuplicateSlotMaterial
 
 struct ReservedUniformMaterial : ecs::MaterialTrait<ecs::HasCamera> {
   void bind(ecs::MaterialBuilder &builder) const {
-    builder.uniform("u_camera_pos", ecs::Uniform{1.0f});
+    builder.uniform("cameraPos", ecs::Uniform{1.0f});
+  }
+};
+
+struct TemporaryUniformNameMaterial : ecs::MaterialTrait<> {
+  void bind(ecs::MaterialBuilder &builder) const {
+    builder.uniform(std::string{"u_temporary_name"}, ecs::Uniform{2.0f});
   }
 };
 
@@ -32,8 +39,7 @@ TEST(MaterialTest, TraitMaterialExpandsDependenciesAndCanonicalizesSlots) {
             std::type_index(typeid(ecs::HasCamera)));
   EXPECT_LE(material.compiled.slots[1].debug_name,
             material.compiled.slots[2].debug_name);
-  EXPECT_EQ(material.compiled.slots[1].type,
-            std::type_index(typeid(HasWind)));
+  EXPECT_EQ(material.compiled.slots[1].type, std::type_index(typeid(HasWind)));
   EXPECT_EQ(material.compiled.slots[2].type,
             std::type_index(typeid(ecs::HasPBR)));
   EXPECT_EQ(material.compiled.shader.vertex_path, "vertex.glsl");
@@ -54,4 +60,22 @@ TEST(MaterialTest, TraitMaterialDeduplicatesExpandedSlots) {
 TEST(MaterialTest, ReservedUniformFailsCompilation) {
   EXPECT_THROW((void)ecs::Material{ReservedUniformMaterial{}},
                std::runtime_error);
+}
+
+TEST(MaterialTest, UniformNamesAreOwnedAfterCompilation) {
+  ecs::Material material = TemporaryUniformNameMaterial{};
+
+  auto it = material.compiled.uniforms.find("u_temporary_name");
+  ASSERT_NE(it, material.compiled.uniforms.end());
+  EXPECT_EQ(it->second, ecs::Uniform{2.0f});
+}
+
+TEST(MaterialTest, PostProcessUniformNamesAreOwned) {
+  ecs::PostProcessDescriptor descriptor;
+  descriptor._uniforms.insert_or_assign(std::string{"u_temporary_post"},
+                                        ecs::Uniform{3.0f});
+
+  auto it = descriptor._uniforms.find("u_temporary_post");
+  ASSERT_NE(it, descriptor._uniforms.end());
+  EXPECT_EQ(it->second, ecs::Uniform{3.0f});
 }

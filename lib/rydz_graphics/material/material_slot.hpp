@@ -3,6 +3,7 @@
 #include "hash.hpp"
 #include "rydz_ecs/helpers.hpp"
 #include "rydz_graphics/gl/shader.hpp"
+#include "rydz_graphics/shader_bindings.hpp"
 #include <algorithm>
 #include <concepts>
 #include <optional>
@@ -20,7 +21,7 @@
 
 namespace ecs {
 
-using UniformName = std::string_view;
+using UniformName = std::string;
 
 struct HasCamera {};
 
@@ -29,7 +30,7 @@ struct HasPBR {
 };
 
 struct MaterialSlotRequirement {
-  std::type_index type = typeid(void);
+  std::type_index type{typeid(void)};
   std::string debug_name;
 
   bool operator==(const MaterialSlotRequirement &o) const {
@@ -41,13 +42,19 @@ namespace detail {
 
 inline bool is_reserved_uniform_name(std::string_view name) {
   static const std::unordered_set<std::string_view> reserved = {
-      "u_alpha_cutoff",        "u_use_instancing",
-      "u_camera_pos",          "matView",
-      "u_dir_light_direction", "u_dir_light_intensity",
-      "u_dir_light_color",     "u_has_directional",
-      "u_cluster_dimensions",  "u_cluster_screen_size",
-      "u_cluster_near_far",    "u_cluster_max_lights",
-      "u_is_orthographic",     "u_render_method",
+      map_uniform_binding(StandardMaterialUniform::AlphaCutoff),
+      map_uniform_binding(StandardMaterialUniform::RenderMethod),
+      map_uniform_binding(CameraUniform::Position),
+      map_uniform_binding(CameraUniform::ViewMatrix),
+      map_uniform_binding(PbrLightingUniform::DirectionalDirection),
+      map_uniform_binding(PbrLightingUniform::DirectionalIntensity),
+      map_uniform_binding(PbrLightingUniform::DirectionalColor),
+      map_uniform_binding(PbrLightingUniform::HasDirectional),
+      map_uniform_binding(PbrLightingUniform::ClusterDimensions),
+      map_uniform_binding(PbrLightingUniform::ClusterScreenSize),
+      map_uniform_binding(PbrLightingUniform::ClusterNearFar),
+      map_uniform_binding(PbrLightingUniform::ClusterMaxLights),
+      map_uniform_binding(PbrLightingUniform::IsOrthographic),
   };
   return reserved.contains(name);
 }
@@ -59,7 +66,7 @@ inline void validate_authored_uniforms(
     if (is_reserved_uniform_name(name)) {
       throw std::runtime_error("Material '" + material_type_name +
                                "' writes reserved uniform '" +
-                               std::string(name) + "'");
+                               std::string{name} + "'");
     }
   }
 }
@@ -82,10 +89,10 @@ struct SlotGraphNode {
 inline SlotGraphNode &find_or_add_slot_node(std::vector<SlotGraphNode> &nodes,
                                             std::type_index type,
                                             std::string debug_name) {
-  auto it = std::find_if(nodes.begin(), nodes.end(),
-                         [&](const auto &node) { return node.type == type; });
-  if (it != nodes.end()) {
-    return *it;
+  auto iter = std::ranges::find_if(
+      nodes, [&](const auto &node) { return node.type == type; });
+  if (iter != nodes.end()) {
+    return *iter;
   }
 
   nodes.push_back(SlotGraphNode{
@@ -98,12 +105,12 @@ inline SlotGraphNode &find_or_add_slot_node(std::vector<SlotGraphNode> &nodes,
 
 inline const SlotGraphNode &
 find_slot_node(const std::vector<SlotGraphNode> &nodes, std::type_index type) {
-  auto it = std::find_if(nodes.begin(), nodes.end(),
-                         [&](const auto &node) { return node.type == type; });
-  if (it == nodes.end()) {
+  auto iter = std::ranges::find_if(
+      nodes, [&](const auto &node) { return node.type == type; });
+  if (iter == nodes.end()) {
     throw std::logic_error("Material slot graph is missing a dependency node");
   }
-  return *it;
+  return *iter;
 }
 
 template <typename Tuple, std::size_t... I>
@@ -115,8 +122,7 @@ template <typename Slot>
 void collect_slot_graph(std::vector<SlotGraphNode> &nodes,
                         std::vector<std::type_index> &visiting) {
   const std::type_index slot_type = typeid(Slot);
-  if (std::find(visiting.begin(), visiting.end(), slot_type) !=
-      visiting.end()) {
+  if (std::ranges::find(visiting, slot_type) != visiting.end()) {
     throw std::runtime_error("Slot dependency cycle detected at '" +
                              demangle(typeid(Slot).name()) + "'");
   }
@@ -139,7 +145,7 @@ void collect_slot_graph(std::vector<SlotGraphNode> &nodes,
     std::vector<std::type_index> deps;
     deps.reserve(std::tuple_size_v<DependsTuple>);
     [&]<std::size_t... I>(std::index_sequence<I...>) {
-      (deps.push_back(typeid(std::tuple_element_t<I, DependsTuple>)), ...);
+      (deps.emplace_back(typeid(std::tuple_element_t<I, DependsTuple>)), ...);
     }(std::make_index_sequence<std::tuple_size_v<DependsTuple>>{});
 
     std::sort(deps.begin(), deps.end(), [&](const auto &lhs, const auto &rhs) {
@@ -182,8 +188,9 @@ topologically_sorted_slots(const std::vector<SlotGraphNode> &nodes) {
   std::set<std::type_index, decltype(cmp)> ready(cmp);
 
   for (const auto &node : nodes) {
-    if (node.deps.empty())
+    if (node.deps.empty()) {
       ready.insert(node.type);
+    }
   }
 
   std::vector<MaterialSlotRequirement> result;

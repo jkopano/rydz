@@ -126,32 +126,37 @@ inline SceneMaterial material_from_backend_material(
   StandardMaterial material_value;
 
   if (material.maps != nullptr) {
-    material_value.base_color = material.maps[gl::MATERIAL_MAP_DIFFUSE].color;
+    auto *maps = material.maps;
+    material_value.base_color =
+        maps[material_map_index(MaterialMap::Albedo)].color;
     material_value.emissive_color =
-        material.maps[gl::MATERIAL_MAP_EMISSION].color;
+        maps[material_map_index(MaterialMap::Emission)].color;
     material_value.texture = transfer_texture(
-        textures, material.maps[gl::MATERIAL_MAP_DIFFUSE].texture,
+        textures, maps[material_map_index(MaterialMap::Albedo)].texture,
         texture_cache);
     material_value.normal_map = transfer_texture(
-        textures, material.maps[gl::MATERIAL_MAP_NORMAL].texture,
+        textures, maps[material_map_index(MaterialMap::Normal)].texture,
         texture_cache);
     material_value.metallic_map = transfer_texture(
-        textures, material.maps[gl::MATERIAL_MAP_METALNESS].texture,
+        textures, maps[material_map_index(MaterialMap::Metalness)].texture,
         texture_cache);
     material_value.roughness_map = transfer_texture(
-        textures, material.maps[gl::MATERIAL_MAP_ROUGHNESS].texture,
+        textures, maps[material_map_index(MaterialMap::Roughness)].texture,
         texture_cache);
     material_value.occlusion_map = transfer_texture(
-        textures, material.maps[gl::MATERIAL_MAP_OCCLUSION].texture,
+        textures, maps[material_map_index(MaterialMap::Occlusion)].texture,
         texture_cache);
     material_value.emissive_map = transfer_texture(
-        textures, material.maps[gl::MATERIAL_MAP_EMISSION].texture,
+        textures, maps[material_map_index(MaterialMap::Emission)].texture,
         texture_cache);
-    material_value.metallic = material.maps[gl::MATERIAL_MAP_METALNESS].value;
-    material_value.roughness = material.maps[gl::MATERIAL_MAP_ROUGHNESS].value;
-    material_value.normal_scale = material.maps[gl::MATERIAL_MAP_NORMAL].value;
+    material_value.metallic =
+        maps[material_map_index(MaterialMap::Metalness)].value;
+    material_value.roughness =
+        maps[material_map_index(MaterialMap::Roughness)].value;
+    material_value.normal_scale =
+        maps[material_map_index(MaterialMap::Normal)].value;
     material_value.occlusion_strength =
-        material.maps[gl::MATERIAL_MAP_OCCLUSION].value;
+        maps[material_map_index(MaterialMap::Occlusion)].value;
   }
 
   CompiledMaterial compiled = Material{material_value}.compiled;

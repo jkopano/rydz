@@ -9,6 +9,7 @@
 #include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/gl/shader.hpp"
 #include "rydz_graphics/render_config.hpp"
+#include "rydz_graphics/shader_bindings.hpp"
 #include <algorithm>
 #include <concepts>
 #include <optional>
@@ -34,7 +35,7 @@ using gl::Uniform;
 using gl::UniformType;
 
 struct MaterialMapBinding {
-  gl::MaterialMapIndex map_type = gl::MATERIAL_MAP_DIFFUSE;
+  MaterialMap map_type = MaterialMap::Albedo;
   Handle<Texture> texture{};
   Color color = kWhite;
   f32 value = 0.0f;
@@ -50,7 +51,7 @@ struct MaterialMapBinding {
            has_value == o.has_value;
   }
 
-  static MaterialMapBinding texture_binding(gl::MaterialMapIndex map_type,
+  static MaterialMapBinding texture_binding(MaterialMap map_type,
                                             Handle<Texture> texture) {
     return MaterialMapBinding{
         .map_type = map_type,
@@ -59,8 +60,7 @@ struct MaterialMapBinding {
     };
   }
 
-  static MaterialMapBinding color_binding(gl::MaterialMapIndex map_type,
-                                          Color color) {
+  static MaterialMapBinding color_binding(MaterialMap map_type, Color color) {
     return MaterialMapBinding{
         .map_type = map_type,
         .color = color,
@@ -68,8 +68,7 @@ struct MaterialMapBinding {
     };
   }
 
-  static MaterialMapBinding value_binding(gl::MaterialMapIndex map_type,
-                                          f32 value) {
+  static MaterialMapBinding value_binding(MaterialMap map_type, f32 value) {
     return MaterialMapBinding{
         .map_type = map_type,
         .value = value,
@@ -85,7 +84,6 @@ enum class RenderMethod {
 };
 
 using ShaderRef = std::string_view;
-using UniformName = std::string_view;
 
 struct CompiledMaterial {
   ShaderSpec shader;
@@ -106,11 +104,21 @@ struct CompiledMaterial {
   }
 
   void set_uniform(std::string_view name, Uniform u) {
-    uniforms.insert_or_assign(name, std::move(u));
+    uniforms.insert_or_assign(std::string{name}, std::move(u));
   }
 
-  bool has_uniform_named(std::string_view name) {
-    return this->uniforms.contains(name);
+  template <ShaderUniformBinding Binding>
+  void set_uniform(Binding binding, Uniform u) {
+    set_uniform(map_uniform_binding(binding), std::move(u));
+  }
+
+  bool has_uniform_named(std::string_view name) const {
+    return this->uniforms.contains(std::string{name});
+  }
+
+  template <ShaderUniformBinding Binding>
+  bool has_uniform(Binding binding) const {
+    return has_uniform_named(map_uniform_binding(binding));
   }
 
   void apply_cull_mode() const {
@@ -124,43 +132,47 @@ struct CompiledMaterial {
   }
 
   void apply(ShaderProgram &shader) const {
-    shader.set("u_alpha_cutoff", this->alpha_cutoff);
-    shader.set("u_render_method", static_cast<int>(this->render_method));
-    shader.set("u_use_instancing", 0);
+    shader.set(StandardMaterialUniform::AlphaCutoff, this->alpha_cutoff);
+    shader.set(StandardMaterialUniform::RenderMethod,
+               static_cast<int>(this->render_method));
     for (const auto &[name, uniform] : this->uniforms) {
-      shader.apply(std::string(name), uniform);
+      shader.apply(name, uniform);
     }
   }
 };
 
 class MaterialBuilder {
   std::vector<MaterialMapBinding> maps_;
-  std::unordered_map<std::string_view, Uniform> uniforms_;
+  std::unordered_map<UniformName, Uniform> uniforms_;
 
 public:
   MaterialBuilder &uniform(std::string_view name, Uniform value) {
-    uniforms_.insert_or_assign(name, value);
+    uniforms_.insert_or_assign(std::string{name}, std::move(value));
     return *this;
   }
 
-  MaterialBuilder &texture(gl::MaterialMapIndex map_type,
-                           Handle<Texture> texture) {
+  template <ShaderUniformBinding Binding>
+  MaterialBuilder &uniform(Binding binding, Uniform value) {
+    return uniform(map_uniform_binding(binding), std::move(value));
+  }
+
+  MaterialBuilder &texture(MaterialMap map_type, Handle<Texture> texture) {
     maps_.push_back(MaterialMapBinding::texture_binding(map_type, texture));
     return *this;
   }
 
-  MaterialBuilder &color(gl::MaterialMapIndex map_type, Color color_value) {
+  MaterialBuilder &color(MaterialMap map_type, Color color_value) {
     maps_.push_back(MaterialMapBinding::color_binding(map_type, color_value));
     return *this;
   }
 
   const std::vector<MaterialMapBinding> &maps() const { return maps_; }
-  const std::unordered_map<std::string_view, Uniform> &uniforms() const {
+  const std::unordered_map<UniformName, Uniform> &uniforms() const {
     return uniforms_;
   }
 
   std::vector<MaterialMapBinding> take_maps() { return std::move(maps_); }
-  std::unordered_map<std::string_view, Uniform> take_uniforms() {
+  std::unordered_map<UniformName, Uniform> take_uniforms() {
     return std::move(uniforms_);
   }
 };
@@ -170,10 +182,12 @@ template <typename... SlotTs> struct MaterialTrait {
   static ShaderRef vertex_shader() { return "res/shaders/basic.vert"; }
   static ShaderRef fragment_shader() { return "res/shaders/basic.frag"; }
 
-  RenderMethod render_method() const { return RenderMethod::Opaque; }
-  bool enable_shadows() const { return true; }
-  bool double_sided() const { return false; }
-  float alpha_cutoff() const { return 0.1f; }
+  [[nodiscard]] RenderMethod render_method() const {
+    return RenderMethod::Opaque;
+  }
+  [[nodiscard]] bool enable_shadows() const { return true; }
+  [[nodiscard]] bool double_sided() const { return false; }
+  [[nodiscard]] float alpha_cutoff() const { return 0.1f; }
   void bind(MaterialBuilder &) const {}
 
 private:
@@ -202,7 +216,7 @@ namespace detail {
 inline std::optional<Uniform>
 remove_uniform_by_name(std::unordered_map<UniformName, Uniform> &uniforms,
                        std::string_view name) {
-  auto it = uniforms.find(name);
+  auto it = uniforms.find(std::string{name});
   if (it == uniforms.end()) {
     return std::nullopt;
   }
@@ -220,7 +234,7 @@ inline bool compiled_material_has_slot(const CompiledMaterial &compiled,
 
 inline const MaterialMapBinding *
 find_last_map_binding(const CompiledMaterial &compiled,
-                      gl::MaterialMapIndex map_type, auto predicate) {
+                      MaterialMap map_type, auto predicate) {
   for (auto it = compiled.maps.rbegin(); it != compiled.maps.rend(); ++it) {
     if (it->map_type == map_type && predicate(*it)) {
       return &*it;
@@ -230,69 +244,70 @@ find_last_map_binding(const CompiledMaterial &compiled,
 }
 
 inline void normalize_pbr_compiled_material(CompiledMaterial &compiled) {
-  if (!compiled.has_uniform_named("u_metallic_factor")) {
+  if (!compiled.has_uniform(MaterialMap::Metalness)) {
     float metallic = 0.0f;
     if (const auto *binding = find_last_map_binding(
-            compiled, gl::MATERIAL_MAP_METALNESS,
+            compiled, MaterialMap::Metalness,
             [](const auto &item) { return item.has_value; })) {
       metallic = binding->value;
     }
-    compiled.set_uniform("u_metallic_factor", Uniform{metallic});
+    compiled.set_uniform(MaterialMap::Metalness, Uniform{metallic});
   }
 
-  if (!compiled.has_uniform_named("u_roughness_factor")) {
+  if (!compiled.has_uniform(MaterialMap::Roughness)) {
     float roughness = 0.0f;
     const auto *value_binding =
-        find_last_map_binding(compiled, gl::MATERIAL_MAP_ROUGHNESS,
+        find_last_map_binding(compiled, MaterialMap::Roughness,
                               [](const auto &item) { return item.has_value; });
     const auto *texture_binding = find_last_map_binding(
-        compiled, gl::MATERIAL_MAP_ROUGHNESS,
+        compiled, MaterialMap::Roughness,
         [](const auto &item) { return item.has_texture; });
     if (value_binding) {
       roughness = value_binding->value;
     } else if (!texture_binding || !texture_binding->texture.is_valid()) {
       roughness = 1.0f;
     }
-    compiled.set_uniform("u_roughness_factor", Uniform{roughness});
+    compiled.set_uniform(MaterialMap::Roughness, Uniform{roughness});
   }
 
-  if (!compiled.has_uniform_named("u_normal_factor")) {
+  if (!compiled.has_uniform(MaterialMap::Normal)) {
     float normal = 1.0f;
     if (const auto *binding = find_last_map_binding(
-            compiled, gl::MATERIAL_MAP_NORMAL,
+            compiled, MaterialMap::Normal,
             [](const auto &item) { return item.has_value; })) {
       normal = binding->value > 0.0f ? binding->value : 1.0f;
     }
-    compiled.set_uniform("u_normal_factor", Uniform{normal});
+    compiled.set_uniform(MaterialMap::Normal, Uniform{normal});
   }
 
-  if (!compiled.has_uniform_named("u_occlusion_factor")) {
+  if (!compiled.has_uniform(MaterialMap::Occlusion)) {
     float occlusion = 1.0f;
     if (const auto *binding = find_last_map_binding(
-            compiled, gl::MATERIAL_MAP_OCCLUSION,
+            compiled, MaterialMap::Occlusion,
             [](const auto &item) { return item.has_value; })) {
       occlusion = binding->value > 0.0f ? binding->value : 1.0f;
     }
-    compiled.set_uniform("u_occlusion_factor", Uniform{occlusion});
+    compiled.set_uniform(MaterialMap::Occlusion, Uniform{occlusion});
   }
 
-  if (!compiled.has_uniform_named("u_emissive_factor")) {
+  if (!compiled.has_uniform(MaterialMap::Emission)) {
     float ex = 0.0f;
     float ey = 0.0f;
     float ez = 0.0f;
     if (const auto *binding = find_last_map_binding(
-            compiled, gl::MATERIAL_MAP_EMISSION,
+            compiled, MaterialMap::Emission,
             [](const auto &item) { return item.has_color; })) {
       auto emissive = color_to_vec3(binding->color);
       ex = emissive.x;
       ey = emissive.y;
       ez = emissive.z;
     }
-    compiled.set_uniform("u_emissive_factor", Uniform{ex, ey, ez});
+    compiled.set_uniform(MaterialMap::Emission, Uniform{ex, ey, ez});
   }
 
-  if (!compiled.has_uniform_named("u_color")) {
-    compiled.set_uniform("u_color", Uniform{1.0f, 1.0f, 1.0f, 0.0f});
+  if (!compiled.has_uniform(MaterialMap::Albedo)) {
+    compiled.set_uniform(MaterialMap::Albedo,
+                         Uniform{1.0f, 1.0f, 1.0f, 0.0f});
   }
 }
 
@@ -345,7 +360,8 @@ namespace std {
 template <> struct hash<ecs::MaterialMapBinding> {
   size_t operator()(const ecs::MaterialMapBinding &k) const noexcept {
     size_t seed = 0;
-    rydz::hash_combine(seed, std::hash<int>{}(k.map_type));
+    rydz::hash_combine(seed,
+                       std::hash<int>{}(ecs::material_map_index(k.map_type)));
     rydz::hash_combine(seed, std::hash<uint32_t>{}(k.texture.id));
     rydz::hash_combine(seed, std::hash<unsigned char>{}(k.color.r));
     rydz::hash_combine(seed, std::hash<unsigned char>{}(k.color.g));
@@ -375,7 +391,7 @@ template <> struct hash<ecs::CompiledMaterial> {
       rydz::hash_combine(seed, std::hash<ecs::MaterialMapBinding>{}(map));
     }
     for (const auto &[name, uniform] : k.uniforms) {
-      rydz::hash_combine(seed, std::hash<std::string_view>{}(name));
+      rydz::hash_combine(seed, std::hash<std::string>{}(name));
       rydz::hash_combine(seed, std::hash<ecs::Uniform>{}(uniform));
     }
     return seed;

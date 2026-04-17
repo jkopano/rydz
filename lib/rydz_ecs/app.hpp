@@ -79,26 +79,52 @@ public:
     world_.insert_resource(Time{});
   }
 
-  template <typename F> App &add_systems(ScheduleLabel label, F &&func) {
+  template <typename F>
+    requires SystemInput<F>
+  App &add_systems(ScheduleLabel label, F &&func) {
     schedules_.entry(label).add_system_fn(std::forward<F>(func));
+    return *this;
+  }
+
+  template <typename F>
+    requires(!SystemInput<F>)
+  App &add_systems(ScheduleLabel /*label*/, F && /*func*/) {
+    detail::static_assert_valid_system_callable<F>();
     return *this;
   }
 
   template <typename E, typename F>
     requires(std::is_enum_v<bare_t<E>> &&
-             !std::same_as<bare_t<E>, ScheduleLabel>)
+             !std::same_as<bare_t<E>, ScheduleLabel> && SystemInput<F>)
   App &add_systems(E set_id, F &&func) {
     return add_systems(set(set_id), std::forward<F>(func));
   }
 
+  template <typename E, typename F>
+    requires(std::is_enum_v<bare_t<E>> &&
+             !std::same_as<bare_t<E>, ScheduleLabel> && !SystemInput<F>)
+  App &add_systems(E /*set_id*/, F && /*func*/) {
+    detail::static_assert_valid_system_callable<F>();
+    return *this;
+  }
+
   template <typename S, typename F>
-    requires(detail::is_set_marker_v<S>)
+    requires(detail::is_set_marker_v<S> && SystemInput<F>)
   App &add_systems(S &&, F &&func) {
     return add_systems(set<bare_t<S>>(), std::forward<F>(func));
   }
 
   template <typename S, typename F>
-    requires(std::same_as<bare_t<S>, SetId> || std::same_as<bare_t<S>, SetList>)
+    requires(detail::is_set_marker_v<S> && !SystemInput<F>)
+  App &add_systems(S &&, F && /*func*/) {
+    detail::static_assert_valid_system_callable<F>();
+    return *this;
+  }
+
+  template <typename S, typename F>
+    requires((std::same_as<bare_t<S>, SetId> ||
+              std::same_as<bare_t<S>, SetList>) &&
+             SystemInput<F>)
   App &add_systems(S &&selector, F &&func) {
     auto sets = SetList{detail::to_set_ids(std::forward<S>(selector))};
     detail::ensure_unique_sets(sets.ids, "add_systems(...)");
@@ -111,6 +137,15 @@ public:
 
     pending_set_systems_.push_back(std::make_unique<PendingSetSystems<F>>(
         std::move(sets), std::forward<F>(func)));
+    return *this;
+  }
+
+  template <typename S, typename F>
+    requires((std::same_as<bare_t<S>, SetId> ||
+              std::same_as<bare_t<S>, SetList>) &&
+             !SystemInput<F>)
+  App &add_systems(S && /*selector*/, F && /*func*/) {
+    detail::static_assert_valid_system_callable<F>();
     return *this;
   }
 
@@ -143,6 +178,7 @@ private:
 
 public:
   template <OnEnterLabel Label, typename F>
+    requires SystemInput<F>
   App &add_systems(Label &&label, F &&func) {
     using S = bare_t<decltype(label.value)>;
     get_or_init_state_schedules<S>().on_enter[label.value].add_system_fn(
@@ -150,7 +186,15 @@ public:
     return *this;
   }
 
+  template <OnEnterLabel Label, typename F>
+    requires(!SystemInput<F>)
+  App &add_systems(Label && /*label*/, F && /*func*/) {
+    detail::static_assert_valid_system_callable<F>();
+    return *this;
+  }
+
   template <OnExitLabel Label, typename F>
+    requires SystemInput<F>
   App &add_systems(Label &&label, F &&func) {
     using S = bare_t<decltype(label.value)>;
     get_or_init_state_schedules<S>().on_exit[label.value].add_system_fn(
@@ -158,11 +202,26 @@ public:
     return *this;
   }
 
+  template <OnExitLabel Label, typename F>
+    requires(!SystemInput<F>)
+  App &add_systems(Label && /*label*/, F && /*func*/) {
+    detail::static_assert_valid_system_callable<F>();
+    return *this;
+  }
+
   template <OnTransitionLabel Label, typename F>
+    requires SystemInput<F>
   App &add_systems(Label &&, F &&func) {
     using S = typename bare_t<Label>::state_type;
     get_or_init_state_schedules<S>().on_transition.add_system_fn(
         std::forward<F>(func));
+    return *this;
+  }
+
+  template <OnTransitionLabel Label, typename F>
+    requires(!SystemInput<F>)
+  App &add_systems(Label &&, F && /*func*/) {
+    detail::static_assert_valid_system_callable<F>();
     return *this;
   }
 

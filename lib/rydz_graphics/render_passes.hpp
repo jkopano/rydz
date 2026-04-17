@@ -240,7 +240,7 @@ private:
     shader.set("u_time", time.elapsed_seconds);
     shader.set("u_enabled", effect.enabled ? 1 : 0);
     for (const auto &[name, uniform] : effect._uniforms) {
-      shader.apply(std::string(name), uniform);
+      shader.apply(name, uniform);
     }
   }
 
@@ -257,8 +257,7 @@ private:
     ShaderProgram &shader =
         resolve_shader(marker, shader_cache, view.postprocess.shader);
     apply_postprocess_uniforms(shader, view.postprocess, time);
-    shader.set_texture(shader.raw().locs[gl::SHADER_LOC_MAP_DIFFUSE],
-                       source_texture);
+    shader.set_texture(MaterialMap::Albedo, source_texture);
 
     shader.with_bound([&] { draw_world_target_to_screen(source_texture); });
   }

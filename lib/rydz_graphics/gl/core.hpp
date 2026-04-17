@@ -3,6 +3,7 @@
 #include "math.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/params.hpp"
+#include "rydz_graphics/shader_bindings.hpp"
 #include "types.hpp"
 #include <bit>
 #include <external/glad.h>
@@ -19,44 +20,24 @@ using Vec3 = rl::Vector3;
 using Vec4 = rl::Vector4;
 using Matrix = rl::Matrix;
 using Rectangle = rl::rlRectangle;
-using MaterialMapIndex = ::MaterialMapIndex;
 using BoneInfo = ::BoneInfo;
 using ModelAnimPose = ::ModelAnimPose;
 using ModelSkeleton = ::ModelSkeleton;
 using AudioStream = ::AudioStream;
 
-inline constexpr int SHADER_UNIFORM_FLOAT = ::SHADER_UNIFORM_FLOAT;
-inline constexpr int SHADER_UNIFORM_VEC2 = ::SHADER_UNIFORM_VEC2;
-inline constexpr int SHADER_UNIFORM_VEC3 = ::SHADER_UNIFORM_VEC3;
-inline constexpr int SHADER_UNIFORM_VEC4 = ::SHADER_UNIFORM_VEC4;
-inline constexpr int SHADER_UNIFORM_INT = ::SHADER_UNIFORM_INT;
-inline constexpr int SHADER_UNIFORM_IVEC2 = ::SHADER_UNIFORM_IVEC2;
-inline constexpr int SHADER_UNIFORM_IVEC3 = ::SHADER_UNIFORM_IVEC3;
-inline constexpr int SHADER_UNIFORM_IVEC4 = ::SHADER_UNIFORM_IVEC4;
-
-inline constexpr int SHADER_LOC_MAP_DIFFUSE = ::SHADER_LOC_MAP_DIFFUSE;
-inline constexpr int SHADER_LOC_MAP_ROUGHNESS = ::SHADER_LOC_MAP_ROUGHNESS;
-inline constexpr int SHADER_LOC_MAP_OCCLUSION = ::SHADER_LOC_MAP_OCCLUSION;
-inline constexpr int SHADER_LOC_MAP_EMISSION = ::SHADER_LOC_MAP_EMISSION;
-inline constexpr int SHADER_LOC_VERTEX_INSTANCETRANSFORM =
-    ::SHADER_LOC_VERTEX_INSTANCETRANSFORM;
-inline constexpr int SHADER_LOC_MATRIX_MODEL = ::SHADER_LOC_MATRIX_MODEL;
+inline constexpr int SHADER_UNIFORM_FLOAT = RL_SHADER_UNIFORM_FLOAT;
+inline constexpr int SHADER_UNIFORM_VEC2 = RL_SHADER_UNIFORM_VEC2;
+inline constexpr int SHADER_UNIFORM_VEC3 = RL_SHADER_UNIFORM_VEC3;
+inline constexpr int SHADER_UNIFORM_VEC4 = RL_SHADER_UNIFORM_VEC4;
+inline constexpr int SHADER_UNIFORM_INT = RL_SHADER_UNIFORM_INT;
+inline constexpr int SHADER_UNIFORM_IVEC2 = RL_SHADER_UNIFORM_IVEC2;
+inline constexpr int SHADER_UNIFORM_IVEC3 = RL_SHADER_UNIFORM_IVEC3;
+inline constexpr int SHADER_UNIFORM_IVEC4 = RL_SHADER_UNIFORM_IVEC4;
 
 inline constexpr int PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 =
     ::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 inline constexpr int TEXTURE_FILTER_BILINEAR = ::TEXTURE_FILTER_BILINEAR;
 inline constexpr int LOG_WARNING = ::LOG_WARNING;
-
-inline constexpr MaterialMapIndex MATERIAL_MAP_DIFFUSE = ::MATERIAL_MAP_DIFFUSE;
-inline constexpr MaterialMapIndex MATERIAL_MAP_NORMAL = ::MATERIAL_MAP_NORMAL;
-inline constexpr MaterialMapIndex MATERIAL_MAP_METALNESS =
-    ::MATERIAL_MAP_METALNESS;
-inline constexpr MaterialMapIndex MATERIAL_MAP_ROUGHNESS =
-    ::MATERIAL_MAP_ROUGHNESS;
-inline constexpr MaterialMapIndex MATERIAL_MAP_OCCLUSION =
-    ::MATERIAL_MAP_OCCLUSION;
-inline constexpr MaterialMapIndex MATERIAL_MAP_EMISSION =
-    ::MATERIAL_MAP_EMISSION;
 
 inline unsigned int default_shader_id() { return rl::rlGetShaderIdDefault(); }
 inline int *default_shader_locs() { return rl::rlGetShaderLocsDefault(); }
@@ -491,11 +472,11 @@ struct Shader {
   [[nodiscard]] bool has_locations() const { return locs != nullptr; }
 
   i32 uniform_location(const char *name) const {
-    return rl::GetShaderLocation(*this, name);
+    return rl::rlGetLocationUniform(id, name);
   }
 
   i32 attribute_location(const char *name) const {
-    return rl::GetShaderLocationAttrib(*this, name);
+    return rl::rlGetLocationAttrib(id, name);
   }
 
   static Shader get_default() {
@@ -594,8 +575,6 @@ struct Mesh {
                      i32 offset) const {
     rl::UpdateMeshBuffer(*this, index, data, data_size, offset);
   }
-  void draw_instanced(Material &material, const Matrix *transforms,
-                      i32 count) const;
 };
 
 struct Material {
@@ -623,16 +602,16 @@ struct Material {
     static bool init = false;
     if (!init) {
       fallback.shader = Shader::get_default();
-      static std::vector<gl::MaterialMap> maps(12);
+      static std::vector<gl::MaterialMap> maps(ecs::kMaterialMapCount);
       fallback.maps = maps.data();
-      fallback.maps[gl::MATERIAL_MAP_DIFFUSE].texture.id =
-          gl::default_texture_id();
-      fallback.maps[gl::MATERIAL_MAP_DIFFUSE].texture.width = 1;
-      fallback.maps[gl::MATERIAL_MAP_DIFFUSE].texture.height = 1;
-      fallback.maps[gl::MATERIAL_MAP_DIFFUSE].texture.mipmaps = 1;
-      fallback.maps[gl::MATERIAL_MAP_DIFFUSE].texture.format =
+      constexpr int albedo = ecs::material_map_index(ecs::MaterialMap::Albedo);
+      fallback.maps[albedo].texture.id = gl::default_texture_id();
+      fallback.maps[albedo].texture.width = 1;
+      fallback.maps[albedo].texture.height = 1;
+      fallback.maps[albedo].texture.mipmaps = 1;
+      fallback.maps[albedo].texture.format =
           gl::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
-      fallback.maps[gl::MATERIAL_MAP_DIFFUSE].color = gl::kWhite;
+      fallback.maps[albedo].color = gl::kWhite;
       init = true;
     }
     return fallback;
@@ -704,11 +683,6 @@ inline Vec3 color_to_vec3(Color color) {
 
 inline Texture Image::load_texture() const {
   return rl::LoadTextureFromImage(*this);
-}
-
-inline void Mesh::draw_instanced(Material &material, const Matrix *transforms,
-                                 i32 count) const {
-  rl::DrawMeshInstanced(*this, material, transforms, count);
 }
 
 } // namespace gl

@@ -313,13 +313,14 @@ inline std::unique_ptr<ICondition> run_once() {
 }
 
 template <typename F, typename Cond>
+  requires SystemCallable<F>
 std::unique_ptr<ISystem> make_system_run_if(F &&func, Cond &&cond) {
   return std::make_unique<ConditionedSystem>(
       make_system(std::forward<F>(func)),
       make_condition(std::forward<Cond>(cond)));
 }
 
-template <typename F> class SystemDescriptor {
+template <SystemCallable F> class SystemDescriptor {
   F func_;
   std::unique_ptr<ICondition> condition_;
   SystemOrdering ordering_;
@@ -365,6 +366,13 @@ struct is_system_descriptor<SystemDescriptor<F>> : std::true_type {};
 template <typename T>
 inline constexpr bool is_system_descriptor_v = is_system_descriptor<T>::value;
 
+namespace detail {
+
+template <typename F>
+struct is_system_input_descriptor<SystemDescriptor<F>> : std::true_type {};
+
+} // namespace detail
+
 struct GroupSystemEntry {
   std::unique_ptr<ISystem> system;
   SystemOrdering ordering;
@@ -377,7 +385,9 @@ class SystemGroupDescriptor {
   bool chained_ = false;
 
 public:
-  template <typename... Fs> explicit SystemGroupDescriptor(Fs &&...funcs) {
+  template <typename... Fs>
+    requires(SystemCallable<Fs> && ...)
+  explicit SystemGroupDescriptor(Fs &&...funcs) {
     (systems_.push_back(make_system(std::forward<Fs>(funcs))), ...);
   }
 
@@ -444,11 +454,20 @@ template <typename T>
 inline constexpr bool is_system_group_descriptor_v =
     is_system_group_descriptor<T>::value;
 
-template <typename F> SystemDescriptor<decay_t<F>> group(F &&func) {
+namespace detail {
+
+template <>
+struct is_system_input_descriptor<SystemGroupDescriptor> : std::true_type {};
+
+} // namespace detail
+
+template <SystemCallable F> SystemDescriptor<decay_t<F>> group(F &&func) {
   return SystemDescriptor<decay_t<F>>(std::forward<F>(func));
 }
 
 template <typename F1, typename F2, typename... Fs>
+  requires(SystemCallable<F1> && SystemCallable<F2> &&
+           (SystemCallable<Fs> && ...))
 SystemGroupDescriptor group(F1 &&f1, F2 &&f2, Fs &&...fs) {
   return SystemGroupDescriptor(std::forward<F1>(f1), std::forward<F2>(f2),
                                std::forward<Fs>(fs)...);

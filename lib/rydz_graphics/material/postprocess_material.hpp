@@ -2,6 +2,7 @@
 
 #include "rydz_graphics/gl/shader.hpp"
 #include <concepts>
+#include <string>
 #include <unordered_map>
 #include <utility>
 
@@ -12,7 +13,7 @@ using gl::Uniform;
 
 struct PostProcessDescriptor {
   ShaderSpec shader;
-  std::unordered_map<std::string_view, Uniform> _uniforms;
+  std::unordered_map<std::string, Uniform> _uniforms;
   bool enabled = true;
 
   bool operator==(const PostProcessDescriptor &o) const = default;

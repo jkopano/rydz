@@ -2,9 +2,13 @@
 
 #include "hash.hpp"
 #include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/shader_bindings.hpp"
 #include <array>
+#include <concepts>
 #include <functional>
+#include <span>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -76,15 +80,30 @@ struct Uniform {
     float_data[3] = w;
   }
 
-  explicit Uniform(int v) : float_data{} {
+  explicit Uniform(int v) : int_data{} {
     type = UniformType::Int;
     int_data[0] = v;
   }
 
-  Uniform(int x, int y) : float_data{} {
+  Uniform(int x, int y) : int_data{} {
     type = UniformType::IVec2;
     int_data[0] = x;
     int_data[1] = y;
+  }
+
+  Uniform(int x, int y, int z) : int_data{} {
+    type = UniformType::IVec3;
+    int_data[0] = x;
+    int_data[1] = y;
+    int_data[2] = z;
+  }
+
+  Uniform(int x, int y, int z, int w) : int_data{} {
+    type = UniformType::IVec4;
+    int_data[0] = x;
+    int_data[1] = y;
+    int_data[2] = z;
+    int_data[3] = w;
   }
 
   explicit Uniform(const std::array<float, 16> &mat)
@@ -162,99 +181,107 @@ public:
   Shader &raw() { return shader_; }
   const Shader &raw() const { return shader_; }
 
-  int uniform_location(const char *name) {
-    auto it = uniform_locations_.find(name);
-    if (it != uniform_locations_.end()) {
-      return it->second;
+  int uniform_location(const std::string_view name) {
+    std::string owned_name{name};
+    auto iter = uniform_locations_.find(owned_name);
+    if (iter != uniform_locations_.end()) {
+      return iter->second;
     }
 
-    const int location = rl::GetShaderLocation(shader_, name);
-    uniform_locations_.emplace(name, location);
+    const int location =
+        rl::rlGetLocationUniform(shader_.id, owned_name.c_str());
+    uniform_locations_.emplace(std::move(owned_name), location);
     return location;
   }
 
   int attribute_location(const char *name) {
-    auto it = attribute_locations_.find(name);
-    if (it != attribute_locations_.end()) {
-      return it->second;
+    auto iter = attribute_locations_.find(name);
+    if (iter != attribute_locations_.end()) {
+      return iter->second;
     }
 
-    const int location = rl::GetShaderLocationAttrib(shader_, name);
+    const int location = rl::rlGetLocationAttrib(shader_.id, name);
     attribute_locations_.emplace(name, location);
     return location;
   }
 
-  void set(const char *name, float value) {
+  void set(const std::string_view name, float value) {
     set_value(name, &value, SHADER_UNIFORM_FLOAT);
   }
 
-  void set(const char *name, int value) {
+  void set(const std::string_view name, int value) {
     set_value(name, &value, SHADER_UNIFORM_INT);
   }
 
-  void set(const char *name, const Vec2 &value) {
+  void set(const std::string_view name, const Vec2 &value) {
     set_value(name, &value, SHADER_UNIFORM_VEC2);
   }
 
-  void set(const char *name, const Vec3 &value) {
+  void set(const std::string_view name, const Vec3 &value) {
     set_value(name, &value, SHADER_UNIFORM_VEC3);
   }
 
-  void set(const char *name, const Vec4 &value) {
+  void set(const std::string_view name, const Vec4 &value) {
     set_value(name, &value, SHADER_UNIFORM_VEC4);
   }
 
-  void set(const char *name, const Matrix &value) {
+  void set(const std::string_view name, const std::array<int, 2> &vec) {
+    set_value(name, vec.data(), SHADER_UNIFORM_IVEC2);
+  }
+
+  void set(const std::string_view name, const std::array<int, 3> &vec) {
+    set_value(name, vec.data(), SHADER_UNIFORM_IVEC3);
+  }
+
+  void set(const std::string_view name, const std::array<int, 4> &vec) {
+    set_value(name, vec.data(), SHADER_UNIFORM_IVEC4);
+  }
+
+  void set(const std::string_view name, const Matrix &value) {
     const int location = uniform_location(name);
     if (location >= 0) {
-      rl::SetShaderValueMatrix(shader_, location, value);
+      rl::rlSetUniformMatrix(location, value);
     }
   }
 
-  void set(const char *name, const math::Mat4 &value) {
+  void set(const std::string_view name, const math::Mat4 &value) {
     set(name, math::to_rl(value));
   }
 
-  void set(const std::string &name, float value) { set(name.c_str(), value); }
-  void set(const std::string &name, int value) { set(name.c_str(), value); }
-  void set(const std::string &name, const Vec2 &value) {
-    set(name.c_str(), value);
-  }
-  void set(const std::string &name, const Vec3 &value) {
-    set(name.c_str(), value);
-  }
-  void set(const std::string &name, const Vec4 &value) {
-    set(name.c_str(), value);
-  }
-  void set(const std::string &name, const Matrix &value) {
-    set(name.c_str(), value);
-  }
-  void set(const std::string &name, const math::Mat4 &value) {
-    set(name.c_str(), value);
-  }
-
-  void set_float_array(const char *name, const float *value, int count) {
+  void set(std::string_view name, std::span<const float> values) {
     const int location = uniform_location(name);
     if (location >= 0) {
-      rl::SetShaderValueV(shader_, location, value, SHADER_UNIFORM_FLOAT,
-                          count);
+      rl::rlSetUniform(location, values.data(), SHADER_UNIFORM_FLOAT,
+                       static_cast<int>(values.size()));
     }
   }
 
-  void set_ints(const char *name, const int *value, int type) {
-    set_value(name, value, type);
-  }
-
-  void set_texture(const char *name, const Texture &texture) {
+  void set(const std::string_view name, const Texture &texture) {
     const int location = uniform_location(name);
     if (location >= 0) {
-      rl::SetShaderValueTexture(shader_, location, texture);
+      int texture_slot = 0;
+      rl::rlActiveTextureSlot(texture_slot);
+      rl::rlEnableTexture(texture.id);
+      rl::rlSetUniform(location, &texture_slot, RL_SHADER_UNIFORM_SAMPLER2D, 1);
     }
   }
 
-  void set_texture(int location, const Texture &texture) {
+  template <ecs::ShaderUniformBinding Binding, typename T>
+  void set(Binding binding, T &&value) {
+    set(map_uniform_binding(binding), std::forward<T>(value));
+  }
+
+  template <ecs::ShaderTextureBinding Binding>
+  void set_texture(Binding binding, const Texture &texture) {
+    set(map_texture_binding(binding), texture);
+  }
+
+  void set(int location, const Texture &texture) {
     if (location >= 0) {
-      rl::SetShaderValueTexture(shader_, location, texture);
+      int texture_slot = 0;
+      rl::rlActiveTextureSlot(texture_slot);
+      rl::rlEnableTexture(texture.id);
+      rl::rlSetUniform(location, &texture_slot, RL_SHADER_UNIFORM_SAMPLER2D, 1);
     }
   }
 
@@ -262,33 +289,39 @@ public:
     switch (uniform.type) {
     case UniformType::Float:
       if (uniform.count > 1) {
-        set_float_array(name.c_str(), uniform.float_data.data(), uniform.count);
+        size_t count = static_cast<size_t>(uniform.count);
+        if (count > uniform.float_data.size()) {
+          count = uniform.float_data.size();
+        }
+        set(name, std::span<const float>{uniform.float_data.data(), count});
       } else {
-        set(name.c_str(), uniform.float_data[0]);
+        set(name, uniform.float_data[0]);
       }
       break;
     case UniformType::Vec2:
-      set(name.c_str(), Vec2{uniform.float_data[0], uniform.float_data[1]});
+      set(name, Vec2{uniform.float_data[0], uniform.float_data[1]});
       break;
     case UniformType::Vec3:
-      set(name.c_str(), Vec3{uniform.float_data[0], uniform.float_data[1],
-                             uniform.float_data[2]});
+      set(name, Vec3{uniform.float_data[0], uniform.float_data[1],
+                     uniform.float_data[2]});
       break;
     case UniformType::Vec4:
-      set(name.c_str(), Vec4{uniform.float_data[0], uniform.float_data[1],
-                             uniform.float_data[2], uniform.float_data[3]});
+      set(name, Vec4{uniform.float_data[0], uniform.float_data[1],
+                     uniform.float_data[2], uniform.float_data[3]});
       break;
     case UniformType::Int:
-      set(name.c_str(), uniform.int_data[0]);
+      set(name, uniform.int_data[0]);
       break;
     case UniformType::IVec2:
-      set_ints(name.c_str(), uniform.int_data.data(), SHADER_UNIFORM_IVEC2);
+      set(name, std::array<int, 2>{uniform.int_data[0], uniform.int_data[1]});
       break;
     case UniformType::IVec3:
-      set_ints(name.c_str(), uniform.int_data.data(), SHADER_UNIFORM_IVEC3);
+      set(name, std::array<int, 3>{uniform.int_data[0], uniform.int_data[1],
+                                   uniform.int_data[2]});
       break;
     case UniformType::IVec4:
-      set_ints(name.c_str(), uniform.int_data.data(), SHADER_UNIFORM_IVEC4);
+      set(name, std::array<int, 4>{uniform.int_data[0], uniform.int_data[1],
+                                   uniform.int_data[2], uniform.int_data[3]});
       break;
     case UniformType::Mat4: {
       const Matrix matrix = {
@@ -301,25 +334,30 @@ public:
           uniform.float_data[12], uniform.float_data[13],
           uniform.float_data[14], uniform.float_data[15],
       };
-      set(name.c_str(), matrix);
+      set(name, matrix);
       break;
     }
     }
   }
 
+  template <ecs::ShaderUniformBinding Binding>
+  void apply(Binding binding, const Uniform &uniform) {
+    apply(std::string{map_uniform_binding(binding)}, uniform);
+  }
+
   template <typename F> decltype(auto) with_bound(F &&fn) {
-    rl::BeginShaderMode(shader_);
+    rl::rlEnableShader(shader_.id);
     try {
       if constexpr (std::is_void_v<std::invoke_result_t<F>>) {
         std::invoke(std::forward<F>(fn));
-        rl::EndShaderMode();
+        rl::rlDisableShader();
       } else {
         decltype(auto) result = std::invoke(std::forward<F>(fn));
-        rl::EndShaderMode();
+        rl::rlDisableShader();
         return result;
       }
     } catch (...) {
-      rl::EndShaderMode();
+      rl::rlDisableShader();
       throw;
     }
   }
@@ -356,20 +394,20 @@ private:
     owns_resource_ = false;
   }
 
-  void set_value(const char *name, const void *value, int type) {
+  void set_value(const std::string_view name, const void *value, int type) {
     const int location = uniform_location(name);
     if (location >= 0) {
-      rl::SetShaderValue(shader_, location, value, type);
+      rl::rlSetUniform(location, value, type, 1);
     }
   }
 };
 
 inline int shader_location(const Shader &shader, const char *name) {
-  return rl::GetShaderLocation(shader, name);
+  return rl::rlGetLocationUniform(shader.id, name);
 }
 
 inline int shader_location_attrib(const Shader &shader, const char *name) {
-  return rl::GetShaderLocationAttrib(shader, name);
+  return rl::rlGetLocationAttrib(shader.id, name);
 }
 
 } // namespace gl
@@ -389,11 +427,21 @@ template <> struct hash<gl::Uniform> {
     size_t seed = 0;
     rydz::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.type)));
     rydz::hash_combine(seed, std::hash<int>{}(k.count));
-    for (float value : k.float_data) {
-      rydz::hash_combine(seed, std::hash<float>{}(value));
-    }
-    for (int value : k.int_data) {
-      rydz::hash_combine(seed, std::hash<int>{}(value));
+
+    switch (k.type) {
+    case gl::UniformType::Int:
+    case gl::UniformType::IVec2:
+    case gl::UniformType::IVec3:
+    case gl::UniformType::IVec4:
+      for (int value : k.int_data) {
+        rydz::hash_combine(seed, std::hash<int>{}(value));
+      }
+      break;
+    default:
+      for (float value : k.float_data) {
+        rydz::hash_combine(seed, std::hash<float>{}(value));
+      }
+      break;
     }
     return seed;
   }

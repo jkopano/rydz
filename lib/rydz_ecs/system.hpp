@@ -42,35 +42,41 @@ template <typename... Args> struct function_traits_impl {
   }
 };
 
+template <typename>
+inline constexpr bool always_false_v = false;
+
 } // namespace detail
 
+template <typename T, typename = void> struct function_traits;
+
 template <typename T>
-struct function_traits
+struct function_traits<T,
+                       std::void_t<decltype(&std::decay_t<T>::operator())>>
     : function_traits<decltype(&std::decay_t<T>::operator())> {};
 
 template <typename C, typename R, typename... Args>
-struct function_traits<R (C::*)(Args...) noexcept>
+struct function_traits<R (C::*)(Args...) noexcept, void>
     : detail::function_traits_impl<Args...> {};
 
 template <typename C, typename R, typename... Args>
-struct function_traits<R (C::*)(Args...)>
+struct function_traits<R (C::*)(Args...), void>
     : detail::function_traits_impl<Args...> {};
 
 template <typename C, typename R, typename... Args>
-struct function_traits<R (C::*)(Args...) const noexcept>
+struct function_traits<R (C::*)(Args...) const noexcept, void>
     : detail::function_traits_impl<Args...> {};
 
 template <typename C, typename R, typename... Args>
-struct function_traits<R (C::*)(Args...) const>
+struct function_traits<R (C::*)(Args...) const, void>
     : detail::function_traits_impl<Args...> {};
 
 template <typename R, typename... Args>
-struct function_traits<R (*)(Args...) noexcept>
+struct function_traits<R (*)(Args...) noexcept, void>
     : detail::function_traits_impl<Args...> {};
 
 template <typename R, typename... Args>
-struct function_traits<R (*)(Args...)> : detail::function_traits_impl<Args...> {
-};
+struct function_traits<R (*)(Args...), void>
+    : detail::function_traits_impl<Args...> {};
 
 template <typename T>
 concept HasStatefulParamRetrieve =
@@ -93,6 +99,43 @@ concept SystemParameter = requires(World &w, SystemAccess &acc) {
   } -> std::same_as<typename SystemParamTraits<bare_t<T>>::State>;
   SystemParamTraits<bare_t<T>>::access(acc);
 } && (HasStatefulParamRetrieve<T> || HasStatelessParamRetrieve<T>);
+
+namespace detail {
+
+template <typename TupleT> struct all_system_parameters;
+
+template <typename... Args>
+struct all_system_parameters<Tuple<Args...>>
+    : std::bool_constant<(SystemParameter<Args> && ...)> {};
+
+template <typename F, typename = void>
+struct is_system_callable : std::false_type {};
+
+template <typename F>
+struct is_system_callable<
+    F, std::void_t<typename function_traits<decay_t<F>>::args_tuple>>
+    : all_system_parameters<typename function_traits<decay_t<F>>::args_tuple> {
+};
+
+template <typename T> struct is_system_input_descriptor : std::false_type {};
+
+template <typename F> constexpr void static_assert_valid_system_callable() {
+  static_assert(
+      always_false_v<F>,
+      "ECS system must be a non-generic callable whose every argument is a "
+      "valid SystemParameter (for example World&, Res<T>, ResMut<T>, "
+      "Query<...>, Commands, Local<T>, MessageReader<T>, or "
+      "MessageWriter<T>).");
+}
+
+} // namespace detail
+
+template <typename F>
+concept SystemCallable = detail::is_system_callable<F>::value;
+
+template <typename F>
+concept SystemInput =
+    SystemCallable<F> || detail::is_system_input_descriptor<bare_t<F>>::value;
 
 template <typename F> class FunctionSystem : public ISystem {
   F func_;
@@ -207,9 +250,17 @@ private:
 };
 
 template <typename F>
+  requires SystemCallable<F>
 std::unique_ptr<ISystem> make_system(F &&func, std::string name = "") {
   return std::make_unique<FunctionSystem<decay_t<F>>>(std::forward<F>(func),
                                                       std::move(name));
+}
+
+template <typename F>
+  requires(!SystemCallable<F>)
+std::unique_ptr<ISystem> make_system(F && /*func*/, std::string /*name*/ = "") {
+  detail::static_assert_valid_system_callable<F>();
+  return nullptr;
 }
 
 template <typename Sched, typename F>

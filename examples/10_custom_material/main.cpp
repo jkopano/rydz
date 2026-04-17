@@ -6,9 +6,22 @@
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/mod.hpp"
 #include "rydz_platform/mod.hpp"
+#include <string_view>
 
 using namespace ecs;
 using namespace math;
+
+enum class ToonUniform {
+  RimStrength,
+};
+
+inline std::string_view map_uniform_binding(ToonUniform uniform) {
+  switch (uniform) {
+  case ToonUniform::RimStrength:
+    return "u_rim_strength";
+  }
+  return "";
+}
 
 struct ToonMaterial : MaterialTrait<HasCamera> {
   ecs::Color base_color = kWhite;
@@ -25,8 +38,8 @@ struct ToonMaterial : MaterialTrait<HasCamera> {
   bool enable_shadows() const { return base_color.a == 255; }
 
   void bind(MaterialBuilder &builder) const {
-    builder.color(MATERIAL_MAP_DIFFUSE, base_color);
-    builder.uniform("u_rim_strength", Uniform{rim_strength});
+    builder.color(ecs::MaterialMap::Albedo, base_color);
+    builder.uniform(ToonUniform::RimStrength, Uniform{rim_strength});
   }
 };
 

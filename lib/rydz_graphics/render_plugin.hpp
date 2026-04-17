@@ -13,27 +13,18 @@
 
 namespace ecs {
 
-enum class RenderExtractSet {
+enum class RenderExtractSet : u8 {
   Extract,
   Queue,
   Prepare,
 };
 
-enum class RenderPassSet {
+enum class RenderPassSet : u8 {
   Setup,
   Main,
   PostProcess,
   Ui,
   Cleanup,
-};
-
-template <typename M, typename P> void queue(Res<M> meshes, ResMut<P> phase) {
-  phase->queue(*meshes);
-};
-
-template <typename P>
-void build_batches(ResMut<P> phase, ResMut<Assets<Mesh>> meshes) {
-  phase->build_batches(*meshes);
 };
 
 struct RenderPlugin {
@@ -99,26 +90,27 @@ struct RenderPlugin {
 
         .add_systems(PostUpdate,
                      group(propagate_transforms, compute_visibility,
-                           compute_mesh_bounds_system, frustum_cull_system))
+                           compute_mesh_bounds_system, frustum_cull_system));
 
-        .add_systems(RenderExtractSet::Extract,
-                     group(extract::clear_meshes, extract::view,
-                           extract::lighting, extract::ui, extract::meshes)
-                         .chain())
+    app.add_systems(RenderExtractSet::Extract,
+                    group(Extract::clear_meshes, Extract::view,
+                          Extract::lighting, Extract::ui, Extract::meshes)
+                        .chain())
 
         .add_systems(RenderExtractSet::Queue,
-                     group(queue<ExtractedMeshes, ShadowPhase>,
-                           queue<ExtractedMeshes, OpaquePhase>,
-                           queue<ExtractedMeshes, TransparentPhase>,
-                           queue<ExtractedUi, UiPhase>)
+                     group(Queue::queue<ExtractedMeshes, ShadowPhase>,
+                           Queue::queue<ExtractedMeshes, OpaquePhase>,
+                           Queue::queue<ExtractedMeshes, TransparentPhase>,
+                           Queue::queue<ExtractedUi, UiPhase>)
                          .chain())
 
         .add_systems(RenderExtractSet::Prepare,
-                     group(prepare_meshes, build_batches<OpaquePhase>,
-                           build_batches<TransparentPhase>)
-                         .chain())
+                     group(Prepare::prepare_meshes,
+                           Prepare::build_batches<OpaquePhase>,
+                           Prepare::build_batches<TransparentPhase>)
+                         .chain());
 
-        .add_systems(RenderPassSet::Setup, FramePass::begin)
+    app.add_systems(RenderPassSet::Setup, FramePass::begin)
 
         .add_systems(RenderPassSet::Main,
                      group(WorldPass::shadow, WorldPass::depth_prepass,
@@ -127,7 +119,6 @@ struct RenderPlugin {
                          .chain())
 
         .add_systems(RenderPassSet::PostProcess, PostProcessPass::postprocess)
-
         .add_systems(RenderPassSet::Ui, UiPass::ui)
         .add_systems(RenderPassSet::Cleanup, FramePass::end);
   }

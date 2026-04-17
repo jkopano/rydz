@@ -39,7 +39,15 @@ inline constexpr bool is_chained_systems_v = is_chained_systems<T>::value;
 
 namespace detail {
 
+template <> struct is_system_input_descriptor<ChainedSystems> : std::true_type {
+};
+
+template <typename T>
+concept ChainSystemInput =
+    SystemCallable<T> || is_system_descriptor_v<bare_t<T>>;
+
 template <typename Func>
+  requires ChainSystemInput<Func>
 ChainedSystems::Entry make_chain_entry(Func &&func, const std::string &prev) {
   SystemOrdering ordering;
   std::unique_ptr<ISystem> sys;
@@ -60,7 +68,9 @@ ChainedSystems::Entry make_chain_entry(Func &&func, const std::string &prev) {
 
 } // namespace detail
 
-template <typename... Fs> ChainedSystems chain(Fs &&...funcs) {
+template <typename... Fs>
+  requires(detail::ChainSystemInput<Fs> && ...)
+ChainedSystems chain(Fs &&...funcs) {
   ChainedSystems result;
   std::string prev_name;
 
@@ -128,30 +138,61 @@ public:
     needs_rebuild_ = true;
   }
 
-  template <typename F> void add_system_fn(F &&func) {
+  template <typename F>
+    requires SystemInput<F>
+  void add_system_fn(F &&func) {
     add_system_fn_with_ordering(std::forward<F>(func), {});
+  }
+
+  template <typename F>
+    requires(!SystemInput<F>)
+  void add_system_fn(F && /*func*/) {
+    detail::static_assert_valid_system_callable<F>();
   }
 
   template <typename E, typename F>
     requires(std::is_enum_v<bare_t<E>> &&
-             !std::same_as<bare_t<E>, ScheduleLabel>)
+             !std::same_as<bare_t<E>, ScheduleLabel> && SystemInput<F>)
   void add_system_fn(E set_id, F &&func) {
     add_system_fn(set(set_id), std::forward<F>(func));
   }
 
+  template <typename E, typename F>
+    requires(std::is_enum_v<bare_t<E>> &&
+             !std::same_as<bare_t<E>, ScheduleLabel> && !SystemInput<F>)
+  void add_system_fn(E /*set_id*/, F && /*func*/) {
+    detail::static_assert_valid_system_callable<F>();
+  }
+
   template <typename S, typename F>
-    requires(detail::is_set_marker_v<S>)
+    requires(detail::is_set_marker_v<S> && SystemInput<F>)
   void add_system_fn(S &&, F &&func) {
     add_system_fn(set<bare_t<S>>(), std::forward<F>(func));
   }
 
   template <typename S, typename F>
-    requires(std::same_as<bare_t<S>, SetId> || std::same_as<bare_t<S>, SetList>)
+    requires(detail::is_set_marker_v<S> && !SystemInput<F>)
+  void add_system_fn(S &&, F && /*func*/) {
+    detail::static_assert_valid_system_callable<F>();
+  }
+
+  template <typename S, typename F>
+    requires((std::same_as<bare_t<S>, SetId> ||
+              std::same_as<bare_t<S>, SetList>) &&
+             SystemInput<F>)
   void add_system_fn(S &&selector, F &&func) {
     SystemOrdering ordering;
     ordering.in_sets = detail::to_set_ids(std::forward<S>(selector));
     detail::ensure_unique_sets(ordering.in_sets, "add_system_fn(...)");
     add_system_fn_with_ordering(std::forward<F>(func), std::move(ordering));
+  }
+
+  template <typename S, typename F>
+    requires((std::same_as<bare_t<S>, SetId> ||
+              std::same_as<bare_t<S>, SetList>) &&
+             !SystemInput<F>)
+  void add_system_fn(S && /*selector*/, F && /*func*/) {
+    detail::static_assert_valid_system_callable<F>();
   }
 
   void run(World &world) {
@@ -203,6 +244,7 @@ private:
   friend struct ScheduleDebug;
 
   template <typename F>
+    requires SystemInput<F>
   void add_system_fn_with_ordering(F &&func, SystemOrdering base_ordering) {
     if constexpr (is_chained_systems_v<bare_t<F>>) {
       for (auto &e : func.systems) {

@@ -15,5 +15,6 @@
 #include "rydz_graphics/render_passes.hpp"
 #include "rydz_graphics/render_phase.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/shader_bindings.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"

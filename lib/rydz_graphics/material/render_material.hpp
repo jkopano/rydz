@@ -7,7 +7,6 @@
 #include "rydz_graphics/render_extract.hpp"
 #include <algorithm>
 #include <array>
-#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <stdexcept>
@@ -17,7 +16,7 @@
 namespace ecs {
 
 struct PreparedMaterial {
-  std::array<gl::MaterialMap, 12> local_maps{};
+  std::array<gl::MaterialMap, kMaterialMapCount> local_maps{};
   gl::Material material;
 };
 
@@ -78,28 +77,6 @@ struct ShaderCache {
   std::unordered_map<ShaderSpec, ShaderProgram> shaders;
 };
 
-inline gl::Material &fallback_material(NonSendMarker) {
-  static gl::Material fallback = {};
-  static bool init = false;
-  if (!init) {
-    fallback.shader = gl::Shader::get_default();
-    fallback.shader.id = gl::Shader::default_id();
-    fallback.shader.locs = gl::Shader::default_locs();
-    fallback.maps = static_cast<gl::MaterialMap *>(
-        std::calloc(12, sizeof(gl::MaterialMap)));
-    fallback.maps[gl::MATERIAL_MAP_DIFFUSE].texture.id =
-        gl::default_texture_id();
-    fallback.maps[gl::MATERIAL_MAP_DIFFUSE].texture.width = 1;
-    fallback.maps[gl::MATERIAL_MAP_DIFFUSE].texture.height = 1;
-    fallback.maps[gl::MATERIAL_MAP_DIFFUSE].texture.mipmaps = 1;
-    fallback.maps[gl::MATERIAL_MAP_DIFFUSE].texture.format =
-        gl::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
-    fallback.maps[gl::MATERIAL_MAP_DIFFUSE].color = gl::kWhite;
-    init = true;
-  }
-  return fallback;
-}
-
 inline PbrFallbackTextures &pbr_fallback_textures() {
   static PbrFallbackTextures textures = [] {
     auto make_texture = [](gl::Color color) {
@@ -121,41 +98,45 @@ inline PbrFallbackTextures &pbr_fallback_textures() {
 }
 
 inline void apply_pbr_defaults(gl::Material &material) {
-  if (material.maps[gl::MATERIAL_MAP_DIFFUSE].color.a == 0) {
-    material.maps[gl::MATERIAL_MAP_DIFFUSE].color = gl::kWhite;
+  auto *maps = material.maps;
+  if (maps[material_map_index(MaterialMap::Albedo)].color.a == 0) {
+    maps[material_map_index(MaterialMap::Albedo)].color = gl::kWhite;
   }
-  if (material.maps[gl::MATERIAL_MAP_ROUGHNESS].value <= 0.0F &&
-      !material.maps[gl::MATERIAL_MAP_ROUGHNESS].texture.ready()) {
-    material.maps[gl::MATERIAL_MAP_ROUGHNESS].value = 1.0F;
+  if (maps[material_map_index(MaterialMap::Roughness)].value <= 0.0F &&
+      !maps[material_map_index(MaterialMap::Roughness)].texture.ready()) {
+    maps[material_map_index(MaterialMap::Roughness)].value = 1.0F;
   }
-  if (material.maps[gl::MATERIAL_MAP_NORMAL].value <= 0.0f) {
-    material.maps[gl::MATERIAL_MAP_NORMAL].value = 1.0f;
+  if (maps[material_map_index(MaterialMap::Normal)].value <= 0.0f) {
+    maps[material_map_index(MaterialMap::Normal)].value = 1.0f;
   }
-  if (material.maps[gl::MATERIAL_MAP_OCCLUSION].value <= 0.0f) {
-    material.maps[gl::MATERIAL_MAP_OCCLUSION].value = 1.0f;
+  if (maps[material_map_index(MaterialMap::Occlusion)].value <= 0.0f) {
+    maps[material_map_index(MaterialMap::Occlusion)].value = 1.0f;
   }
 }
 
 inline void apply_pbr_fallback_textures(gl::Material &material) {
   auto &fallbacks = pbr_fallback_textures();
 
-  if (!material.maps[gl::MATERIAL_MAP_METALNESS].texture.ready()) {
-    material.maps[gl::MATERIAL_MAP_METALNESS].texture =
+  auto *maps = material.maps;
+  if (!maps[material_map_index(MaterialMap::Metalness)].texture.ready()) {
+    maps[material_map_index(MaterialMap::Metalness)].texture =
         fallbacks.metallic_black;
   }
-  if (!material.maps[gl::MATERIAL_MAP_ROUGHNESS].texture.ready()) {
-    material.maps[gl::MATERIAL_MAP_ROUGHNESS].texture =
+  if (!maps[material_map_index(MaterialMap::Roughness)].texture.ready()) {
+    maps[material_map_index(MaterialMap::Roughness)].texture =
         fallbacks.roughness_white;
   }
-  if (!material.maps[gl::MATERIAL_MAP_NORMAL].texture.ready()) {
-    material.maps[gl::MATERIAL_MAP_NORMAL].texture = fallbacks.normal_flat;
+  if (!maps[material_map_index(MaterialMap::Normal)].texture.ready()) {
+    maps[material_map_index(MaterialMap::Normal)].texture =
+        fallbacks.normal_flat;
   }
-  if (!material.maps[gl::MATERIAL_MAP_OCCLUSION].texture.ready()) {
-    material.maps[gl::MATERIAL_MAP_OCCLUSION].texture =
+  if (!maps[material_map_index(MaterialMap::Occlusion)].texture.ready()) {
+    maps[material_map_index(MaterialMap::Occlusion)].texture =
         fallbacks.occlusion_white;
   }
-  if (!material.maps[gl::MATERIAL_MAP_EMISSION].texture.ready()) {
-    material.maps[gl::MATERIAL_MAP_EMISSION].texture = fallbacks.emission_black;
+  if (!maps[material_map_index(MaterialMap::Emission)].texture.ready()) {
+    maps[material_map_index(MaterialMap::Emission)].texture =
+        fallbacks.emission_black;
   }
 }
 
@@ -168,34 +149,38 @@ inline ShaderProgram &resolve_shader(NonSendMarker, ShaderCache &cache,
   return it->second;
 }
 
-inline void initialize_custom_map_locations(ShaderProgram &shader) {
+inline void initialize_material_map_location(ShaderProgram &shader,
+                                             MaterialMap map) {
   auto &raw = shader.raw();
   if (raw.locs == nullptr) {
     return;
   }
 
-  if (raw.locs[gl::SHADER_LOC_MAP_ROUGHNESS] < 0) {
-    raw.locs[gl::SHADER_LOC_MAP_ROUGHNESS] =
-        gl::shader_location(raw, "u_roughness_texture");
+  const int location_index = shader_location_index(map);
+  if (raw.locs[location_index] < 0) {
+    raw.locs[location_index] =
+        shader.uniform_location(map_texture_binding(map));
   }
-  if (raw.locs[gl::SHADER_LOC_MAP_OCCLUSION] < 0) {
-    raw.locs[gl::SHADER_LOC_MAP_OCCLUSION] =
-        gl::shader_location(raw, "u_occlusion_texture");
-  }
-  if (raw.locs[gl::SHADER_LOC_MAP_EMISSION] < 0) {
-    raw.locs[gl::SHADER_LOC_MAP_EMISSION] =
-        gl::shader_location(raw, "u_emissive_texture");
-  }
+}
+
+inline void initialize_material_map_locations(ShaderProgram &shader) {
+  initialize_material_map_location(shader, MaterialMap::Albedo);
+  initialize_material_map_location(shader, MaterialMap::Metalness);
+  initialize_material_map_location(shader, MaterialMap::Normal);
+  initialize_material_map_location(shader, MaterialMap::Roughness);
+  initialize_material_map_location(shader, MaterialMap::Occlusion);
+  initialize_material_map_location(shader, MaterialMap::Emission);
 }
 
 inline void apply_material_map_binding(gl::Material &material,
                                        const MaterialMapBinding &binding,
                                        const Assets<Texture> &textures) {
-  if (binding.map_type < 0 || binding.map_type >= 12) {
+  const int map_index = material_map_index(binding.map_type);
+  if (map_index < 0 || map_index >= kMaterialMapCount) {
     return;
   }
 
-  auto &map = material.maps[binding.map_type];
+  auto &map = material.maps[map_index];
   if (binding.has_color) {
     map.color = binding.color;
   }
@@ -231,14 +216,14 @@ prepare_material(NonSendMarker marker, const CompiledMaterial &material,
                  const SlotProviderRegistry &slot_registry,
                  const SlotPrepareContext &prepare_ctx,
                  const ShaderSpec &shader_spec, PreparedMaterial &prepared) {
-  const auto &src_mat = fallback_material(marker);
+  const auto &src_mat = gl::Material::fallback_material(marker);
   prepared.material = src_mat;
   std::memcpy(prepared.local_maps.data(), src_mat.maps,
               sizeof(prepared.local_maps));
   prepared.material.maps = prepared.local_maps.data();
 
   ShaderProgram &shader = resolve_shader(marker, shader_cache, shader_spec);
-  initialize_custom_map_locations(shader);
+  initialize_material_map_locations(shader);
   prepared.material.shader = shader.raw();
 
   for (const auto &binding : material.maps) {
@@ -272,8 +257,9 @@ inline SlotProvider make_has_camera_slot_provider() {
   SlotProvider provider;
   provider.apply = [](const RenderSlotContext &ctx, const CompiledMaterial &,
                       const PreparedMaterial &, ShaderProgram &shader) {
-    shader.set("u_camera_pos", math::to_rl(ctx.view().camera_view.position));
-    shader.set("matView", ctx.view().camera_view.view);
+    shader.set(CameraUniform::Position,
+               math::to_rl(ctx.view().camera_view.position));
+    shader.set(CameraUniform::ViewMatrix, ctx.view().camera_view.view);
   };
   return provider;
 }
@@ -303,50 +289,31 @@ inline SlotProvider make_has_pbr_slot_provider() {
         std::max(view.near_plane, 0.001f),
         std::max(view.far_plane, view.near_plane + 0.001f),
     };
-    int cluster_dimensions[4] = {cluster_config.tile_count_x,
-                                 cluster_config.tile_count_y,
-                                 cluster_config.slice_count_z, 0};
+    std::array<int, 4> cluster_dimensions = {cluster_config.tile_count_x,
+                                             cluster_config.tile_count_y,
+                                             cluster_config.slice_count_z, 0};
     int cluster_max_lights =
         static_cast<int>(cluster_config.max_lights_per_cluster);
     int is_orthographic = view.orthographic ? 1 : 0;
 
     gl::bind_clustered_lighting(ctx.clustered_lighting());
-    shader.set("u_has_directional", has_directional);
-    shader.set("u_dir_light_direction", dir_dir);
-    shader.set("u_dir_light_intensity", dir_intensity);
-    shader.set("u_dir_light_color", dir_color);
-    shader.set_ints("u_cluster_dimensions", cluster_dimensions,
-                    gl::SHADER_UNIFORM_IVEC4);
-    shader.set("u_cluster_screen_size", cluster_screen_size);
-    shader.set("u_cluster_near_far", cluster_near_far);
-    shader.set("u_cluster_max_lights", cluster_max_lights);
-    shader.set("u_is_orthographic", is_orthographic);
+    shader.set(PbrLightingUniform::HasDirectional, has_directional);
+    shader.set(PbrLightingUniform::DirectionalDirection, dir_dir);
+    shader.set(PbrLightingUniform::DirectionalIntensity, dir_intensity);
+    shader.set(PbrLightingUniform::DirectionalColor, dir_color);
+    shader.set(PbrLightingUniform::ClusterDimensions, cluster_dimensions);
+    shader.set(PbrLightingUniform::ClusterScreenSize, cluster_screen_size);
+    shader.set(PbrLightingUniform::ClusterNearFar, cluster_near_far);
+    shader.set(PbrLightingUniform::ClusterMaxLights, cluster_max_lights);
+    shader.set(PbrLightingUniform::IsOrthographic, is_orthographic);
   };
   return provider;
-}
-
-inline bool can_draw_instanced(gl::Material &material, const gl::Mesh &mesh) {
-  if (!material.shader.locs || !mesh.uploaded()) {
-    return false;
-  }
-
-  if (material.shader.locs[gl::SHADER_LOC_VERTEX_INSTANCETRANSFORM] < 0) {
-    material.shader.locs[gl::SHADER_LOC_VERTEX_INSTANCETRANSFORM] =
-        gl::shader_location_attrib(material.shader, "instanceTransform");
-  }
-  if (material.shader.locs[gl::SHADER_LOC_MATRIX_MODEL] < 0) {
-    material.shader.locs[gl::SHADER_LOC_MATRIX_MODEL] =
-        gl::shader_location(material.shader, "matModel");
-  }
-
-  return material.shader.locs[gl::SHADER_LOC_VERTEX_INSTANCETRANSFORM] >= 0;
 }
 
 template <typename BatchT>
 inline void draw_batch(ShaderProgram &shader, const gl::Mesh &mesh,
                        gl::Material &material, const BatchT &batch) {
-  shader.set("u_use_instancing", 1);
-  gl::draw_mesh_instanced(mesh, material, batch.transforms.data(),
+  gl::draw_mesh_instanced(shader, mesh, material, batch.transforms.data(),
                           static_cast<i32>(batch.transforms.size()));
 }
 

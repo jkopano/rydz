@@ -5,13 +5,14 @@
 #include "rydz_graphics/material/standard_material.hpp"
 #include "rydz_graphics/visibility.hpp"
 #include <algorithm>
+#include <ranges>
 
 namespace ecs {
 
 struct SceneRuntimeSystems {
   static void cleanup_orphan_scene_entities_system(World &world) {
     auto *owned_storage = world.get_storage<SceneOwned>();
-    if (!owned_storage) {
+    if (owned_storage == nullptr) {
       return;
     }
 
@@ -23,10 +24,12 @@ struct SceneRuntimeSystems {
       }
     });
 
-    std::sort(to_remove.begin(), to_remove.end(),
-              [](Entity lhs, Entity rhs) { return lhs.index() > rhs.index(); });
-    to_remove.erase(std::unique(to_remove.begin(), to_remove.end()),
-                    to_remove.end());
+    std::ranges::sort(to_remove, [](Entity lhs, Entity rhs) {
+      return lhs.index() > rhs.index();
+    });
+
+    auto [first, last] = std::ranges::unique(to_remove);
+    to_remove.erase(first, last);
 
     for (Entity entity : to_remove) {
       if (world.entities.is_alive(entity)) {
@@ -38,7 +41,7 @@ struct SceneRuntimeSystems {
   static void sync_scene_roots_system(World &world) {
     auto *scene_roots = world.get_storage<SceneRoot>();
     auto *scene_assets = world.get_resource<Assets<Scene>>();
-    if (!scene_roots || !scene_assets) {
+    if ((scene_roots == nullptr) || (scene_assets == nullptr)) {
       return;
     }
 
@@ -48,14 +51,14 @@ struct SceneRuntimeSystems {
 
     for (Entity root_entity : roots) {
       auto *root = world.get_component<SceneRoot>(root_entity);
-      if (!root) {
+      if (root == nullptr) {
         continue;
       }
 
       auto *instance = world.get_component<SceneInstance>(root_entity);
 
       if (!root->scene.is_valid()) {
-        if (instance) {
+        if (instance != nullptr) {
           detail::destroy_scene_instance(world, *instance);
           world.remove_component<SceneInstance>(root_entity);
         }
@@ -63,27 +66,21 @@ struct SceneRuntimeSystems {
       }
 
       const Scene *scene = scene_assets->get(root->scene);
-      if (!scene) {
-        if (instance && instance->scene != root->scene) {
+      if (scene == nullptr) {
+        if ((instance != nullptr) && instance->scene != root->scene) {
           detail::destroy_scene_instance(world, *instance);
           world.remove_component<SceneInstance>(root_entity);
         }
         continue;
       }
 
-      bool rebuild = false;
-      if (!instance) {
-        rebuild = true;
-      } else if (instance->scene != root->scene) {
-        rebuild = true;
-      } else if (!detail::scene_instance_alive(world, *instance)) {
-        rebuild = true;
-      } else if (!detail::scene_instance_matches_shape(*scene, *instance)) {
-        rebuild = true;
-      }
+      bool rebuild = (instance == nullptr) ||
+                     (instance->scene != root->scene) ||
+                     (!detail::scene_instance_alive(world, *instance)) ||
+                     (!detail::scene_instance_matches_shape(*scene, *instance));
 
       if (rebuild) {
-        if (instance) {
+        if (instance != nullptr) {
           detail::destroy_scene_instance(world, *instance);
         }
         world.insert_component(
@@ -100,12 +97,9 @@ private:
   struct detail {
     static bool scene_instance_alive(const World &world,
                                      const SceneInstance &inst) {
-      for (Entity entity : inst.owned_entities) {
-        if (!world.entities.is_alive(entity)) {
-          return false;
-        }
-      }
-      return true;
+      return std::ranges::all_of(inst.owned_entities, [&](Entity entity) {
+        return world.entities.is_alive(entity);
+      });
     }
 
     static void ensure_transform(World &world, Entity entity,
@@ -148,7 +142,8 @@ private:
         node->root = root;
         node->node_index = node_index;
       } else {
-        world.insert_component(entity, SceneNodeInstance{root, node_index});
+        world.insert_component(
+            entity, SceneNodeInstance{.root = root, .node_index = node_index});
       }
 
       if (bone_index >= 0) {
@@ -174,7 +169,9 @@ private:
         primitive->primitive_index = primitive_index;
       } else {
         world.insert_component(
-            entity, ScenePrimitiveInstance{root, node_index, primitive_index});
+            entity, ScenePrimitiveInstance{.root = root,
+                                           .node_index = node_index,
+                                           .primitive_index = primitive_index});
       }
 
       if (skin_index >= 0) {
@@ -188,8 +185,7 @@ private:
       }
     }
 
-    static void ensure_mesh(World &world, Entity entity,
-                            Handle<Mesh> mesh) {
+    static void ensure_mesh(World &world, Entity entity, Handle<Mesh> mesh) {
       if (auto *existing = world.get_component<Mesh3d>(entity)) {
         existing->mesh = mesh;
       } else {
@@ -208,10 +204,10 @@ private:
 
     static void destroy_scene_instance(World &world,
                                        const SceneInstance &inst) {
-      for (auto it = inst.owned_entities.rbegin();
-           it != inst.owned_entities.rend(); ++it) {
-        if (world.entities.is_alive(*it)) {
-          world.despawn(*it);
+      for (auto owned_entitie :
+           std::ranges::reverse_view(inst.owned_entities)) {
+        if (world.entities.is_alive(owned_entitie)) {
+          world.despawn(owned_entitie);
         }
       }
     }

@@ -97,113 +97,120 @@ struct ExtractedUi {
   void clear() { *this = ExtractedUi{}; }
 };
 
-namespace extract {
-inline void
-view(Query<Camera3DComponent, ActiveCamera, GlobalTransform, Opt<ClearColor>,
-           Opt<gl::Skybox>, Opt<PostProcessMaterial>>
-         cam_query,
-     Res<Window> window, ResMut<ExtractedView> view) {
-  view->clear();
-  const float aspect = compute_camera_aspect_ratio(
-      static_cast<float>(window->width), static_cast<float>(window->height));
+struct Extract {
+  static void
+  view(Query<Camera3DComponent, ActiveCamera, GlobalTransform, Opt<ClearColor>,
+             Opt<gl::Skybox>, Opt<PostProcessMaterial>>
+           cam_query,
+       Res<Window> window, ResMut<ExtractedView> view) {
+    view->clear();
+    const float aspect = compute_camera_aspect_ratio(
+        static_cast<float>(window->width), static_cast<float>(window->height));
 
-  for (auto [cam_comp, _, cam_gt, clear_color, skybox, postprocess] :
-       cam_query.iter()) {
-    view->camera_view = compute_camera_view(*cam_gt, *cam_comp, aspect);
-    if (clear_color != nullptr) {
-      view->clear_color = clear_color->color;
+    for (auto [cam_comp, _, cam_gt, clear_color, skybox, postprocess] :
+         cam_query.iter()) {
+      view->camera_view = compute_camera_view(*cam_gt, *cam_comp, aspect);
+      if (clear_color != nullptr) {
+        view->clear_color = clear_color->color;
+      }
+      view->active_skybox = skybox;
+      view->active = true;
+      view->orthographic = cam_comp->is_orthographic();
+      view->near_plane = cam_comp->near_plane;
+      view->far_plane = cam_comp->far_plane;
+      if (postprocess != nullptr) {
+        view->postprocess = postprocess->material;
+        view->has_postprocess = true;
+      }
+      break;
     }
-    view->active_skybox = skybox;
-    view->active = true;
-    view->orthographic = cam_comp->is_orthographic();
-    view->near_plane = cam_comp->near_plane;
-    view->far_plane = cam_comp->far_plane;
-    if (postprocess != nullptr) {
-      view->postprocess = postprocess->material;
-      view->has_postprocess = true;
-    }
-    break;
-  }
-}
-
-inline void lighting(Query<DirectionalLight> dir_query,
-                     Query<PointLight, GlobalTransform> point_query,
-                     ResMut<ExtractedLights> lights) {
-  lights->clear();
-
-  for (auto [dir] : dir_query.iter()) {
-    lights->dir_light = *dir;
-    lights->has_directional = true;
-    break;
   }
 
-  for (auto [point_light, global] : point_query.iter()) {
-    lights->point_lights.push_back(ExtractedLights::PointLight{
-        .position = global->translation(),
-        .color = point_light->color,
-        .intensity = point_light->intensity,
-        .range = point_light->range,
-    });
+  static void lighting(Query<DirectionalLight> dir_query,
+                       Query<PointLight, GlobalTransform> point_query,
+                       ResMut<ExtractedLights> lights) {
+    lights->clear();
+
+    for (auto [dir] : dir_query.iter()) {
+      lights->dir_light = *dir;
+      lights->has_directional = true;
+      break;
+    }
+
+    for (auto [point_light, global] : point_query.iter()) {
+      lights->point_lights.push_back(ExtractedLights::PointLight{
+          .position = global->translation(),
+          .color = point_light->color,
+          .intensity = point_light->intensity,
+          .range = point_light->range,
+      });
+    }
   }
-}
 
-inline void clear_meshes(ResMut<ExtractedMeshes> meshes) { meshes->clear(); }
+  static void clear_meshes(ResMut<ExtractedMeshes> meshes) { meshes->clear(); }
 
-inline void meshes(
-    Query<Mesh3d, GlobalTransform, MeshMaterial3d, Opt<ViewVisibility>> query,
-    Res<ExtractedView> view, Res<Assets<Material>> material_assets,
-    ResMut<ExtractedMeshes> meshes) {
-  for (auto [mesh3d, global, material, visibility] : query.iter()) {
-    if (!mesh3d->mesh.is_valid() || !material->material.is_valid()) {
-      continue;
+  static void meshes(
+      Query<Mesh3d, GlobalTransform, MeshMaterial3d, Opt<ViewVisibility>> query,
+      Res<ExtractedView> view, Res<Assets<Material>> material_assets,
+      ResMut<ExtractedMeshes> meshes) {
+    for (auto [mesh3d, global, material, visibility] : query.iter()) {
+      if (!mesh3d->mesh.is_valid() || !material->material.is_valid()) {
+        continue;
+      }
+      if (visibility == nullptr || !visibility->visible) {
+        continue;
+      }
+
+      const auto *material_asset = material_assets->get(material->material);
+      if (material_asset == nullptr) {
+        continue;
+      }
+
+      CompiledMaterial compiled = material_asset->compiled;
+      const bool transparent =
+          compiled.render_method == RenderMethod::Transparent;
+      const bool casts_shadows = compiled.casts_shadows;
+      Vec3 camera_offset = global->translation() - view->camera_view.position;
+
+      meshes->items.push_back(ExtractedMeshes::Item{
+          .mesh = mesh3d->mesh,
+          .material = std::move(compiled),
+          .world_transform = global->matrix,
+          .distance_to_camera = camera_offset.LengthSq(),
+          .transparent = transparent,
+          .casts_shadows = casts_shadows,
+      });
     }
-    if (visibility == nullptr || !visibility->visible) {
-      continue;
-    }
-
-    const auto *material_asset = material_assets->get(material->material);
-    if (material_asset == nullptr) {
-      continue;
-    }
-
-    CompiledMaterial compiled = material_asset->compiled;
-    const bool transparent =
-        compiled.render_method == RenderMethod::Transparent;
-    const bool casts_shadows = compiled.casts_shadows;
-    Vec3 camera_offset = global->translation() - view->camera_view.position;
-
-    meshes->items.push_back(ExtractedMeshes::Item{
-        .mesh = mesh3d->mesh,
-        .material = std::move(compiled),
-        .world_transform = global->matrix,
-        .distance_to_camera = camera_offset.LengthSq(),
-        .transparent = transparent,
-        .casts_shadows = casts_shadows,
-    });
   }
-}
 
-inline void ui(Query<Sprite, Transform> textures, ResMut<ExtractedUi> ui) {
-  ui->clear();
+  static void ui(Query<Sprite, Transform> textures, ResMut<ExtractedUi> ui) {
+    ui->clear();
 
-  for (auto [texture, transform] : textures.iter()) {
-    if (!texture->handle.is_valid()) {
-      continue;
+    for (auto [texture, transform] : textures.iter()) {
+      if (!texture->handle.is_valid()) {
+        continue;
+      }
+
+      ui->items.push_back(ExtractedUi::Item{
+          .texture = texture->handle,
+          .transform = *transform,
+          .tint = texture->tint,
+          .layer = texture->layer,
+      });
     }
-
-    ui->items.push_back(ExtractedUi::Item{
-        .texture = texture->handle,
-        .transform = *transform,
-        .tint = texture->tint,
-        .layer = texture->layer,
-    });
   }
-}
 
-inline void overlay(Query<Sprite, Transform> textures,
-                    ResMut<ExtractedUi> overlay) {
-  ui(textures, overlay);
-}
-} // namespace extract
+  static void overlay(Query<Sprite, Transform> textures,
+                      ResMut<ExtractedUi> overlay) {
+    ui(textures, overlay);
+  }
+};
+
+struct Queue {
+  template <typename M, typename P>
+  static void queue(Res<M> meshes, ResMut<P> phase) {
+    phase->queue(*meshes);
+  };
+};
 
 } // namespace ecs

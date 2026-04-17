@@ -86,7 +86,7 @@ struct OpaquePhase {
     }
   }
 
-  void build_batches(Assets<Mesh> &mesh_assets) {
+  void build_batches() {
     batches.clear();
     std::unordered_map<RenderBatchKey, usize> batch_index;
 
@@ -152,7 +152,7 @@ struct TransparentPhase {
     });
   }
 
-  void build_batches(Assets<Mesh> &mesh_assets) {
+  void build_batches() {
     batches.clear();
 
     for (const auto &item : items) {
@@ -205,17 +205,23 @@ struct UiPhase {
   }
 };
 
-void prepare_meshes(Res<ExtractedMeshes> extracted,
-                    ResMut<Assets<Mesh>> mesh_assets, NonSendMarker) {
-  std::unordered_set<u32> seen;
+struct Prepare {
+  template <typename P> static void build_batches(ResMut<P> phase) {
+    phase->build_batches();
+  };
 
-  for (const auto &item : extracted->items) {
-    if (!seen.insert(item.mesh.id).second) {
-      continue;
+  static void prepare_meshes(Res<ExtractedMeshes> extracted,
+                             ResMut<Assets<Mesh>> mesh_assets, NonSendMarker) {
+    std::unordered_set<u32> seen;
+
+    for (const auto &item : extracted->items) {
+      if (!seen.insert(item.mesh.id).second) {
+        continue;
+      }
+
+      detail::prepare_mesh(item.mesh, *mesh_assets);
     }
-
-    detail::prepare_mesh(item.mesh, *mesh_assets);
   }
-}
+};
 
 } // namespace ecs
