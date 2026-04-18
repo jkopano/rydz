@@ -10,6 +10,7 @@
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/mod.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include "rydz_scripting/lua_resource.hpp"
 #include <algorithm>
 #include <print>
 
@@ -151,6 +152,13 @@ inline void scene_plugin(App &app) {
   app.add_systems(Startup, spawn_ground);
   app.add_systems(Startup, spawn_player);
 
+  app.add_systems(Startup, [](ecs::World& world) {
+      auto* lua = world.get_resource<engine::LuaResource>();
+      if (lua) {
+          scripting::register_rydz_api(lua->vm);
+          scripting::expose_world_global(lua->vm, &world);
+      }
+  });
   app.add_systems(Update, group(player_movement_system,
                                 update_isometric_camera_target_system)
                               .run_if(is_gameplay_active));

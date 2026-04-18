@@ -7,13 +7,24 @@ extern "C" {
 }
 
 #include <rydz_ecs/mod.hpp>
+#include <rydz_scripting/bindings/bind_world.hpp>
 #include <string>
 #include <stdexcept>
 #include <filesystem>
 
 namespace scripting {
 
-	void register_rydz_api(lua_State* L);
+	inline void register_rydz_api(lua_State* L) {
+		register_world_metatable(L);
+
+		lua_newtable(L);
+		lua_setglobal(L, "Rydz");
+
+		lua_newtable(L);
+		lua_pushstring(L, "Startup"); lua_setfield(L, -2, "Startup");
+		lua_pushstring(L, "Update");  lua_setfield(L, -2, "Update");
+		lua_setglobal(L, "Schedule");
+	}
 
 	struct LuaResource {
 
