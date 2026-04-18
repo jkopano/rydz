@@ -14,6 +14,8 @@
 #include <unordered_map>
 #include <utility>
 
+using namespace math;
+
 namespace gl {
 
 struct ShaderSpec {

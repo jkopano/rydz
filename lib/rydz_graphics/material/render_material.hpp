@@ -284,9 +284,7 @@ inline auto make_has_camera_slot_provider() -> SlotProvider {
                      PreparedMaterial const&,
                      ShaderProgram& shader
                    ) -> void {
-    shader.set(
-      CameraUniform::Position, math::to_rl(ctx.view().camera_view.position)
-    );
+    shader.set(CameraUniform::Position, ctx.view().camera_view.position);
     shader.set(CameraUniform::ViewMatrix, ctx.view().camera_view.view);
     shader.set(CameraUniform::ProjectionMatrix, ctx.view().camera_view.proj);
   };
@@ -315,14 +313,14 @@ inline auto make_has_pbr_slot_provider() -> SlotProvider {
     auto const& cluster_config = ctx.cluster_config();
 
     int has_directional = lights.has_directional ? 1 : 0;
-    gl::Vec3 dir_color = lights.dir_light.color;
-    gl::Vec3 dir_dir = math::to_rl(lights.dir_light.direction.normalized());
+    Vec3 dir_color = lights.dir_light.color;
+    Vec3 dir_dir = lights.dir_light.direction.normalized();
     float dir_intensity = lights.dir_light.intensity;
-    gl::Vec2 cluster_screen_size = {
+    Vec2 cluster_screen_size = {
       std::max(view.viewport.width, 1.0F),
       std::max(view.viewport.height, 1.0F),
     };
-    gl::Vec2 cluster_near_far = {
+    Vec2 cluster_near_far = {
       std::max(view.near_plane, 0.001f),
       std::max(view.far_plane, view.near_plane + 0.001f),
     };
@@ -336,7 +334,7 @@ inline auto make_has_pbr_slot_provider() -> SlotProvider {
       static_cast<int>(cluster_config.max_lights_per_cluster);
     int is_orthographic = view.orthographic ? 1 : 0;
 
-    gl::bind_clustered_lighting(ctx.clustered_lighting());
+    ctx.clustered_lighting().bind();
     shader.set(PbrLightingUniform::HasDirectional, has_directional);
     shader.set(PbrLightingUniform::DirectionalDirection, dir_dir);
     shader.set(PbrLightingUniform::DirectionalIntensity, dir_intensity);

@@ -340,7 +340,7 @@ private:
     ExtractedView const& view,
     Time const& time
   ) -> void {
-    gl::Vec2 const resolution = {
+    Vec2 const resolution = {
       std::max(view.viewport.width, 1.0F),
       std::max(view.viewport.height, 1.0F),
     };
@@ -396,7 +396,7 @@ struct UiPass {
         continue;
       }
 
-      gl::Vec2 position = {
+      Vec2 position = {
         item.transform.translation.x, item.transform.translation.y
       };
       gl::Rectangle source = {
@@ -411,7 +411,7 @@ struct UiPass {
         texture->width * item.transform.scale.x,
         texture->height * item.transform.scale.y
       };
-      gl::Vec2 origin = {0, 0};
+      Vec2 origin = {0, 0};
 
       gl::draw_texture_pro(
         *texture,

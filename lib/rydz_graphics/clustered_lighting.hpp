@@ -151,12 +151,8 @@ inline auto build_cluster_record(
     }
   }
 
-  record.min_bounds = {
-    .x = bbox.mMin.x, .y = bbox.mMin.y, .z = bbox.mMin.z, .w = 0.0F
-  };
-  record.max_bounds = {
-    .x = bbox.mMax.x, .y = bbox.mMax.y, .z = bbox.mMax.z, .w = 0.0F
-  };
+  record.min_bounds = Vec4{bbox.mMin.x, bbox.mMin.y, bbox.mMin.z, 0.0F};
+  record.max_bounds = Vec4{bbox.mMax.x, bbox.mMax.y, bbox.mMax.z, 0.0F};
   return record;
 }
 
@@ -348,23 +344,22 @@ public:
       last_reported_overflow = U32_MAX;
     }
   }
-};
 
-inline auto bind_clustered_lighting(ClusteredLightingState const& state)
-  -> void {
-  if (state.point_light_buffer.ready()) {
-    state.point_light_buffer.bind(0);
+  auto bind() const -> void {
+    if (point_light_buffer.ready()) {
+      point_light_buffer.bind(0);
+    }
+    if (cluster_buffer.ready()) {
+      cluster_buffer.bind(1);
+    }
+    if (light_index_buffer.ready()) {
+      light_index_buffer.bind(2);
+    }
+    if (overflow_buffer.ready()) {
+      overflow_buffer.bind(3);
+    }
   }
-  if (state.cluster_buffer.ready()) {
-    state.cluster_buffer.bind(1);
-  }
-  if (state.light_index_buffer.ready()) {
-    state.light_index_buffer.bind(2);
-  }
-  if (state.overflow_buffer.ready()) {
-    state.overflow_buffer.bind(3);
-  }
-}
+};
 
 } // namespace gl
 

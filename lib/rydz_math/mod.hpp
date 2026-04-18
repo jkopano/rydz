@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rl.hpp"
 #include "rydz_ecs/requires.hpp"
 #include "types.hpp"
 #include <algorithm>
@@ -28,6 +29,8 @@ struct Vec2 : public glm::vec2 {
 
   Vec2() : Base(0.0F) {}
   Vec2(Base const& value) : Base(value) {}
+
+  constexpr operator rl::Vector2 const() const { return {x, y}; };
 
   static Vec2 const ZERO;
   static auto splat(f32 value) -> Vec2 { return Vec2{value}; }
@@ -65,6 +68,8 @@ struct Vec3 : public glm::vec3 {
 
   Vec3() : Base(0.0F) {}
   Vec3(Base const& value) : Base(value) {}
+
+  constexpr operator rl::Vector3 const() const { return {x, y, z}; };
 
   static Vec3 const ZERO;
   static auto splat(f32 value) -> Vec3 { return Vec3{value}; }
@@ -108,6 +113,8 @@ struct Vec4 : public glm::vec4 {
 
   Vec4() : Base(0.0F) {}
   Vec4(Base const& value) : Base(value) {}
+
+  constexpr operator rl::Vector4 const() const { return {x, y, z, w}; };
 
   static Vec4 const ZERO;
   static auto splat(f32 value) -> Vec4 { return Vec4{value}; }

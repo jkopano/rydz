@@ -11,7 +11,7 @@ struct DebugOverlaySettings {
   using T = Resource;
 
   bool draw_fps = true;
-  gl::Vec2 fps_position = {10.0f, 10.0f};
+  Vec2 fps_position = {10.0f, 10.0f};
 };
 
 struct PipelineState {

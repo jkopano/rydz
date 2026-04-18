@@ -329,7 +329,7 @@ inline auto normalize_pbr_compiled_material(CompiledMaterial& compiled)
             return item.has_color;
           }
         )) {
-      auto emissive = binding->color;
+      math::Vec3 emissive = binding->color;
       ex = emissive.x;
       ey = emissive.y;
       ez = emissive.z;

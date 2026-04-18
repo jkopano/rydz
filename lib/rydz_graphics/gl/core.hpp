@@ -14,11 +14,13 @@
 
 #include "rydz_log/mod.hpp"
 
+using namespace math;
+
 namespace gl {
 
-using Vec2 = rl::Vector2;
-using Vec3 = rl::Vector3;
-using Vec4 = rl::Vector4;
+// using Vec2 = rl::Vector2;
+// using Vec3 = rl::Vector3;
+// using Vec4 = rl::Vector4;
 using Matrix = rl::Matrix;
 using BoneInfo = ::BoneInfo;
 using ModelAnimPose = ::ModelAnimPose;
