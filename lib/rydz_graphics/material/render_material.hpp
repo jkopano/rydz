@@ -318,8 +318,8 @@ inline auto make_has_pbr_slot_provider() -> SlotProvider {
     gl::Vec3 dir_dir = math::to_rl(lights.dir_light.direction.normalized());
     float dir_intensity = lights.dir_light.intensity;
     gl::Vec2 cluster_screen_size = {
-      static_cast<float>(std::max(gl::screen_width(), 1)),
-      static_cast<float>(std::max(gl::screen_height(), 1)),
+      std::max(view.viewport.width, 1.0F),
+      std::max(view.viewport.height, 1.0F),
     };
     gl::Vec2 cluster_near_far = {
       std::max(view.near_plane, 0.001f),

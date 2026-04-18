@@ -15,6 +15,7 @@
 #include <print>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace ecs {
@@ -37,6 +38,20 @@ struct AppRunner {
   using T = Resource;
   std::function<void(App&)> run;
 };
+
+namespace detail {
+
+template <typename P>
+concept BuildPlugin = requires(P&& plugin, App& app) {
+  std::forward<P>(plugin).build(app);
+};
+
+template <typename F>
+concept CallablePlugin = requires(F&& plugin_fn, App& app) {
+  std::forward<F>(plugin_fn)(app);
+};
+
+} // namespace detail
 
 class App {
   struct PendingSetSystemsBase {
@@ -242,7 +257,16 @@ public:
     return *this;
   }
 
-  template <typename F> auto add_plugin(F&& plugin_fn) -> App& {
+  template <typename P>
+    requires detail::BuildPlugin<P>
+  auto add_plugin(P&& plugin) -> App& {
+    std::forward<P>(plugin).build(*this);
+    return *this;
+  }
+
+  template <typename F>
+    requires(!detail::BuildPlugin<F> && detail::CallablePlugin<F>)
+  auto add_plugin(F&& plugin_fn) -> App& {
     std::forward<F>(plugin_fn)(*this);
     return *this;
   }

@@ -14,7 +14,7 @@ if is_plat("windows") then
 elseif is_plat("linux") then
 	set_toolchains("clang")
 	add_cxflags("-stdlib=libc++")
-    add_ldflags("-stdlib=libc++")
+	add_ldflags("-stdlib=libc++")
 end
 
 -- helpers
@@ -40,6 +40,14 @@ end
 set_languages("c++23")
 add_includedirs("lib")
 set_warnings("all", "extra")
+
+if is_plat("windows") then
+	-- Dla clang-cl / msvc (jeśli używasz clang-cl, to zrozumie te flagi)
+	add_cxflags("-Wfloat-conversion", "-Wconstant-conversion")
+else
+	-- Dla czystego Clanga na Linuxie
+	add_cxflags("-Wfloat-conversion", "-Wconversion")
+end
 
 -- common dependencies
 add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")

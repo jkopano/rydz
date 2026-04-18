@@ -112,11 +112,11 @@ struct MeshBounds {
   AABox bbox;
 };
 
-inline void compute_mesh_bounds_system(
+inline auto compute_mesh_bounds_system(
   Query<Entity, Mesh3d, Without<MeshBounds>> query,
   Res<Assets<Mesh>> mesh_assets,
   Cmd cmd
-) {
+) -> void {
   for (auto [e, mesh3d] : query.iter()) {
     auto const* mesh = mesh_assets->get(mesh3d->mesh);
     if ((mesh == nullptr) || mesh->vertex_count() <= 0 ||

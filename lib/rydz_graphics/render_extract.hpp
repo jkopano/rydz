@@ -33,6 +33,7 @@ concept IsExtracted = requires(M const& m) {
 
 struct ExtractedView {
   using T = Resource;
+  gl::Rectangle viewport{0.0F, 0.0F, 1.0F, 1.0F};
   CameraView camera_view{
     .view = Mat4::IDENTITY,
     .proj = Mat4::IDENTITY,
@@ -110,9 +111,14 @@ struct Extract {
     ResMut<ExtractedView> view
   ) -> void {
     view->clear();
-    float const aspect = compute_camera_aspect_ratio(
-      static_cast<float>(window->width), static_cast<float>(window->height)
-    );
+    view->viewport = gl::Rectangle{
+      0.0F,
+      0.0F,
+      static_cast<float>(window->width),
+      static_cast<float>(window->height),
+    };
+    float const aspect =
+      compute_camera_aspect_ratio(view->viewport.width, view->viewport.height);
 
     for (auto [cam_comp, _, cam_gt, clear_color, skybox, postprocess] :
          cam_query.iter()) {

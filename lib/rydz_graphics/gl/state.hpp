@@ -60,19 +60,14 @@ enum class PolygonMode {
 };
 
 inline auto screen_width() -> int { return rl::GetScreenWidth(); }
-
 inline auto screen_height() -> int { return rl::GetScreenHeight(); }
-
 inline auto begin_drawing() -> void { rl::BeginDrawing(); }
-
 inline auto end_drawing() -> void { rl::EndDrawing(); }
-
 inline auto clear_background(Color color) -> void {
   rl::ClearBackground(color);
 }
 
 inline auto begin_texture_mode(RenderTarget target) -> void { target.begin(); }
-
 inline auto draw_fps(int x, int y) -> void { rl::DrawFPS(x, y); }
 
 inline auto draw_render_batch_active() -> void {
@@ -80,11 +75,8 @@ inline auto draw_render_batch_active() -> void {
 }
 
 inline auto matrix_mode(int mode) -> void { rl::rlMatrixMode(mode); }
-
 inline auto push_matrix() -> void { rl::rlPushMatrix(); }
-
 inline auto pop_matrix() -> void { rl::rlPopMatrix(); }
-
 inline auto load_identity() -> void { rl::rlLoadIdentity(); }
 
 inline auto set_projection_matrix(math::Mat4 projection) -> void {
@@ -96,29 +88,19 @@ inline auto set_modelview_matrix(math::Mat4 modelview) -> void {
 }
 
 inline auto enable_depth_test() -> void { rl::rlEnableDepthTest(); }
-
 inline auto disable_depth_test() -> void { rl::rlDisableDepthTest(); }
-
 inline auto enable_depth_mask() -> void { rl::rlEnableDepthMask(); }
-
 inline auto disable_depth_mask() -> void { rl::rlDisableDepthMask(); }
-
 inline auto enable_backface_culling() -> void { rl::rlEnableBackfaceCulling(); }
-
 inline auto disable_backface_culling() -> void {
   rl::rlDisableBackfaceCulling();
 }
 
 inline auto enable_color_blend() -> void { rl::rlEnableColorBlend(); }
-
 inline auto disable_color_blend() -> void { rl::rlDisableColorBlend(); }
-
 inline auto enable_wire_mode() -> void { rl::rlEnableWireMode(); }
-
 inline auto disable_wire_mode() -> void { rl::rlDisableWireMode(); }
-
 inline auto set_blend_mode(int mode) -> void { rl::rlSetBlendMode(mode); }
-
 inline auto color_mask(bool r, bool g, bool b, bool a) -> void {
   rl::rlColorMask(r, g, b, a);
 }
@@ -142,22 +124,23 @@ inline auto end_world_pass() -> void {
   load_identity();
 }
 
-inline auto texture_rect(const Texture &texture) -> Rectangle {
-  return texture.rect();
-}
-
-inline auto flipped_texture_rect(const Texture &texture) -> Rectangle {
-  return texture.flipped_rect();
-}
-
 inline auto screen_rect() -> Rectangle {
-  return {0.0f, 0.0f, static_cast<float>(screen_width()),
-          static_cast<float>(screen_height())};
+  return {
+    0.0f,
+    0.0f,
+    static_cast<float>(screen_width()),
+    static_cast<float>(screen_height())
+  };
 }
 
-inline auto draw_texture_pro(const Texture &texture, Rectangle source,
-                             Rectangle dest, Vec2 origin, float rotation,
-                             Color tint) -> void {
+inline auto draw_texture_pro(
+  Texture const& texture,
+  Rectangle source,
+  Rectangle dest,
+  Vec2 origin,
+  float rotation,
+  Color tint
+) -> void {
   rl::DrawTexturePro(texture, source, dest, origin, rotation, tint);
 }
 

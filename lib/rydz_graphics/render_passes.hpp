@@ -26,7 +26,6 @@ struct FramePass {
     Res<ExtractedView> view,
     ResMut<RenderExecutionState> state,
     ResMut<PipelineState> screen_pipeline,
-    Res<Window> window,
     NonSendMarker marker
   ) -> void;
 
@@ -183,9 +182,9 @@ struct WorldPass {
 
 private:
   static auto depth_prepass_shader_spec() -> ShaderSpec const& {
-    static ShaderSpec const spec =
+    static ShaderSpec const SPEC =
       ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth.frag");
-    return spec;
+    return SPEC;
   }
 
   template <typename BatchT>
@@ -273,31 +272,13 @@ struct PostProcessPass {
   }
 
 private:
-  static auto postprocess_source_rect(gl::Texture const& texture)
-    -> gl::Rectangle {
-    return {
-      0.0F,
-      0.0F,
-      static_cast<f32>(texture.width),
-      -static_cast<f32>(texture.height),
-    };
-  }
-
-  static auto postprocess_dest_rect() -> gl::Rectangle {
-    return {
-      0.0F,
-      0.0F,
-      static_cast<f32>(gl::screen_width()),
-      static_cast<f32>(gl::screen_height()),
-    };
-  }
-
-  static auto draw_world_target_to_screen(gl::Texture const& source_texture)
-    -> void {
+  static auto draw_world_target_to_screen(
+    gl::Texture const& source_texture, ExtractedView const& view
+  ) -> void {
     gl::draw_texture_pro(
       source_texture,
-      postprocess_source_rect(source_texture),
-      postprocess_dest_rect(),
+      source_texture.rect().flipped_y(),
+      view.viewport,
       {0.0F, 0.0F},
       0.0F,
       gl::kWhite
@@ -305,11 +286,14 @@ private:
   }
 
   static auto apply_postprocess_uniforms(
-    ShaderProgram& shader, PostProcessDescriptor const& effect, Time const& time
+    ShaderProgram& shader,
+    PostProcessDescriptor const& effect,
+    ExtractedView const& view,
+    Time const& time
   ) -> void {
     gl::Vec2 const resolution = {
-      static_cast<f32>(std::max(gl::screen_width(), 1)),
-      static_cast<f32>(std::max(gl::screen_height(), 1)),
+      std::max(view.viewport.width, 1.0F),
+      std::max(view.viewport.height, 1.0F),
     };
     shader.set("u_resolution", resolution);
     shader.set("u_time", time.elapsed_seconds);
@@ -327,17 +311,17 @@ private:
     Time const& time
   ) -> void {
     if (!view.has_postprocess || !view.postprocess.enabled) {
-      draw_world_target_to_screen(source_texture);
+      draw_world_target_to_screen(source_texture, view);
       return;
     }
 
     ShaderProgram& shader =
       resolve_shader(marker, shader_cache, view.postprocess.shader);
-    apply_postprocess_uniforms(shader, view.postprocess, time);
+    apply_postprocess_uniforms(shader, view.postprocess, view, time);
     shader.set_texture(MaterialMap::Albedo, source_texture);
 
     shader.with_bound([&] -> void {
-      draw_world_target_to_screen(source_texture);
+      draw_world_target_to_screen(source_texture, view);
     });
   }
 };
@@ -403,7 +387,6 @@ inline auto FramePass::begin(
   Res<ExtractedView> view,
   ResMut<RenderExecutionState> state,
   ResMut<PipelineState> pipeline,
-  Res<Window> window,
   NonSendMarker marker
 ) -> void {
   state->world_pass_active = false;
@@ -418,7 +401,10 @@ inline auto FramePass::begin(
     return;
   }
 
-  pipeline->ensure_target(window->width, window->height);
+  pipeline->ensure_target(
+    static_cast<u32>(std::max(view->viewport.width, 1.0F)),
+    static_cast<u32>(std::max(view->viewport.height, 1.0F))
+  );
   pipeline->world_target.begin();
   gl::clear_background(view->clear_color);
   state->world_target_active = true;
