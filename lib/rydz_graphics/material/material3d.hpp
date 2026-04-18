@@ -149,7 +149,7 @@ class MaterialBuilder {
 
 public:
   auto uniform(std::string_view name, Uniform value) -> MaterialBuilder& {
-    uniforms_.insert_or_assign(std::string{name}, std::move(value));
+    uniforms_.insert_or_assign(std::string{name}, value);
     return *this;
   }
 
@@ -195,7 +195,7 @@ concept IsMaterial = requires(T const m, MaterialBuilder& builder) {
   { T::fragment_shader() } -> std::convertible_to<ShaderRef>;
 };
 
-template <typename... SlotTs> struct IMaterial {
+template <typename... SlotTs> struct MaterialTrait {
   static auto vertex_shader() -> ShaderRef { return ""; }
   static auto fragment_shader() -> ShaderRef { return ""; }
   auto bind(MaterialBuilder&) const -> void {}
@@ -208,7 +208,7 @@ template <typename... SlotTs> struct IMaterial {
   using _material_have_to_implement = void;
 
 private:
-  using __slot_tuple = std::tuple<SlotTs...>;
+  using _slot_tuple = std::tuple<SlotTs...>;
   template <typename, typename> friend struct MaterialMeta;
 };
 
@@ -217,8 +217,8 @@ template <typename M, typename = void> struct MaterialMeta {
 };
 
 template <typename M>
-struct MaterialMeta<M, std::void_t<typename bare_t<M>::__slot_tuple>> {
-  using slot_tuple = typename bare_t<M>::__slot_tuple;
+struct MaterialMeta<M, std::void_t<typename bare_t<M>::_slot_tuple>> {
+  using slot_tuple = typename bare_t<M>::_slot_tuple;
   static constexpr bool is_trait_based = true;
 };
 
@@ -238,7 +238,7 @@ inline auto remove_uniform_by_name(
     return std::nullopt;
   }
 
-  Uniform removed = std::move(it->second);
+  Uniform removed = it->second;
   uniforms.erase(it);
   return removed;
 }
@@ -288,9 +288,10 @@ inline auto normalize_pbr_compiled_material(CompiledMaterial& compiled)
         return item.has_texture;
       }
     );
-    if (value_binding) {
+    if (value_binding != nullptr) {
       roughness = value_binding->value;
-    } else if (!texture_binding || !texture_binding->texture.is_valid()) {
+    } else if ((texture_binding == nullptr) ||
+               !texture_binding->texture.is_valid()) {
       roughness = 1.0f;
     }
     compiled.set_uniform(MaterialMap::Roughness, Uniform{roughness});

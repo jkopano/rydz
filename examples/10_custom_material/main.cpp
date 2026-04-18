@@ -1,14 +1,8 @@
 // 10 - Custom Material
 
-#include "math.hpp"
-#include "rl.hpp"
-#include "rydz_ecs/mod.hpp"
-#include "rydz_graphics/mod.hpp"
 #include "rydz_graphics/render_plugin.hpp"
 #include "rydz_platform/mod.hpp"
 #include <cmath>
-#include <numbers>
-#include <print>
 #include <string_view>
 
 using namespace ecs;
@@ -30,8 +24,8 @@ static inline auto map_uniform_binding(ToonUniform uniform)
   return "";
 }
 
-struct ToonMaterial : IMaterial<HasCamera> {
-  ecs::Color base_color = ecs::Color::WHITE;
+struct ToonMaterial : MaterialTrait<HasCamera> {
+  Color base_color = Color::WHITE;
   float rim_strength = 0.15f;
   Vec3 lightDir = {1.0, -1.0, 0.1};
 
@@ -48,7 +42,7 @@ struct ToonMaterial : IMaterial<HasCamera> {
   }
 
   void bind(MaterialBuilder& builder) const {
-    builder.color(ecs::MaterialMap::Albedo, base_color);
+    builder.color(MaterialMap::Albedo, base_color);
     builder.uniform(ToonUniform::RimStrength, Uniform{rim_strength});
     builder.uniform("lightDir", Uniform{lightDir});
   }

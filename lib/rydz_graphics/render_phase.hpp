@@ -40,7 +40,8 @@ struct ShadowPhase {
   auto queue(ExtractedMeshes const& meshes) -> void {
     clear();
     for (auto const& item : meshes.items) {
-      if (!item.casts_shadows) {
+      auto const& material = meshes.materials[item.material_index];
+      if (!material.casts_shadows) {
         continue;
       }
       items.push_back(
@@ -59,16 +60,19 @@ struct OpaquePhase {
 
   struct Batch {
     RenderBatchKey key;
+    CompiledMaterial material{};
     std::vector<gl::Matrix> transforms;
   };
 
   struct Item {
     Handle<Mesh> mesh{};
-    CompiledMaterial material{};
+    RenderMaterialKey material{};
+    usize material_index{};
     Mat4 world_transform = Mat4::IDENTITY;
     f32 distance_to_camera = 0.0F;
   };
 
+  std::vector<ExtractedMeshes::MaterialItem> materials;
   std::vector<Item> items;
   std::vector<Batch> batches;
 
@@ -76,14 +80,17 @@ struct OpaquePhase {
 
   auto queue(ExtractedMeshes const& meshes) -> void {
     clear();
+    materials = meshes.materials;
     for (auto const& item : meshes.items) {
-      if (item.transparent) {
+      auto const& material = meshes.materials[item.material_index];
+      if (material.transparent) {
         continue;
       }
       items.push_back(
         Item{
           .mesh = item.mesh,
           .material = item.material,
+          .material_index = item.material_index,
           .world_transform = item.world_transform,
           .distance_to_camera = item.distance_to_camera,
         }
@@ -106,6 +113,7 @@ struct OpaquePhase {
         usize batch_slot = batches.size();
         Batch batch{};
         batch.key = key;
+        batch.material = materials[item.material_index].material;
         batch.transforms.push_back(math::to_rl(item.world_transform));
         batches.push_back(std::move(batch));
         batch_index.emplace(batches.back().key, batch_slot);
@@ -124,16 +132,19 @@ struct TransparentPhase {
 
   struct Batch {
     RenderBatchKey key;
+    CompiledMaterial material{};
     std::vector<gl::Matrix> transforms;
   };
 
   struct Item {
     Handle<Mesh> mesh{};
-    CompiledMaterial material{};
+    RenderMaterialKey material{};
+    usize material_index{};
     Mat4 world_transform = Mat4::IDENTITY;
     f32 sort_key = 0.0F;
   };
 
+  std::vector<ExtractedMeshes::MaterialItem> materials;
   std::vector<Item> items;
   std::vector<Batch> batches;
 
@@ -141,14 +152,17 @@ struct TransparentPhase {
 
   auto queue(ExtractedMeshes const& meshes) -> void {
     clear();
+    materials = meshes.materials;
     for (auto const& item : meshes.items) {
-      if (!item.transparent) {
+      auto const& material = meshes.materials[item.material_index];
+      if (!material.transparent) {
         continue;
       }
       items.push_back(
         Item{
           .mesh = item.mesh,
           .material = item.material,
+          .material_index = item.material_index,
           .world_transform = item.world_transform,
           .sort_key = item.distance_to_camera,
         }
@@ -172,6 +186,7 @@ struct TransparentPhase {
       if (batches.empty() || !(batches.back().key == key)) {
         Batch batch{};
         batch.key = key;
+        batch.material = materials[item.material_index].material;
         batch.transforms.push_back(math::to_rl(item.world_transform));
         batches.push_back(std::move(batch));
         continue;

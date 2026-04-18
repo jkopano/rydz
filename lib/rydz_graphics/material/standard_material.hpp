@@ -7,7 +7,7 @@
 
 namespace ecs {
 
-struct StandardMaterial : IMaterial<HasPBR> {
+struct StandardMaterial : MaterialTrait<HasPBR> {
   Color base_color = Color::WHITE;
   Handle<Texture> texture{};
   Handle<Texture> normal_map{};

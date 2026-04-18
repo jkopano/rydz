@@ -74,8 +74,8 @@ struct RenderPlugin {
     if (auto* server = app.world().get_resource<AssetServer>()) {
       register_default_loaders(*server);
     }
-    register_slot<HasCamera>(app, make_has_camera_slot_provider());
-    register_slot<HasPBR>(app, make_has_pbr_slot_provider());
+    register_slot<HasCamera>(app, HasCamera::slot_provider());
+    register_slot<HasPBR>(app, HasPBR::slot_provider());
 
     app.add_systems(First, [](World& world) -> void {
       if (auto* server = world.get_resource<AssetServer>()) {

@@ -3,7 +3,7 @@
 #include "color.hpp"
 #include "light.hpp"
 #include "math.hpp"
-#include "mesh3d.hpp"
+#include "mesh3d_component.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/frustum.hpp"
@@ -12,6 +12,7 @@
 #include "rydz_graphics/material/material3d.hpp"
 #include "rydz_graphics/material/postprocess_material.hpp"
 #include "rydz_graphics/material/standard_material.hpp"
+#include "rydz_graphics/render_batches.hpp"
 #include "transform.hpp"
 #include "visibility.hpp"
 #include <array>
@@ -72,15 +73,22 @@ struct ExtractedLights {
 struct ExtractedMeshes {
   using T = Resource;
 
-  struct Item {
-    Handle<Mesh> mesh{};
+  struct MaterialItem {
+    RenderMaterialKey key{};
     CompiledMaterial material{};
-    Mat4 world_transform{Mat4::IDENTITY};
-    float distance_to_camera{0.0F};
     bool transparent{};
     bool casts_shadows{true};
   };
 
+  struct Item {
+    Handle<Mesh> mesh{};
+    RenderMaterialKey material{};
+    usize material_index{};
+    Mat4 world_transform{Mat4::IDENTITY};
+    float distance_to_camera{0.0F};
+  };
+
+  std::vector<MaterialItem> materials;
   std::vector<Item> items;
   auto clear() -> void { *this = ExtractedMeshes{}; }
 };
@@ -171,12 +179,13 @@ struct Extract {
 
   template <RenderMaterialAsset M>
   static auto meshes(
-    Query<Mesh3d, GlobalTransform, MeshMaterial3d<M>, Opt<ViewVisibility>> query,
+    Query<Mesh3d, GlobalTransform, MeshMaterial3d<M>, Opt<ViewVisibility>>
+      query,
     Res<ExtractedView> view,
     Res<Assets<M>> material_assets,
     ResMut<ExtractedMeshes> meshes
   ) -> void {
-    std::unordered_map<u32, CompiledMaterial> compiled_cache;
+    std::unordered_map<u32, usize> material_cache;
 
     for (auto [mesh3d, global, material, visibility] : query.iter()) {
       if (!mesh3d->mesh.is_valid() || !material->material.is_valid()) {
@@ -192,25 +201,34 @@ struct Extract {
       }
 
       auto [compiled_iter, inserted] =
-        compiled_cache.try_emplace(material->material.id);
+        material_cache.try_emplace(material->material.id);
       if (inserted) {
-        compiled_iter->second = compile_render_material_asset(*material_asset);
+        CompiledMaterial compiled =
+          compile_render_material_asset(*material_asset);
+        bool const transparent =
+          compiled.render_method == RenderMethod::Transparent;
+        bool const casts_shadows = compiled.casts_shadows;
+        compiled_iter->second = meshes->materials.size();
+        meshes->materials.push_back(
+          ExtractedMeshes::MaterialItem{
+            .key = render_material_key(material->material),
+            .material = std::move(compiled),
+            .transparent = transparent,
+            .casts_shadows = casts_shadows,
+          }
+        );
       }
 
-      CompiledMaterial compiled = compiled_iter->second;
-      bool const transparent =
-        compiled.render_method == RenderMethod::Transparent;
-      bool const casts_shadows = compiled.casts_shadows;
+      auto const& material_item = meshes->materials[compiled_iter->second];
       Vec3 camera_offset = global->translation() - view->camera_view.position;
 
       meshes->items.push_back(
         ExtractedMeshes::Item{
           .mesh = mesh3d->mesh,
-          .material = std::move(compiled),
+          .material = material_item.key,
+          .material_index = compiled_iter->second,
           .world_transform = global->matrix,
           .distance_to_camera = camera_offset.length_sq(),
-          .transparent = transparent,
-          .casts_shadows = casts_shadows,
         }
       );
     }

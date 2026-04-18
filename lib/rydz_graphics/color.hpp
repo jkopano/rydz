@@ -1,5 +1,6 @@
 #pragma once
 
+#include "math.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/fwd.hpp"
 #include "types.hpp"

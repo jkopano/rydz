@@ -600,14 +600,14 @@ struct MaterialMap {
   f32 value{};
 
   constexpr MaterialMap() = default;
-  constexpr MaterialMap(::MaterialMap const& raw) noexcept
+  constexpr MaterialMap(::rlMaterialMap const& raw) noexcept
       : MaterialMap(detail::raylib_cast<MaterialMap>(raw)) {}
 
-  constexpr operator ::MaterialMap() const noexcept {
-    return detail::raylib_cast<::MaterialMap>(*this);
+  constexpr operator ::rlMaterialMap() const noexcept {
+    return detail::raylib_cast<::rlMaterialMap>(*this);
   }
 
-  auto operator=(::MaterialMap const& raw) noexcept -> MaterialMap& {
+  auto operator=(::rlMaterialMap const& raw) noexcept -> MaterialMap& {
     *this = MaterialMap(raw);
     return *this;
   }
@@ -637,14 +637,14 @@ struct Mesh {
   i32 parentId{};
 
   constexpr Mesh() = default;
-  constexpr Mesh(::Mesh const& raw) noexcept
+  constexpr Mesh(::rlMesh const& raw) noexcept
       : Mesh(detail::raylib_cast<Mesh>(raw)) {}
 
-  constexpr operator ::Mesh() const noexcept {
-    return detail::raylib_cast<::Mesh>(*this);
+  constexpr operator ::rlMesh() const noexcept {
+    return detail::raylib_cast<::rlMesh>(*this);
   }
 
-  auto operator=(::Mesh const& raw) noexcept -> Mesh& {
+  auto operator=(::rlMesh const& raw) noexcept -> Mesh& {
     *this = Mesh(raw);
     return *this;
   }
@@ -659,13 +659,13 @@ struct Mesh {
   [[nodiscard]] auto vertex_data() -> float* { return vertices; }
 
   auto gen_tangents() -> void {
-    auto raw = static_cast<::Mesh>(*this);
+    auto raw = static_cast<::rlMesh>(*this);
     rl::GenMeshTangents(&raw);
     *this = raw;
   }
 
   auto upload(bool dynamic) -> void {
-    auto raw = static_cast<::Mesh>(*this);
+    auto raw = static_cast<::rlMesh>(*this);
     rl::UploadMesh(&raw, dynamic);
     *this = raw;
   }
@@ -785,11 +785,11 @@ static_assert(std::is_trivially_copyable_v<Sound>);
 static_assert(sizeof(Shader) == sizeof(::Shader));
 static_assert(alignof(Shader) == alignof(::Shader));
 static_assert(std::is_trivially_copyable_v<Shader>);
-static_assert(sizeof(MaterialMap) == sizeof(::MaterialMap));
-static_assert(alignof(MaterialMap) == alignof(::MaterialMap));
+static_assert(sizeof(MaterialMap) == sizeof(::rlMaterialMap));
+static_assert(alignof(MaterialMap) == alignof(::rlMaterialMap));
 static_assert(std::is_trivially_copyable_v<MaterialMap>);
-static_assert(sizeof(Mesh) == sizeof(::Mesh));
-static_assert(alignof(Mesh) == alignof(::Mesh));
+static_assert(sizeof(Mesh) == sizeof(::rlMesh));
+static_assert(alignof(Mesh) == alignof(::rlMesh));
 static_assert(std::is_trivially_copyable_v<Mesh>);
 static_assert(sizeof(Material) == sizeof(::Material));
 static_assert(alignof(Material) == alignof(::Material));

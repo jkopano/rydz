@@ -1141,14 +1141,14 @@ Model LoadModel(const char *fileName)
 // WARNING: A shallow copy of mesh is generated, passed by value,
 // as long as struct contains pointers to data and some values, get a copy
 // of mesh pointing to same data as original version... be careful!
-Model LoadModelFromMesh(Mesh mesh)
+Model LoadModelFromMesh(rlMesh mesh)
 {
     Model model = { 0 };
 
     model.transform = MatrixIdentity();
 
     model.meshCount = 1;
-    model.meshes = (Mesh *)RL_CALLOC(model.meshCount, sizeof(Mesh));
+    model.meshes = (rlMesh *)RL_CALLOC(model.meshCount, sizeof(rlMesh));
     model.meshes[0] = mesh;
 
     model.materialCount = 1;
@@ -1257,7 +1257,7 @@ BoundingBox GetModelBoundingBox(Model model)
 }
 
 // Upload vertex data into a VAO (if supported) and VBO
-void UploadMesh(Mesh *mesh, bool dynamic)
+void UploadMesh(rlMesh *mesh, bool dynamic)
 {
     if (mesh->vaoId > 0)
     {
@@ -1424,13 +1424,13 @@ void UploadMesh(Mesh *mesh, bool dynamic)
 }
 
 // Update mesh vertex data in GPU for a specific buffer index
-void UpdateMeshBuffer(Mesh mesh, int index, const void *data, int dataSize, int offset)
+void UpdateMeshBuffer(rlMesh mesh, int index, const void *data, int dataSize, int offset)
 {
     rlUpdateVertexBuffer(mesh.vboId[index], data, dataSize, offset);
 }
 
 // Draw a 3d mesh with material and transform
-void DrawMesh(Mesh mesh, Material material, Matrix transform)
+void DrawMesh(rlMesh mesh, Material material, Matrix transform)
 {
 #if defined(GRAPHICS_API_OPENGL_11) || defined(GRAPHICS_API_OPENGL_11_SOFTWARE)
     #define GL_VERTEX_ARRAY         0x8074
@@ -1684,7 +1684,7 @@ void DrawMesh(Mesh mesh, Material material, Matrix transform)
 }
 
 // Draw multiple mesh instances with material and different transforms
-void DrawMeshInstanced(Mesh mesh, Material material, const Matrix *transforms, int instances)
+void DrawMeshInstanced(rlMesh mesh, Material material, const Matrix *transforms, int instances)
 {
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
     // Instancing required variables
@@ -1923,7 +1923,7 @@ void DrawMeshInstanced(Mesh mesh, Material material, const Matrix *transforms, i
 }
 
 // Unload mesh from memory (RAM and VRAM)
-void UnloadMesh(Mesh mesh)
+void UnloadMesh(rlMesh mesh)
 {
     // Unload rlgl mesh vboId data
     rlUnloadVertexArray(mesh.vaoId);
@@ -1950,7 +1950,7 @@ void UnloadMesh(Mesh mesh)
 }
 
 // Export mesh data to file
-bool ExportMesh(Mesh mesh, const char *fileName)
+bool ExportMesh(rlMesh mesh, const char *fileName)
 {
     bool success = false;
 
@@ -2029,7 +2029,7 @@ bool ExportMesh(Mesh mesh, const char *fileName)
 }
 
 // Export mesh as code file (.h) defining multiple arrays of vertex attributes
-bool ExportMeshAsCode(Mesh mesh, const char *fileName)
+bool ExportMeshAsCode(rlMesh mesh, const char *fileName)
 {
     bool success = false;
 
@@ -2194,7 +2194,7 @@ Material *LoadMaterials(const char *fileName, int *materialCount)
 Material LoadMaterialDefault(void)
 {
     Material material = { 0 };
-    material.maps = (MaterialMap *)RL_CALLOC(MAX_MATERIAL_MAPS, sizeof(MaterialMap));
+    material.maps = (rlMaterialMap *)RL_CALLOC(MAX_MATERIAL_MAPS, sizeof(rlMaterialMap));
 
     // Using rlgl default shader
     material.shader.id = rlGetShaderIdDefault();
@@ -2460,7 +2460,7 @@ static void UpdateModelAnimationVertexBuffers(Model model)
 {
     for (int m = 0; m < model.meshCount; m++)
     {
-        Mesh mesh = model.meshes[m];
+        rlMesh mesh = model.meshes[m];
         Vector3 animVertex = { 0 };
         Vector3 animNormal = { 0 };
         const int vertexValuesCount = mesh.vertexCount*3;
@@ -2550,9 +2550,9 @@ bool IsModelAnimationValid(Model model, ModelAnimation anim)
 
 #if SUPPORT_MESH_GENERATION
 // Generate polygonal mesh
-Mesh GenMeshPoly(int sides, float radius)
+rlMesh GenMeshPoly(int sides, float radius)
 {
-    Mesh mesh = { 0 };
+    rlMesh mesh = { 0 };
 
     if (sides < 3) return mesh; // Security check
 
@@ -2619,9 +2619,9 @@ Mesh GenMeshPoly(int sides, float radius)
 }
 
 // Generate plane mesh (with subdivisions)
-Mesh GenMeshPlane(float width, float length, int resX, int resZ)
+rlMesh GenMeshPlane(float width, float length, int resX, int resZ)
 {
-    Mesh mesh = { 0 };
+    rlMesh mesh = { 0 };
 
 #define CUSTOM_MESH_GEN_PLANE
 #if defined(CUSTOM_MESH_GEN_PLANE)
@@ -2752,9 +2752,9 @@ Mesh GenMeshPlane(float width, float length, int resX, int resZ)
 }
 
 // Generated cuboid mesh
-Mesh GenMeshCube(float width, float height, float length)
+rlMesh GenMeshCube(float width, float height, float length)
 {
-    Mesh mesh = { 0 };
+    rlMesh mesh = { 0 };
 
 #define CUSTOM_MESH_GEN_CUBE
 #if defined(CUSTOM_MESH_GEN_CUBE)
@@ -2917,9 +2917,9 @@ par_shapes_mesh *par_shapes_create_icosahedron();       // 20 sides polyhedron
 }
 
 // Generate sphere mesh (standard sphere)
-Mesh GenMeshSphere(float radius, int rings, int slices)
+rlMesh GenMeshSphere(float radius, int rings, int slices)
 {
-    Mesh mesh = { 0 };
+    rlMesh mesh = { 0 };
 
     if ((rings >= 3) && (slices >= 3))
     {
@@ -2960,9 +2960,9 @@ Mesh GenMeshSphere(float radius, int rings, int slices)
 }
 
 // Generate hemisphere mesh (half sphere, no bottom cap)
-Mesh GenMeshHemiSphere(float radius, int rings, int slices)
+rlMesh GenMeshHemiSphere(float radius, int rings, int slices)
 {
-    Mesh mesh = { 0 };
+    rlMesh mesh = { 0 };
 
     if ((rings >= 3) && (slices >= 3))
     {
@@ -3004,9 +3004,9 @@ Mesh GenMeshHemiSphere(float radius, int rings, int slices)
 }
 
 // Generate cylinder mesh
-Mesh GenMeshCylinder(float radius, float height, int slices)
+rlMesh GenMeshCylinder(float radius, float height, int slices)
 {
-    Mesh mesh = { 0 };
+    rlMesh mesh = { 0 };
 
     if (slices >= 3)
     {
@@ -3068,9 +3068,9 @@ Mesh GenMeshCylinder(float radius, float height, int slices)
 }
 
 // Generate cone/pyramid mesh
-Mesh GenMeshCone(float radius, float height, int slices)
+rlMesh GenMeshCone(float radius, float height, int slices)
 {
-    Mesh mesh = { 0 };
+    rlMesh mesh = { 0 };
 
     if (slices >= 3)
     {
@@ -3123,9 +3123,9 @@ Mesh GenMeshCone(float radius, float height, int slices)
 }
 
 // Generate torus mesh
-Mesh GenMeshTorus(float radius, float size, int radSeg, int sides)
+rlMesh GenMeshTorus(float radius, float size, int radSeg, int sides)
 {
-    Mesh mesh = { 0 };
+    rlMesh mesh = { 0 };
 
     if ((sides >= 3) && (radSeg >= 3))
     {
@@ -3169,9 +3169,9 @@ Mesh GenMeshTorus(float radius, float size, int radSeg, int sides)
 }
 
 // Generate trefoil knot mesh
-Mesh GenMeshKnot(float radius, float size, int radSeg, int sides)
+rlMesh GenMeshKnot(float radius, float size, int radSeg, int sides)
 {
-    Mesh mesh = { 0 };
+    rlMesh mesh = { 0 };
 
     if ((sides >= 3) && (radSeg >= 3))
     {
@@ -3214,11 +3214,11 @@ Mesh GenMeshKnot(float radius, float size, int radSeg, int sides)
 
 // Generate a mesh from heightmap
 // NOTE: Vertex data is uploaded to GPU
-Mesh GenMeshHeightmap(Image heightmap, Vector3 size)
+rlMesh GenMeshHeightmap(Image heightmap, Vector3 size)
 {
     #define GRAY_VALUE(c) ((float)(c.r + c.g + c.b)/3.0f)
 
-    Mesh mesh = { 0 };
+    rlMesh mesh = { 0 };
 
     int mapX = heightmap.width;
     int mapZ = heightmap.height;
@@ -3346,11 +3346,11 @@ Mesh GenMeshHeightmap(Image heightmap, Vector3 size)
 
 // Generate a cubes mesh from pixel data
 // NOTE: Vertex data is uploaded to GPU
-Mesh GenMeshCubicmap(Image cubicmap, Vector3 cubeSize)
+rlMesh GenMeshCubicmap(Image cubicmap, Vector3 cubeSize)
 {
     #define COLOR_EQUAL(col1, col2) ((col1.r == col2.r)&&(col1.g == col2.g)&&(col1.b == col2.b)&&(col1.a == col2.a))
 
-    Mesh mesh = { 0 };
+    rlMesh mesh = { 0 };
 
     rlColor *pixels = LoadImageColors(cubicmap);
 
@@ -3696,7 +3696,7 @@ Mesh GenMeshCubicmap(Image cubicmap, Vector3 cubeSize)
 
 // Compute mesh bounding box limits
 // NOTE: minVertex and maxVertex should be transformed by model transform matrix
-BoundingBox GetMeshBoundingBox(Mesh mesh)
+BoundingBox GetMeshBoundingBox(rlMesh mesh)
 {
     // Get min and max vertex to construct bounds (AABB)
     Vector3 minVertex = { 0 };
@@ -3723,7 +3723,7 @@ BoundingBox GetMeshBoundingBox(Mesh mesh)
 }
 
 // Compute mesh tangents
-void GenMeshTangents(Mesh *mesh)
+void GenMeshTangents(rlMesh *mesh)
 {
     // Check if input mesh data is useful
     if ((mesh == NULL) || (mesh->vertices == NULL) || (mesh->texcoords == NULL) || (mesh->normals == NULL))
@@ -4254,7 +4254,7 @@ RayCollision GetRayCollisionBox(Ray ray, BoundingBox box)
 }
 
 // Get collision info between ray and mesh
-RayCollision GetRayCollisionMesh(Ray ray, Mesh mesh, Matrix transform)
+RayCollision GetRayCollisionMesh(Ray ray, rlMesh mesh, Matrix transform)
 {
     RayCollision collision = { 0 };
 
@@ -4480,7 +4480,7 @@ static Model LoadOBJ(const char *fileName)
 
     // Allocate the base meshes and materials
     model.meshCount = meshIndex + 1;
-    model.meshes = (Mesh *)MemAlloc(sizeof(Mesh)*model.meshCount);
+    model.meshes = (rlMesh *)MemAlloc(sizeof(rlMesh)*model.meshCount);
 
     if (objMaterialCount > 0)
     {
@@ -4797,7 +4797,7 @@ static Model LoadIQM(const char *fileName)
     memcpy(imesh, fileDataPtr + iqmHeader->ofs_meshes, iqmHeader->num_meshes*sizeof(IQMMesh));
 
     model.meshCount = iqmHeader->num_meshes;
-    model.meshes = (Mesh *)RL_CALLOC(model.meshCount, sizeof(Mesh));
+    model.meshes = (rlMesh *)RL_CALLOC(model.meshCount, sizeof(rlMesh));
 
     model.materialCount = model.meshCount;
     model.materials = (Material *)RL_CALLOC(model.materialCount, sizeof(Material));
@@ -5521,7 +5521,7 @@ static Model LoadGLTF(const char *fileName)
 
         // Load our model data: meshes and materials
         model.meshCount = primitivesCount;
-        model.meshes = (Mesh *)RL_CALLOC(model.meshCount, sizeof(Mesh));
+        model.meshes = (rlMesh *)RL_CALLOC(model.meshCount, sizeof(rlMesh));
 
         // NOTE: Keep an extra slot for default material, in case some mesh requires it
         model.materialCount = (int)data->materials_count + 1;
@@ -6723,7 +6723,7 @@ static Model LoadVOX(const char *fileName)
     model.transform = MatrixIdentity();
 
     model.meshCount = meshescount;
-    model.meshes = (Mesh *)RL_CALLOC(model.meshCount, sizeof(Mesh));
+    model.meshes = (rlMesh *)RL_CALLOC(model.meshCount, sizeof(rlMesh));
 
     model.meshMaterial = (int *)RL_CALLOC(model.meshCount, sizeof(int));
 
@@ -6746,8 +6746,8 @@ static Model LoadVOX(const char *fileName)
 
     for (int i = 0; i < meshescount; i++)
     {
-        Mesh *pmesh = &model.meshes[i];
-        memset(pmesh, 0, sizeof(Mesh));
+        rlMesh *pmesh = &model.meshes[i];
+        memset(pmesh, 0, sizeof(rlMesh));
 
         // Copy vertices
         pmesh->vertexCount = (int)fmin(verticesMax, verticesRemain);
@@ -6864,7 +6864,7 @@ static Model LoadM3D(const char *fileName)
         }
         */
 
-        model.meshes = (Mesh *)RL_CALLOC(model.meshCount, sizeof(Mesh));
+        model.meshes = (rlMesh *)RL_CALLOC(model.meshCount, sizeof(rlMesh));
         model.meshMaterial = (int *)RL_CALLOC(model.meshCount, sizeof(int));
         model.materials = (Material *)RL_CALLOC(model.materialCount + 1, sizeof(Material));
 
@@ -6883,8 +6883,8 @@ static Model LoadM3D(const char *fileName)
                     model.meshCount++;
 
                     // Create a second buffer for mesh re-allocation
-                    Mesh *tempMeshes = (Mesh *)RL_CALLOC(model.meshCount, sizeof(Mesh));
-                    memcpy(tempMeshes, model.meshes, (model.meshCount - 1)*sizeof(Mesh));
+                    rlMesh *tempMeshes = (rlMesh *)RL_CALLOC(model.meshCount, sizeof(rlMesh));
+                    memcpy(tempMeshes, model.meshes, (model.meshCount - 1)*sizeof(rlMesh));
                     RL_FREE(model.meshes);
                     model.meshes = tempMeshes;
 
@@ -7335,7 +7335,7 @@ GltfScene LoadGltfScene(const char *fileName)
         }
 
         scene.meshCount = primitivesCount;
-        scene.meshes = (Mesh *)RL_CALLOC(scene.meshCount, sizeof(Mesh));
+        scene.meshes = (rlMesh *)RL_CALLOC(scene.meshCount, sizeof(rlMesh));
 
         scene.materialCount = (int)data->materials_count + 1;
         scene.materials = (Material *)RL_CALLOC(scene.materialCount, sizeof(Material));

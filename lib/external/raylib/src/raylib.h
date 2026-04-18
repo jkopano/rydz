@@ -371,7 +371,7 @@ typedef struct Camera2D {
 } Camera2D;
 
 // Mesh, vertex data and vao/vbo
-typedef struct Mesh {
+typedef struct rlMesh {
   int vertexCount;   // Number of vertices stored in arrays
   int triangleCount; // Number of triangles stored (indexed or not)
 
@@ -411,7 +411,7 @@ typedef struct Mesh {
   char name[64]; // Mesh name (from GLTF node/mesh name)
   int id;        // Mesh ID within the scene (-1 = unset)
   int parentId;  // Parent mesh ID (-1 = top-level / scene root)
-} Mesh;
+} rlMesh;
 
 // Shader
 typedef struct Shader {
@@ -420,17 +420,17 @@ typedef struct Shader {
 } Shader;
 
 // MaterialMap
-typedef struct MaterialMap {
+typedef struct rlMaterialMap {
   Texture2D texture; // Material map texture
   rlColor color;     // Material map color
   float value;       // Material map value
-} MaterialMap;
+} rlMaterialMap;
 
 // Material, includes shader and maps
 typedef struct Material {
-  Shader shader;     // Material shader
-  MaterialMap* maps; // Material maps array (MAX_MATERIAL_MAPS)
-  float params[4];   // Material generic parameters (if required)
+  Shader shader;       // Material shader
+  rlMaterialMap* maps; // Material maps array (MAX_MATERIAL_MAPS)
+  float params[4];     // Material generic parameters (if required)
 } Material;
 
 // Transform, vertex transformation data
@@ -462,7 +462,7 @@ typedef struct Model {
 
   int meshCount;       // Number of meshes
   int materialCount;   // Number of materials
-  Mesh* meshes;        // Meshes array
+  rlMesh* meshes;      // Meshes array
   Material* materials; // Materials array
   int* meshMaterial;   // Mesh material number
 
@@ -479,7 +479,7 @@ typedef struct Model {
 typedef struct GltfScene {
   int meshCount;       // Number of meshes
   int materialCount;   // Number of materials
-  Mesh* meshes;        // Meshes array (with name/id/parentId populated)
+  rlMesh* meshes;      // Meshes array (with name/id/parentId populated)
   Material* materials; // Materials array
   int* meshMaterial;   // Mesh material number (mesh[i] uses
                        // materials[meshMaterial[i]])
@@ -3173,7 +3173,7 @@ RLAPI void DrawGrid(
 RLAPI Model
 LoadModel(char const* fileName); // Load model from files (meshes and materials)
 RLAPI Model LoadModelFromMesh(
-  Mesh mesh
+  rlMesh mesh
 ); // Load model from generated mesh (default material)
 RLAPI bool IsModelValid(
   Model model
@@ -3263,90 +3263,90 @@ RLAPI void DrawBillboardPro(
 
 // Mesh management functions
 RLAPI void UploadMesh(
-  Mesh* mesh,
+  rlMesh* mesh,
   bool dynamic
 ); // Upload mesh vertex data in GPU and provide VAO/VBO ids
 RLAPI void UpdateMeshBuffer(
-  Mesh mesh,
+  rlMesh mesh,
   int index,
   void const* data,
   int dataSize,
   int offset
 ); // Update mesh vertex data in GPU for a specific buffer index
-RLAPI void UnloadMesh(Mesh mesh); // Unload mesh data from CPU and GPU
+RLAPI void UnloadMesh(rlMesh mesh); // Unload mesh data from CPU and GPU
 RLAPI void DrawMesh(
-  Mesh mesh,
+  rlMesh mesh,
   Material material,
   Matrix transform
 ); // Draw a 3d mesh with material and transform
 RLAPI void DrawMeshInstanced(
-  Mesh mesh,
+  rlMesh mesh,
   Material material,
   Matrix const* transforms,
   int instances
 ); // Draw multiple mesh instances with material
    // and different transforms
 RLAPI BoundingBox
-GetMeshBoundingBox(Mesh mesh);          // Compute mesh bounding box limits
-RLAPI void GenMeshTangents(Mesh* mesh); // Compute mesh tangents
+GetMeshBoundingBox(rlMesh mesh);          // Compute mesh bounding box limits
+RLAPI void GenMeshTangents(rlMesh* mesh); // Compute mesh tangents
 RLAPI bool ExportMesh(
-  Mesh mesh,
+  rlMesh mesh,
   char const* fileName
 ); // Export mesh data to file, returns true on success
 RLAPI bool ExportMeshAsCode(
-  Mesh mesh, char const* fileName
+  rlMesh mesh, char const* fileName
 ); // Export mesh as code file (.h) defining
    // multiple arrays of vertex attributes
 
 // Mesh generation functions
-RLAPI Mesh GenMeshPoly(int sides, float radius); // Generate polygonal mesh
-RLAPI Mesh GenMeshPlane(
+RLAPI rlMesh GenMeshPoly(int sides, float radius); // Generate polygonal mesh
+RLAPI rlMesh GenMeshPlane(
   float width,
   float length,
   int resX,
   int resZ
 ); // Generate plane mesh (with subdivisions)
-RLAPI Mesh GenMeshCube(
+RLAPI rlMesh GenMeshCube(
   float width,
   float height,
   float length
 ); // Generate cuboid mesh
-RLAPI Mesh GenMeshSphere(
+RLAPI rlMesh GenMeshSphere(
   float radius,
   int rings,
   int slices
 ); // Generate sphere mesh (standard sphere)
-RLAPI Mesh GenMeshHemiSphere(
+RLAPI rlMesh GenMeshHemiSphere(
   float radius,
   int rings,
   int slices
 ); // Generate half-sphere mesh (no bottom cap)
-RLAPI Mesh GenMeshCylinder(
+RLAPI rlMesh GenMeshCylinder(
   float radius,
   float height,
   int slices
 ); // Generate cylinder mesh
-RLAPI Mesh GenMeshCone(
+RLAPI rlMesh GenMeshCone(
   float radius,
   float height,
   int slices
 ); // Generate cone/pyramid mesh
-RLAPI Mesh GenMeshTorus(
+RLAPI rlMesh GenMeshTorus(
   float radius,
   float size,
   int radSeg,
   int sides
 ); // Generate torus mesh
-RLAPI Mesh GenMeshKnot(
+RLAPI rlMesh GenMeshKnot(
   float radius,
   float size,
   int radSeg,
   int sides
 ); // Generate trefoil knot mesh
-RLAPI Mesh GenMeshHeightmap(
+RLAPI rlMesh GenMeshHeightmap(
   Image heightmap, Vector3 size
 ); // Generate heightmap mesh from image data
-RLAPI Mesh GenMeshCubicmap(
+RLAPI rlMesh GenMeshCubicmap(
   Image cubicmap,
   Vector3 cubeSize
 ); // Generate cubes-based map mesh from image data
@@ -3431,7 +3431,7 @@ RLAPI RayCollision GetRayCollisionBox(
 ); // Get collision info between ray and box
 RLAPI RayCollision GetRayCollisionMesh(
   Ray ray,
-  Mesh mesh,
+  rlMesh mesh,
   Matrix transform
 ); // Get collision info between ray and mesh
 RLAPI RayCollision GetRayCollisionTriangle(

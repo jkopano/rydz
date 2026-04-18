@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
-#include "rydz_graphics/material/material3d.hpp"
-#include "rydz_graphics/material/postprocess_material.hpp"
 #include "rydz_ecs/query.hpp"
 #include "rydz_ecs/world.hpp"
+#include "rydz_graphics/material/material3d.hpp"
+#include "rydz_graphics/material/postprocess_material.hpp"
 
 namespace {
 
@@ -11,27 +11,27 @@ struct HasWind {
   using DependsOn = std::tuple<ecs::HasCamera>;
 };
 
-struct FancyMaterial : ecs::IMaterial<HasWind, ecs::HasPBR> {
+struct FancyMaterial : ecs::MaterialTrait<HasWind, ecs::HasPBR> {
   static ecs::ShaderRef vertex_shader() { return "vertex.glsl"; }
   static ecs::ShaderRef fragment_shader() { return "fragment.glsl"; }
 };
 
 struct DuplicateSlotMaterial
-    : ecs::IMaterial<ecs::HasCamera, ecs::HasPBR, ecs::HasCamera> {};
+    : ecs::MaterialTrait<ecs::HasCamera, ecs::HasPBR, ecs::HasCamera> {};
 
-struct ReservedUniformMaterial : ecs::IMaterial<ecs::HasCamera> {
+struct ReservedUniformMaterial : ecs::MaterialTrait<ecs::HasCamera> {
   void bind(ecs::MaterialBuilder& builder) const {
     builder.uniform("cameraPos", ecs::Uniform{1.0f});
   }
 };
 
-struct TemporaryUniformNameMaterial : ecs::IMaterial<> {
+struct TemporaryUniformNameMaterial : ecs::MaterialTrait<> {
   void bind(ecs::MaterialBuilder& builder) const {
     builder.uniform(std::string{"u_temporary_name"}, ecs::Uniform{2.0f});
   }
 };
 
-struct QueryMaterial : ecs::IMaterial<> {
+struct QueryMaterial : ecs::MaterialTrait<> {
   int value = 0;
 
   static ecs::ShaderRef vertex_shader() { return "query.vert"; }
@@ -43,7 +43,7 @@ struct QueryMaterial : ecs::IMaterial<> {
   auto bind(ecs::MaterialBuilder&) const -> void {}
 };
 
-struct OtherQueryMaterial : ecs::IMaterial<> {
+struct OtherQueryMaterial : ecs::MaterialTrait<> {
   static ecs::ShaderRef vertex_shader() { return "other.vert"; }
   static ecs::ShaderRef fragment_shader() { return "other.frag"; }
   [[nodiscard]] auto render_method() const -> ecs::RenderMethod {
@@ -128,7 +128,8 @@ TEST(MaterialTest, MeshMaterial3dQueryFiltersByMaterialType) {
 
   EXPECT_EQ(count, 1);
 
-  auto const* stored_materials = world.get_resource<ecs::Assets<QueryMaterial>>();
+  auto const* stored_materials =
+    world.get_resource<ecs::Assets<QueryMaterial>>();
   ASSERT_NE(stored_materials, nullptr);
   auto const* stored_material = stored_materials->get(material);
   ASSERT_NE(stored_material, nullptr);

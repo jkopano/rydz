@@ -1,9 +1,9 @@
 #pragma once
 
 #include "math.hpp"
-#include "mesh3d.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/mod.hpp"
+#include "rydz_graphics/mesh3d_component.hpp"
 #include "rydz_graphics/transform.hpp"
 #include "rydz_graphics/visibility.hpp"
 #include "types.hpp"

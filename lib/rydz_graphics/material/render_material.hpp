@@ -3,77 +3,14 @@
 #include "rydz_graphics/clustered_lighting.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/gl/state.hpp"
+#include "rydz_graphics/material/slot_provider.hpp"
 #include "rydz_graphics/render_batches.hpp"
 #include "rydz_graphics/render_extract.hpp"
 #include <algorithm>
-#include <array>
 #include <cstring>
-#include <functional>
 #include <stdexcept>
-#include <typeindex>
-#include <unordered_map>
 
 namespace ecs {
-
-struct PreparedMaterial {
-  std::array<gl::MaterialMap, K_MATERIAL_MAP_COUNT> local_maps{};
-  gl::Material material;
-};
-
-struct SlotPrepareContext {
-  Assets<Texture> const* texture_assets = nullptr;
-  bool instanced = false;
-
-  [[nodiscard]] auto textures() const -> Assets<Texture> const& {
-    return *texture_assets;
-  }
-};
-
-struct RenderSlotContext {
-  ExtractedView const* view_data = nullptr;
-  ExtractedLights const* lights_data = nullptr;
-  ClusterConfig const* cluster_config_data = nullptr;
-  ClusteredLightingState const* cluster_state_data = nullptr;
-  bool instanced = false;
-
-  [[nodiscard]] auto view() const -> ExtractedView const& { return *view_data; }
-  [[nodiscard]] auto lights() const -> ExtractedLights const& {
-    return *lights_data;
-  }
-  [[nodiscard]] auto cluster_config() const -> ClusterConfig const& {
-    return *cluster_config_data;
-  }
-  [[nodiscard]] auto clustered_lighting() const
-    -> ClusteredLightingState const& {
-    return *cluster_state_data;
-  }
-};
-
-struct SlotProvider {
-  std::function<void(
-    SlotPrepareContext const&,
-    CompiledMaterial const&,
-    PreparedMaterial&,
-    ShaderProgram&
-  )>
-    prepare;
-  std::function<void(
-    RenderSlotContext const&,
-    CompiledMaterial const&,
-    PreparedMaterial const&,
-    ShaderProgram&
-  )>
-    apply;
-};
-
-struct SlotProviderRegistry {
-  using T = Resource;
-  std::unordered_map<std::type_index, SlotProvider> providers;
-
-  template <typename SlotT> void register_slot(SlotProvider provider) {
-    this->providers[typeid(SlotT)] = std::move(provider);
-  }
-};
 
 struct PbrFallbackTextures {
   gl::Texture metallic_black;
@@ -276,7 +213,7 @@ inline auto apply_slot_uniforms(
   }
 }
 
-inline auto make_has_camera_slot_provider() -> SlotProvider {
+inline auto HasCamera::slot_provider() -> SlotProvider {
   SlotProvider provider;
   provider.apply = [](
                      RenderSlotContext const& ctx,
@@ -291,7 +228,20 @@ inline auto make_has_camera_slot_provider() -> SlotProvider {
   return provider;
 }
 
-inline auto make_has_pbr_slot_provider() -> SlotProvider {
+inline auto HasTime::slot_provider() -> SlotProvider {
+  SlotProvider provider;
+  provider.apply = [](
+                     RenderSlotContext const& ctx,
+                     CompiledMaterial const&,
+                     PreparedMaterial const&,
+                     ShaderProgram& shader
+                   ) -> void {
+    shader.set("u_time", ctx.view().camera_view.position);
+  };
+  return provider;
+}
+
+inline auto HasPBR::slot_provider() -> SlotProvider {
   SlotProvider provider;
   provider.prepare = [](
                        SlotPrepareContext const&,

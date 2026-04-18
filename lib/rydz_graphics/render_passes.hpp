@@ -144,7 +144,7 @@ struct WorldPass {
         *lights,
         *cluster_config,
         *cluster_state,
-        batch.key.material.shader
+        batch.material.shader
       );
     }
     render_state->apply(RenderConfig{});
@@ -183,7 +183,7 @@ struct WorldPass {
         *lights,
         *cluster_config,
         *cluster_state,
-        batch.key.material.shader
+        batch.material.shader
       );
     }
     render_state->apply(RenderConfig{});
@@ -251,7 +251,7 @@ private:
       return;
     }
 
-    pass_config.cull = batch.key.material.cull_state();
+    pass_config.cull = batch.material.cull_state();
     render_state.apply(pass_config);
 
     PreparedMaterial prepared{};
@@ -261,7 +261,7 @@ private:
     };
     ShaderProgram& shader = prepare_material(
       marker,
-      batch.key.material,
+      batch.material,
       texture_assets,
       shader_cache,
       slot_registry,
@@ -269,7 +269,7 @@ private:
       shader_spec,
       prepared
     );
-    batch.key.material.apply(shader);
+    batch.material.apply(shader);
     RenderSlotContext render_ctx{
       .view_data = &view,
       .lights_data = &lights,
@@ -278,7 +278,7 @@ private:
       .instanced = true,
     };
     apply_slot_uniforms(
-      slot_registry, render_ctx, batch.key.material, prepared, shader
+      slot_registry, render_ctx, batch.material, prepared, shader
     );
     draw_batch(shader, *mesh, prepared.material, batch);
   }

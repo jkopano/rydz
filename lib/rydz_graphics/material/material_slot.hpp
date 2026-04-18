@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hash.hpp"
+#include "slot_provider.hpp"
 #include "rydz_ecs/helpers.hpp"
 #include "rydz_graphics/gl/shader.hpp"
 #include "rydz_graphics/shader_bindings.hpp"
@@ -23,10 +24,17 @@ namespace ecs {
 
 using UniformName = std::string;
 
-struct HasCamera {};
+struct HasCamera {
+  static auto slot_provider() -> SlotProvider;
+};
+
+struct HasTime {
+  static auto slot_provider() -> SlotProvider;
+};
 
 struct HasPBR {
   using DependsOn = std::tuple<HasCamera>;
+  static auto slot_provider() -> SlotProvider;
 };
 
 struct MaterialSlotRequirement {
