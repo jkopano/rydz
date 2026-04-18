@@ -2,6 +2,7 @@
 
 #include "render_extract.hpp"
 #include "rydz_graphics/material/render_material.hpp"
+#include "rydz_graphics/render_batches.hpp"
 #include <algorithm>
 #include <unordered_map>
 #include <vector>
@@ -9,9 +10,9 @@
 namespace ecs {
 
 namespace detail {
-inline auto prepare_mesh(const Handle<Mesh> &handle, Assets<Mesh> &mesh_assets)
-    -> bool {
-  auto *mesh = mesh_assets.get(handle);
+inline auto prepare_mesh(Handle<Mesh> const& handle, Assets<Mesh>& mesh_assets)
+  -> bool {
+  auto* mesh = mesh_assets.get(handle);
   if ((mesh == nullptr) || mesh->vertex_count() <= 0 ||
       mesh->vertex_data() == nullptr) {
     return false;
@@ -36,17 +37,19 @@ struct ShadowPhase {
 
   auto clear() -> void { *this = ShadowPhase{}; }
 
-  auto queue(const ExtractedMeshes &meshes) -> void {
+  auto queue(ExtractedMeshes const& meshes) -> void {
     clear();
-    for (const auto &item : meshes.items) {
+    for (auto const& item : meshes.items) {
       if (!item.casts_shadows) {
         continue;
       }
-      items.push_back(Item{
+      items.push_back(
+        Item{
           .mesh = item.mesh,
           .world_transform = item.world_transform,
           .distance_to_camera = item.distance_to_camera,
-      });
+        }
+      );
     }
   }
 };
@@ -71,18 +74,20 @@ struct OpaquePhase {
 
   auto clear() -> void { *this = OpaquePhase{}; }
 
-  auto queue(const ExtractedMeshes &meshes) -> void {
+  auto queue(ExtractedMeshes const& meshes) -> void {
     clear();
-    for (const auto &item : meshes.items) {
+    for (auto const& item : meshes.items) {
       if (item.transparent) {
         continue;
       }
-      items.push_back(Item{
+      items.push_back(
+        Item{
           .mesh = item.mesh,
           .material = item.material,
           .world_transform = item.world_transform,
           .distance_to_camera = item.distance_to_camera,
-      });
+        }
+      );
     }
   }
 
@@ -90,7 +95,7 @@ struct OpaquePhase {
     batches.clear();
     std::unordered_map<RenderBatchKey, usize> batch_index;
 
-    for (const auto &item : items) {
+    for (auto const& item : items) {
 
       RenderBatchKey key{};
       key.mesh = item.mesh;
@@ -108,7 +113,8 @@ struct OpaquePhase {
       }
 
       batches[it->second].transforms.push_back(
-          math::to_rl(item.world_transform));
+        math::to_rl(item.world_transform)
+      );
     }
   }
 };
@@ -133,21 +139,23 @@ struct TransparentPhase {
 
   auto clear() -> void { *this = TransparentPhase{}; }
 
-  auto queue(const ExtractedMeshes &meshes) -> void {
+  auto queue(ExtractedMeshes const& meshes) -> void {
     clear();
-    for (const auto &item : meshes.items) {
+    for (auto const& item : meshes.items) {
       if (!item.transparent) {
         continue;
       }
-      items.push_back(Item{
+      items.push_back(
+        Item{
           .mesh = item.mesh,
           .material = item.material,
           .world_transform = item.world_transform,
           .sort_key = item.distance_to_camera,
-      });
+        }
+      );
     }
 
-    std::ranges::sort(items, [](const Item &lhs, const Item &rhs) -> bool {
+    std::ranges::sort(items, [](Item const& lhs, Item const& rhs) -> bool {
       return lhs.sort_key > rhs.sort_key;
     });
   }
@@ -155,7 +163,7 @@ struct TransparentPhase {
   auto build_batches() -> void {
     batches.clear();
 
-    for (const auto &item : items) {
+    for (auto const& item : items) {
 
       RenderBatchKey key{};
       key.mesh = item.mesh;
@@ -188,21 +196,24 @@ struct UiPhase {
 
   auto clear() -> void { *this = UiPhase{}; }
 
-  auto queue(const ExtractedUi &ui) -> void {
+  auto queue(ExtractedUi const& ui) -> void {
     clear();
-    for (const auto &item : ui.items) {
-      items.push_back(Item{
+    for (auto const& item : ui.items) {
+      items.push_back(
+        Item{
           .texture = item.texture,
           .transform = item.transform,
           .tint = item.tint,
           .layer = item.layer,
-      });
+        }
+      );
     }
 
-    std::ranges::stable_sort(items,
-                             [](const Item &lhs, const Item &rhs) -> bool {
-                               return lhs.layer < rhs.layer;
-                             });
+    std::ranges::stable_sort(
+      items, [](Item const& lhs, Item const& rhs) -> bool {
+        return lhs.layer < rhs.layer;
+      }
+    );
   }
 };
 
@@ -211,12 +222,14 @@ struct Prepare {
     phase->build_batches();
   };
 
-  static auto prepare_meshes(Res<ExtractedMeshes> extracted,
-                             ResMut<Assets<Mesh>> mesh_assets, NonSendMarker)
-      -> void {
+  static auto prepare_meshes(
+    Res<ExtractedMeshes> extracted,
+    ResMut<Assets<Mesh>> mesh_assets,
+    NonSendMarker
+  ) -> void {
     std::unordered_set<u32> seen;
 
-    for (const auto &item : extracted->items) {
+    for (auto const& item : extracted->items) {
       if (!seen.insert(item.mesh.id).second) {
         continue;
       }

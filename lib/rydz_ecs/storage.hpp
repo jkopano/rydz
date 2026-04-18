@@ -18,8 +18,8 @@ public:
   [[nodiscard]] virtual auto size() const -> usize = 0;
   [[nodiscard]] virtual auto empty() const -> bool = 0;
   [[nodiscard]] virtual auto get_ticks(Entity entity) const
-      -> std::optional<ComponentTicks> = 0;
-  [[nodiscard]] virtual auto entities() const -> std::span<const Entity> = 0;
+    -> std::optional<ComponentTicks> = 0;
+  [[nodiscard]] virtual auto entities() const -> std::span<Entity const> = 0;
 };
 
 template <typename T> class SparseSetStorage : public IStorage {
@@ -56,17 +56,17 @@ public:
     dense_entities_.push_back(entity);
   }
 
-  template <typename Self> auto get(this Self &self, Entity entity) -> auto * {
+  template <typename Self> auto get(this Self& self, Entity entity) -> auto* {
     auto idx = self.get_dense_idx(entity);
     return idx ? &self.dense_data_[*idx] : nullptr;
   }
 
-  auto get_ticks_mut(Entity enitity) -> ComponentTicks * {
+  auto get_ticks_mut(Entity enitity) -> ComponentTicks* {
     auto idx = get_dense_idx(enitity);
     return idx ? &dense_ticks_[*idx] : nullptr;
   }
 
-  auto get_with_ticks(Entity entity) -> std::pair<T *, ComponentTicks *> {
+  auto get_with_ticks(Entity entity) -> std::pair<T*, ComponentTicks*> {
     auto idx = get_dense_idx(entity);
     if (idx) {
       return {&dense_data_[*idx], &dense_ticks_[*idx]};
@@ -99,7 +99,7 @@ public:
   }
   auto size() const -> usize override { return dense_data_.size(); }
   auto empty() const -> bool override { return dense_data_.empty(); }
-  auto entities() const -> std::span<const Entity> override {
+  auto entities() const -> std::span<Entity const> override {
     return dense_entities_;
   }
 
@@ -113,12 +113,12 @@ public:
       dense_ticks_[*i].changed = tick;
   }
 
-  template <typename F> void for_each(F &&func) const {
+  template <typename F> void for_each(F&& func) const {
     for (usize i = 0; i < dense_data_.size(); ++i)
       func(dense_entities_[i], dense_data_[i]);
   }
 
-  template <typename F> void for_each_mut(F &&func) {
+  template <typename F> void for_each_mut(F&& func) {
     for (usize i = 0; i < dense_data_.size(); ++i)
       func(dense_entities_[i], dense_data_[i]);
   }
@@ -137,27 +137,27 @@ public:
     ticks_.insert_or_assign(entity, ComponentTicks{current_tick, current_tick});
   }
 
-  auto get(Entity entity) -> T * {
+  auto get(Entity entity) -> T* {
     auto it = data_.find(entity);
     return it != data_.end() ? &it->second : nullptr;
   }
 
-  auto get(Entity entity) const -> const T * {
+  auto get(Entity entity) const -> T const* {
     auto it = data_.find(entity);
     return it != data_.end() ? &it->second : nullptr;
   }
 
-  auto get_ticks_mut(Entity entity) -> ComponentTicks * {
+  auto get_ticks_mut(Entity entity) -> ComponentTicks* {
     auto it = ticks_.find(entity);
     return it != ticks_.end() ? &it->second : nullptr;
   }
 
-  auto get_ticks_ptr(Entity entity) const -> const ComponentTicks * {
+  auto get_ticks_ptr(Entity entity) const -> ComponentTicks const* {
     auto it = ticks_.find(entity);
     return it != ticks_.end() ? &it->second : nullptr;
   }
 
-  auto get_with_ticks(Entity entity) -> std::pair<T *, ComponentTicks *> {
+  auto get_with_ticks(Entity entity) -> std::pair<T*, ComponentTicks*> {
     auto it = data_.find(entity);
     if (it != data_.end()) {
       auto ticks_it = ticks_.find(entity);
@@ -176,13 +176,13 @@ public:
     return data_.contains(entity);
   }
 
-  template <typename F> void for_each(F &&func) const {
-    for (auto &[e, comp] : data_)
+  template <typename F> void for_each(F&& func) const {
+    for (auto& [e, comp] : data_)
       func(e, comp);
   }
 
-  template <typename F> void for_each_mut(F &&func) {
-    for (auto &[e, comp] : data_)
+  template <typename F> void for_each_mut(F&& func) {
+    for (auto& [e, comp] : data_)
       func(e, comp);
   }
 
@@ -190,18 +190,18 @@ public:
   auto empty() const -> bool override { return data_.empty(); }
   auto data_size() const -> usize { return data_.size(); }
 
-  auto entities() const -> std::span<const Entity> override {
+  auto entities() const -> std::span<Entity const> override {
     return entity_keys_;
   }
 
   auto get_ticks(Entity entity) const
-      -> std::optional<ComponentTicks> override {
-    auto *t = get_ticks_ptr(entity);
+    -> std::optional<ComponentTicks> override {
+    auto* t = get_ticks_ptr(entity);
     return t ? std::optional(*t) : std::nullopt;
   }
 
   auto mark_changed(Entity entity, Tick tick) -> void {
-    auto *t = get_ticks_mut(entity);
+    auto* t = get_ticks_mut(entity);
     if (t)
       t->changed = tick;
   }

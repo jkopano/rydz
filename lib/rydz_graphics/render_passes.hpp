@@ -22,99 +22,152 @@ struct RenderExecutionState {
 };
 
 struct FramePass {
-  static auto begin(Res<ExtractedView> view, ResMut<RenderExecutionState> state,
-                    ResMut<PipelineState> screen_pipeline, Res<Window> window,
-                    NonSendMarker marker) -> void;
+  static auto begin(
+    Res<ExtractedView> view,
+    ResMut<RenderExecutionState> state,
+    ResMut<PipelineState> screen_pipeline,
+    Res<Window> window,
+    NonSendMarker marker
+  ) -> void;
 
-  static auto end(ResMut<RenderExecutionState> state,
-                  ResMut<PipelineState> screen_pipeline,
-                  Res<DebugOverlaySettings> debug_settings,
-                  NonSendMarker marker) -> void;
+  static auto end(
+    ResMut<RenderExecutionState> state,
+    ResMut<PipelineState> screen_pipeline,
+    Res<DebugOverlaySettings> debug_settings,
+    NonSendMarker marker
+  ) -> void;
 };
 
 struct WorldPass {
   static auto shadow(Res<RenderExecutionState>, Res<ShadowPhase>, NonSendMarker)
-      -> void {}
+    -> void {}
 
   static auto depth_prepass(
-      Res<RenderExecutionState> state, Res<OpaquePhase> phase,
-      Res<Assets<Mesh>> mesh_assets, Res<Assets<Texture>> texture_assets,
-      ResMut<ShaderCache> shader_cache, Res<SlotProviderRegistry> slot_registry,
-      Res<ExtractedView> view, Res<ExtractedLights> lights,
-      Res<ClusterConfig> cluster_config,
-      Res<ClusteredLightingState> cluster_state, NonSendMarker marker) -> void {
+    Res<RenderExecutionState> state,
+    Res<OpaquePhase> phase,
+    Res<Assets<Mesh>> mesh_assets,
+    Res<Assets<Texture>> texture_assets,
+    ResMut<ShaderCache> shader_cache,
+    Res<SlotProviderRegistry> slot_registry,
+    Res<ExtractedView> view,
+    Res<ExtractedLights> lights,
+    Res<ClusterConfig> cluster_config,
+    Res<ClusteredLightingState> cluster_state,
+    NonSendMarker marker
+  ) -> void {
     if (!state->world_pass_active) {
       return;
     }
 
     RenderConfig::depth_prepass()(marker);
-    for (const auto &batch : phase->batches) {
-      draw_batch_common(marker, batch, *mesh_assets, *texture_assets,
-                        *shader_cache, *slot_registry, *view, *lights,
-                        *cluster_config, *cluster_state,
-                        depth_prepass_shader_spec());
+    for (auto const& batch : phase->batches) {
+      draw_batch_common(
+        marker,
+        batch,
+        *mesh_assets,
+        *texture_assets,
+        *shader_cache,
+        *slot_registry,
+        *view,
+        *lights,
+        *cluster_config,
+        *cluster_state,
+        depth_prepass_shader_spec()
+      );
     }
     RenderConfig::post_depth_prepass()(marker);
   }
 
-  static auto cluster_build(Res<RenderExecutionState> state,
-                            Res<ExtractedView> view,
-                            Res<ExtractedLights> lights,
-                            Res<ClusterConfig> cluster_config,
-                            ResMut<ClusteredLightingState> cluster_state,
-                            NonSendMarker marker) -> void {
+  static auto cluster_build(
+    Res<RenderExecutionState> state,
+    Res<ExtractedView> view,
+    Res<ExtractedLights> lights,
+    Res<ClusterConfig> cluster_config,
+    ResMut<ClusteredLightingState> cluster_state,
+    NonSendMarker marker
+  ) -> void {
     if (!state->world_pass_active) {
       return;
     }
 
-    cluster_state->build_cluster_buffers(marker, *view, *lights,
-                                         *cluster_config);
+    cluster_state->build_cluster_buffers(
+      marker, *view, *lights, *cluster_config
+    );
   }
 
-  static void
-  opaque(Res<RenderExecutionState> state, Res<OpaquePhase> phase,
-         Res<Assets<Mesh>> mesh_assets, Res<Assets<Texture>> texture_assets,
-         ResMut<ShaderCache> shader_cache,
-         Res<SlotProviderRegistry> slot_registry, Res<ExtractedView> view,
-         Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
-         Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
+  static void opaque(
+    Res<RenderExecutionState> state,
+    Res<OpaquePhase> phase,
+    Res<Assets<Mesh>> mesh_assets,
+    Res<Assets<Texture>> texture_assets,
+    ResMut<ShaderCache> shader_cache,
+    Res<SlotProviderRegistry> slot_registry,
+    Res<ExtractedView> view,
+    Res<ExtractedLights> lights,
+    Res<ClusterConfig> cluster_config,
+    Res<ClusteredLightingState> cluster_state,
+    NonSendMarker marker
+  ) {
     if (!state->world_pass_active) {
       return;
     }
 
     RenderConfig::opaque()(marker);
-    for (const auto &batch : phase->batches) {
-      draw_batch_common(marker, batch, *mesh_assets, *texture_assets,
-                        *shader_cache, *slot_registry, *view, *lights,
-                        *cluster_config, *cluster_state,
-                        batch.key.material.shader);
+    for (auto const& batch : phase->batches) {
+      draw_batch_common(
+        marker,
+        batch,
+        *mesh_assets,
+        *texture_assets,
+        *shader_cache,
+        *slot_registry,
+        *view,
+        *lights,
+        *cluster_config,
+        *cluster_state,
+        batch.key.material.shader
+      );
     }
     RenderConfig{}(marker);
   }
 
-  static void
-  transparent(Res<RenderExecutionState> state, Res<TransparentPhase> phase,
-              Res<Assets<Mesh>> mesh_assets,
-              Res<Assets<Texture>> texture_assets,
-              ResMut<ShaderCache> shader_cache,
-              Res<SlotProviderRegistry> slot_registry, Res<ExtractedView> view,
-              Res<ExtractedLights> lights, Res<ClusterConfig> cluster_config,
-              Res<ClusteredLightingState> cluster_state, NonSendMarker marker) {
+  static void transparent(
+    Res<RenderExecutionState> state,
+    Res<TransparentPhase> phase,
+    Res<Assets<Mesh>> mesh_assets,
+    Res<Assets<Texture>> texture_assets,
+    ResMut<ShaderCache> shader_cache,
+    Res<SlotProviderRegistry> slot_registry,
+    Res<ExtractedView> view,
+    Res<ExtractedLights> lights,
+    Res<ClusterConfig> cluster_config,
+    Res<ClusteredLightingState> cluster_state,
+    NonSendMarker marker
+  ) {
     if (!state->world_pass_active) {
       return;
     }
 
     RenderConfig::transparent()(marker);
-    for (const auto &batch : phase->batches) {
-      draw_batch_common(marker, batch, *mesh_assets, *texture_assets,
-                        *shader_cache, *slot_registry, *view, *lights,
-                        *cluster_config, *cluster_state,
-                        batch.key.material.shader);
+    for (auto const& batch : phase->batches) {
+      draw_batch_common(
+        marker,
+        batch,
+        *mesh_assets,
+        *texture_assets,
+        *shader_cache,
+        *slot_registry,
+        *view,
+        *lights,
+        *cluster_config,
+        *cluster_state,
+        batch.key.material.shader
+      );
     }
     RenderConfig{}(marker);
   }
 
-  static auto begin(NonSendMarker marker, const ExtractedView &view) -> void {
+  static auto begin(NonSendMarker marker, ExtractedView const& view) -> void {
     gl::begin_world_pass(view.camera_view.view, view.camera_view.proj);
     RenderConfig::get_default()(marker);
 
@@ -129,57 +182,71 @@ struct WorldPass {
   }
 
 private:
-  static auto depth_prepass_shader_spec() -> const ShaderSpec & {
-    static const ShaderSpec spec =
-        ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth.frag");
+  static auto depth_prepass_shader_spec() -> ShaderSpec const& {
+    static ShaderSpec const spec =
+      ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth.frag");
     return spec;
   }
 
   template <typename BatchT>
-  static auto draw_batch_common(NonSendMarker marker, const BatchT &batch,
-                                const Assets<Mesh> &mesh_assets,
-                                const Assets<Texture> &texture_assets,
-                                ShaderCache &shader_cache,
-                                const SlotProviderRegistry &slot_registry,
-                                const ExtractedView &view,
-                                const ExtractedLights &lights,
-                                const ClusterConfig &cluster_config,
-                                const ClusteredLightingState &cluster_state,
-                                const ShaderSpec &shader_spec) -> void {
-    const auto *mesh = mesh_assets.get(batch.key.mesh);
+  static auto draw_batch_common(
+    NonSendMarker marker,
+    BatchT const& batch,
+    Assets<Mesh> const& mesh_assets,
+    Assets<Texture> const& texture_assets,
+    ShaderCache& shader_cache,
+    SlotProviderRegistry const& slot_registry,
+    ExtractedView const& view,
+    ExtractedLights const& lights,
+    ClusterConfig const& cluster_config,
+    ClusteredLightingState const& cluster_state,
+    ShaderSpec const& shader_spec
+  ) -> void {
+    auto const* mesh = mesh_assets.get(batch.key.mesh);
     if (!mesh) {
       return;
     }
 
     PreparedMaterial prepared{};
     SlotPrepareContext prepare_ctx{
-        .texture_assets = &texture_assets,
-        .instanced = true,
+      .texture_assets = &texture_assets,
+      .instanced = true,
     };
-    ShaderProgram &shader = prepare_material(
-        marker, batch.key.material, texture_assets, shader_cache, slot_registry,
-        prepare_ctx, shader_spec, prepared);
+    ShaderProgram& shader = prepare_material(
+      marker,
+      batch.key.material,
+      texture_assets,
+      shader_cache,
+      slot_registry,
+      prepare_ctx,
+      shader_spec,
+      prepared
+    );
     batch.key.material.apply(shader);
     RenderSlotContext render_ctx{
-        .view_data = &view,
-        .lights_data = &lights,
-        .cluster_config_data = &cluster_config,
-        .cluster_state_data = &cluster_state,
-        .instanced = true,
+      .view_data = &view,
+      .lights_data = &lights,
+      .cluster_config_data = &cluster_config,
+      .cluster_state_data = &cluster_state,
+      .instanced = true,
     };
-    apply_slot_uniforms(slot_registry, render_ctx, batch.key.material, prepared,
-                        shader);
+    apply_slot_uniforms(
+      slot_registry, render_ctx, batch.key.material, prepared, shader
+    );
     batch.key.material.apply_cull_mode();
     draw_batch(shader, *mesh, prepared.material, batch);
   }
 };
 
 struct PostProcessPass {
-  static auto postprocess(ResMut<RenderExecutionState> state,
-                          Res<PipelineState> pipeline,
-                          ResMut<ShaderCache> shader_cache,
-                          Res<ExtractedView> view, Res<Time> time,
-                          NonSendMarker marker) -> void {
+  static auto postprocess(
+    ResMut<RenderExecutionState> state,
+    Res<PipelineState> pipeline,
+    ResMut<ShaderCache> shader_cache,
+    Res<ExtractedView> view,
+    Res<Time> time,
+    NonSendMarker marker
+  ) -> void {
     if (state->world_pass_active) {
       WorldPass::end(marker);
       state->world_pass_active = false;
@@ -200,115 +267,145 @@ struct PostProcessPass {
       return;
     }
 
-    draw_postprocess_pass(marker, pipeline->world_target.texture, *shader_cache,
-                          *view, *time);
+    draw_postprocess_pass(
+      marker, pipeline->world_target.texture, *shader_cache, *view, *time
+    );
   }
 
 private:
-  static auto postprocess_source_rect(const gl::Texture &texture)
-      -> gl::Rectangle {
+  static auto postprocess_source_rect(gl::Texture const& texture)
+    -> gl::Rectangle {
     return {
-        0.0F,
-        0.0F,
-        static_cast<f32>(texture.width),
-        -static_cast<f32>(texture.height),
+      0.0F,
+      0.0F,
+      static_cast<f32>(texture.width),
+      -static_cast<f32>(texture.height),
     };
   }
 
   static auto postprocess_dest_rect() -> gl::Rectangle {
     return {
-        0.0F,
-        0.0F,
-        static_cast<f32>(gl::screen_width()),
-        static_cast<f32>(gl::screen_height()),
+      0.0F,
+      0.0F,
+      static_cast<f32>(gl::screen_width()),
+      static_cast<f32>(gl::screen_height()),
     };
   }
 
-  static auto draw_world_target_to_screen(const gl::Texture &source_texture)
-      -> void {
+  static auto draw_world_target_to_screen(gl::Texture const& source_texture)
+    -> void {
     gl::draw_texture_pro(
-        source_texture, postprocess_source_rect(source_texture),
-        postprocess_dest_rect(), {0.0F, 0.0F}, 0.0F, gl::kWhite);
+      source_texture,
+      postprocess_source_rect(source_texture),
+      postprocess_dest_rect(),
+      {0.0F, 0.0F},
+      0.0F,
+      gl::kWhite
+    );
   }
 
-  static auto apply_postprocess_uniforms(ShaderProgram &shader,
-                                         const PostProcessDescriptor &effect,
-                                         const Time &time) -> void {
-    const gl::Vec2 resolution = {
-        static_cast<f32>(std::max(gl::screen_width(), 1)),
-        static_cast<f32>(std::max(gl::screen_height(), 1)),
+  static auto apply_postprocess_uniforms(
+    ShaderProgram& shader, PostProcessDescriptor const& effect, Time const& time
+  ) -> void {
+    gl::Vec2 const resolution = {
+      static_cast<f32>(std::max(gl::screen_width(), 1)),
+      static_cast<f32>(std::max(gl::screen_height(), 1)),
     };
     shader.set("u_resolution", resolution);
     shader.set("u_time", time.elapsed_seconds);
     shader.set("u_enabled", effect.enabled ? 1 : 0);
-    for (const auto &[name, uniform] : effect._uniforms) {
+    for (auto const& [name, uniform] : effect._uniforms) {
       shader.apply(name, uniform);
     }
   }
 
-  static auto draw_postprocess_pass(NonSendMarker marker,
-                                    const gl::Texture &source_texture,
-                                    ShaderCache &shader_cache,
-                                    const ExtractedView &view, const Time &time)
-      -> void {
+  static auto draw_postprocess_pass(
+    NonSendMarker marker,
+    gl::Texture const& source_texture,
+    ShaderCache& shader_cache,
+    ExtractedView const& view,
+    Time const& time
+  ) -> void {
     if (!view.has_postprocess || !view.postprocess.enabled) {
       draw_world_target_to_screen(source_texture);
       return;
     }
 
-    ShaderProgram &shader =
-        resolve_shader(marker, shader_cache, view.postprocess.shader);
+    ShaderProgram& shader =
+      resolve_shader(marker, shader_cache, view.postprocess.shader);
     apply_postprocess_uniforms(shader, view.postprocess, time);
     shader.set_texture(MaterialMap::Albedo, source_texture);
 
-    shader.with_bound(
-        [&] -> void { draw_world_target_to_screen(source_texture); });
+    shader.with_bound([&] -> void {
+      draw_world_target_to_screen(source_texture);
+    });
   }
 };
 
 struct UiPass {
-  static auto ui(Res<UiPhase> phase, Res<Assets<Texture>> texture_assets,
-                 ResMut<RenderExecutionState> state, NonSendMarker) -> void {
+  static auto ui(
+    Res<UiPhase> phase,
+    Res<Assets<Texture>> texture_assets,
+    ResMut<RenderExecutionState> state,
+    NonSendMarker
+  ) -> void {
     if (!state->backbuffer_active) {
       gl::begin_drawing();
       state->backbuffer_active = true;
     }
 
-    for (const auto &item : phase->items) {
-      const auto *texture = texture_assets->get(item.texture);
+    for (auto const& item : phase->items) {
+      auto const* texture = texture_assets->get(item.texture);
       if (texture == nullptr) {
         continue;
       }
 
-      gl::Vec2 position = {item.transform.translation.x,
-                           item.transform.translation.y};
-      gl::Rectangle source = {0, 0, static_cast<f32>(texture->width),
-                              static_cast<f32>(texture->height)};
-      gl::Rectangle dest = {position.x, position.y,
-                            texture->width * item.transform.scale.x,
-                            texture->height * item.transform.scale.y};
+      gl::Vec2 position = {
+        item.transform.translation.x, item.transform.translation.y
+      };
+      gl::Rectangle source = {
+        0,
+        0,
+        static_cast<f32>(texture->width),
+        static_cast<f32>(texture->height)
+      };
+      gl::Rectangle dest = {
+        position.x,
+        position.y,
+        texture->width * item.transform.scale.x,
+        texture->height * item.transform.scale.y
+      };
       gl::Vec2 origin = {0, 0};
 
-      gl::draw_texture_pro(*texture, source, dest, origin,
-                           texture_rotation_degrees(item.transform), item.tint);
+      gl::draw_texture_pro(
+        *texture,
+        source,
+        dest,
+        origin,
+        texture_rotation_degrees(item.transform),
+        item.tint
+      );
     }
   }
 
 private:
-  static auto texture_rotation_degrees(const Transform &transform) -> f32 {
+  static auto texture_rotation_degrees(Transform const& transform) -> f32 {
     f32 siny_cosp = 2.0F * (transform.rotation.w * transform.rotation.z +
                             transform.rotation.x * transform.rotation.y);
     f32 cosy_cosp =
-        1.0F - (2.0F * (transform.rotation.y * transform.rotation.y +
-                        transform.rotation.z * transform.rotation.z));
+      1.0F - (2.0F * (transform.rotation.y * transform.rotation.y +
+                      transform.rotation.z * transform.rotation.z));
     return std::atan2(siny_cosp, cosy_cosp) * (180.0F / PI);
   }
 };
 
-inline auto FramePass::begin(Res<ExtractedView> view,
-                             ResMut<RenderExecutionState> state,
-                             ResMut<PipelineState> pipeline, Res<Window> window,
-                             NonSendMarker marker) -> void {
+inline auto FramePass::begin(
+  Res<ExtractedView> view,
+  ResMut<RenderExecutionState> state,
+  ResMut<PipelineState> pipeline,
+  Res<Window> window,
+  NonSendMarker marker
+) -> void {
   state->world_pass_active = false;
   state->world_target_active = false;
   state->backbuffer_active = false;
@@ -329,10 +426,12 @@ inline auto FramePass::begin(Res<ExtractedView> view,
   state->world_pass_active = true;
 }
 
-inline auto FramePass::end(ResMut<RenderExecutionState> state,
-                           ResMut<PipelineState> pipeline,
-                           Res<DebugOverlaySettings> debug_settings,
-                           NonSendMarker marker) -> void {
+inline auto FramePass::end(
+  ResMut<RenderExecutionState> state,
+  ResMut<PipelineState> pipeline,
+  Res<DebugOverlaySettings> debug_settings,
+  NonSendMarker marker
+) -> void {
   if (state->world_pass_active) {
     WorldPass::end(marker);
     state->world_pass_active = false;
@@ -349,8 +448,10 @@ inline auto FramePass::end(ResMut<RenderExecutionState> state,
   }
 
   if (debug_settings->draw_fps) {
-    gl::draw_fps(static_cast<i32>(debug_settings->fps_position.x),
-                 static_cast<i32>(debug_settings->fps_position.y));
+    gl::draw_fps(
+      static_cast<i32>(debug_settings->fps_position.x),
+      static_cast<i32>(debug_settings->fps_position.y)
+    );
   }
 
   if (state->backbuffer_active) {

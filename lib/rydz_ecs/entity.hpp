@@ -23,15 +23,16 @@ struct Entity {
     return generation_val;
   }
 
-  auto operator<=>(const Entity &) const = default;
+  auto operator<=>(Entity const&) const = default;
 };
 
 } // namespace ecs
 
 template <> struct std::hash<ecs::Entity> {
-  auto operator()(const ecs::Entity &e) const noexcept -> size_t {
-    return std::hash<u64>{}((static_cast<u64>(e.index_val) << 32) |
-                            e.generation_val);
+  auto operator()(ecs::Entity const& e) const noexcept -> size_t {
+    return std::hash<u64>{}(
+      (static_cast<u64>(e.index_val) << 32) | e.generation_val
+    );
   }
 };
 

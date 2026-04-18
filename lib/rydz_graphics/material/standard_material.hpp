@@ -25,7 +25,7 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
     return {.base_color = c};
   }
   static auto from_texture(Handle<Texture> tex, Color tint = kWhite)
-      -> StandardMaterial {
+    -> StandardMaterial {
     return {.base_color = tint, .texture = tex};
   }
 
@@ -43,7 +43,7 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
   [[nodiscard]] auto double_sided() const -> bool { return false; }
   [[nodiscard]] auto alpha_cutoff() const -> float { return 0.1F; }
 
-  auto bind(MaterialBuilder &builder) const -> void {
+  auto bind(MaterialBuilder& builder) const -> void {
     builder.color(MaterialMap::Albedo, base_color);
     if (texture.is_valid()) {
       builder.texture(MaterialMap::Albedo, texture);
@@ -78,8 +78,9 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
     }
     if (emissive_color.a > 0) {
       auto emissive = color_to_vec3(emissive_color);
-      builder.uniform(MaterialMap::Emission,
-                      math::Vec3(emissive.x, emissive.y, emissive.z));
+      builder.uniform(
+        MaterialMap::Emission, math::Vec3(emissive.x, emissive.y, emissive.z)
+      );
     }
     builder.uniform(MaterialMap::Albedo, gl::Uniform{1.0F, 1.0F, 1.0F, 0.0F});
   }

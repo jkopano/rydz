@@ -22,10 +22,10 @@ struct PipelineState {
   u32 height = 0;
 
   PipelineState() = default;
-  PipelineState(const PipelineState &) = delete;
-  auto operator=(const PipelineState &) -> PipelineState & = delete;
+  PipelineState(PipelineState const&) = delete;
+  auto operator=(PipelineState const&) -> PipelineState& = delete;
 
-  PipelineState(PipelineState &&other) noexcept
+  PipelineState(PipelineState&& other) noexcept
       : world_target(other.world_target), width(other.width),
         height(other.height) {
     other.world_target = gl::RenderTarget{};
@@ -33,7 +33,7 @@ struct PipelineState {
     other.height = 0;
   }
 
-  auto operator=(PipelineState &&other) noexcept -> PipelineState & {
+  auto operator=(PipelineState&& other) noexcept -> PipelineState& {
     if (this == &other) {
       return *this;
     }

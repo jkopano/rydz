@@ -35,33 +35,33 @@ public:
 
 struct AppRunner {
   using T = Resource;
-  std::function<void(App &)> run;
+  std::function<void(App&)> run;
 };
 
 class App {
   struct PendingSetSystemsBase {
     PendingSetSystemsBase() = default;
-    PendingSetSystemsBase(const PendingSetSystemsBase &) = default;
-    PendingSetSystemsBase(PendingSetSystemsBase &&) = delete;
-    auto operator=(const PendingSetSystemsBase &)
-        -> PendingSetSystemsBase & = default;
-    auto operator=(PendingSetSystemsBase &&)
-        -> PendingSetSystemsBase & = delete;
+    PendingSetSystemsBase(PendingSetSystemsBase const&) = default;
+    PendingSetSystemsBase(PendingSetSystemsBase&&) = delete;
+    auto operator=(PendingSetSystemsBase const&)
+      -> PendingSetSystemsBase& = default;
+    auto operator=(PendingSetSystemsBase&&) -> PendingSetSystemsBase& = delete;
     virtual ~PendingSetSystemsBase() = default;
-    virtual auto attach(App &app) -> void = 0;
+    virtual auto attach(App& app) -> void = 0;
   };
 
   template <typename F> struct PendingSetSystems final : PendingSetSystemsBase {
     SetList sets{};
     decay_t<F> func{};
 
-    PendingSetSystems(SetList selector, F &&system_fn)
+    PendingSetSystems(SetList selector, F&& system_fn)
         : sets(std::move(selector)), func(std::forward<F>(system_fn)) {}
 
-    auto attach(App &app) -> void override {
+    auto attach(App& app) -> void override {
       auto label = app.resolve_set_schedule(sets);
-      app.schedules_.entry(label).add_system_fn(std::move(sets),
-                                                std::move(func));
+      app.schedules_.entry(label).add_system_fn(
+        std::move(sets), std::move(func)
+      );
     }
   };
 
@@ -83,87 +83,97 @@ public:
 
   template <typename F>
     requires SystemInput<F>
-  auto add_systems(ScheduleLabel label, F &&func) -> App & {
+  auto add_systems(ScheduleLabel label, F&& func) -> App& {
     schedules_.entry(label).add_system_fn(std::forward<F>(func));
     return *this;
   }
 
   template <typename F>
     requires(!SystemInput<F>)
-  auto add_systems(ScheduleLabel /*label*/, F && /*func*/) -> App & {
+  auto add_systems(ScheduleLabel /*label*/, F&& /*func*/) -> App& {
     detail::static_assert_valid_system_callable<F>();
     return *this;
   }
 
   template <typename E, typename F>
-    requires(std::is_enum_v<bare_t<E>> &&
-             !std::same_as<bare_t<E>, ScheduleLabel> && SystemInput<F>)
-  auto add_systems(E set_id, F &&func) -> App & {
+    requires(
+      std::is_enum_v<bare_t<E>> && !std::same_as<bare_t<E>, ScheduleLabel> &&
+      SystemInput<F>
+    )
+  auto add_systems(E set_id, F&& func) -> App& {
     return add_systems(set(set_id), std::forward<F>(func));
   }
 
   template <typename E, typename F>
-    requires(std::is_enum_v<bare_t<E>> &&
-             !std::same_as<bare_t<E>, ScheduleLabel> && !SystemInput<F>)
-  auto add_systems(E /*set_id*/, F && /*func*/) -> App & {
+    requires(
+      std::is_enum_v<bare_t<E>> && !std::same_as<bare_t<E>, ScheduleLabel> &&
+      !SystemInput<F>
+    )
+  auto add_systems(E /*set_id*/, F&& /*func*/) -> App& {
     detail::static_assert_valid_system_callable<F>();
     return *this;
   }
 
   template <typename S, typename F>
     requires(detail::is_set_marker_v<S> && SystemInput<F>)
-  auto add_systems(S &&, F &&func) -> App & {
+  auto add_systems(S&&, F&& func) -> App& {
     return add_systems(set<bare_t<S>>(), std::forward<F>(func));
   }
 
   template <typename S, typename F>
     requires(detail::is_set_marker_v<S> && !SystemInput<F>)
-  auto add_systems(S &&, F && /*func*/) -> App & {
+  auto add_systems(S&&, F&& /*func*/) -> App& {
     detail::static_assert_valid_system_callable<F>();
     return *this;
   }
 
   template <typename S, typename F>
-    requires((std::same_as<bare_t<S>, SetId> ||
-              std::same_as<bare_t<S>, SetList>) &&
-             SystemInput<F>)
-  auto add_systems(S &&selector, F &&func) -> App & {
+    requires(
+      (std::same_as<bare_t<S>, SetId> || std::same_as<bare_t<S>, SetList>) &&
+      SystemInput<F>
+    )
+  auto add_systems(S&& selector, F&& func) -> App& {
     auto sets = SetList{detail::to_set_ids(std::forward<S>(selector))};
     detail::ensure_unique_sets(sets.ids, "add_systems(...)");
 
     if (auto label = try_resolve_set_schedule(sets)) {
-      schedules_.entry(*label).add_system_fn(std::move(sets),
-                                             std::forward<F>(func));
+      schedules_.entry(*label).add_system_fn(
+        std::move(sets), std::forward<F>(func)
+      );
       return *this;
     }
 
-    pending_set_systems_.push_back(std::make_unique<PendingSetSystems<F>>(
-        std::move(sets), std::forward<F>(func)));
+    pending_set_systems_.push_back(
+      std::make_unique<PendingSetSystems<F>>(
+        std::move(sets), std::forward<F>(func)
+      )
+    );
     return *this;
   }
 
   template <typename S, typename F>
-    requires((std::same_as<bare_t<S>, SetId> ||
-              std::same_as<bare_t<S>, SetList>) &&
-             !SystemInput<F>)
-  auto add_systems(S && /*selector*/, F && /*func*/) -> App & {
+    requires(
+      (std::same_as<bare_t<S>, SetId> || std::same_as<bare_t<S>, SetList>) &&
+      !SystemInput<F>
+    )
+  auto add_systems(S&& /*selector*/, F&& /*func*/) -> App& {
     detail::static_assert_valid_system_callable<F>();
     return *this;
   }
 
-  auto configure_set(ScheduleLabel label, SetConfigDescriptor &&desc) -> App & {
+  auto configure_set(ScheduleLabel label, SetConfigDescriptor&& desc) -> App& {
     register_set_schedule(label, desc.id());
     schedules_.entry(label).add_set_config(std::move(desc).take());
     return *this;
   }
 
-  auto configure_set(ScheduleLabel label, ChainedSetConfigDescriptor &&desc)
-      -> App & {
+  auto configure_set(ScheduleLabel label, ChainedSetConfigDescriptor&& desc)
+    -> App& {
     auto configs = std::move(desc).take();
-    for (const auto &config : configs) {
+    for (auto const& config : configs) {
       register_set_schedule(label, config.id);
     }
-    for (auto &config : configs) {
+    for (auto& config : configs) {
       schedules_.entry(label).add_set_config(std::move(config));
     }
     return *this;
@@ -171,8 +181,8 @@ public:
 
 private:
   template <typename S>
-  auto get_or_init_state_schedules() -> StateSchedules<S> & {
-    auto *schedules = world_.get_resource<StateSchedules<S>>();
+  auto get_or_init_state_schedules() -> StateSchedules<S>& {
+    auto* schedules = world_.get_resource<StateSchedules<S>>();
     if (!schedules) {
       world_.insert_resource(StateSchedules<S>{});
       schedules = world_.get_resource<StateSchedules<S>>();
@@ -183,121 +193,124 @@ private:
 public:
   template <OnEnterLabel Label, typename F>
     requires SystemInput<F>
-  auto add_systems(Label &&label, F &&func) -> App & {
+  auto add_systems(Label&& label, F&& func) -> App& {
     using S = bare_t<decltype(label.value)>;
     get_or_init_state_schedules<S>().on_enter[label.value].add_system_fn(
-        std::forward<F>(func));
+      std::forward<F>(func)
+    );
     return *this;
   }
 
   template <OnEnterLabel Label, typename F>
     requires(!SystemInput<F>)
-  auto add_systems(Label && /*label*/, F && /*func*/) -> App & {
+  auto add_systems(Label&& /*label*/, F&& /*func*/) -> App& {
     detail::static_assert_valid_system_callable<F>();
     return *this;
   }
 
   template <OnExitLabel Label, typename F>
     requires SystemInput<F>
-  auto add_systems(Label &&label, F &&func) -> App & {
+  auto add_systems(Label&& label, F&& func) -> App& {
     using S = bare_t<decltype(label.value)>;
     get_or_init_state_schedules<S>().on_exit[label.value].add_system_fn(
-        std::forward<F>(func));
+      std::forward<F>(func)
+    );
     return *this;
   }
 
   template <OnExitLabel Label, typename F>
     requires(!SystemInput<F>)
-  auto add_systems(Label && /*label*/, F && /*func*/) -> App & {
+  auto add_systems(Label&& /*label*/, F&& /*func*/) -> App& {
     detail::static_assert_valid_system_callable<F>();
     return *this;
   }
 
   template <OnTransitionLabel Label, typename F>
     requires SystemInput<F>
-  auto add_systems(Label &&, F &&func) -> App & {
+  auto add_systems(Label&&, F&& func) -> App& {
     using S = typename bare_t<Label>::state_type;
     get_or_init_state_schedules<S>().on_transition.add_system_fn(
-        std::forward<F>(func));
+      std::forward<F>(func)
+    );
     return *this;
   }
 
   template <OnTransitionLabel Label, typename F>
     requires(!SystemInput<F>)
-  auto add_systems(Label &&, F && /*func*/) -> App & {
+  auto add_systems(Label&&, F&& /*func*/) -> App& {
     detail::static_assert_valid_system_callable<F>();
     return *this;
   }
 
-  template <typename F> auto add_plugin(F &&plugin_fn) -> App & {
+  template <typename F> auto add_plugin(F&& plugin_fn) -> App& {
     std::forward<F>(plugin_fn)(*this);
     return *this;
   }
 
-  auto add_plugin(IPlugin &plugin) -> App & {
+  auto add_plugin(IPlugin& plugin) -> App& {
     plugin.build(*this);
     return *this;
   }
 
-  template <typename R> auto insert_resource(R resource) -> App & {
+  template <typename R> auto insert_resource(R resource) -> App& {
     world_.insert_resource(std::move(resource));
     return *this;
   }
 
   template <typename R, typename... Args>
-  auto init_resource(Args &&...args) -> App & {
+  auto init_resource(Args&&... args) -> App& {
     if (!world_.has_resource<R>()) {
       world_.insert_resource(R{std::forward<Args>(args)...});
     }
     return *this;
   }
 
-  template <typename S> auto init_state(S initial) -> App & {
+  template <typename S> auto init_state(S initial) -> App& {
     world_.insert_resource(State<S>(std::move(initial)));
     world_.insert_resource(NextState<S>{});
     world_.insert_resource(StateTransitionEvent<S>{});
     world_.insert_resource(StateSchedules<S>{});
     schedules_.entry(ScheduleLabel::PreUpdate)
-        .add_system(make_system([](World &world_ref) -> auto {
-          check_state_transitions<S>(world_ref);
-        }));
+      .add_system(make_system([](World& world_ref) -> auto {
+        check_state_transitions<S>(world_ref);
+      }));
 
     S initial_copy = initial;
     schedules_.entry(ScheduleLabel::Startup)
-        .add_system(make_system([initial_copy](World &world_ref) -> auto {
-          auto *schedules = world_ref.get_resource<StateSchedules<S>>();
-          if (schedules) {
-            auto iter = schedules->on_enter.find(initial_copy);
-            if (iter != schedules->on_enter.end()) {
-              iter->second.run(world_ref);
-            }
+      .add_system(make_system([initial_copy](World& world_ref) -> auto {
+        auto* schedules = world_ref.get_resource<StateSchedules<S>>();
+        if (schedules) {
+          auto iter = schedules->on_enter.find(initial_copy);
+          if (iter != schedules->on_enter.end()) {
+            iter->second.run(world_ref);
           }
-        }));
+        }
+      }));
     return *this;
   }
 
-  template <IsMessage E> auto add_message() -> App & {
+  template <IsMessage E> auto add_message() -> App& {
     if (!world_.has_resource<Messages<E>>()) {
       world_.insert_resource(Messages<E>{});
       schedules_.entry(ScheduleLabel::First)
-          .add_system_fn(message_update_system<E>);
+        .add_system_fn(message_update_system<E>);
     }
     return *this;
   }
 
-  template <IsEvent E> auto add_event() -> App & {
+  template <IsEvent E> auto add_event() -> App& {
     world_.add_event<E>();
     return *this;
   }
 
-  template <typename F> auto add_observer(F &&func) -> App & {
+  template <typename F> auto add_observer(F&& func) -> App& {
     world_.add_observer(std::forward<F>(func));
     return *this;
   }
 
-  auto world() -> World & { return world_; }
-  auto world() const -> const World & { return world_; }
-  auto schedules() -> Schedules & { return schedules_; }
+  auto world() -> World& { return world_; }
+  auto world() const -> World const& { return world_; }
+  auto schedules() -> Schedules& { return schedules_; }
 
   auto startup() -> void {
     flush_pending_set_systems();
@@ -318,7 +331,7 @@ public:
   auto update(float delta_seconds = 0.0F) -> void {
     flush_pending_set_systems();
     debug_dump_schedule_graph_once();
-    auto *time = world_.get_resource<Time>();
+    auto* time = world_.get_resource<Time>();
     if (time != nullptr) {
       time->delta_seconds = delta_seconds;
       time->elapsed_seconds += time->delta_seconds;
@@ -346,39 +359,43 @@ public:
   }
 
   auto run() -> void {
-    auto *runner = world_.get_resource<AppRunner>();
+    auto* runner = world_.get_resource<AppRunner>();
     if ((runner == nullptr) || !runner->run) {
-      std::println(stderr,
-                   "App::run() called without an AppRunner resource.\n");
+      std::println(
+        stderr, "App::run() called without an AppRunner resource.\n"
+      );
       return;
     }
     runner->run(*this);
   }
 
 private:
-  auto register_set_schedule(ScheduleLabel label, const SetId &set_id) -> void {
+  auto register_set_schedule(ScheduleLabel label, SetId const& set_id) -> void {
     auto [iter, inserted] = set_schedules_.emplace(set_id, label);
     if (!inserted && iter->second != label) {
       throw std::runtime_error(
-          "Set '" + set_name(set_id) + "' is configured for both schedules '" +
-          std::string(schedule_label_name(iter->second)) + "' and '" +
-          std::string(schedule_label_name(label)) + "'");
+        "Set '" + set_name(set_id) + "' is configured for both schedules '" +
+        std::string(schedule_label_name(iter->second)) + "' and '" +
+        std::string(schedule_label_name(label)) + "'"
+      );
     }
   }
 
-  auto try_resolve_set_schedule(const SetList &sets) const
-      -> std::optional<ScheduleLabel> {
+  auto try_resolve_set_schedule(SetList const& sets) const
+    -> std::optional<ScheduleLabel> {
     std::optional<ScheduleLabel> label;
 
-    for (const auto &set_id : sets.ids) {
+    for (auto const& set_id : sets.ids) {
       auto iter = set_schedules_.find(set_id);
       if (iter == set_schedules_.end()) {
         return std::nullopt;
       }
 
       if (label && *label != iter->second) {
-        throw std::runtime_error("Sets '" + detail::set_names(sets.ids) +
-                                 "' are configured for different schedules");
+        throw std::runtime_error(
+          "Sets '" + detail::set_names(sets.ids) +
+          "' are configured for different schedules"
+        );
       }
       label = iter->second;
     }
@@ -386,12 +403,14 @@ private:
     return label;
   }
 
-  auto resolve_set_schedule(const SetList &sets) const -> ScheduleLabel {
+  auto resolve_set_schedule(SetList const& sets) const -> ScheduleLabel {
     auto label = try_resolve_set_schedule(sets);
     if (!label) {
-      throw std::runtime_error("Sets '" + detail::set_names(sets.ids) +
-                               "' were used by add_systems(...) but were not "
-                               "configured");
+      throw std::runtime_error(
+        "Sets '" + detail::set_names(sets.ids) +
+        "' were used by add_systems(...) but were not "
+        "configured"
+      );
     }
     return *label;
   }
@@ -403,7 +422,7 @@ private:
 
     auto pending = std::move(pending_set_systems_);
     pending_set_systems_.clear();
-    for (auto &entry : pending) {
+    for (auto& entry : pending) {
       entry->attach(*this);
     }
   }
@@ -423,7 +442,7 @@ private:
   }
 
   auto apply_commands() -> void {
-    auto *queues = world_.get_resource<CommandQueues>();
+    auto* queues = world_.get_resource<CommandQueues>();
     if ((queues != nullptr) && !queues->empty()) {
       world_.increment_change_tick();
       queues->apply(world_);
@@ -431,10 +450,10 @@ private:
   }
 };
 
-inline auto time_plugin(App &app) -> void { app.init_resource<Time>(); }
+inline auto time_plugin(App& app) -> void { app.init_resource<Time>(); }
 
 inline auto Window::install(Window config) {
-  return [config = std::move(config)](ecs::App &app) -> void {
+  return [config = std::move(config)](ecs::App& app) -> void {
     app.insert_resource(config);
   };
 }

@@ -15,7 +15,7 @@
 
 namespace ecs {
 
-inline auto global_executor() -> tf::Executor & {
+inline auto global_executor() -> tf::Executor& {
   static tf::Executor executor;
   return executor;
 }
@@ -44,12 +44,12 @@ struct is_system_input_descriptor<ChainedSystems> : std::true_type {};
 
 template <typename T>
 concept ChainSystemInput =
-    SystemCallable<T> || is_system_descriptor_v<bare_t<T>>;
+  SystemCallable<T> || is_system_descriptor_v<bare_t<T>>;
 
 template <typename Func>
   requires ChainSystemInput<Func>
-auto make_chain_entry(Func &&func, const std::string &prev)
-    -> ChainedSystems::Entry {
+auto make_chain_entry(Func&& func, std::string const& prev)
+  -> ChainedSystems::Entry {
   SystemOrdering ordering;
   std::unique_ptr<ISystem> sys;
 
@@ -71,13 +71,13 @@ auto make_chain_entry(Func &&func, const std::string &prev)
 
 template <typename... Fs>
   requires(detail::ChainSystemInput<Fs> && ...)
-auto chain(Fs &&...funcs) -> ChainedSystems {
+auto chain(Fs&&... funcs) -> ChainedSystems {
   ChainedSystems result;
   std::string prev_name;
 
-  auto process = [&](auto &&func) -> auto {
+  auto process = [&](auto&& func) -> auto {
     auto entry =
-        detail::make_chain_entry(std::forward<decltype(func)>(func), prev_name);
+      detail::make_chain_entry(std::forward<decltype(func)>(func), prev_name);
     prev_name = entry.system->name();
     result.systems.push_back(std::move(entry));
   };
@@ -112,19 +112,19 @@ class Schedule {
   std::vector<ExecutionStep> steps_;
   std::vector<SetConfig> set_configs_;
 
-  World *current_world_ = nullptr;
+  World* current_world_ = nullptr;
   bool needs_rebuild_ = true;
 
 public:
   Schedule() = default;
   ~Schedule() = default;
-  Schedule(Schedule &&) = default;
-  auto operator=(Schedule &&) -> Schedule & = default;
-  Schedule(const Schedule &) = delete;
-  auto operator=(const Schedule &) -> Schedule & = delete;
+  Schedule(Schedule&&) = default;
+  auto operator=(Schedule&&) -> Schedule& = default;
+  Schedule(Schedule const&) = delete;
+  auto operator=(Schedule const&) -> Schedule& = delete;
 
   auto add_system(std::unique_ptr<ISystem> system, SystemOrdering ordering = {})
-      -> void {
+    -> void {
     SystemEntry entry;
     entry.system = std::move(system);
     entry.access = entry.system->access();
@@ -141,47 +141,52 @@ public:
 
   template <typename F>
     requires SystemInput<F>
-  auto add_system_fn(F &&func) -> void {
+  auto add_system_fn(F&& func) -> void {
     add_system_fn_with_ordering(std::forward<F>(func), {});
   }
 
   template <typename F>
     requires(!SystemInput<F>)
-  auto add_system_fn(F && /*func*/) -> void {
+  auto add_system_fn(F&& /*func*/) -> void {
     detail::static_assert_valid_system_callable<F>();
   }
 
   template <typename E, typename F>
-    requires(std::is_enum_v<bare_t<E>> &&
-             !std::same_as<bare_t<E>, ScheduleLabel> && SystemInput<F>)
-  auto add_system_fn(E set_id, F &&func) -> void {
+    requires(
+      std::is_enum_v<bare_t<E>> && !std::same_as<bare_t<E>, ScheduleLabel> &&
+      SystemInput<F>
+    )
+  auto add_system_fn(E set_id, F&& func) -> void {
     add_system_fn(set(set_id), std::forward<F>(func));
   }
 
   template <typename E, typename F>
-    requires(std::is_enum_v<bare_t<E>> &&
-             !std::same_as<bare_t<E>, ScheduleLabel> && !SystemInput<F>)
-  auto add_system_fn(E /*set_id*/, F && /*func*/) -> void {
+    requires(
+      std::is_enum_v<bare_t<E>> && !std::same_as<bare_t<E>, ScheduleLabel> &&
+      !SystemInput<F>
+    )
+  auto add_system_fn(E /*set_id*/, F&& /*func*/) -> void {
     detail::static_assert_valid_system_callable<F>();
   }
 
   template <typename S, typename F>
     requires(detail::is_set_marker_v<S> && SystemInput<F>)
-  auto add_system_fn(S &&, F &&func) -> void {
+  auto add_system_fn(S&&, F&& func) -> void {
     add_system_fn(set<bare_t<S>>(), std::forward<F>(func));
   }
 
   template <typename S, typename F>
     requires(detail::is_set_marker_v<S> && !SystemInput<F>)
-  auto add_system_fn(S &&, F && /*func*/) -> void {
+  auto add_system_fn(S&&, F&& /*func*/) -> void {
     detail::static_assert_valid_system_callable<F>();
   }
 
   template <typename S, typename F>
-    requires((std::same_as<bare_t<S>, SetId> ||
-              std::same_as<bare_t<S>, SetList>) &&
-             SystemInput<F>)
-  auto add_system_fn(S &&selector, F &&func) -> void {
+    requires(
+      (std::same_as<bare_t<S>, SetId> || std::same_as<bare_t<S>, SetList>) &&
+      SystemInput<F>
+    )
+  auto add_system_fn(S&& selector, F&& func) -> void {
     SystemOrdering ordering;
     ordering.in_sets = detail::to_set_ids(std::forward<S>(selector));
     detail::ensure_unique_sets(ordering.in_sets, "add_system_fn(...)");
@@ -189,14 +194,15 @@ public:
   }
 
   template <typename S, typename F>
-    requires((std::same_as<bare_t<S>, SetId> ||
-              std::same_as<bare_t<S>, SetList>) &&
-             !SystemInput<F>)
-  auto add_system_fn(S && /*selector*/, F && /*func*/) -> void {
+    requires(
+      (std::same_as<bare_t<S>, SetId> || std::same_as<bare_t<S>, SetList>) &&
+      !SystemInput<F>
+    )
+  auto add_system_fn(S&& /*selector*/, F&& /*func*/) -> void {
     detail::static_assert_valid_system_callable<F>();
   }
 
-  auto run(World &world) -> void {
+  auto run(World& world) -> void {
     if (entries_.empty()) {
       return;
     }
@@ -206,15 +212,16 @@ public:
     world.begin_schedule_run();
 
     if (!world.multithreaded()) {
-      for (auto &entry : entries_) {
-        run_entry(static_cast<usize>(std::distance(entries_.data(), &entry)),
-                  world);
+      for (auto& entry : entries_) {
+        run_entry(
+          static_cast<usize>(std::distance(entries_.data(), &entry)), world
+        );
       }
       return;
     }
 
-    for (auto &step : steps_) {
-      if (auto *s = std::get_if<InlineStep>(&step)) {
+    for (auto& step : steps_) {
+      if (auto* s = std::get_if<InlineStep>(&step)) {
         for (usize i : range(s->start, s->end)) {
           run_entry(i, world);
         }
@@ -238,8 +245,8 @@ public:
   }
 
 #ifndef NDEBUG
-  [[nodiscard]] auto debug_dump(const std::string &schedule_name) const
-      -> std::string;
+  [[nodiscard]] auto debug_dump(const std::string& schedule_name) const
+    -> std::string;
 #endif
 
 private:
@@ -247,16 +254,16 @@ private:
 
   template <typename F>
     requires SystemInput<F>
-  auto add_system_fn_with_ordering(F &&func, SystemOrdering base_ordering)
-      -> void {
+  auto add_system_fn_with_ordering(F&& func, SystemOrdering base_ordering)
+    -> void {
     if constexpr (is_chained_systems_v<bare_t<F>>) {
-      for (auto &e : func.systems) {
+      for (auto& e : func.systems) {
         merge_ordering(e.ordering, base_ordering);
         add_system(std::move(e.system), std::move(e.ordering));
       }
 
     } else if constexpr (is_system_group_descriptor_v<bare_t<F>>) {
-      for (auto &entry : func.build()) {
+      for (auto& entry : func.build()) {
         merge_ordering(entry.ordering, base_ordering);
         add_system(std::move(entry.system), std::move(entry.ordering));
       }
@@ -271,20 +278,24 @@ private:
     }
   }
 
-  static auto merge_ordering(SystemOrdering &target,
-                             const SystemOrdering &extra) -> void {
-    target.after.insert(target.after.end(), extra.after.begin(),
-                        extra.after.end());
-    target.before.insert(target.before.end(), extra.before.begin(),
-                         extra.before.end());
-    target.in_sets.insert(target.in_sets.end(), extra.in_sets.begin(),
-                          extra.in_sets.end());
+  static auto merge_ordering(
+    SystemOrdering& target, SystemOrdering const& extra
+  ) -> void {
+    target.after.insert(
+      target.after.end(), extra.after.begin(), extra.after.end()
+    );
+    target.before.insert(
+      target.before.end(), extra.before.begin(), extra.before.end()
+    );
+    target.in_sets.insert(
+      target.in_sets.end(), extra.in_sets.begin(), extra.in_sets.end()
+    );
   }
 
   auto rebuild() -> void {
     steps_.clear();
 
-    const usize count = entries_.size();
+    usize const count = entries_.size();
     if (count == 0) {
       return;
     }
@@ -297,22 +308,24 @@ private:
   auto apply_set_configs() -> void {
     std::unordered_map<SetId, std::vector<usize>> set_members;
     for (usize i = 0; i < entries_.size(); ++i) {
-      for (const auto &sid : entries_[i].in_sets) {
+      for (auto const& sid : entries_[i].in_sets) {
         set_members[sid].push_back(i);
       }
     }
 
-    for (const auto &[sid, _] : set_members) {
-      auto it = std::ranges::find_if(
-          set_configs_, [&](auto &c) -> auto { return c.id == sid; });
+    for (auto const& [sid, _] : set_members) {
+      auto it = std::ranges::find_if(set_configs_, [&](auto& c) -> auto {
+        return c.id == sid;
+      });
       if (it == set_configs_.end()) {
         throw std::runtime_error(
-            std::format("Set '{}' used but never configured", set_name(sid)));
+          std::format("Set '{}' used but never configured", set_name(sid))
+        );
       }
     }
 
-    for (auto &cfg : set_configs_) {
-      const auto &members = set_members[cfg.id];
+    for (auto& cfg : set_configs_) {
+      auto const& members = set_members[cfg.id];
       if (members.empty()) {
         continue;
       }
@@ -320,9 +333,10 @@ private:
       // CONDITION
       if (cfg.condition) {
         for (usize idx : members) {
-          auto &entry = entries_[idx];
+          auto& entry = entries_[idx];
           entry.system = std::make_unique<ConditionedSystem>(
-              std::move(entry.system), cfg.condition);
+            std::move(entry.system), cfg.condition
+          );
           entry.access = entry.system->access();
         }
       }
@@ -339,11 +353,11 @@ private:
       };
 
       // BEFORE
-      for (const auto &target_set : cfg.before) {
+      for (auto const& target_set : cfg.before) {
         auto target_names = get_names(target_set);
         for (usize from_idx : members) {
-          auto &before_list = entries_[from_idx].ordering.before;
-          for (const auto &name : target_names) {
+          auto& before_list = entries_[from_idx].ordering.before;
+          for (auto const& name : target_names) {
             if (name != entries_[from_idx].system->name()) {
               before_list.emplace_back(name);
             }
@@ -352,11 +366,11 @@ private:
       }
 
       // AFTER
-      for (const auto &target_set : cfg.after) {
+      for (auto const& target_set : cfg.after) {
         auto target_names = get_names(target_set);
         for (usize to_idx : members) {
-          auto &after_list = entries_[to_idx].ordering.after;
-          for (const auto &name : target_names) {
+          auto& after_list = entries_[to_idx].ordering.after;
+          for (auto const& name : target_names) {
             if (name != entries_[to_idx].system->name()) {
               after_list.emplace_back(name);
             }
@@ -367,7 +381,7 @@ private:
   }
 
   auto topological_sort() -> void {
-    const usize n = entries_.size();
+    usize const n = entries_.size();
 
     std::unordered_map<std::string, usize> name_to_idx;
     for (usize i = 0; i < n; ++i) {
@@ -377,12 +391,14 @@ private:
     std::vector<std::vector<usize>> adj(n);
     std::vector<usize> in_degree(n, 0);
 
-    auto resolve = [&](const std::string &dep,
-                       const std::string &owner) -> unsigned long {
+    auto resolve =
+      [&](std::string const& dep, std::string const& owner) -> unsigned long {
       auto it = name_to_idx.find(dep);
       if (it == name_to_idx.end())
-        throw std::runtime_error("System '" + owner + "' references '" + dep +
-                                 "' which does not exist in this schedule");
+        throw std::runtime_error(
+          "System '" + owner + "' references '" + dep +
+          "' which does not exist in this schedule"
+        );
       return it->second;
     };
 
@@ -395,12 +411,12 @@ private:
     };
 
     for (usize i = 0; i < n; ++i) {
-      const auto &name = entries_[i].system->name();
-      for (const auto &dep : entries_[i].ordering.after) {
+      auto const& name = entries_[i].system->name();
+      for (auto const& dep : entries_[i].ordering.after) {
         usize j = resolve(dep, name);
         add_edge(j, i);
       }
-      for (const auto &dep : entries_[i].ordering.before) {
+      for (auto const& dep : entries_[i].ordering.before) {
         usize j = resolve(dep, name);
         add_edge(i, j);
       }
@@ -472,8 +488,8 @@ private:
   }
 
   [[nodiscard]] auto systems_conflict(usize i, usize j) const -> bool {
-    const auto &a = entries_[i];
-    const auto &b = entries_[j];
+    auto const& a = entries_[i];
+    auto const& b = entries_[j];
 
     if (a.access.exclusive || b.access.exclusive ||
         !a.access.is_compatible(b.access)) {
@@ -486,10 +502,10 @@ private:
   using Batch = std::vector<usize>;
 
   [[nodiscard]] auto batch_compatible_systems(usize start, usize end) const
-      -> std::vector<Batch> {
+    -> std::vector<Batch> {
     std::vector<Batch> batches;
     for (usize offset = 0; offset < (end - start); ++offset) {
-      auto iter = std::ranges::find_if(batches, [&](const auto &batch) -> auto {
+      auto iter = std::ranges::find_if(batches, [&](auto const& batch) -> auto {
         return std::ranges::none_of(batch, [&](auto member) -> auto {
           return systems_conflict(start + offset, start + member);
         });
@@ -504,12 +520,13 @@ private:
     return batches;
   }
 
-  auto reorder_entries_by_batches(usize start,
-                                  const std::vector<Batch> &batches) -> void {
+  auto reorder_entries_by_batches(
+    usize start, std::vector<Batch> const& batches
+  ) -> void {
     std::vector<SystemEntry> reordered;
     reordered.reserve(batches.size());
 
-    for (const auto &batch : batches) {
+    for (auto const& batch : batches) {
       for (usize idx : batch) {
         reordered.push_back(std::move(entries_[start + idx]));
       }
@@ -524,8 +541,9 @@ private:
     auto batches = batch_compatible_systems(start, end);
     reorder_entries_by_batches(start, batches);
 
-    bool any_parallel = std::ranges::any_of(
-        batches, [](auto &b) -> auto { return b.size() > 1; });
+    bool any_parallel = std::ranges::any_of(batches, [](auto& b) -> auto {
+      return b.size() > 1;
+    });
     if (!any_parallel) {
       return InlineStep{.start = start, .end = end};
     }
@@ -533,7 +551,7 @@ private:
     ParallelStep step;
     usize batch_start = start;
 
-    for (const auto &batch : batches) {
+    for (auto const& batch : batches) {
       usize batch_end = batch_start + batch.size();
       step.batches.push_back({batch_start, batch_end});
       batch_start = batch_end;
@@ -542,8 +560,8 @@ private:
     return step;
   }
 
-  auto run_parallel_step(const ParallelStep &step, World &world) -> void {
-    for (const auto &batch : step.batches) {
+  auto run_parallel_step(ParallelStep const& step, World& world) -> void {
+    for (auto const& batch : step.batches) {
       tf::Taskflow taskflow;
       bool has_worker_tasks = false;
 
@@ -553,8 +571,9 @@ private:
         }
 
         has_worker_tasks = true;
-        taskflow.emplace(
-            [this, idx, &world] -> void { run_entry(idx, world); });
+        taskflow.emplace([this, idx, &world] -> void {
+          run_entry(idx, world);
+        });
       }
 
       if (!has_worker_tasks) {
@@ -577,7 +596,7 @@ private:
     }
   }
 
-  auto run_entry(usize index, World &world) -> void {
+  auto run_entry(usize index, World& world) -> void {
 #ifdef TRACY_ENABLE
     const auto sys_name = entries_[index].system->name();
     ZoneScopedTransient(sys_name.c_str());
@@ -585,10 +604,11 @@ private:
     entries_[index].system->run(world);
   }
 
-  static auto have_ordering_dependency(const SystemEntry &a,
-                                       const SystemEntry &b) -> bool {
-    const auto &a_name = a.system->name();
-    const auto &b_name = b.system->name();
+  static auto have_ordering_dependency(
+    SystemEntry const& a, SystemEntry const& b
+  ) -> bool {
+    auto const& a_name = a.system->name();
+    auto const& b_name = b.system->name();
 
     return std::ranges::contains(a.ordering.after, b_name) ||
            std::ranges::contains(a.ordering.before, b_name) ||
@@ -601,15 +621,15 @@ class Schedules {
   std::unordered_map<ScheduleLabel, Schedule> schedules_;
 
 public:
-  auto entry(ScheduleLabel label) -> Schedule & { return schedules_[label]; }
+  auto entry(ScheduleLabel label) -> Schedule& { return schedules_[label]; }
 
-  auto get(ScheduleLabel label) -> Schedule * {
+  auto get(ScheduleLabel label) -> Schedule* {
     auto iter = schedules_.find(label);
     return iter != schedules_.end() ? &iter->second : nullptr;
   }
 
-  auto run(ScheduleLabel label, World &world) -> void {
-    auto *schedule = get(label);
+  auto run(ScheduleLabel label, World& world) -> void {
+    auto* schedule = get(label);
     if (schedule != nullptr) {
       ZoneScopedN("Schedule");
 #ifdef TRACY_ENABLE
@@ -621,7 +641,7 @@ public:
   }
 
   auto prepare_all() -> void {
-    for (auto &[_, schedule] : schedules_) {
+    for (auto& [_, schedule] : schedules_) {
       schedule.prepare();
     }
   }
@@ -637,14 +657,14 @@ private:
 namespace detail {
 
 template <typename F>
-auto add_system_to_schedule(Schedule &schedule, F &&func) -> void {
+auto add_system_to_schedule(Schedule& schedule, F&& func) -> void {
   schedule.add_system_fn(std::forward<F>(func));
 }
 
 } // namespace detail
 
 inline auto system_multithreading(TaskPoolOptions opts = {}) {
-  return [opts](auto &app) -> auto {
+  return [opts](auto& app) -> auto {
     app.world().set_multithreaded(opts.multithreaded);
   };
 }
@@ -655,8 +675,8 @@ inline auto system_multithreading(TaskPoolOptions opts = {}) {
 #include "schedule_debug.hpp"
 
 namespace ecs {
-inline auto Schedule::debug_dump(const std::string &schedule_name) const
-    -> std::string {
+inline auto Schedule::debug_dump(std::string const& schedule_name) const
+  -> std::string {
   return ScheduleDebug::dump(*this, schedule_name);
 }
 

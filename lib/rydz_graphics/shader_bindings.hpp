@@ -93,7 +93,7 @@ enum class StandardMaterialUniform {
 };
 
 inline auto map_uniform_binding(StandardMaterialUniform uniform)
-    -> std::string_view {
+  -> std::string_view {
   switch (uniform) {
   case StandardMaterialUniform::AlphaCutoff:
     return "alphaCutoff";
@@ -131,7 +131,7 @@ enum class PbrLightingUniform {
 };
 
 inline auto map_uniform_binding(PbrLightingUniform uniform)
-    -> std::string_view {
+  -> std::string_view {
   switch (uniform) {
   case PbrLightingUniform::HasDirectional:
     return "u_has_directional";

@@ -44,7 +44,7 @@ concept Spawnable = IsComponent<bare_t<T>> || IsBundle<bare_t<T>>;
 
 template <typename R>
 concept SpawnableRange =
-    std::ranges::input_range<R> && Spawnable<std::ranges::range_value_t<R>>;
+  std::ranges::input_range<R> && Spawnable<std::ranges::range_value_t<R>>;
 
 namespace detail {
 
@@ -103,33 +103,33 @@ template <typename T> auto to_tuple(T &&t) {
 template <typename T> struct IsTuple : std::false_type {};
 template <typename... Ts> struct IsTuple<std::tuple<Ts...>> : std::true_type {};
 
-template <typename T> void insert_single(World &world, Entity entity, T &&item);
+template <typename T> void insert_single(World& world, Entity entity, T&& item);
 
 template <typename... Ts>
-auto insert_tuple_items(World &world, Entity entity, Tuple<Ts...> &&tup)
-    -> void {
+auto insert_tuple_items(World& world, Entity entity, Tuple<Ts...>&& tup)
+  -> void {
   std::apply(
-      [&](auto &&...elems) -> auto {
-        (insert_single(world, entity, std::forward<decltype(elems)>(elems)),
-         ...);
-      },
-      std::move(tup));
+    [&](auto&&... elems) -> auto {
+      (insert_single(world, entity, std::forward<decltype(elems)>(elems)), ...);
+    },
+    std::move(tup)
+  );
 }
 
 } // namespace detail
 
 template <typename T>
-auto insert_bundle(World &world, Entity entity, T &&item) -> void {
+auto insert_bundle(World& world, Entity entity, T&& item) -> void {
   detail::insert_single(world, entity, std::forward<T>(item));
 }
 
 template <typename... Ts>
-auto insert_bundle(World &world, Entity entity, Ts &&...items) -> void {
+auto insert_bundle(World& world, Entity entity, Ts&&... items) -> void {
   (detail::insert_single(world, entity, std::forward<Ts>(items)), ...);
 }
 
 template <std::ranges::input_range R>
   requires Spawnable<std::ranges::range_value_t<R>>
-auto spawn_batch(World &world, R &&_range) -> std::vector<Entity>;
+auto spawn_batch(World& world, R&& _range) -> std::vector<Entity>;
 
 } // namespace ecs

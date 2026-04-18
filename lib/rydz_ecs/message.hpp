@@ -13,31 +13,31 @@ struct MessageId {
 };
 
 template <typename E> class MessageRange {
-  std::vector<const E *> messages_;
+  std::vector<E const*> messages_;
 
 public:
-  explicit MessageRange(std::vector<const E *> messages)
+  explicit MessageRange(std::vector<E const*> messages)
       : messages_(std::move(messages)) {}
 
   class iterator {
-    typename std::vector<const E *>::const_iterator it_;
+    typename std::vector<E const*>::const_iterator it_;
 
   public:
-    explicit iterator(typename std::vector<const E *>::const_iterator iter)
+    explicit iterator(typename std::vector<E const*>::const_iterator iter)
         : it_(iter) {}
 
-    auto operator*() const -> const E & { return **it_; }
-    auto operator->() const -> const E * { return *it_; }
+    auto operator*() const -> E const& { return **it_; }
+    auto operator->() const -> E const* { return *it_; }
 
-    auto operator++() -> iterator & {
+    auto operator++() -> iterator& {
       ++it_;
       return *this;
     }
 
-    auto operator==(const iterator &other) const -> bool {
+    auto operator==(iterator const& other) const -> bool {
       return it_ == other.it_;
     }
-    auto operator!=(const iterator &other) const -> bool {
+    auto operator!=(iterator const& other) const -> bool {
       return it_ != other.it_;
     }
   };
@@ -70,12 +70,12 @@ private:
   usize next_reader_id_ = 0;
 
 public:
-  auto send(const E &message) -> void {
+  auto send(E const& message) -> void {
     MessageId id{message_count_++};
     buffers_.current.push_back({message, id});
   }
 
-  auto send(E &&message) -> void {
+  auto send(E&& message) -> void {
     MessageId id{message_count_++};
     buffers_.current.push_back({std::move(message), id});
   }
@@ -101,24 +101,24 @@ public:
 
   auto register_reader() -> usize {
     usize idx = next_reader_id_++;
-    usize start = buffers_.prev.empty() ? message_count_
-                                        : buffers_.prev.front().second.id;
+    usize start =
+      buffers_.prev.empty() ? message_count_ : buffers_.prev.front().second.id;
     reader_cursors_[idx] = MessageId{start};
     return idx;
   }
 
   auto iter(usize reader_id) -> MessageRange<E> {
-    auto &cursor = reader_cursors_[reader_id];
+    auto& cursor = reader_cursors_[reader_id];
     usize start_id = cursor.id;
-    std::vector<const E *> unread;
+    std::vector<E const*> unread;
     unread.reserve(total_count());
 
-    for (auto &[message, id] : buffers_.prev) {
+    for (auto& [message, id] : buffers_.prev) {
       if (id.id >= start_id) {
         unread.push_back(&message);
       }
     }
-    for (auto &[message, id] : buffers_.current) {
+    for (auto& [message, id] : buffers_.current) {
       if (id.id >= start_id) {
         unread.push_back(&message);
       }

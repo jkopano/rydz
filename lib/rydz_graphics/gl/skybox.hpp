@@ -63,16 +63,17 @@ public:
     rl::rlDisableBackfaceCulling();
     rl::rlDisableDepthMask();
 
-    shader.set("matView", view);
-    shader.set("matProjection", proj);
-
     active_texture_slot(0);
     enable_texture_cubemap(cubemap_id);
 
     shader.with_enabled([&] -> void {
-      vao.bind();
-      vao.draw(0, 36);
-      VAO::unbind();
+      shader.set("matView", view);
+      shader.set("matProjection", proj);
+      shader.set("u_skybox", 0);
+      if (vao.bind()) {
+        vao.draw(0, 36);
+        VAO::unbind();
+      }
     });
 
     disable_texture_cubemap();
@@ -117,11 +118,12 @@ private:
         -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f};
 
     vao = VAO::create();
-    vao.bind();
-    vbo = VBO::create(vertices, sizeof(vertices), false);
-    set_vertex_attribute(0, 3, RL_FLOAT, false, 0, 0);
-    enable_vertex_attribute(0);
-    VAO::unbind();
+    if (vao.bind()) {
+      vbo = VBO::create(vertices, sizeof(vertices), false);
+      set_vertex_attribute(0, 3, RL_FLOAT, false, 0, 0);
+      enable_vertex_attribute(0);
+      VAO::unbind();
+    }
   }
 
   static auto

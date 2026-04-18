@@ -360,18 +360,18 @@ public:
   }
 
   template <typename F> auto with_enabled(F &&fn) -> decltype(auto) {
-    rl::BeginShaderMode(shader_);
+    rl::rlEnableShader(shader_.id);
     try {
       if constexpr (std::is_void_v<std::invoke_result_t<F>>) {
         std::invoke(std::forward<F>(fn));
-        rl::EndShaderMode();
+        rl::rlDisableShader();
       } else {
         decltype(auto) result = std::invoke(std::forward<F>(fn));
-        rl::EndShaderMode();
+        rl::rlDisableShader();
         return result;
       }
     } catch (...) {
-      rl::EndShaderMode();
+      rl::rlDisableShader();
       throw;
     }
   }

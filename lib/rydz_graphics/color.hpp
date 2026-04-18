@@ -18,7 +18,7 @@ struct Color {
 
   constexpr operator gl::Color() const { return {r, g, b, a}; }
 
-  auto operator==(const Color &) const -> bool = default;
+  auto operator==(Color const&) const -> bool = default;
 };
 
 inline constexpr Color kWhite = {255, 255, 255, 255};

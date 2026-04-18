@@ -27,25 +27,25 @@ struct Sprite {
 };
 
 template <typename M>
-concept IsExtracted = requires(const M &m) {
+concept IsExtracted = requires(M const& m) {
   { m.clear() } -> std::same_as<void>;
 };
 
 struct ExtractedView {
   using T = Resource;
   CameraView camera_view{
-      .view = Mat4::IDENTITY,
-      .proj = Mat4::IDENTITY,
-      .position = Vec3{},
+    .view = Mat4::IDENTITY,
+    .proj = Mat4::IDENTITY,
+    .position = Vec3{},
   };
   Color clear_color = ClearColor{}.color;
-  const Skybox *active_skybox{};
+  Skybox const* active_skybox{};
   PostProcessDescriptor postprocess{};
   bool active{};
   bool has_postprocess{};
   bool orthographic{};
-  float near_plane{0.1f};
-  float far_plane{1000.0f};
+  float near_plane{0.1F};
+  float far_plane{1000.0F};
 
   auto clear() -> void { *this = ExtractedView{}; }
 };
@@ -98,14 +98,21 @@ struct ExtractedUi {
 };
 
 struct Extract {
-  static void
-  view(Query<Camera3DComponent, ActiveCamera, GlobalTransform, Opt<ClearColor>,
-             Opt<gl::Skybox>, Opt<PostProcessMaterial>>
-           cam_query,
-       Res<Window> window, ResMut<ExtractedView> view) {
+  static auto view(
+    Query<
+      Camera3DComponent,
+      ActiveCamera,
+      GlobalTransform,
+      Opt<ClearColor>,
+      Opt<gl::Skybox>,
+      Opt<PostProcessMaterial>> cam_query,
+    Res<Window> window,
+    ResMut<ExtractedView> view
+  ) -> void {
     view->clear();
-    const float aspect = compute_camera_aspect_ratio(
-        static_cast<float>(window->width), static_cast<float>(window->height));
+    float const aspect = compute_camera_aspect_ratio(
+      static_cast<float>(window->width), static_cast<float>(window->height)
+    );
 
     for (auto [cam_comp, _, cam_gt, clear_color, skybox, postprocess] :
          cam_query.iter()) {
@@ -126,9 +133,11 @@ struct Extract {
     }
   }
 
-  static auto lighting(Query<DirectionalLight> dir_query,
-                       Query<PointLight, GlobalTransform> point_query,
-                       ResMut<ExtractedLights> lights) -> void {
+  static auto lighting(
+    Query<DirectionalLight> dir_query,
+    Query<PointLight, GlobalTransform> point_query,
+    ResMut<ExtractedLights> lights
+  ) -> void {
     lights->clear();
 
     for (auto [dir] : dir_query.iter()) {
@@ -138,12 +147,14 @@ struct Extract {
     }
 
     for (auto [point_light, global] : point_query.iter()) {
-      lights->point_lights.push_back(ExtractedLights::PointLight{
+      lights->point_lights.push_back(
+        ExtractedLights::PointLight{
           .position = global->translation(),
           .color = point_light->color,
           .intensity = point_light->intensity,
           .range = point_light->range,
-      });
+        }
+      );
     }
   }
 
@@ -152,9 +163,11 @@ struct Extract {
   }
 
   static auto meshes(
-      Query<Mesh3d, GlobalTransform, MeshMaterial3d, Opt<ViewVisibility>> query,
-      Res<ExtractedView> view, Res<Assets<Material>> material_assets,
-      ResMut<ExtractedMeshes> meshes) -> void {
+    Query<Mesh3d, GlobalTransform, MeshMaterial3d, Opt<ViewVisibility>> query,
+    Res<ExtractedView> view,
+    Res<Assets<Material>> material_assets,
+    ResMut<ExtractedMeshes> meshes
+  ) -> void {
     for (auto [mesh3d, global, material, visibility] : query.iter()) {
       if (!mesh3d->mesh.is_valid() || !material->material.is_valid()) {
         continue;
@@ -163,30 +176,32 @@ struct Extract {
         continue;
       }
 
-      const auto *material_asset = material_assets->get(material->material);
+      auto const* material_asset = material_assets->get(material->material);
       if (material_asset == nullptr) {
         continue;
       }
 
       CompiledMaterial compiled = material_asset->compiled;
-      const bool transparent =
-          compiled.render_method == RenderMethod::Transparent;
-      const bool casts_shadows = compiled.casts_shadows;
+      bool const transparent =
+        compiled.render_method == RenderMethod::Transparent;
+      bool const casts_shadows = compiled.casts_shadows;
       Vec3 camera_offset = global->translation() - view->camera_view.position;
 
-      meshes->items.push_back(ExtractedMeshes::Item{
+      meshes->items.push_back(
+        ExtractedMeshes::Item{
           .mesh = mesh3d->mesh,
           .material = std::move(compiled),
           .world_transform = global->matrix,
           .distance_to_camera = camera_offset.length_sq(),
           .transparent = transparent,
           .casts_shadows = casts_shadows,
-      });
+        }
+      );
     }
   }
 
   static auto ui(Query<Sprite, Transform> textures, ResMut<ExtractedUi> ui)
-      -> void {
+    -> void {
     ui->clear();
 
     for (auto [texture, transform] : textures.iter()) {
@@ -194,17 +209,20 @@ struct Extract {
         continue;
       }
 
-      ui->items.push_back(ExtractedUi::Item{
+      ui->items.push_back(
+        ExtractedUi::Item{
           .texture = texture->handle,
           .transform = *transform,
           .tint = texture->tint,
           .layer = texture->layer,
-      });
+        }
+      );
     }
   }
 
-  static auto overlay(Query<Sprite, Transform> textures,
-                      ResMut<ExtractedUi> overlay) -> void {
+  static auto overlay(
+    Query<Sprite, Transform> textures, ResMut<ExtractedUi> overlay
+  ) -> void {
     ui(textures, overlay);
   }
 };

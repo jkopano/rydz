@@ -16,7 +16,7 @@ struct RenderBatchKey {
   Handle<Mesh> mesh{};
   CompiledMaterial material;
 
-  auto operator==(const RenderBatchKey &o) const -> bool {
+  auto operator==(RenderBatchKey const& o) const -> bool {
     return mesh == o.mesh && material == o.material;
   }
 };
@@ -26,7 +26,7 @@ struct RenderBatchKey {
 namespace std {
 
 template <> struct hash<ecs::RenderBatchKey> {
-  auto operator()(const ecs::RenderBatchKey &k) const noexcept -> size_t {
+  auto operator()(ecs::RenderBatchKey const& k) const noexcept -> size_t {
     size_t seed = 0;
     rydz::hash_combine(seed, std::hash<uint32_t>{}(k.mesh.id));
     rydz::hash_combine(seed, std::hash<ecs::CompiledMaterial>{}(k.material));

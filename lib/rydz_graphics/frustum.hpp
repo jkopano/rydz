@@ -26,7 +26,7 @@ struct ViewVisibility {
   bool visible = true;
 };
 
-inline auto compute_local_bbox(const gl::Mesh &mesh) -> AABox {
+inline auto compute_local_bbox(gl::Mesh const& mesh) -> AABox {
   if ((mesh.vertex_data() == nullptr) || mesh.vertex_count() <= 0) {
     return {};
   }
@@ -35,41 +35,45 @@ inline auto compute_local_bbox(const gl::Mesh &mesh) -> AABox {
   bbox.mMin = Vec3(FLT_MAX, FLT_MAX, FLT_MAX);
   bbox.mMax = Vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
   for (int i = 0; i < mesh.vertex_count(); ++i) {
-    const float *vertices = mesh.vertex_data();
-    Vec3 vec(vertices[(i * 3) + 0], vertices[(i * 3) + 1],
-             vertices[(i * 3) + 2]);
+    float const* vertices = mesh.vertex_data();
+    Vec3 vec(
+      vertices[(i * 3) + 0], vertices[(i * 3) + 1], vertices[(i * 3) + 2]
+    );
     bbox.encapsulate(vec);
   }
   return bbox;
 }
 
-inline auto transform_bbox(const AABox &local, Mat4 m) -> AABox {
+inline auto transform_bbox(AABox const& local, Mat4 m) -> AABox {
   std::array<Vec3, 8> corners{
-      Vec3(local.mMin.x, local.mMin.y, local.mMin.z),
-      Vec3(local.mMin.x, local.mMin.y, local.mMax.z),
-      Vec3(local.mMin.x, local.mMax.y, local.mMin.z),
-      Vec3(local.mMin.x, local.mMax.y, local.mMax.z),
-      Vec3(local.mMax.x, local.mMin.y, local.mMin.z),
-      Vec3(local.mMax.x, local.mMin.y, local.mMax.z),
-      Vec3(local.mMax.x, local.mMax.y, local.mMin.z),
-      Vec3(local.mMax.x, local.mMax.y, local.mMax.z),
+    Vec3(local.mMin.x, local.mMin.y, local.mMin.z),
+    Vec3(local.mMin.x, local.mMin.y, local.mMax.z),
+    Vec3(local.mMin.x, local.mMax.y, local.mMin.z),
+    Vec3(local.mMin.x, local.mMax.y, local.mMax.z),
+    Vec3(local.mMax.x, local.mMin.y, local.mMin.z),
+    Vec3(local.mMax.x, local.mMin.y, local.mMax.z),
+    Vec3(local.mMax.x, local.mMax.y, local.mMin.z),
+    Vec3(local.mMax.x, local.mMax.y, local.mMax.z),
   };
 
   AABox result;
   result.mMin = Vec3(FLT_MAX, FLT_MAX, FLT_MAX);
   result.mMax = Vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-  for (auto &corner : corners) {
+  for (auto& corner : corners) {
     result.encapsulate(m * corner);
   }
   return result;
 }
 
-inline auto aabb_in_frustum(const AABox &bbox,
-                            const std::array<FrustumPlane, 6> &planes) -> bool {
-  return std::ranges::all_of(planes, [&](const auto &plane) -> auto {
-    const Vec3 p_vertex(plane.normal.x >= 0 ? bbox.mMax.x : bbox.mMin.x,
-                        plane.normal.y >= 0 ? bbox.mMax.y : bbox.mMin.y,
-                        plane.normal.z >= 0 ? bbox.mMax.z : bbox.mMin.z);
+inline auto aabb_in_frustum(
+  AABox const& bbox, std::array<FrustumPlane, 6> const& planes
+) -> bool {
+  return std::ranges::all_of(planes, [&](auto const& plane) -> auto {
+    Vec3 const p_vertex(
+      plane.normal.x >= 0 ? bbox.mMax.x : bbox.mMin.x,
+      plane.normal.y >= 0 ? bbox.mMax.y : bbox.mMin.y,
+      plane.normal.z >= 0 ? bbox.mMax.z : bbox.mMin.z
+    );
 
     return (plane.normal.dot(p_vertex) + plane.distance) >= 0;
   });
@@ -95,9 +99,12 @@ inline auto extract_frustum_planes(Mat4 vp) -> std::array<FrustumPlane, 6> {
   };
 
   return {
-      normalize_plane(r3 + r0), normalize_plane(r3 - r0),
-      normalize_plane(r3 + r1), normalize_plane(r3 - r1),
-      normalize_plane(r3 + r2), normalize_plane(r3 - r2),
+    normalize_plane(r3 + r0),
+    normalize_plane(r3 - r0),
+    normalize_plane(r3 + r1),
+    normalize_plane(r3 - r1),
+    normalize_plane(r3 + r2),
+    normalize_plane(r3 - r2),
   };
 }
 
@@ -105,11 +112,13 @@ struct MeshBounds {
   AABox bbox;
 };
 
-inline void
-compute_mesh_bounds_system(Query<Entity, Mesh3d, Without<MeshBounds>> query,
-                           Res<Assets<Mesh>> mesh_assets, Cmd cmd) {
+inline void compute_mesh_bounds_system(
+  Query<Entity, Mesh3d, Without<MeshBounds>> query,
+  Res<Assets<Mesh>> mesh_assets,
+  Cmd cmd
+) {
   for (auto [e, mesh3d] : query.iter()) {
-    const auto *mesh = mesh_assets->get(mesh3d->mesh);
+    auto const* mesh = mesh_assets->get(mesh3d->mesh);
     if ((mesh == nullptr) || mesh->vertex_count() <= 0 ||
         (mesh->vertex_data() == nullptr)) {
       continue;
@@ -120,17 +129,20 @@ compute_mesh_bounds_system(Query<Entity, Mesh3d, Without<MeshBounds>> query,
 }
 
 inline auto frustum_cull_system(
-    Query<Camera3DComponent, GlobalTransform, With<ActiveCamera>> cam_query,
-    Query<Entity, MeshBounds, GlobalTransform, Opt<ComputedVisibility>>
-        mesh_query,
-    Res<Window> window, Cmd cmd) -> void {
+  Query<Camera3DComponent, GlobalTransform, With<ActiveCamera>> cam_query,
+  Query<Entity, MeshBounds, GlobalTransform, Opt<ComputedVisibility>>
+    mesh_query,
+  Res<Window> window,
+  Cmd cmd
+) -> void {
   auto cam_result = cam_query.single();
   if (!cam_result) {
     return;
   }
   auto [cam_comp, cam_gt] = *cam_result;
-  const float aspect = compute_camera_aspect_ratio(
-      static_cast<float>(window->width), static_cast<float>(window->height));
+  float const aspect = compute_camera_aspect_ratio(
+    static_cast<float>(window->width), static_cast<float>(window->height)
+  );
 
   CameraView cam_view = compute_camera_view(*cam_gt, *cam_comp, aspect);
   Mat4 view = cam_view.view;
@@ -140,9 +152,9 @@ inline auto frustum_cull_system(
 
   struct CullEntry {
     Entity entity;
-    const MeshBounds *bounds;
-    const GlobalTransform *gt;
-    const ComputedVisibility *cv;
+    MeshBounds const* bounds;
+    GlobalTransform const* gt;
+    ComputedVisibility const* cv;
   };
 
   std::vector<CullEntry> entries;
@@ -158,17 +170,18 @@ inline auto frustum_cull_system(
 
   tf::Taskflow taskflow;
   taskflow.for_each_index(
-      size_t{0}, entries.size(), size_t{1}, [&](size_t idx) -> void {
-        auto &entry = entries[idx];
+    size_t{0}, entries.size(), size_t{1}, [&](size_t idx) -> void {
+      auto& entry = entries[idx];
 
-        if (entry.cv && !entry.cv->visible) {
-          results[idx] = ViewVisibility{false};
-          return;
-        }
+      if (entry.cv && !entry.cv->visible) {
+        results[idx] = ViewVisibility{false};
+        return;
+      }
 
-        AABox world_bbox = transform_bbox(entry.bounds->bbox, entry.gt->matrix);
-        results[idx] = ViewVisibility{aabb_in_frustum(world_bbox, planes)};
-      });
+      AABox world_bbox = transform_bbox(entry.bounds->bbox, entry.gt->matrix);
+      results[idx] = ViewVisibility{aabb_in_frustum(world_bbox, planes)};
+    }
+  );
 
   static tf::Executor executor;
   executor.run(taskflow).wait();

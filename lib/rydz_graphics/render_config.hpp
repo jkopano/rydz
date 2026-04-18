@@ -82,12 +82,12 @@ struct RenderConfig {
 
   static auto depth_prepass() -> RenderConfig {
     return {
-        .depth = {.test = true, .write = true},
-        .blend = gl::BlendMode::Alpha,
-        .cull_mode = gl::CullMode::Back,
-        .polygon_mode = gl::PolygonMode::Fill,
-        .color_mask = {.r = false, .g = false, .b = false, .a = false},
-        .color_blend = false,
+      .depth = {.test = true, .write = true},
+      .blend = gl::BlendMode::Alpha,
+      .cull_mode = gl::CullMode::Back,
+      .polygon_mode = gl::PolygonMode::Fill,
+      .color_mask = {.r = false, .g = false, .b = false, .a = false},
+      .color_blend = false,
     };
   }
 
@@ -95,34 +95,34 @@ struct RenderConfig {
 
   static auto opaque() -> RenderConfig {
     return {
-        .depth = {.test = true, .write = true},
-        .blend = gl::BlendMode::Alpha,
-        .cull_mode = gl::CullMode::Back,
-        .polygon_mode = gl::PolygonMode::Fill,
-        .color_mask = {},
-        .color_blend = false,
+      .depth = {.test = true, .write = true},
+      .blend = gl::BlendMode::Alpha,
+      .cull_mode = gl::CullMode::Back,
+      .polygon_mode = gl::PolygonMode::Fill,
+      .color_mask = {},
+      .color_blend = false,
     };
   }
 
   static auto transparent() -> RenderConfig {
     return {
-        .depth = {.test = true, .write = false},
-        .blend = gl::BlendMode::Alpha,
-        .cull_mode = gl::CullMode::Back,
-        .polygon_mode = gl::PolygonMode::Fill,
-        .color_mask = {},
-        .color_blend = true,
+      .depth = {.test = true, .write = false},
+      .blend = gl::BlendMode::Alpha,
+      .cull_mode = gl::CullMode::Back,
+      .polygon_mode = gl::PolygonMode::Fill,
+      .color_mask = {},
+      .color_blend = true,
     };
   }
 
   static auto end_world_pass() -> RenderConfig {
     return {
-        // .depth = {.test = false, .write = true},
-        // .blend = gl::BlendMode::Alpha,
-        // .cull_mode = gl::CullMode::None,
-        // .polygon_mode = gl::PolygonMode::Fill,
-        // .color_mask = {},
-        // .color_blend = true,
+      // .depth = {.test = false, .write = true},
+      // .blend = gl::BlendMode::Alpha,
+      // .cull_mode = gl::CullMode::None,
+      // .polygon_mode = gl::PolygonMode::Fill,
+      // .color_mask = {},
+      // .color_blend = true,
     };
   }
 };

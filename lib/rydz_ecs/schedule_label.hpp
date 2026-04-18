@@ -47,7 +47,7 @@ template <> struct std::hash<ecs::ScheduleLabel> {
 
 namespace ecs {
 
-inline constexpr auto schedule_label_name(ScheduleLabel label) -> const char * {
+inline constexpr auto schedule_label_name(ScheduleLabel label) -> char const* {
   switch (label) {
   case ScheduleLabel::PreStartup:
     return "PreStartup";

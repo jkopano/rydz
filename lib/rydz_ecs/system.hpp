@@ -15,12 +15,12 @@ namespace ecs {
 class ISystem {
 public:
   ISystem() = default;
-  ISystem(const ISystem &) = default;
-  ISystem(ISystem &&) = delete;
-  auto operator=(const ISystem &) -> ISystem & = default;
-  auto operator=(ISystem &&) -> ISystem & = delete;
+  ISystem(ISystem const&) = default;
+  ISystem(ISystem&&) = delete;
+  auto operator=(ISystem const&) -> ISystem& = default;
+  auto operator=(ISystem&&) -> ISystem& = delete;
   virtual ~ISystem() = default;
-  virtual auto run(World &world) -> void = 0;
+  virtual auto run(World& world) -> void = 0;
   [[nodiscard]] virtual auto name() const -> std::string = 0;
   [[nodiscard]] virtual auto type_name() const -> std::string { return name(); }
   [[nodiscard]] virtual auto access() const -> SystemAccess { return {}; }
@@ -37,7 +37,7 @@ namespace detail {
 template <typename... Args> struct function_traits_impl {
   using args_tuple = Tuple<Args...>;
 
-  template <typename Fn> static auto apply(Fn &&fn) -> decltype(auto) {
+  template <typename Fn> static auto apply(Fn&& fn) -> decltype(auto) {
     return std::forward<Fn>(fn).template operator()<Args...>();
   }
 };
@@ -77,20 +77,20 @@ struct function_traits<R (*)(Args...), void>
     : detail::function_traits_impl<Args...> {};
 
 template <typename T>
-concept HasStatefulParamRetrieve =
-    requires(World &w, const SystemContext &ctx,
-             typename SystemParamTraits<bare_t<T>>::State &state) {
-      SystemParamTraits<bare_t<T>>::retrieve(w, ctx, state);
-    };
+concept HasStatefulParamRetrieve = requires(
+  World& w,
+  SystemContext const& ctx,
+  typename SystemParamTraits<bare_t<T>>::State& state
+) { SystemParamTraits<bare_t<T>>::retrieve(w, ctx, state); };
 
 template <typename T>
 concept HasStatelessParamRetrieve =
-    requires(World &w, const SystemContext &ctx) {
-      SystemParamTraits<bare_t<T>>::retrieve(w, ctx);
-    };
+  requires(World& w, SystemContext const& ctx) {
+    SystemParamTraits<bare_t<T>>::retrieve(w, ctx);
+  };
 
 template <typename T>
-concept SystemParameter = requires(World &w, SystemAccess &acc) {
+concept SystemParameter = requires(World& w, SystemAccess& acc) {
   typename SystemParamTraits<bare_t<T>>::State;
   {
     SystemParamTraits<bare_t<T>>::init_state(w)
@@ -111,7 +111,8 @@ struct is_system_callable : std::false_type {};
 
 template <typename F>
 struct is_system_callable<
-    F, std::void_t<typename function_traits<decay_t<F>>::args_tuple>>
+  F,
+  std::void_t<typename function_traits<decay_t<F>>::args_tuple>>
     : all_system_parameters<typename function_traits<decay_t<F>>::args_tuple> {
 };
 
@@ -119,11 +120,12 @@ template <typename T> struct is_system_input_descriptor : std::false_type {};
 
 template <typename F> constexpr void static_assert_valid_system_callable() {
   static_assert(
-      always_false_v<F>,
-      "ECS system must be a non-generic callable whose every argument is a "
-      "valid SystemParameter (for example World&, Res<T>, ResMut<T>, "
-      "Query<...>, Commands, Local<T>, MessageReader<T>, or "
-      "MessageWriter<T>).");
+    always_false_v<F>,
+    "ECS system must be a non-generic callable whose every argument is a "
+    "valid SystemParameter (for example World&, Res<T>, ResMut<T>, "
+    "Query<...>, Commands, Local<T>, MessageReader<T>, or "
+    "MessageWriter<T>)."
+  );
 }
 
 } // namespace detail
@@ -133,7 +135,7 @@ concept SystemCallable = detail::is_system_callable<F>::value;
 
 template <typename F>
 concept SystemInput =
-    SystemCallable<F> || detail::is_system_input_descriptor<bare_t<F>>::value;
+  SystemCallable<F> || detail::is_system_input_descriptor<bare_t<F>>::value;
 
 template <typename F> class FunctionSystem : public ISystem {
   F func_;
@@ -147,7 +149,7 @@ template <typename F> class FunctionSystem : public ISystem {
   };
 
   typename ParamStateTuple<ParamTuple>::type param_states_{};
-  World *state_world_ = nullptr;
+  World* state_world_ = nullptr;
 
 public:
   explicit FunctionSystem(F func, std::string name = "")
@@ -159,7 +161,7 @@ public:
     }
   }
 
-  auto run(World &world) -> void override {
+  auto run(World& world) -> void override {
     ensure_param_states(world);
 
     Tick this_run = world.read_change_tick();
@@ -184,23 +186,25 @@ public:
   }
 
 private:
-  auto ensure_param_states(World &world) -> void {
+  auto ensure_param_states(World& world) -> void {
     if (state_world_ == &world) {
       return;
     }
 
     function_traits<F>::apply([&]<SystemParameter... Args>() -> auto {
       param_states_ = Tuple<typename SystemParamTraits<bare_t<Args>>::State...>{
-          SystemParamTraits<bare_t<Args>>::init_state(world)...};
+        SystemParamTraits<bare_t<Args>>::init_state(world)...
+      };
     });
     state_world_ = &world;
   }
 
   template <SystemParameter Arg>
-  static auto
-  retrieve_param(World &world, const SystemContext &ctx,
-                 typename SystemParamTraits<bare_t<Arg>>::State &state)
-      -> decltype(auto) {
+  static auto retrieve_param(
+    World& world,
+    SystemContext const& ctx,
+    typename SystemParamTraits<bare_t<Arg>>::State& state
+  ) -> decltype(auto) {
     if constexpr (HasStatefulParamRetrieve<Arg>) {
       return SystemParamTraits<bare_t<Arg>>::retrieve(world, ctx, state);
     } else {
@@ -209,19 +213,21 @@ private:
   }
 
   template <SystemParameter... Args>
-  auto run_with_args(World &world, const SystemContext &ctx) -> void {
+  auto run_with_args(World& world, SystemContext const& ctx) -> void {
     run_with_args_impl<Args...>(world, ctx, std::index_sequence_for<Args...>{});
   }
 
   template <SystemParameter... Args, std::size_t... I>
-  auto run_with_args_impl(World &world, const SystemContext &ctx,
-                          std::index_sequence<I...>) -> void {
+  auto run_with_args_impl(
+    World& world, SystemContext const& ctx, std::index_sequence<I...>
+  ) -> void {
     func_(retrieve_param<Args>(world, ctx, std::get<I>(param_states_))...);
   }
 
   template <SystemParameter... Args>
-  static auto access_with_args(SystemAccess &acc,
-                               const std::string &system_name) -> void {
+  static auto access_with_args(
+    SystemAccess& acc, std::string const& system_name
+  ) -> void {
     std::array<SystemAccess, sizeof...(Args)> per_param;
     std::size_t idx = 0;
     ((SystemParamTraits<bare_t<Args>>::access(per_param[idx]), ++idx), ...);
@@ -237,15 +243,16 @@ private:
         if (!per_param[a].is_compatible(per_param[b]) &&
             !per_param[a].is_archetype_disjoint(per_param[b])) {
           throw std::runtime_error(
-              "System '" + system_name +
-              "': parameter conflict detected between parameters " +
-              std::to_string(a) + " and " + std::to_string(b) +
-              " (conflicting access to the same component or resource)");
+            "System '" + system_name +
+            "': parameter conflict detected between parameters " +
+            std::to_string(a) + " and " + std::to_string(b) +
+            " (conflicting access to the same component or resource)"
+          );
         }
       }
     }
 
-    for (auto &p : per_param) {
+    for (auto& p : per_param) {
       acc.merge(p);
     }
   }
@@ -253,21 +260,22 @@ private:
 
 template <typename F>
   requires SystemCallable<F>
-auto make_system(F &&func, std::string name = "") -> std::unique_ptr<ISystem> {
-  return std::make_unique<FunctionSystem<decay_t<F>>>(std::forward<F>(func),
-                                                      std::move(name));
+auto make_system(F&& func, std::string name = "") -> std::unique_ptr<ISystem> {
+  return std::make_unique<FunctionSystem<decay_t<F>>>(
+    std::forward<F>(func), std::move(name)
+  );
 }
 
 template <typename F>
   requires(!SystemCallable<F>)
-auto make_system(F && /*func*/, std::string /*name*/ = "")
-    -> std::unique_ptr<ISystem> {
+auto make_system(F&& /*func*/, std::string /*name*/ = "")
+  -> std::unique_ptr<ISystem> {
   detail::static_assert_valid_system_callable<F>();
   return nullptr;
 }
 
 template <typename Sched, typename F>
-auto add_single_system(Sched &schedule, F &&func) -> void {
+auto add_single_system(Sched& schedule, F&& func) -> void {
   schedule.add_system(make_system(std::forward<F>(func)));
 }
 
