@@ -154,11 +154,11 @@ set_default(false)
 add_headerfiles("lib/rydz_**/*.hpp")
 -- add_deps("raylib")
 -- add_packages("taskflow", "joltphysics", "glaze")
--- if is_plat("windows") then
--- 	add_packages("luajit")
--- elseif is_plat("linux") then
--- 	add_packages("luajit")
--- end
+if is_plat("windows") then
+add_packages("luajit")
+elseif is_plat("linux") then
+add_packages("luajit")
+end
 
 
 target("tests")
