@@ -7,8 +7,8 @@
 
 namespace ecs {
 
-struct StandardMaterial : MaterialTrait<HasPBR> {
-  Color base_color = kWhite;
+struct StandardMaterial : IMaterial<HasPBR> {
+  Color base_color = Color::WHITE;
   Handle<Texture> texture{};
   Handle<Texture> normal_map{};
   Handle<Texture> metallic_map{};
@@ -24,7 +24,7 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
   static auto from_color(Color c) -> StandardMaterial {
     return {.base_color = c};
   }
-  static auto from_texture(Handle<Texture> tex, Color tint = kWhite)
+  static auto from_texture(Handle<Texture> tex, Color tint = Color::WHITE)
     -> StandardMaterial {
     return {.base_color = tint, .texture = tex};
   }
@@ -77,7 +77,7 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
       builder.uniform(MaterialMap::Occlusion, gl::Uniform{occlusion_strength});
     }
     if (emissive_color.a > 0) {
-      auto emissive = color_to_vec3(emissive_color);
+      math::Vec3 emissive = emissive_color;
       builder.uniform(
         MaterialMap::Emission, math::Vec3(emissive.x, emissive.y, emissive.z)
       );
@@ -87,12 +87,5 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
 };
 
 static_assert(MaterialValue<StandardMaterial>);
-
-struct MeshMaterial3d {
-  Handle<Material> material{};
-
-  MeshMaterial3d() = default;
-  explicit MeshMaterial3d(Handle<Material> material) : material(material) {}
-};
 
 } // namespace ecs

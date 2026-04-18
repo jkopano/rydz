@@ -28,7 +28,15 @@ enum class RenderPassSet : u8 {
 };
 
 struct RenderPlugin {
-  template <MaterialValue M> static void register_material(App&) {}
+  template <RenderMaterialAsset M> static void register_material(App& app) {
+    app.init_resource<Assets<M>>();
+    app.add_systems(
+      RenderExtractSet::Extract,
+      group(Extract::meshes<M>)
+        .after(Extract::clear_meshes)
+        .after(Extract::view)
+    );
+  }
 
   template <typename SlotT>
   static auto register_slot(App& app, SlotProvider provider) -> void {
@@ -56,6 +64,7 @@ struct RenderPlugin {
       .init_resource<SlotProviderRegistry>()
       .init_resource<DebugOverlaySettings>()
       .init_resource<PipelineState>()
+      .init_resource<gl::RenderState>()
       .init_resource<ShadowPhase>()
       .init_resource<OpaquePhase>()
       .init_resource<TransparentPhase>()
@@ -121,7 +130,7 @@ struct RenderPlugin {
           Extract::view,
           Extract::lighting,
           Extract::ui,
-          Extract::meshes
+          Extract::meshes<Material>
         )
           .chain()
       )
@@ -165,6 +174,8 @@ struct RenderPlugin {
       .add_systems(RenderPassSet::PostProcess, PostProcessPass::postprocess)
       .add_systems(RenderPassSet::Ui, UiPass::ui)
       .add_systems(RenderPassSet::Cleanup, FramePass::end);
+
+    register_material<StandardMaterial>(app);
   }
 };
 

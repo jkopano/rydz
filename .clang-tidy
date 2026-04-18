@@ -19,7 +19,9 @@ Checks: >
   -cppcoreguidelines-avoid-magic-numbers,
   -cppcoreguidelines-pro-type-union-access,
   -readability-identifier-length,
+  -bugprone-easily-swappable-parameters,
   -readability-uppercase-literal-suffix
+
 
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*'

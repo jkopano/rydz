@@ -3,6 +3,7 @@
 #include "math.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/params.hpp"
+#include "rydz_graphics/color.hpp"
 #include "rydz_graphics/shader_bindings.hpp"
 #include "types.hpp"
 #include <algorithm>
@@ -15,7 +16,6 @@
 
 namespace gl {
 
-using Color = rl::Color;
 using Vec2 = rl::Vector2;
 using Vec3 = rl::Vector3;
 using Vec4 = rl::Vector4;
@@ -137,20 +137,10 @@ inline constexpr int SHADER_UNIFORM_IVEC4 = RL_SHADER_UNIFORM_IVEC4;
 inline constexpr int PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 =
   ::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 inline constexpr int TEXTURE_FILTER_BILINEAR = ::TEXTURE_FILTER_BILINEAR;
-inline constexpr int LOG_WARNING = ::LOG_WARNING;
 
-inline auto default_shader_id() -> unsigned int {
-  return rl::rlGetShaderIdDefault();
-}
-inline auto default_shader_locs() -> int* {
-  return rl::rlGetShaderLocsDefault();
-}
 inline auto default_texture_id() -> unsigned int {
   return rl::rlGetTextureIdDefault();
 }
-
-inline constexpr Color kWhite = {255, 255, 255, 255};
-inline constexpr Color kBlack = {0, 0, 0, 255};
 
 namespace detail {
 
@@ -531,6 +521,8 @@ struct Texture {
   [[nodiscard]] auto flipped_rect() const -> Rectangle {
     return {0.0F, 0.0F, static_cast<f32>(width), -static_cast<float>(height)};
   }
+
+  static auto get_default() -> u32 { return rl::rlGetTextureIdDefault(); }
 };
 
 struct Sound {
@@ -563,8 +555,8 @@ struct Sound {
 };
 
 struct Shader {
-  u32 id = 0;
-  i32* locs = nullptr;
+  u32 id{};
+  i32* locs{};
 
   constexpr Shader() = default;
   constexpr Shader(::Shader const& raw) noexcept
@@ -602,8 +594,8 @@ struct Shader {
 
 struct MaterialMap {
   Texture texture{};
-  Color color{};
-  f32 value = 0.0f;
+  ecs::Color color{};
+  f32 value{};
 
   constexpr MaterialMap() = default;
   constexpr MaterialMap(::MaterialMap const& raw) noexcept
@@ -622,25 +614,25 @@ struct MaterialMap {
 };
 
 struct Mesh {
-  i32 vertexCount = 0;
-  i32 triangleCount = 0;
-  f32* vertices = nullptr;
-  f32* texcoords = nullptr;
-  f32* texcoords2 = nullptr;
-  f32* normals = nullptr;
-  f32* tangents = nullptr;
-  u8* colors = nullptr;
-  u16* indices = nullptr;
-  i32 boneCount = 0;
-  u8* boneIndices = nullptr;
-  f32* boneWeights = nullptr;
-  f32* animVertices = nullptr;
-  f32* animNormals = nullptr;
-  u32 vaoId = 0;
-  u32* vboId = nullptr;
+  i32 vertexCount{};
+  i32 triangleCount{};
+  f32* vertices{};
+  f32* texcoords{};
+  f32* texcoords2{};
+  f32* normals{};
+  f32* tangents{};
+  u8* colors{};
+  u16* indices{};
+  i32 boneCount{};
+  u8* boneIndices{};
+  f32* boneWeights{};
+  f32* animVertices{};
+  f32* animNormals{};
+  u32 vaoId{};
+  u32* vboId{};
   u8 name[64]{};
-  i32 id = 0;
-  i32 parentId = 0;
+  i32 id{};
+  i32 parentId{};
 
   constexpr Mesh() = default;
   constexpr Mesh(::Mesh const& raw) noexcept
@@ -696,7 +688,7 @@ struct Mesh {
 struct Material {
   Shader shader{};
   MaterialMap* maps{};
-  f32 params[4]{};
+  std::array<f32, 4> params{};
 
   constexpr Material() = default;
   constexpr Material(::Material const& raw) noexcept
@@ -720,16 +712,16 @@ struct Material {
     static bool init = false;
     if (!init) {
       fallback.shader = Shader::get_default();
-      static std::vector<gl::MaterialMap> maps(ecs::kMaterialMapCount);
+      static std::vector<gl::MaterialMap> maps(ecs::K_MATERIAL_MAP_COUNT);
       fallback.maps = maps.data();
       constexpr int albedo = ecs::material_map_index(ecs::MaterialMap::Albedo);
-      fallback.maps[albedo].texture.id = gl::default_texture_id();
+      fallback.maps[albedo].texture.id = Texture::get_default();
       fallback.maps[albedo].texture.width = 1;
       fallback.maps[albedo].texture.height = 1;
       fallback.maps[albedo].texture.mipmaps = 1;
       fallback.maps[albedo].texture.format =
         gl::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
-      fallback.maps[albedo].color = gl::kWhite;
+      fallback.maps[albedo].color = ecs::Color::WHITE;
       init = true;
     }
     return fallback;
@@ -773,7 +765,7 @@ struct RenderTarget {
   }
 
   auto begin() const -> void { rl::BeginTextureMode(*this); }
-  static auto end() -> void { rl::EndTextureMode(); };
+  auto end() const -> void { rl::EndTextureMode(); };
 };
 
 static_assert(sizeof(Image) == sizeof(::Image));
@@ -803,10 +795,6 @@ static_assert(std::is_trivially_copyable_v<Material>);
 static_assert(sizeof(RenderTarget) == sizeof(::RenderTexture));
 static_assert(alignof(RenderTarget) == alignof(::RenderTexture));
 static_assert(std::is_trivially_copyable_v<RenderTarget>);
-
-inline auto color_to_vec3(Color color) -> Vec3 {
-  return {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f};
-}
 
 inline auto Image::load_texture() const -> Texture {
   return rl::LoadTextureFromImage(*this);

@@ -2,6 +2,7 @@
 
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/gl/shader.hpp"
+#include <cstddef>
 #include <cstring>
 #include <string>
 
@@ -12,35 +13,39 @@ class Skybox {
 
 public:
   struct Config {
-    std::string right{};
-    std::string left{};
-    std::string top{};
-    std::string bottom{};
-    std::string front{};
-    std::string back{};
+    std::string right;
+    std::string left;
+    std::string top;
+    std::string bottom;
+    std::string front;
+    std::string back;
 
-    static auto from_directory(const std::string &dir,
-                               const std::string &ext = ".jpg") -> Config {
-      return {.right = dir + "/right" + ext,
-              .left = dir + "/left" + ext,
-              .top = dir + "/top" + ext,
-              .bottom = dir + "/bottom" + ext,
-              .front = dir + "/front" + ext,
-              .back = dir + "/back" + ext};
+    static auto from_directory(
+      std::string const& dir, std::string const& ext = ".jpg"
+    ) -> Config {
+      return {
+        .right = dir + "/right" + ext,
+        .left = dir + "/left" + ext,
+        .top = dir + "/top" + ext,
+        .bottom = dir + "/bottom" + ext,
+        .front = dir + "/front" + ext,
+        .back = dir + "/back" + ext
+      };
     }
   };
 
-  u32 cubemap_id = 0;
+  u32 cubemap_id{};
   VAO vao{};
   VBO vbo{};
-  bool loaded = false;
+  bool loaded{};
 
   Skybox() = default;
 
   static auto from(Config cfg) -> Skybox {
     Skybox skybox{};
-    const std::array<std::string, FACE_COUNT> paths = {
-        cfg.right, cfg.left, cfg.top, cfg.bottom, cfg.front, cfg.back};
+    std::array<std::string, FACE_COUNT> const paths = {
+      cfg.right, cfg.left, cfg.top, cfg.bottom, cfg.front, cfg.back
+    };
 
     skybox.cubemap_id = load_cubemap_from_paths(paths);
     skybox.create_cube_vao();
@@ -49,7 +54,7 @@ public:
     return skybox;
   }
 
-  static auto from(const std::string &directory_path) -> Skybox {
+  static auto from(std::string const& directory_path) -> Skybox {
     return Skybox::from(Config::from_directory(directory_path));
   }
 
@@ -58,7 +63,7 @@ public:
       return;
     }
 
-    ShaderProgram &shader = get_skybox_shader();
+    ShaderProgram& shader = get_skybox_shader();
 
     rl::rlDisableBackfaceCulling();
     rl::rlDisableDepthMask();
@@ -92,10 +97,11 @@ public:
   }
 
 private:
-  static auto get_skybox_shader() -> ShaderProgram & {
+  static auto get_skybox_shader() -> ShaderProgram& {
     static ShaderProgram shader = [] -> ShaderProgram {
-      ShaderProgram program = ShaderProgram::load(ShaderSpec::from(
-          "res/shaders/skybox.vert", "res/shaders/skybox.frag"));
+      ShaderProgram program = ShaderProgram::load(
+        ShaderSpec::from("res/shaders/skybox.vert", "res/shaders/skybox.frag")
+      );
       int value = 0;
       program.set("u_skybox", value);
       return program;
@@ -104,31 +110,32 @@ private:
   }
 
   auto create_cube_vao() -> void {
-    float vertices[] = {
-        -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,
-        -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f,
-        1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f,
-        -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
-        -1.0f, 1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
-        -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,
-        1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f,
-        -1.0f, 1.0f,  -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f,  1.0f,
-        1.0f,  1.0f,  1.0f,  1.0f,  -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f,
-        -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
-        -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f};
+    std::array<f32, 108> vertices = {
+      -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,
+      -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f,
+      1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f,
+      -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
+      -1.0f, 1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
+      -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,
+      1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f,
+      -1.0f, 1.0f,  -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f,  1.0f,
+      1.0f,  1.0f,  1.0f,  1.0f,  -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f,
+      -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
+      -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f
+    };
 
     vao = VAO::create();
     if (vao.bind()) {
-      vbo = VBO::create(vertices, sizeof(vertices), false);
+      vbo = VBO::create(vertices.data(), sizeof(vertices), false);
       set_vertex_attribute(0, 3, RL_FLOAT, false, 0, 0);
       enable_vertex_attribute(0);
       VAO::unbind();
     }
   }
 
-  static auto
-  load_cubemap_from_paths(const std::array<std::string, FACE_COUNT> &paths)
-      -> unsigned int {
+  static auto load_cubemap_from_paths(
+    std::array<std::string, FACE_COUNT> const& paths
+  ) -> unsigned int {
     std::array<Image, FACE_COUNT> images;
 
     for (usize i = 0; i < images.size(); ++i) {
@@ -148,18 +155,22 @@ private:
     u32 height = images[0].height;
     u32 pixel_size = 4U;
 
-    std::vector<u8> data(width * height * FACE_COUNT * pixel_size);
+    std::vector<u8> data((width * height * FACE_COUNT * pixel_size));
 
     for (usize i = 0; i < FACE_COUNT; ++i) {
       u32 size = width * height * pixel_size;
       usize offset = i * size;
-      std::memcpy(data.data() + offset, images.at(i).data,
-                  width * height * pixel_size);
+      std::memcpy(
+        data.data() + offset,
+        images.at(i).data,
+        static_cast<size_t>(width * height) * pixel_size
+      );
       unload_image(images.at(i));
     }
 
     unsigned int id = load_texture_cubemap(
-        data.data(), width, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
+      data.data(), width, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1
+    );
 
     return id;
   }

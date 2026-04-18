@@ -5,6 +5,7 @@
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/entity.hpp"
 #include "rydz_ecs/fwd.hpp"
+#include "rydz_graphics/color.hpp"
 #include <string>
 #include <unordered_map>
 
@@ -76,13 +77,13 @@ struct Style {
 };
 
 struct Panel {
-  rl::Color background_color = rl::Color{WHITE};
+  ecs::Color background_color = ecs::Color::WHITE;
 };
 
 struct Label {
   std::string text = "";
   float font_size = 16.0;
-  rl::Color color = rl::Color{BLACK};
+  ecs::Color color = ecs::Color::BLACK;
 };
 
 inline std::string make_label_cache_key(const Label &label) {

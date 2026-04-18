@@ -18,8 +18,8 @@ struct PipelineState {
   using T = Resource;
 
   gl::RenderTarget world_target{};
-  u32 width = 0;
-  u32 height = 0;
+  u32 width{};
+  u32 height{};
 
   PipelineState() = default;
   PipelineState(PipelineState const&) = delete;

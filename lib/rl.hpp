@@ -8,7 +8,6 @@ namespace rl {
 // ---- Types ----
 using ::Camera2D;
 using ::Camera3D;
-using ::Color;
 using ::GltfScene;
 using ::Image;
 using ::Material;
@@ -17,6 +16,7 @@ using ::Matrix;
 using ::Mesh;
 using ::Model;
 using ::Quaternion;
+using ::rlColor;
 using ::rlRectangle;
 using Rectangle = ::rlRectangle;
 using ::RenderTexture;
@@ -94,7 +94,7 @@ using ::ImageFormat;
 using ::ImageText;
 using ::ImageTextEx;
 using ::rlLoadImage;
-inline auto LoadImage(const char *fileName) -> Image {
+inline auto LoadImage(char const* fileName) -> Image {
   return ::rlLoadImage(fileName);
 }
 using ::LoadRenderTexture;

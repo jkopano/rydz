@@ -16,7 +16,7 @@
 namespace ecs {
 
 struct PreparedMaterial {
-  std::array<gl::MaterialMap, kMaterialMapCount> local_maps{};
+  std::array<gl::MaterialMap, K_MATERIAL_MAP_COUNT> local_maps{};
   gl::Material material;
 };
 
@@ -90,7 +90,7 @@ struct ShaderCache {
 
 inline auto pbr_fallback_textures() -> PbrFallbackTextures& {
   static PbrFallbackTextures textures = [] -> PbrFallbackTextures {
-    auto make_texture = [](gl::Color color) -> gl::Texture {
+    auto make_texture = [](Color color) -> gl::Texture {
       gl::Image image = gl::gen_image_with_color(1, 1, color);
       gl::Texture texture = image.load_texture();
       gl::unload_image(image);
@@ -98,11 +98,11 @@ inline auto pbr_fallback_textures() -> PbrFallbackTextures& {
     };
 
     return PbrFallbackTextures{
-      .metallic_black = make_texture({0, 0, 0, 255}),
-      .roughness_white = make_texture(gl::kWhite),
+      .metallic_black = make_texture(Color::BLACK),
+      .roughness_white = make_texture(Color::WHITE),
       .normal_flat = make_texture({128, 128, 255, 255}),
-      .occlusion_white = make_texture(gl::kWhite),
-      .emission_black = make_texture({0, 0, 0, 255}),
+      .occlusion_white = make_texture(Color::WHITE),
+      .emission_black = make_texture(Color::BLACK),
     };
   }();
   return textures;
@@ -111,7 +111,7 @@ inline auto pbr_fallback_textures() -> PbrFallbackTextures& {
 inline auto apply_pbr_defaults(gl::Material& material) -> void {
   auto* maps = material.maps;
   if (maps[material_map_index(MaterialMap::Albedo)].color.a == 0) {
-    maps[material_map_index(MaterialMap::Albedo)].color = gl::kWhite;
+    maps[material_map_index(MaterialMap::Albedo)].color = Color::WHITE;
   }
   if (maps[material_map_index(MaterialMap::Roughness)].value <= 0.0F &&
       !maps[material_map_index(MaterialMap::Roughness)].texture.ready()) {
@@ -191,7 +191,7 @@ inline auto apply_material_map_binding(
   Assets<Texture> const& textures
 ) -> void {
   int const map_index = material_map_index(binding.map_type);
-  if (map_index < 0 || map_index >= kMaterialMapCount) {
+  if (map_index < 0 || map_index >= K_MATERIAL_MAP_COUNT) {
     return;
   }
 
@@ -288,6 +288,7 @@ inline auto make_has_camera_slot_provider() -> SlotProvider {
       CameraUniform::Position, math::to_rl(ctx.view().camera_view.position)
     );
     shader.set(CameraUniform::ViewMatrix, ctx.view().camera_view.view);
+    shader.set(CameraUniform::ProjectionMatrix, ctx.view().camera_view.proj);
   };
   return provider;
 }
@@ -314,7 +315,7 @@ inline auto make_has_pbr_slot_provider() -> SlotProvider {
     auto const& cluster_config = ctx.cluster_config();
 
     int has_directional = lights.has_directional ? 1 : 0;
-    gl::Vec3 dir_color = color_to_vec3(lights.dir_light.color);
+    gl::Vec3 dir_color = lights.dir_light.color;
     gl::Vec3 dir_dir = math::to_rl(lights.dir_light.direction.normalized());
     float dir_intensity = lights.dir_light.intensity;
     gl::Vec2 cluster_screen_size = {

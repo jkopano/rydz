@@ -46,6 +46,7 @@ inline auto is_reserved_uniform_name(std::string_view name) -> bool {
     map_uniform_binding(StandardMaterialUniform::RenderMethod),
     map_uniform_binding(CameraUniform::Position),
     map_uniform_binding(CameraUniform::ViewMatrix),
+    map_uniform_binding(CameraUniform::ProjectionMatrix),
     map_uniform_binding(PbrLightingUniform::DirectionalDirection),
     map_uniform_binding(PbrLightingUniform::DirectionalIntensity),
     map_uniform_binding(PbrLightingUniform::DirectionalColor),

@@ -35,9 +35,9 @@ struct IsometricCamera {
   bool smooth_follow = true;
 };
 
-inline void
-isometric_camera_system(Query<Mut<Transform>, IsometricCamera> query,
-                        Res<Time> time) {
+inline void isometric_camera_system(
+  Query<Mut<Transform>, IsometricCamera> query, Res<Time> time
+) {
 
   for (auto [t, cam] : query.iter()) {
     f32 dt = time->delta_seconds;
@@ -58,33 +58,38 @@ isometric_camera_system(Query<Mut<Transform>, IsometricCamera> query,
 
 struct IsometricCameraBundle {
   using T = Bundle;
-  Camera3DComponent camera_component;
+  Camera3d camera_component;
   ActiveCamera active_camera;
   Transform transform;
   IsometricCamera iso;
 
-  static auto setup(Vec3 target = Vec3::ZERO,
-                    Vec3 offset = Vec3(10.0f, 10.0f, 10.0f),
-                    f32 ortho_height = 20.0f, f32 follow_speed = 5.0f)
-      -> IsometricCameraBundle {
+  static auto setup(
+    Vec3 target = Vec3::ZERO,
+    Vec3 offset = Vec3(10.0f, 10.0f, 10.0f),
+    f32 ortho_height = 20.0f,
+    f32 follow_speed = 5.0f
+  ) -> IsometricCameraBundle {
     return IsometricCameraBundle{
-        .camera_component = Camera3DComponent::orthographic(ortho_height),
-        .active_camera = ActiveCamera{},
-        .transform =
-            Transform::from_xyz(target.x + offset.x, target.y + offset.y,
-                                target.z + offset.z)
-                .look_at(target),
-        .iso = IsometricCamera{
-            .target = target, .offset = offset, .follow_speed = follow_speed}};
+      .camera_component = Camera3d::orthographic(ortho_height),
+      .active_camera = ActiveCamera{},
+      .transform =
+        Transform::from_xyz(
+          target.x + offset.x, target.y + offset.y, target.z + offset.z
+        )
+          .look_at(target),
+      .iso = IsometricCamera{
+        .target = target, .offset = offset, .follow_speed = follow_speed
+      }
+    };
   }
 };
 
-inline auto camera_plugin(App &app) -> void {
+inline auto camera_plugin(App& app) -> void {
   app.add_systems(ScheduleLabel::Update, isometric_camera_system);
 
-  app.add_systems(ScheduleLabel::Startup, [](World &world) -> void {
+  app.add_systems(ScheduleLabel::Startup, [](World& world) -> void {
     engine::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
-      return [zoom_level](Query<Mut<Camera3DComponent>> query) -> void {
+      return [zoom_level](Query<Mut<Camera3d>> query) -> void {
         for (auto [cam] : query.iter()) {
           if (cam->is_orthographic()) {
             cam->orthographic_height = zoom_level;

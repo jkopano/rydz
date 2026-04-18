@@ -2,6 +2,7 @@
 #pragma once
 #include "rl.hpp"
 #include "rydz_ecs/mod.hpp"
+#include "rydz_graphics/color.hpp"
 #include "scripting.hpp"
 #include <sstream>
 #include <string>
@@ -143,7 +144,7 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
   i32 screen_w = rl::GetScreenWidth();
   i32 console_h = rl::GetScreenHeight() / 3;
 
-  rl::DrawRectangle(0, 0, screen_w, console_h, Fade(rl::BLACK, 0.85f));
+  rl::DrawRectangle(0, 0, screen_w, console_h, Fade(ecs::Color::BLACK, 0.85f));
 
   int y = console_h - 30;
   int current_line = 0;
@@ -155,7 +156,7 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
       continue;
     }
 
-    rlDrawText(it->c_str(), 10, y, 20, rl::RAYWHITE);
+    DrawText(it->c_str(), 10, y, 20, ecs::Color::RAYWHITE);
     y -= 25;
     current_line++;
 
@@ -163,9 +164,9 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
       break;
   }
 
-  DrawRectangle(0, console_h, screen_w, 30, Fade(DARKGRAY, 0.9f));
-  rlDrawText(("] " + console->current_input + "_").c_str(), 10, console_h + 5,
-             20, rl::GREEN);
+  DrawRectangle(0, console_h, screen_w, 30, Fade(ecs::Color::DARKGRAY, 0.9f));
+  DrawText(("] " + console->current_input + "_").c_str(), 10, console_h + 5,
+           20, ecs::Color::GREEN);
 }
 
 inline void console_plugin(ecs::App &app) {

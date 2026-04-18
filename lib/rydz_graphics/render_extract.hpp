@@ -16,13 +16,14 @@
 #include "visibility.hpp"
 #include <array>
 #include <concepts>
+#include <unordered_map>
 #include <vector>
 
 namespace ecs {
 
 struct Sprite {
   Handle<Texture> handle;
-  Color tint = kWhite;
+  Color tint = Color::WHITE;
   i32 layer{};
 };
 
@@ -56,7 +57,7 @@ struct ExtractedLights {
 
   struct PointLight {
     Vec3 position;
-    Color color{kWhite};
+    Color color{Color::WHITE};
     float intensity{0.0F};
     float range{0.0F};
   };
@@ -90,7 +91,7 @@ struct ExtractedUi {
   struct Item {
     Handle<Texture> texture{};
     Transform transform{};
-    Color tint = kWhite;
+    Color tint = Color::WHITE;
     i32 layer = 0;
   };
 
@@ -101,7 +102,7 @@ struct ExtractedUi {
 struct Extract {
   static auto view(
     Query<
-      Camera3DComponent,
+      Camera3d,
       ActiveCamera,
       GlobalTransform,
       Opt<ClearColor>,
@@ -168,12 +169,15 @@ struct Extract {
     meshes->clear();
   }
 
+  template <RenderMaterialAsset M>
   static auto meshes(
-    Query<Mesh3d, GlobalTransform, MeshMaterial3d, Opt<ViewVisibility>> query,
+    Query<Mesh3d, GlobalTransform, MeshMaterial3d<M>, Opt<ViewVisibility>> query,
     Res<ExtractedView> view,
-    Res<Assets<Material>> material_assets,
+    Res<Assets<M>> material_assets,
     ResMut<ExtractedMeshes> meshes
   ) -> void {
+    std::unordered_map<u32, CompiledMaterial> compiled_cache;
+
     for (auto [mesh3d, global, material, visibility] : query.iter()) {
       if (!mesh3d->mesh.is_valid() || !material->material.is_valid()) {
         continue;
@@ -187,7 +191,13 @@ struct Extract {
         continue;
       }
 
-      CompiledMaterial compiled = material_asset->compiled;
+      auto [compiled_iter, inserted] =
+        compiled_cache.try_emplace(material->material.id);
+      if (inserted) {
+        compiled_iter->second = compile_render_material_asset(*material_asset);
+      }
+
+      CompiledMaterial compiled = compiled_iter->second;
       bool const transparent =
         compiled.render_method == RenderMethod::Transparent;
       bool const casts_shadows = compiled.casts_shadows;

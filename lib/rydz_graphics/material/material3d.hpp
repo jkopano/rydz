@@ -37,7 +37,7 @@ using gl::UniformType;
 struct MaterialMapBinding {
   MaterialMap map_type = MaterialMap::Albedo;
   Handle<Texture> texture{};
-  Color color = kWhite;
+  Color color = Color::WHITE;
   f32 value = 0.0f;
   bool has_texture = false;
   bool has_color = false;
@@ -95,7 +95,7 @@ struct CompiledMaterial {
   RenderMethod render_method = RenderMethod::Opaque;
   bool casts_shadows = true;
   bool double_sided = false;
-  float alpha_cutoff = 0.1f;
+  f32 alpha_cutoff = 0.1f;
   std::string material_type_name;
 
   auto operator==(CompiledMaterial const& o) const -> bool {
@@ -123,14 +123,12 @@ struct CompiledMaterial {
     return has_uniform_named(map_uniform_binding(binding));
   }
 
-  auto apply_cull_mode() const -> void {
+  [[nodiscard]] auto cull_state() const -> gl::Cull {
     if (this->double_sided) {
-      gl::disable_backface_culling();
-      return;
+      return gl::Cull::none();
     }
 
-    gl::enable_backface_culling();
-    gl::set_cull_face(gl::CullFace::Back);
+    return gl::Cull::back();
   }
 
   auto apply(ShaderProgram& shader) const -> void {
@@ -183,21 +181,31 @@ public:
     return std::move(uniforms_);
   }
 };
-;
 
-template <typename... SlotTs> struct MaterialTrait {
-  static auto vertex_shader() -> ShaderRef { return "res/shaders/basic.vert"; }
-  static auto fragment_shader() -> ShaderRef {
-    return "res/shaders/basic.frag";
-  }
+template <typename T>
+concept IsMaterial = requires(T const m, MaterialBuilder& builder) {
+  typename T::_material_have_to_implement;
+  { m.bind(builder) } -> std::same_as<void>;
+  { m.render_method() } -> std::same_as<RenderMethod>;
+  { m.enable_shadows() } -> std::same_as<bool>;
+  { m.double_sided() } -> std::same_as<bool>;
+  { m.alpha_cutoff() } -> std::same_as<f32>;
 
+  { T::vertex_shader() } -> std::convertible_to<ShaderRef>;
+  { T::fragment_shader() } -> std::convertible_to<ShaderRef>;
+};
+
+template <typename... SlotTs> struct IMaterial {
+  static auto vertex_shader() -> ShaderRef { return ""; }
+  static auto fragment_shader() -> ShaderRef { return ""; }
+  auto bind(MaterialBuilder&) const -> void {}
   [[nodiscard]] auto render_method() const -> RenderMethod {
     return RenderMethod::Opaque;
   }
   [[nodiscard]] auto enable_shadows() const -> bool { return true; }
   [[nodiscard]] auto double_sided() const -> bool { return false; }
-  [[nodiscard]] auto alpha_cutoff() const -> float { return 0.1f; }
-  auto bind(MaterialBuilder&) const -> void {}
+  [[nodiscard]] auto alpha_cutoff() const -> f32 { return 0.1f; }
+  using _material_have_to_implement = void;
 
 private:
   using __slot_tuple = std::tuple<SlotTs...>;
@@ -246,9 +254,9 @@ inline auto compiled_material_has_slot(
 inline auto find_last_map_binding(
   CompiledMaterial const& compiled, MaterialMap map_type, auto predicate
 ) -> MaterialMapBinding const* {
-  for (auto it = compiled.maps.rbegin(); it != compiled.maps.rend(); ++it) {
-    if (it->map_type == map_type && predicate(*it)) {
-      return &*it;
+  for (auto const& map : std::ranges::reverse_view(compiled.maps)) {
+    if (map.map_type == map_type && predicate(map)) {
+      return &map;
     }
   }
   return nullptr;
@@ -257,7 +265,7 @@ inline auto find_last_map_binding(
 inline auto normalize_pbr_compiled_material(CompiledMaterial& compiled)
   -> void {
   if (!compiled.has_uniform(MaterialMap::Metalness)) {
-    float metallic = 0.0f;
+    f32 metallic = 0.0f;
     if (auto const* binding = find_last_map_binding(
           compiled, MaterialMap::Metalness, [](auto const& item) -> auto {
             return item.has_value;
@@ -269,7 +277,7 @@ inline auto normalize_pbr_compiled_material(CompiledMaterial& compiled)
   }
 
   if (!compiled.has_uniform(MaterialMap::Roughness)) {
-    float roughness = 0.0f;
+    f32 roughness = 0.0f;
     auto const* value_binding = find_last_map_binding(
       compiled, MaterialMap::Roughness, [](auto const& item) -> auto {
         return item.has_value;
@@ -289,7 +297,7 @@ inline auto normalize_pbr_compiled_material(CompiledMaterial& compiled)
   }
 
   if (!compiled.has_uniform(MaterialMap::Normal)) {
-    float normal = 1.0f;
+    f32 normal = 1.0f;
     if (auto const* binding = find_last_map_binding(
           compiled, MaterialMap::Normal, [](auto const& item) -> auto {
             return item.has_value;
@@ -301,7 +309,7 @@ inline auto normalize_pbr_compiled_material(CompiledMaterial& compiled)
   }
 
   if (!compiled.has_uniform(MaterialMap::Occlusion)) {
-    float occlusion = 1.0f;
+    f32 occlusion = 1.0f;
     if (auto const* binding = find_last_map_binding(
           compiled, MaterialMap::Occlusion, [](auto const& item) -> auto {
             return item.has_value;
@@ -313,15 +321,15 @@ inline auto normalize_pbr_compiled_material(CompiledMaterial& compiled)
   }
 
   if (!compiled.has_uniform(MaterialMap::Emission)) {
-    float ex = 0.0f;
-    float ey = 0.0f;
-    float ez = 0.0f;
+    f32 ex = 0.0f;
+    f32 ey = 0.0f;
+    f32 ez = 0.0f;
     if (auto const* binding = find_last_map_binding(
           compiled, MaterialMap::Emission, [](auto const& item) -> auto {
             return item.has_color;
           }
         )) {
-      auto emissive = color_to_vec3(binding->color);
+      auto emissive = binding->color;
       ex = emissive.x;
       ey = emissive.y;
       ez = emissive.z;
@@ -334,7 +342,7 @@ inline auto normalize_pbr_compiled_material(CompiledMaterial& compiled)
   }
 }
 
-template <typename M>
+template <IsMaterial M>
 auto compile_trait_material(M const& material) -> CompiledMaterial {
   using T = bare_t<M>;
   static_assert(MaterialMeta<T>::is_trait_based);
@@ -378,6 +386,29 @@ struct Material {
       : compiled(detail::compile_trait_material(material)) {}
 };
 
+template <typename M>
+concept RenderMaterialAsset =
+  std::same_as<bare_t<M>, Material> || MaterialValue<bare_t<M>>;
+
+template <RenderMaterialAsset M>
+auto compile_render_material_asset(M const& material) -> CompiledMaterial {
+  if constexpr (std::same_as<bare_t<M>, Material>) {
+    return material.compiled;
+  } else {
+    return detail::compile_trait_material(material);
+  }
+}
+
+template <typename M = Material> struct MeshMaterial3d {
+  Handle<M> material{};
+
+  MeshMaterial3d() = default;
+  explicit MeshMaterial3d(Handle<M> material) : material(material) {}
+
+  auto operator*() -> Handle<M>& { return material; }
+  auto operator*() const -> Handle<M> const& { return material; }
+};
+
 } // namespace ecs
 
 namespace std {
@@ -385,14 +416,14 @@ template <> struct hash<ecs::MaterialMapBinding> {
   auto operator()(ecs::MaterialMapBinding const& k) const noexcept -> size_t {
     size_t seed = 0;
     rydz::hash_combine(
-      seed, std::hash<int>{}(ecs::material_map_index(k.map_type))
+      seed, std::hash<i32>{}(ecs::material_map_index(k.map_type))
     );
-    rydz::hash_combine(seed, std::hash<uint32_t>{}(k.texture.id));
-    rydz::hash_combine(seed, std::hash<unsigned char>{}(k.color.r));
-    rydz::hash_combine(seed, std::hash<unsigned char>{}(k.color.g));
-    rydz::hash_combine(seed, std::hash<unsigned char>{}(k.color.b));
-    rydz::hash_combine(seed, std::hash<unsigned char>{}(k.color.a));
-    rydz::hash_combine(seed, std::hash<float>{}(k.value));
+    rydz::hash_combine(seed, std::hash<u32>{}(k.texture.id));
+    rydz::hash_combine(seed, std::hash<u8>{}(k.color.r));
+    rydz::hash_combine(seed, std::hash<u8>{}(k.color.g));
+    rydz::hash_combine(seed, std::hash<u8>{}(k.color.b));
+    rydz::hash_combine(seed, std::hash<u8>{}(k.color.a));
+    rydz::hash_combine(seed, std::hash<f32>{}(k.value));
     rydz::hash_combine(seed, std::hash<bool>{}(k.has_texture));
     rydz::hash_combine(seed, std::hash<bool>{}(k.has_color));
     rydz::hash_combine(seed, std::hash<bool>{}(k.has_value));
@@ -405,11 +436,11 @@ template <> struct hash<ecs::CompiledMaterial> {
     size_t seed = 0;
     rydz::hash_combine(seed, std::hash<ecs::ShaderSpec>{}(k.shader));
     rydz::hash_combine(
-      seed, std::hash<int>{}(static_cast<int>(k.render_method))
+      seed, std::hash<i32>{}(static_cast<int>(k.render_method))
     );
     rydz::hash_combine(seed, std::hash<bool>{}(k.casts_shadows));
     rydz::hash_combine(seed, std::hash<bool>{}(k.double_sided));
-    rydz::hash_combine(seed, std::hash<float>{}(k.alpha_cutoff));
+    rydz::hash_combine(seed, std::hash<f32>{}(k.alpha_cutoff));
     for (auto const& slot : k.slots) {
       rydz::hash_combine(seed, std::hash<ecs::MaterialSlotRequirement>{}(slot));
     }

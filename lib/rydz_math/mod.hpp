@@ -14,6 +14,10 @@
 #include <limits>
 #include <raylib.h>
 
+#ifdef PI
+#define PI std::numbers::pi_v<f32>
+#endif
+
 namespace rydz_math {
 
 struct Transform;

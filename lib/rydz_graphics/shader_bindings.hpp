@@ -1,12 +1,13 @@
 #pragma once
 
+#include "types.hpp"
 #include <concepts>
 #include <string_view>
 #include <type_traits>
 
 namespace ecs {
 
-enum class MaterialMap : int {
+enum class MaterialMap : u8 {
   Albedo = 0,
   Metalness = 1,
   Normal = 2,
@@ -20,15 +21,15 @@ enum class MaterialMap : int {
   Brdf = 10,
 };
 
-inline constexpr int kMaterialMapCount = 12;
-inline constexpr int kRaylibMapLocationBase = 15;
+inline constexpr i32 K_MATERIAL_MAP_COUNT = 12;
+inline constexpr i32 K_RAYLIB_MAP_LOCATION_BASE = 15;
 
-inline constexpr auto material_map_index(MaterialMap map) -> int {
+constexpr auto material_map_index(MaterialMap map) -> i32 {
   return static_cast<int>(map);
 }
 
-inline constexpr auto shader_location_index(MaterialMap map) -> int {
-  return kRaylibMapLocationBase + material_map_index(map);
+constexpr auto shader_location_index(MaterialMap map) -> i32 {
+  return K_RAYLIB_MAP_LOCATION_BASE + material_map_index(map);
 }
 
 inline auto map_texture_binding(MaterialMap map) -> std::string_view {
@@ -106,6 +107,7 @@ inline auto map_uniform_binding(StandardMaterialUniform uniform)
 enum class CameraUniform {
   Position,
   ViewMatrix,
+  ProjectionMatrix,
 };
 
 inline auto map_uniform_binding(CameraUniform uniform) -> std::string_view {
@@ -114,6 +116,8 @@ inline auto map_uniform_binding(CameraUniform uniform) -> std::string_view {
     return "cameraPos";
   case CameraUniform::ViewMatrix:
     return "matView";
+  case CameraUniform::ProjectionMatrix:
+    return "matProjection";
   }
   return "";
 }

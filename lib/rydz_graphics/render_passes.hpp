@@ -4,12 +4,16 @@
 #include "pipeline.hpp"
 #include "render_extract.hpp"
 #include "render_phase.hpp"
+#include "rl.hpp"
 #include "rydz_ecs/core/time.hpp"
+#include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/gl/state.hpp"
 #include "rydz_graphics/material/render_material.hpp"
 #include "rydz_graphics/render_config.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <numbers>
 
 namespace ecs {
 
@@ -19,6 +23,10 @@ struct RenderExecutionState {
   bool world_pass_active = false;
   bool world_target_active = false;
   bool backbuffer_active = false;
+
+  auto begin() -> void { rl::BeginDrawing(); };
+  auto end() -> void { rl::EndDrawing(); };
+  auto clear(Color color) -> void { rl::ClearBackground(color); };
 };
 
 struct FramePass {
@@ -26,23 +34,30 @@ struct FramePass {
     Res<ExtractedView> view,
     ResMut<RenderExecutionState> state,
     ResMut<PipelineState> screen_pipeline,
+    ResMut<gl::RenderState> render_state,
     NonSendMarker marker
   ) -> void;
 
   static auto end(
     ResMut<RenderExecutionState> state,
     ResMut<PipelineState> screen_pipeline,
+    ResMut<gl::RenderState> render_state,
     Res<DebugOverlaySettings> debug_settings,
     NonSendMarker marker
   ) -> void;
 };
 
 struct WorldPass {
-  static auto shadow(Res<RenderExecutionState>, Res<ShadowPhase>, NonSendMarker)
-    -> void {}
+  static auto shadow(
+    Res<RenderExecutionState>,
+    Res<ShadowPhase>,
+    ResMut<gl::RenderState>,
+    NonSendMarker
+  ) -> void {}
 
   static auto depth_prepass(
     Res<RenderExecutionState> state,
+    ResMut<gl::RenderState> render_state,
     Res<OpaquePhase> phase,
     Res<Assets<Mesh>> mesh_assets,
     Res<Assets<Texture>> texture_assets,
@@ -58,10 +73,12 @@ struct WorldPass {
       return;
     }
 
-    RenderConfig::depth_prepass()(marker);
+    RenderConfig const config = RenderConfig::depth_prepass();
     for (auto const& batch : phase->batches) {
       draw_batch_common(
         marker,
+        *render_state,
+        config,
         batch,
         *mesh_assets,
         *texture_assets,
@@ -74,7 +91,7 @@ struct WorldPass {
         depth_prepass_shader_spec()
       );
     }
-    RenderConfig::post_depth_prepass()(marker);
+    render_state->apply(RenderConfig::post_depth_prepass());
   }
 
   static auto cluster_build(
@@ -96,6 +113,7 @@ struct WorldPass {
 
   static void opaque(
     Res<RenderExecutionState> state,
+    ResMut<gl::RenderState> render_state,
     Res<OpaquePhase> phase,
     Res<Assets<Mesh>> mesh_assets,
     Res<Assets<Texture>> texture_assets,
@@ -111,10 +129,12 @@ struct WorldPass {
       return;
     }
 
-    RenderConfig::opaque()(marker);
+    RenderConfig const config = RenderConfig::opaque();
     for (auto const& batch : phase->batches) {
       draw_batch_common(
         marker,
+        *render_state,
+        config,
         batch,
         *mesh_assets,
         *texture_assets,
@@ -127,11 +147,12 @@ struct WorldPass {
         batch.key.material.shader
       );
     }
-    RenderConfig{}(marker);
+    render_state->apply(RenderConfig{});
   }
 
   static void transparent(
     Res<RenderExecutionState> state,
+    ResMut<gl::RenderState> render_state,
     Res<TransparentPhase> phase,
     Res<Assets<Mesh>> mesh_assets,
     Res<Assets<Texture>> texture_assets,
@@ -147,10 +168,12 @@ struct WorldPass {
       return;
     }
 
-    RenderConfig::transparent()(marker);
+    RenderConfig const config = RenderConfig::transparent();
     for (auto const& batch : phase->batches) {
       draw_batch_common(
         marker,
+        *render_state,
+        config,
         batch,
         *mesh_assets,
         *texture_assets,
@@ -163,21 +186,41 @@ struct WorldPass {
         batch.key.material.shader
       );
     }
-    RenderConfig{}(marker);
+    render_state->apply(RenderConfig{});
   }
 
-  static auto begin(NonSendMarker marker, ExtractedView const& view) -> void {
-    gl::begin_world_pass(view.camera_view.view, view.camera_view.proj);
-    RenderConfig::get_default()(marker);
+  static auto begin(
+    NonSendMarker marker,
+    gl::RenderState& render_state,
+    ExtractedView const& view
+  ) -> void {
+    (void) marker;
+
+    render_state.begin_view(
+      gl::RenderViewState{
+        .viewport = view.viewport,
+        .view = view.camera_view.view,
+        .projection = view.camera_view.proj,
+        .camera_position = view.camera_view.position,
+        .orthographic = view.orthographic,
+        .near_plane = view.near_plane,
+        .far_plane = view.far_plane,
+      }
+    );
+
+    render_state.apply(RenderConfig::get_default());
 
     if ((view.active_skybox != nullptr) && view.active_skybox->loaded) {
-      view.active_skybox->draw(view.camera_view.view, view.camera_view.proj);
+      auto const& active_view = render_state.view();
+      view.active_skybox->draw(active_view.view, active_view.projection);
+      render_state.reset();
     }
   }
 
-  static auto end(NonSendMarker marker) -> void {
-    gl::end_world_pass();
-    RenderConfig::end_world_pass()(marker);
+  static auto end(NonSendMarker marker, gl::RenderState& render_state) -> void {
+    (void) marker;
+    render_state.end_view();
+    render_state.apply(RenderConfig{});
   }
 
 private:
@@ -190,6 +233,8 @@ private:
   template <typename BatchT>
   static auto draw_batch_common(
     NonSendMarker marker,
+    gl::RenderState& render_state,
+    RenderConfig pass_config,
     BatchT const& batch,
     Assets<Mesh> const& mesh_assets,
     Assets<Texture> const& texture_assets,
@@ -205,6 +250,9 @@ private:
     if (!mesh) {
       return;
     }
+
+    pass_config.cull = batch.key.material.cull_state();
+    render_state.apply(pass_config);
 
     PreparedMaterial prepared{};
     SlotPrepareContext prepare_ctx{
@@ -232,7 +280,6 @@ private:
     apply_slot_uniforms(
       slot_registry, render_ctx, batch.key.material, prepared, shader
     );
-    batch.key.material.apply_cull_mode();
     draw_batch(shader, *mesh, prepared.material, batch);
   }
 };
@@ -240,6 +287,7 @@ private:
 struct PostProcessPass {
   static auto postprocess(
     ResMut<RenderExecutionState> state,
+    ResMut<gl::RenderState> render_state,
     Res<PipelineState> pipeline,
     ResMut<ShaderCache> shader_cache,
     Res<ExtractedView> view,
@@ -247,18 +295,18 @@ struct PostProcessPass {
     NonSendMarker marker
   ) -> void {
     if (state->world_pass_active) {
-      WorldPass::end(marker);
+      WorldPass::end(marker, *render_state);
       state->world_pass_active = false;
     }
 
     if (state->world_target_active) {
-      pipeline->world_target.end();
+      render_state->end_target();
       state->world_target_active = false;
     }
 
     if (!state->backbuffer_active) {
-      gl::begin_drawing();
-      gl::clear_background(gl::kBlack);
+      state->begin();
+      state->clear(Color::BLACK);
       state->backbuffer_active = true;
     }
 
@@ -269,6 +317,7 @@ struct PostProcessPass {
     draw_postprocess_pass(
       marker, pipeline->world_target.texture, *shader_cache, *view, *time
     );
+    render_state->reset();
   }
 
 private:
@@ -281,7 +330,7 @@ private:
       view.viewport,
       {0.0F, 0.0F},
       0.0F,
-      gl::kWhite
+      Color::WHITE
     );
   }
 
@@ -331,12 +380,15 @@ struct UiPass {
     Res<UiPhase> phase,
     Res<Assets<Texture>> texture_assets,
     ResMut<RenderExecutionState> state,
+    ResMut<gl::RenderState> render_state,
     NonSendMarker
   ) -> void {
     if (!state->backbuffer_active) {
-      gl::begin_drawing();
+      state->begin();
       state->backbuffer_active = true;
     }
+
+    render_state->apply(RenderConfig{});
 
     for (auto const& item : phase->items) {
       auto const* texture = texture_assets->get(item.texture);
@@ -379,7 +431,8 @@ private:
     f32 cosy_cosp =
       1.0F - (2.0F * (transform.rotation.y * transform.rotation.y +
                       transform.rotation.z * transform.rotation.z));
-    return std::atan2(siny_cosp, cosy_cosp) * (180.0F / PI);
+    return std::atan2(siny_cosp, cosy_cosp) *
+           (180.0F / std::numbers::pi_v<float>);
   }
 };
 
@@ -387,16 +440,18 @@ inline auto FramePass::begin(
   Res<ExtractedView> view,
   ResMut<RenderExecutionState> state,
   ResMut<PipelineState> pipeline,
+  ResMut<gl::RenderState> render_state,
   NonSendMarker marker
 ) -> void {
+  render_state->reset();
   state->world_pass_active = false;
   state->world_target_active = false;
   state->backbuffer_active = false;
   state->scene_active = view->active;
 
   if (!view->active) {
-    gl::begin_drawing();
-    gl::clear_background(view->clear_color);
+    state->begin();
+    state->clear(view->clear_color);
     state->backbuffer_active = true;
     return;
   }
@@ -405,31 +460,32 @@ inline auto FramePass::begin(
     static_cast<u32>(std::max(view->viewport.width, 1.0F)),
     static_cast<u32>(std::max(view->viewport.height, 1.0F))
   );
-  pipeline->world_target.begin();
-  gl::clear_background(view->clear_color);
+  render_state->begin_target(pipeline->world_target);
+  state->clear(view->clear_color);
   state->world_target_active = true;
-  WorldPass::begin(marker, *view);
+  WorldPass::begin(marker, *render_state, *view);
   state->world_pass_active = true;
 }
 
 inline auto FramePass::end(
   ResMut<RenderExecutionState> state,
   ResMut<PipelineState> pipeline,
+  ResMut<gl::RenderState> render_state,
   Res<DebugOverlaySettings> debug_settings,
   NonSendMarker marker
 ) -> void {
   if (state->world_pass_active) {
-    WorldPass::end(marker);
+    WorldPass::end(marker, *render_state);
     state->world_pass_active = false;
   }
 
   if (state->world_target_active) {
-    pipeline->world_target.end();
+    render_state->end_target();
     state->world_target_active = false;
   }
 
   if (!state->backbuffer_active) {
-    gl::begin_drawing();
+    state->begin();
     state->backbuffer_active = true;
   }
 
@@ -441,7 +497,7 @@ inline auto FramePass::end(
   }
 
   if (state->backbuffer_active) {
-    gl::end_drawing();
+    state->end();
     state->backbuffer_active = false;
   }
 }

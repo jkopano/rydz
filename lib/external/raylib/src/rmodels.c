@@ -180,7 +180,7 @@ static void UpdateModelAnimationVertexBuffers(Model model);
 // Module Functions Definition
 //----------------------------------------------------------------------------------
 // Draw a line in 3D world space
-void DrawLine3D(Vector3 startPos, Vector3 endPos, Color color)
+void DrawLine3D(Vector3 startPos, Vector3 endPos, rlColor color)
 {
     rlBegin(RL_LINES);
         rlColor4ub(color.r, color.g, color.b, color.a);
@@ -191,7 +191,7 @@ void DrawLine3D(Vector3 startPos, Vector3 endPos, Color color)
 
 // Draw a point in 3D space, actually a small line
 // WARNING: OpenGL ES 2.0 does not support point mode drawing
-void DrawPoint3D(Vector3 position, Color color)
+void DrawPoint3D(Vector3 position, rlColor color)
 {
     rlPushMatrix();
         rlTranslatef(position.x, position.y, position.z);
@@ -204,7 +204,7 @@ void DrawPoint3D(Vector3 position, Color color)
 }
 
 // Draw a circle in 3D world space
-void DrawCircle3D(Vector3 center, float radius, Vector3 rotationAxis, float rotationAngle, Color color)
+void DrawCircle3D(Vector3 center, float radius, Vector3 rotationAxis, float rotationAngle, rlColor color)
 {
     rlPushMatrix();
         rlTranslatef(center.x, center.y, center.z);
@@ -223,7 +223,7 @@ void DrawCircle3D(Vector3 center, float radius, Vector3 rotationAxis, float rota
 }
 
 // Draw a color-filled triangle (vertex in counter-clockwise order!)
-void DrawTriangle3D(Vector3 v1, Vector3 v2, Vector3 v3, Color color)
+void DrawTriangle3D(Vector3 v1, Vector3 v2, Vector3 v3, rlColor color)
 {
     rlBegin(RL_TRIANGLES);
         rlColor4ub(color.r, color.g, color.b, color.a);
@@ -234,7 +234,7 @@ void DrawTriangle3D(Vector3 v1, Vector3 v2, Vector3 v3, Color color)
 }
 
 // Draw a triangle strip defined by points
-void DrawTriangleStrip3D(const Vector3 *points, int pointCount, Color color)
+void DrawTriangleStrip3D(const Vector3 *points, int pointCount, rlColor color)
 {
     if (pointCount < 3) return; // Security check
 
@@ -261,7 +261,7 @@ void DrawTriangleStrip3D(const Vector3 *points, int pointCount, Color color)
 
 // Draw cube
 // NOTE: Cube position is the center position
-void DrawCube(Vector3 position, float width, float height, float length, Color color)
+void DrawCube(Vector3 position, float width, float height, float length, rlColor color)
 {
     float x = 0.0f;
     float y = 0.0f;
@@ -340,13 +340,13 @@ void DrawCube(Vector3 position, float width, float height, float length, Color c
 }
 
 // Draw cube (Vector version)
-void DrawCubeV(Vector3 position, Vector3 size, Color color)
+void DrawCubeV(Vector3 position, Vector3 size, rlColor color)
 {
     DrawCube(position, size.x, size.y, size.z, color);
 }
 
 // Draw cube wires
-void DrawCubeWires(Vector3 position, float width, float height, float length, Color color)
+void DrawCubeWires(Vector3 position, float width, float height, float length, rlColor color)
 {
     float x = 0.0f;
     float y = 0.0f;
@@ -418,19 +418,19 @@ void DrawCubeWires(Vector3 position, float width, float height, float length, Co
 }
 
 // Draw cube wires (vector version)
-void DrawCubeWiresV(Vector3 position, Vector3 size, Color color)
+void DrawCubeWiresV(Vector3 position, Vector3 size, rlColor color)
 {
     DrawCubeWires(position, size.x, size.y, size.z, color);
 }
 
 // Draw sphere
-void DrawSphere(Vector3 centerPos, float radius, Color color)
+void DrawSphere(Vector3 centerPos, float radius, rlColor color)
 {
     DrawSphereEx(centerPos, radius, 16, 16, color);
 }
 
 // Draw sphere with extended parameters
-void DrawSphereEx(Vector3 centerPos, float radius, int rings, int slices, Color color)
+void DrawSphereEx(Vector3 centerPos, float radius, int rings, int slices, rlColor color)
 {
 #if 0
     // Basic implementation, do not use it!
@@ -526,7 +526,7 @@ void DrawSphereEx(Vector3 centerPos, float radius, int rings, int slices, Color 
 }
 
 // Draw sphere wires
-void DrawSphereWires(Vector3 centerPos, float radius, int rings, int slices, Color color)
+void DrawSphereWires(Vector3 centerPos, float radius, int rings, int slices, rlColor color)
 {
     rlPushMatrix();
         // NOTE: Transformation is applied in inverse order (scale -> translate)
@@ -568,7 +568,7 @@ void DrawSphereWires(Vector3 centerPos, float radius, int rings, int slices, Col
 
 // Draw a cylinder
 // NOTE: It could be also used for pyramid and cone
-void DrawCylinder(Vector3 position, float radiusTop, float radiusBottom, float height, int sides, Color color)
+void DrawCylinder(Vector3 position, float radiusTop, float radiusBottom, float height, int sides, rlColor color)
 {
     if (sides < 3) sides = 3;
 
@@ -627,7 +627,7 @@ void DrawCylinder(Vector3 position, float radiusTop, float radiusBottom, float h
 
 // Draw a cylinder with base at startPos and top at endPos
 // NOTE: It could be also used for pyramid and cone
-void DrawCylinderEx(Vector3 startPos, Vector3 endPos, float startRadius, float endRadius, int sides, Color color)
+void DrawCylinderEx(Vector3 startPos, Vector3 endPos, float startRadius, float endRadius, int sides, rlColor color)
 {
     if (sides < 3) sides = 3;
 
@@ -686,7 +686,7 @@ void DrawCylinderEx(Vector3 startPos, Vector3 endPos, float startRadius, float e
 
 // Draw a wired cylinder
 // NOTE: It could be also used for pyramid and cone
-void DrawCylinderWires(Vector3 position, float radiusTop, float radiusBottom, float height, int sides, Color color)
+void DrawCylinderWires(Vector3 position, float radiusTop, float radiusBottom, float height, int sides, rlColor color)
 {
     if (sides < 3) sides = 3;
 
@@ -718,7 +718,7 @@ void DrawCylinderWires(Vector3 position, float radiusTop, float radiusBottom, fl
 
 // Draw a wired cylinder with base at startPos and top at endPos
 // NOTE: It could be also used for pyramid and cone
-void DrawCylinderWiresEx(Vector3 startPos, Vector3 endPos, float startRadius, float endRadius, int sides, Color color)
+void DrawCylinderWiresEx(Vector3 startPos, Vector3 endPos, float startRadius, float endRadius, int sides, rlColor color)
 {
     if (sides < 3) sides = 3;
 
@@ -763,7 +763,7 @@ void DrawCylinderWiresEx(Vector3 startPos, Vector3 endPos, float startRadius, fl
 }
 
 // Draw a capsule with the center of its sphere caps at startPos and endPos
-void DrawCapsule(Vector3 startPos, Vector3 endPos, float radius, int slices, int rings, Color color)
+void DrawCapsule(Vector3 startPos, Vector3 endPos, float radius, int slices, int rings, rlColor color)
 {
     if (slices < 3) slices = 3;
 
@@ -902,7 +902,7 @@ void DrawCapsule(Vector3 startPos, Vector3 endPos, float radius, int slices, int
 }
 
 // Draw capsule wires with the center of its sphere caps at startPos and endPos
-void DrawCapsuleWires(Vector3 startPos, Vector3 endPos, float radius, int slices, int rings, Color color)
+void DrawCapsuleWires(Vector3 startPos, Vector3 endPos, float radius, int slices, int rings, rlColor color)
 {
     if (slices < 3) slices = 3;
 
@@ -1033,7 +1033,7 @@ void DrawCapsuleWires(Vector3 startPos, Vector3 endPos, float radius, int slices
 }
 
 // Draw a plane
-void DrawPlane(Vector3 centerPos, Vector2 size, Color color)
+void DrawPlane(Vector3 centerPos, Vector2 size, rlColor color)
 {
     // NOTE: Plane is always created on XZ ground
     rlPushMatrix();
@@ -1053,7 +1053,7 @@ void DrawPlane(Vector3 centerPos, Vector2 size, Color color)
 }
 
 // Draw a ray line
-void DrawRay(Ray ray, Color color)
+void DrawRay(Ray ray, rlColor color)
 {
     float scale = 10000;
 
@@ -2143,18 +2143,18 @@ static void ProcessMaterialsOBJ(Material *materials, tinyobj_material_t *mats, i
         materials[m].maps[MATERIAL_MAP_DIFFUSE].texture = (Texture2D){ rlGetTextureIdDefault(), 1, 1, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
 
         if (mats[m].diffuse_texname != NULL) materials[m].maps[MATERIAL_MAP_DIFFUSE].texture = LoadTexture(mats[m].diffuse_texname);  //char *diffuse_texname; // map_Kd
-        else materials[m].maps[MATERIAL_MAP_DIFFUSE].color = (Color){ (unsigned char)(mats[m].diffuse[0]*255.0f), (unsigned char)(mats[m].diffuse[1]*255.0f), (unsigned char)(mats[m].diffuse[2]*255.0f), 255 }; //float diffuse[3];
+        else materials[m].maps[MATERIAL_MAP_DIFFUSE].color = (rlColor){ (unsigned char)(mats[m].diffuse[0]*255.0f), (unsigned char)(mats[m].diffuse[1]*255.0f), (unsigned char)(mats[m].diffuse[2]*255.0f), 255 }; //float diffuse[3];
         materials[m].maps[MATERIAL_MAP_DIFFUSE].value = 0.0f;
 
         if (mats[m].specular_texname != NULL) materials[m].maps[MATERIAL_MAP_SPECULAR].texture = LoadTexture(mats[m].specular_texname);  //char *specular_texname; // map_Ks
-        materials[m].maps[MATERIAL_MAP_SPECULAR].color = (Color){ (unsigned char)(mats[m].specular[0]*255.0f), (unsigned char)(mats[m].specular[1]*255.0f), (unsigned char)(mats[m].specular[2]*255.0f), 255 }; //float specular[3];
+        materials[m].maps[MATERIAL_MAP_SPECULAR].color = (rlColor){ (unsigned char)(mats[m].specular[0]*255.0f), (unsigned char)(mats[m].specular[1]*255.0f), (unsigned char)(mats[m].specular[2]*255.0f), 255 }; //float specular[3];
         materials[m].maps[MATERIAL_MAP_SPECULAR].value = 0.0f;
 
         if (mats[m].bump_texname != NULL) materials[m].maps[MATERIAL_MAP_NORMAL].texture = LoadTexture(mats[m].bump_texname);  //char *bump_texname; // map_bump, bump
         materials[m].maps[MATERIAL_MAP_NORMAL].color = WHITE;
         materials[m].maps[MATERIAL_MAP_NORMAL].value = mats[m].shininess;
 
-        materials[m].maps[MATERIAL_MAP_EMISSION].color = (Color){ (unsigned char)(mats[m].emission[0]*255.0f), (unsigned char)(mats[m].emission[1]*255.0f), (unsigned char)(mats[m].emission[2]*255.0f), 255 }; //float emission[3];
+        materials[m].maps[MATERIAL_MAP_EMISSION].color = (rlColor){ (unsigned char)(mats[m].emission[0]*255.0f), (unsigned char)(mats[m].emission[1]*255.0f), (unsigned char)(mats[m].emission[2]*255.0f), 255 }; //float emission[3];
 
         if (mats[m].displacement_texname != NULL) materials[m].maps[MATERIAL_MAP_HEIGHT].texture = LoadTexture(mats[m].displacement_texname);  //char *displacement_texname; // disp
     }
@@ -3223,7 +3223,7 @@ Mesh GenMeshHeightmap(Image heightmap, Vector3 size)
     int mapX = heightmap.width;
     int mapZ = heightmap.height;
 
-    Color *pixels = LoadImageColors(heightmap);
+    rlColor *pixels = LoadImageColors(heightmap);
 
     // NOTE: One vertex per pixel
     mesh.triangleCount = (mapX - 1)*(mapZ - 1)*2;    // One quad every four pixels
@@ -3352,7 +3352,7 @@ Mesh GenMeshCubicmap(Image cubicmap, Vector3 cubeSize)
 
     Mesh mesh = { 0 };
 
-    Color *pixels = LoadImageColors(cubicmap);
+    rlColor *pixels = LoadImageColors(cubicmap);
 
     // NOTE: Max possible number of triangles numCubes*(12 triangles by cube)
     int maxTriangles = cubicmap.width*cubicmap.height*12;
@@ -3891,7 +3891,7 @@ void GenMeshTangents(Mesh *mesh)
 }
 
 // Draw a model (with texture if set)
-void DrawModel(Model model, Vector3 position, float scale, Color tint)
+void DrawModel(Model model, Vector3 position, float scale, rlColor tint)
 {
     Vector3 vScale = { scale, scale, scale };
     Vector3 rotationAxis = { 0.0f, 1.0f, 0.0f };
@@ -3900,7 +3900,7 @@ void DrawModel(Model model, Vector3 position, float scale, Color tint)
 }
 
 // Draw a model with extended parameters
-void DrawModelEx(Model model, Vector3 position, Vector3 rotationAxis, float rotationAngle, Vector3 scale, Color tint)
+void DrawModelEx(Model model, Vector3 position, Vector3 rotationAxis, float rotationAngle, Vector3 scale, rlColor tint)
 {
     // Calculate transformation matrix from function parameters
     // Get transform matrix (rotation -> scale -> translation)
@@ -3916,11 +3916,11 @@ void DrawModelEx(Model model, Vector3 position, Vector3 rotationAxis, float rota
     for (int i = 0; i < model.meshCount; i++)
     {
         Material mat = model.materials[model.meshMaterial[i]];
-        Color colDiffuse = mat.maps[MATERIAL_MAP_DIFFUSE].color;
+        rlColor colDiffuse = mat.maps[MATERIAL_MAP_DIFFUSE].color;
 
         // Applying color tint directly to material diffuse map,
         // because is comes as an input paramter to the function
-        Color colTinted = { 0 };
+        rlColor colTinted = { 0 };
         colTinted.r = (unsigned char)(((int)colDiffuse.r*(int)tint.r)/255);
         colTinted.g = (unsigned char)(((int)colDiffuse.g*(int)tint.g)/255);
         colTinted.b = (unsigned char)(((int)colDiffuse.b*(int)tint.b)/255);
@@ -3944,7 +3944,7 @@ void DrawModelEx(Model model, Vector3 position, Vector3 rotationAxis, float rota
 }
 
 // Draw a model wires (with texture if set)
-void DrawModelWires(Model model, Vector3 position, float scale, Color tint)
+void DrawModelWires(Model model, Vector3 position, float scale, rlColor tint)
 {
     rlEnableWireMode();
 
@@ -3954,7 +3954,7 @@ void DrawModelWires(Model model, Vector3 position, float scale, Color tint)
 }
 
 // Draw a model wires (with texture if set) with extended parameters
-void DrawModelWiresEx(Model model, Vector3 position, Vector3 rotationAxis, float rotationAngle, Vector3 scale, Color tint)
+void DrawModelWiresEx(Model model, Vector3 position, Vector3 rotationAxis, float rotationAngle, Vector3 scale, rlColor tint)
 {
     rlEnableWireMode();
 
@@ -3965,7 +3965,7 @@ void DrawModelWiresEx(Model model, Vector3 position, Vector3 rotationAxis, float
 
 // Draw a model points
 // WARNING: OpenGL ES 2.0 does not support point mode drawing
-void DrawModelPoints(Model model, Vector3 position, float scale, Color tint)
+void DrawModelPoints(Model model, Vector3 position, float scale, rlColor tint)
 {
     rlEnablePointMode();
     rlDisableBackfaceCulling();
@@ -3978,7 +3978,7 @@ void DrawModelPoints(Model model, Vector3 position, float scale, Color tint)
 
 // Draw a model points
 // WARNING: OpenGL ES 2.0 does not support point mode drawing
-void DrawModelPointsEx(Model model, Vector3 position, Vector3 rotationAxis, float rotationAngle, Vector3 scale, Color tint)
+void DrawModelPointsEx(Model model, Vector3 position, Vector3 rotationAxis, float rotationAngle, Vector3 scale, rlColor tint)
 {
     rlEnablePointMode();
     rlDisableBackfaceCulling();
@@ -3990,7 +3990,7 @@ void DrawModelPointsEx(Model model, Vector3 position, Vector3 rotationAxis, floa
 }
 
 // Draw a billboard
-void DrawBillboard(Camera camera, Texture2D texture, Vector3 position, float scale, Color tint)
+void DrawBillboard(Camera camera, Texture2D texture, Vector3 position, float scale, rlColor tint)
 {
     rlRectangle source = { 0.0f, 0.0f, (float)texture.width, (float)texture.height };
 
@@ -3998,7 +3998,7 @@ void DrawBillboard(Camera camera, Texture2D texture, Vector3 position, float sca
 }
 
 // Draw a billboard (part of a texture defined by a rectangle)
-void DrawBillboardRec(Camera camera, Texture2D texture, rlRectangle source, Vector3 position, Vector2 size, Color tint)
+void DrawBillboardRec(Camera camera, Texture2D texture, rlRectangle source, Vector3 position, Vector2 size, rlColor tint)
 {
     // NOTE: Billboard locked on axis-Y
     Vector3 up = { 0.0f, 1.0f, 0.0f };
@@ -4007,7 +4007,7 @@ void DrawBillboardRec(Camera camera, Texture2D texture, rlRectangle source, Vect
 }
 
 // Draw a billboard with additional parameters
-void DrawBillboardPro(Camera camera, Texture2D texture, rlRectangle source, Vector3 position, Vector3 up, Vector2 size, Vector2 origin, float rotation, Color tint)
+void DrawBillboardPro(Camera camera, Texture2D texture, rlRectangle source, Vector3 position, Vector3 up, Vector2 size, Vector2 origin, float rotation, rlColor tint)
 {
     // Compute the up vector and the right vector
     Matrix matView = MatrixLookAt(camera.position, camera.target, camera.up);
@@ -4083,7 +4083,7 @@ void DrawBillboardPro(Camera camera, Texture2D texture, rlRectangle source, Vect
 }
 
 // Draw a bounding box with wires
-void DrawBoundingBox(BoundingBox box, Color color)
+void DrawBoundingBox(BoundingBox box, rlColor color)
 {
     Vector3 size = { 0 };
 
@@ -5580,7 +5580,7 @@ static Model LoadGLTF(const char *fileName)
                         {
                             for (int y = 0; y < imRoughness.height; y++)
                             {
-                                Color color = GetImageColor(imMetallicRoughness, x, y);
+                                rlColor color = GetImageColor(imMetallicRoughness, x, y);
 
                                 ((unsigned char *)imRoughness.data)[y*imRoughness.width + x] = color.g; // Roughness color channel
                                 ((unsigned char *)imMetallic.data)[y*imMetallic.width + x] = color.b; // Metallic color channel
@@ -6738,7 +6738,7 @@ static Model LoadVOX(const char *fileName)
     // 6*4 = 12 vertices per voxel
     Vector3 *pvertices = (Vector3 *)voxarray.vertices.array;
     Vector3 *pnormals = (Vector3 *)voxarray.normals.array;
-    Color *pcolors = (Color *)voxarray.colors.array;
+    rlColor *pcolors = (rlColor *)voxarray.colors.array;
 
     unsigned short *pindices = voxarray.indices.array;    // 5461*6*6 = 196596 indices max per mesh
 
@@ -6768,7 +6768,7 @@ static Model LoadVOX(const char *fileName)
         pmesh->triangleCount = (pmesh->vertexCount/4)*2;
 
         // Copy colors
-        size = pmesh->vertexCount*sizeof(Color);
+        size = pmesh->vertexCount*sizeof(rlColor);
         pmesh->colors = (unsigned char *)RL_MALLOC(size);
         memcpy(pmesh->colors, pcolors, size);
 
@@ -7386,7 +7386,7 @@ GltfScene LoadGltfScene(const char *fileName)
                         {
                             for (int y = 0; y < imRoughness.height; y++)
                             {
-                                Color color = GetImageColor(imMetallicRoughness, x, y);
+                                rlColor color = GetImageColor(imMetallicRoughness, x, y);
                                 ((unsigned char *)imRoughness.data)[y*imRoughness.width + x] = color.g;
                                 ((unsigned char *)imMetallic.data)[y*imMetallic.width + x] = color.b;
                             }

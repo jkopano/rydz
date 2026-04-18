@@ -17,7 +17,7 @@ public:
       return;
     }
 
-    rl::Image img = rl::GenImageColor(1, 1, rl::Color{255, 255, 255, 255});
+    rl::Image img = rl::GenImageColor(1, 1, ecs::Color::WHITE);
     rl::Texture2D tex = rl::LoadTextureFromImage(img);
     rl::UnloadImage(img);
 
@@ -117,7 +117,7 @@ public:
       }
 
       tex->handle = it->second;
-      tex->tint = rl::Color{255, 255, 255, 255};
+      tex->tint = ecs::Color::WHITE;
       if (auto *node = world.get_component<rydz::ui::UiNode>(e)) {
         tex->layer = node->z_index;
       }

@@ -213,7 +213,7 @@ inline auto spawn_lights_on_input(
 
 inline auto setup_camera(Cmd cmd, NonSendMarker) -> void {
   cmd.spawn(
-    Camera3DComponent::perspective(),
+    Camera3d::perspective(),
     ActiveCamera{},
     Transform::from_xyz(8, 6, 8).look_at(Vec3::ZERO),
     CameraController{},

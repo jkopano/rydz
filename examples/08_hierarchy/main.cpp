@@ -2,8 +2,8 @@
 #include "math.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/mod.hpp"
-#include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/mod.hpp"
+#include "rydz_graphics/render_plugin.hpp"
 #include "rydz_platform/mod.hpp"
 #include <print>
 
@@ -13,51 +13,72 @@ using namespace math;
 struct PivotTag {};
 struct ArmTag {};
 
-void setup(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
-           ResMut<Assets<ecs::Material>> materials, NonSendMarker) {
+void setup(
+  Cmd cmd,
+  ResMut<Assets<ecs::Mesh>> meshes,
+  ResMut<Assets<ecs::Material>> materials,
+  NonSendMarker
+) {
   // kamera
-  cmd.spawn(Camera3DComponent::perspective(60.0f), ActiveCamera{},
-            Transform::from_xyz(0, 8, 15).look_at(Vec3::ZERO));
+  cmd.spawn(
+    Camera3d::perspective(60.0f),
+    ActiveCamera{},
+    Transform::from_xyz(0, 8, 15).look_at(Vec3::ZERO)
+  );
 
   // podłoga
   auto floor_h = meshes->add(mesh::plane(20, 20));
-  auto floor_mat = materials->add(StandardMaterial::from_color(kDarkGray));
-  cmd.spawn(Mesh3d{floor_h},
-            MeshMaterial3d{floor_mat},
-            Transform{});
+  auto floor_mat =
+    materials->add(StandardMaterial::from_color(ecs::Color::DARKGRAY));
+  cmd.spawn(Mesh3d{floor_h}, MeshMaterial3d{floor_mat}, Transform{});
 
   // światło
-  cmd.spawn(DirectionalLight{
-      .color = kWhite,
+  cmd.spawn(
+    DirectionalLight{
+      .color = ecs::Color::WHITE,
       .direction = Vec3(-0.3f, -1.0f, -0.5f),
       .intensity = 0.6f,
-  });
+    }
+  );
 
   // parent
   auto cube_h = meshes->add(mesh::cube(1, 1, 1));
-  auto yellow_mat = materials->add(StandardMaterial::from_color(kYellow));
-  auto pivot =
-      cmd.spawn(Mesh3d{cube_h}, MeshMaterial3d{yellow_mat},
-                Transform::from_xyz(0, 2, 0), PivotTag{});
+  auto yellow_mat =
+    materials->add(StandardMaterial::from_color(ecs::Color::YELLOW));
+  auto pivot = cmd.spawn(
+    Mesh3d{cube_h},
+    MeshMaterial3d{yellow_mat},
+    Transform::from_xyz(0, 2, 0),
+    PivotTag{}
+  );
 
   // child
   auto arm_h = meshes->add(mesh::cube(3, 0.4f, 0.4f));
-  auto red_mat = materials->add(StandardMaterial::from_color(kRed));
-  auto arm =
-      cmd.spawn(Mesh3d{arm_h}, MeshMaterial3d{red_mat},
-                Transform::from_xyz(2.0f, 0, 0), // offset od pivota
-                Parent{pivot.id()}, ArmTag{});
+  auto red_mat = materials->add(StandardMaterial::from_color(ecs::Color::RED));
+  auto arm = cmd.spawn(
+    Mesh3d{arm_h},
+    MeshMaterial3d{red_mat},
+    Transform::from_xyz(2.0f, 0, 0), // offset od pivota
+    Parent{pivot.id()},
+    ArmTag{}
+  );
 
   // child of child
   auto tip_h = meshes->add(mesh::sphere(0.4f));
-  auto blue_mat = materials->add(StandardMaterial::from_color(kBlue));
-  cmd.spawn(Mesh3d{tip_h},
-            MeshMaterial3d{blue_mat},
-            Transform::from_xyz(1.8f, 0, 0), // offset od ramienia
-            Parent{arm.id()});
+  auto blue_mat =
+    materials->add(StandardMaterial::from_color(ecs::Color::BLUE));
+  cmd.spawn(
+    Mesh3d{tip_h},
+    MeshMaterial3d{blue_mat},
+    Transform::from_xyz(1.8f, 0, 0), // offset od ramienia
+    Parent{arm.id()}
+  );
 
-  std::println("hierarchy: pivot({}) -> arm({}) -> tip", pivot.id().index(),
-               arm.id().index());
+  std::println(
+    "hierarchy: pivot({}) -> arm({}) -> tip",
+    pivot.id().index(),
+    arm.id().index()
+  );
 }
 
 // filtrujesz entity które mają Parent
@@ -93,12 +114,15 @@ void rotate_pivot(Query<Mut<Transform>, PivotTag> query, Res<Time> time) {
 
 int main() {
   App app;
-  app.add_plugin(rydz_platform::RayPlugin::install({
-          .window = {1024, 768, "08 - Hierarchy", 60},
-      }))
-      .add_plugin(time_plugin)
-      .add_plugin(RenderPlugin::install)
-      .add_systems(Startup, setup)
-      .add_systems(Update, rotate_pivot)
-      .run();
+  app
+    .add_plugin(
+      rydz_platform::RayPlugin::install({
+        .window = {1024, 768, "08 - Hierarchy", 60},
+      })
+    )
+    .add_plugin(time_plugin)
+    .add_plugin(RenderPlugin::install)
+    .add_systems(Startup, setup)
+    .add_systems(Update, rotate_pivot)
+    .run();
 }

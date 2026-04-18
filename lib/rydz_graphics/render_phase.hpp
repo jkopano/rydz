@@ -188,7 +188,7 @@ struct UiPhase {
   struct Item {
     Handle<Texture> texture{};
     Transform transform{};
-    Color tint = kWhite;
+    Color tint = Color::WHITE;
     i32 layer = 0;
   };
 
