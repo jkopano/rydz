@@ -3,7 +3,7 @@
 #include "color.hpp"
 #include "light.hpp"
 #include "math.hpp"
-#include "mesh3d_component.hpp"
+#include "mesh3d.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/frustum.hpp"
