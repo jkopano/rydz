@@ -4,6 +4,7 @@
 #include "frustum.hpp"
 #include "pipeline.hpp"
 #include "render_extract.hpp"
+#include "render_graph.hpp"
 #include "render_passes.hpp"
 #include "render_phase.hpp"
 #include "rydz_ecs/app.hpp"
@@ -64,14 +65,25 @@ struct RenderPlugin {
       .init_resource<ShaderCache>()
       .init_resource<SlotProviderRegistry>()
       .init_resource<DebugOverlaySettings>()
-      .init_resource<PipelineState>()
       .init_resource<gl::RenderState>()
       .init_resource<ShadowPhase>()
       .init_resource<OpaquePhase>()
       .init_resource<TransparentPhase>()
       .init_resource<UiPhase>()
-      .init_resource<PreparedMaterialCache>()
       .init_resource<RenderExecutionState>();
+
+    app.init_resource<RenderGraph>();
+    if (auto* graph = app.world().get_resource<RenderGraph>()) {
+      graph->add_pass<ClearPass>();
+      graph->add_pass<ShadowPass>();
+      graph->add_pass<DepthPrepass>();
+      graph->add_pass<ClusterBuildPass>();
+      graph->add_pass<SkyboxPass>();
+      graph->add_pass<OpaquePass>();
+      graph->add_pass<TransparentPass>();
+      graph->add_pass<PostProcessPassNode>();
+      graph->add_pass<UiPass>();
+    }
 
     if (auto* server = app.world().get_resource<AssetServer>()) {
       register_default_loaders(*server);
@@ -98,11 +110,7 @@ struct RenderPlugin {
       .configure_set(
         Render,
         configure(
-          RenderPassSet::Setup,
-          RenderPassSet::Main,
-          RenderPassSet::PostProcess,
-          RenderPassSet::Ui,
-          RenderPassSet::Cleanup
+          RenderPassSet::Setup, RenderPassSet::Main, RenderPassSet::Cleanup
         )
           .chain()
       );
@@ -139,42 +147,16 @@ struct RenderPlugin {
 
       .add_systems(
         RenderExtractSet::Queue,
-        group(
-          Queue::queue<ExtractedMeshes, ShadowPhase>,
-          Queue::queue<ExtractedMeshes, OpaquePhase>,
-          Queue::queue<ExtractedMeshes, TransparentPhase>,
-          Queue::queue<ExtractedUi, UiPhase>
-        )
+        group(Queue::shadow, Queue::opaque, Queue::transparent, Queue::ui)
           .chain()
       )
 
-      .add_systems(
-        RenderExtractSet::Prepare,
-        group(
-          Prepare::prepare_meshes,
-          Prepare::build_batches<OpaquePhase>,
-          Prepare::build_batches<TransparentPhase>
-        )
-          .chain()
-      );
+      .add_systems(RenderExtractSet::Prepare, group(Prepare::prepare_meshes))
 
-    app
       .add_systems(RenderPassSet::Setup, FramePass::begin)
 
-      .add_systems(
-        RenderPassSet::Main,
-        group(
-          WorldPass::shadow,
-          WorldPass::depth_prepass,
-          WorldPass::cluster_build,
-          WorldPass::opaque,
-          WorldPass::transparent
-        )
-          .chain()
-      )
+      .add_systems(RenderPassSet::Main, FramePass::execute_graph)
 
-      .add_systems(RenderPassSet::PostProcess, PostProcessPass::postprocess)
-      .add_systems(RenderPassSet::Ui, UiPass::ui)
       .add_systems(RenderPassSet::Cleanup, FramePass::end);
 
     register_material<StandardMaterial>(app);

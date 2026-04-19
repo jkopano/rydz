@@ -1,9 +1,11 @@
 #pragma once
 
 #include "color.hpp"
+#include "extracted_data.hpp"
 #include "light.hpp"
 #include "math.hpp"
 #include "mesh3d.hpp"
+#include "render_phase.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/frustum.hpp"
@@ -31,80 +33,6 @@ struct Sprite {
 template <typename M>
 concept IsExtracted = requires(M const& m) {
   { m.clear() } -> std::same_as<void>;
-};
-
-struct ExtractedView {
-  using T = Resource;
-  gl::Rectangle viewport{0.0F, 0.0F, 1.0F, 1.0F};
-  CameraView camera_view{
-    .view = Mat4::IDENTITY,
-    .proj = Mat4::IDENTITY,
-    .position = Vec3{},
-  };
-  Color clear_color = ClearColor{}.color;
-  Skybox const* active_skybox{};
-  PostProcessDescriptor postprocess{};
-  bool active{};
-  bool has_postprocess{};
-  bool orthographic{};
-  float near_plane{0.1F};
-  float far_plane{1000.0F};
-
-  auto clear() -> void { *this = ExtractedView{}; }
-};
-
-struct ExtractedLights {
-  using T = Resource;
-
-  struct PointLight {
-    Vec3 position;
-    Color color{Color::WHITE};
-    float intensity{0.0F};
-    float range{0.0F};
-  };
-
-  std::vector<PointLight> point_lights{};
-  DirectionalLight dir_light{};
-  bool has_directional{};
-
-  auto clear() -> void { *this = ExtractedLights{}; }
-};
-
-struct ExtractedMeshes {
-  using T = Resource;
-
-  struct MaterialItem {
-    RenderMaterialKey key{};
-    CompiledMaterial material{};
-    bool transparent{};
-    bool casts_shadows{true};
-  };
-
-  struct Item {
-    Handle<Mesh> mesh{};
-    RenderMaterialKey material{};
-    usize material_index{};
-    Mat4 world_transform{Mat4::IDENTITY};
-    float distance_to_camera{0.0F};
-  };
-
-  std::vector<MaterialItem> materials;
-  std::vector<Item> items;
-  auto clear() -> void { *this = ExtractedMeshes{}; }
-};
-
-struct ExtractedUi {
-  using T = Resource;
-
-  struct Item {
-    Handle<Texture> texture{};
-    Transform transform{};
-    Color tint = Color::WHITE;
-    i32 layer = 0;
-  };
-
-  std::vector<Item> items{};
-  auto clear() -> void { *this = ExtractedUi{}; }
 };
 
 struct Extract {
@@ -275,11 +203,107 @@ inline auto prepare_mesh(Handle<Mesh> const& handle, Assets<Mesh>& mesh_assets)
 }
 } // namespace detail
 
-struct Prepare {
-  template <typename P> static void build_batches(ResMut<P> phase) {
-    phase->build_batches();
-  };
+struct Queue {
+  static auto opaque(Res<ExtractedMeshes> meshes, ResMut<OpaquePhase> phase)
+    -> void {
+    phase->clear();
+    std::unordered_map<RenderBatchKey, usize> batch_index;
 
+    for (auto const& item : meshes->items) {
+      auto const& material = meshes->materials[item.material_index];
+      if (material.transparent) {
+        continue;
+      }
+
+      RenderBatchKey key{.mesh = item.mesh, .material = item.material};
+
+      auto it = batch_index.find(key);
+      if (it == batch_index.end()) {
+        usize const idx = phase->commands.size();
+        RenderCommand cmd{
+          .mesh = item.mesh,
+          .material = material.material,
+          .instances = {math::to_rl(item.world_transform)},
+          .sort_key = item.distance_to_camera,
+        };
+        phase->commands.push_back(std::move(cmd));
+        batch_index.emplace(key, idx);
+      } else {
+        phase->commands[it->second].instances.push_back(
+          math::to_rl(item.world_transform)
+        );
+      }
+    }
+  }
+
+  static auto transparent(
+    Res<ExtractedMeshes> meshes, ResMut<TransparentPhase> phase
+  ) -> void {
+    phase->clear();
+
+    for (auto const& item : meshes->items) {
+      auto const& material = meshes->materials[item.material_index];
+      if (!material.transparent) {
+        continue;
+      }
+
+      RenderCommand cmd{
+        .mesh = item.mesh,
+        .material = material.material,
+        .instances = {math::to_rl(item.world_transform)},
+        .sort_key = item.distance_to_camera,
+      };
+      phase->commands.push_back(std::move(cmd));
+    }
+
+    std::ranges::sort(
+      phase->commands,
+      [](RenderCommand const& lhs, RenderCommand const& rhs) -> bool {
+        return lhs.sort_key > rhs.sort_key;
+      }
+    );
+  }
+
+  static auto shadow(Res<ExtractedMeshes> meshes, ResMut<ShadowPhase> phase)
+    -> void {
+    phase->clear();
+    for (auto const& item : meshes->items) {
+      auto const& material = meshes->materials[item.material_index];
+      if (!material.casts_shadows) {
+        continue;
+      }
+      RenderCommand cmd{
+        .mesh = item.mesh,
+        .material = material.material,
+        .instances = {math::to_rl(item.world_transform)},
+        .sort_key = item.distance_to_camera,
+      };
+      phase->commands.push_back(std::move(cmd));
+    }
+  }
+
+  static auto ui(Res<ExtractedUi> ui, ResMut<UiPhase> phase) -> void {
+    phase->clear();
+    for (auto const& item : ui->items) {
+      phase->items.push_back(
+        UiPhase::Item{
+          .texture = item.texture,
+          .transform = item.transform,
+          .tint = item.tint,
+          .layer = item.layer,
+        }
+      );
+    }
+
+    std::ranges::stable_sort(
+      phase->items, [](UiPhase::Item const& lhs, UiPhase::Item const& rhs) {
+        return lhs.layer < rhs.layer;
+      }
+    );
+  }
+};
+
+struct Prepare {
   static auto prepare_meshes(
     Res<ExtractedMeshes> extracted,
     ResMut<Assets<Mesh>> mesh_assets,
@@ -295,13 +319,6 @@ struct Prepare {
       detail::prepare_mesh(item.mesh, *mesh_assets);
     }
   }
-};
-
-struct Queue {
-  template <typename M, typename P>
-  static auto queue(Res<M> meshes, ResMut<P> phase) -> void {
-    phase->queue(*meshes);
-  };
 };
 
 } // namespace ecs

@@ -5,7 +5,7 @@
 #include "rydz_graphics/gl/state.hpp"
 #include "rydz_graphics/material/slot_provider.hpp"
 #include "rydz_graphics/render_batches.hpp"
-#include "rydz_graphics/render_extract.hpp"
+#include "rydz_graphics/extracted_data.hpp"
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
@@ -283,13 +283,13 @@ inline auto HasPBR::slot_provider() -> SlotProvider {
       std::max(view.far_plane, view.near_plane + 0.001f),
     };
     std::array<int, 4> cluster_dimensions = {
-      cluster_config.tile_count_x,
-      cluster_config.tile_count_y,
-      cluster_config.slice_count_z,
+      cluster_config.tile_count_x_clamped(),
+      cluster_config.tile_count_y_clamped(),
+      cluster_config.slice_count_z_clamped(),
       0
     };
     int cluster_max_lights =
-      static_cast<int>(cluster_config.max_lights_per_cluster);
+      static_cast<int>(cluster_config.max_lights_per_cluster_clamped());
     int is_orthographic = view.orthographic ? 1 : 0;
 
     ctx.clustered_lighting().bind();

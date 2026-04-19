@@ -1,186 +1,38 @@
 #pragma once
 
-#include "render_extract.hpp"
-#include "rydz_graphics/material/render_material.hpp"
-#include "rydz_graphics/render_batches.hpp"
-#include <algorithm>
-#include <unordered_map>
+#include "rydz_graphics/gl/resources.hpp"
+#include "rydz_graphics/material/material3d.hpp"
 #include <vector>
 
 namespace ecs {
 
-struct ShadowPhase {
-  using T = Resource;
+struct RenderCommand {
+  Handle<Mesh> mesh{};
+  CompiledMaterial material{};
+  std::vector<gl::Matrix> instances;
+  f32 sort_key = 0.0F;
 
-  struct Item {
-    Handle<Mesh> mesh{};
-    Mat4 world_transform = Mat4::IDENTITY;
-    f32 distance_to_camera = 0.0F;
-  };
-
-  std::vector<Item> items;
-
-  auto clear() -> void { *this = ShadowPhase{}; }
-
-  auto queue(ExtractedMeshes const& meshes) -> void {
-    clear();
-    for (auto const& item : meshes.items) {
-      auto const& material = meshes.materials[item.material_index];
-      if (!material.casts_shadows) {
-        continue;
-      }
-      items.push_back(
-        Item{
-          .mesh = item.mesh,
-          .world_transform = item.world_transform,
-          .distance_to_camera = item.distance_to_camera,
-        }
-      );
-    }
+  auto add_instance(Mat4 const& transform) -> void {
+    instances.push_back(math::to_rl(transform));
   }
 };
 
-struct OpaquePhase {
+template <typename Tag>
+struct RenderPhase {
   using T = Resource;
 
-  struct Batch {
-    RenderBatchKey key;
-    CompiledMaterial material{};
-    std::vector<gl::Matrix> transforms;
-  };
+  std::vector<RenderCommand> commands;
 
-  struct Item {
-    Handle<Mesh> mesh{};
-    RenderMaterialKey material{};
-    usize material_index{};
-    Mat4 world_transform = Mat4::IDENTITY;
-    f32 distance_to_camera = 0.0F;
-  };
-
-  std::vector<ExtractedMeshes::MaterialItem> materials;
-  std::vector<Item> items;
-  std::vector<Batch> batches;
-
-  auto clear() -> void { *this = OpaquePhase{}; }
-
-  auto queue(ExtractedMeshes const& meshes) -> void {
-    clear();
-    materials = meshes.materials;
-    for (auto const& item : meshes.items) {
-      auto const& material = meshes.materials[item.material_index];
-      if (material.transparent) {
-        continue;
-      }
-      items.push_back(
-        Item{
-          .mesh = item.mesh,
-          .material = item.material,
-          .material_index = item.material_index,
-          .world_transform = item.world_transform,
-          .distance_to_camera = item.distance_to_camera,
-        }
-      );
-    }
-  }
-
-  auto build_batches() -> void {
-    batches.clear();
-    std::unordered_map<RenderBatchKey, usize> batch_index;
-
-    for (auto const& item : items) {
-
-      RenderBatchKey key{};
-      key.mesh = item.mesh;
-      key.material = item.material;
-
-      auto it = batch_index.find(key);
-      if (it == batch_index.end()) {
-        usize batch_slot = batches.size();
-        Batch batch{};
-        batch.key = key;
-        batch.material = materials[item.material_index].material;
-        batch.transforms.push_back(math::to_rl(item.world_transform));
-        batches.push_back(std::move(batch));
-        batch_index.emplace(batches.back().key, batch_slot);
-        continue;
-      }
-
-      batches[it->second].transforms.push_back(
-        math::to_rl(item.world_transform)
-      );
-    }
-  }
+  auto clear() -> void { commands.clear(); }
 };
 
-struct TransparentPhase {
-  using T = Resource;
+struct OpaqueTag {};
+struct TransparentTag {};
+struct ShadowTag {};
 
-  struct Batch {
-    RenderBatchKey key;
-    CompiledMaterial material{};
-    std::vector<gl::Matrix> transforms;
-  };
-
-  struct Item {
-    Handle<Mesh> mesh{};
-    RenderMaterialKey material{};
-    usize material_index{};
-    Mat4 world_transform = Mat4::IDENTITY;
-    f32 sort_key = 0.0F;
-  };
-
-  std::vector<ExtractedMeshes::MaterialItem> materials;
-  std::vector<Item> items;
-  std::vector<Batch> batches;
-
-  auto clear() -> void { *this = TransparentPhase{}; }
-
-  auto queue(ExtractedMeshes const& meshes) -> void {
-    clear();
-    materials = meshes.materials;
-    for (auto const& item : meshes.items) {
-      auto const& material = meshes.materials[item.material_index];
-      if (!material.transparent) {
-        continue;
-      }
-      items.push_back(
-        Item{
-          .mesh = item.mesh,
-          .material = item.material,
-          .material_index = item.material_index,
-          .world_transform = item.world_transform,
-          .sort_key = item.distance_to_camera,
-        }
-      );
-    }
-
-    std::ranges::sort(items, [](Item const& lhs, Item const& rhs) -> bool {
-      return lhs.sort_key > rhs.sort_key;
-    });
-  }
-
-  auto build_batches() -> void {
-    batches.clear();
-
-    for (auto const& item : items) {
-
-      RenderBatchKey key{};
-      key.mesh = item.mesh;
-      key.material = item.material;
-
-      if (batches.empty() || !(batches.back().key == key)) {
-        Batch batch{};
-        batch.key = key;
-        batch.material = materials[item.material_index].material;
-        batch.transforms.push_back(math::to_rl(item.world_transform));
-        batches.push_back(std::move(batch));
-        continue;
-      }
-
-      batches.back().transforms.push_back(math::to_rl(item.world_transform));
-    }
-  }
-};
+using OpaquePhase = RenderPhase<OpaqueTag>;
+using TransparentPhase = RenderPhase<TransparentTag>;
+using ShadowPhase = RenderPhase<ShadowTag>;
 
 struct UiPhase {
   using T = Resource;
@@ -194,27 +46,7 @@ struct UiPhase {
 
   std::vector<Item> items;
 
-  auto clear() -> void { *this = UiPhase{}; }
-
-  auto queue(ExtractedUi const& ui) -> void {
-    clear();
-    for (auto const& item : ui.items) {
-      items.push_back(
-        Item{
-          .texture = item.texture,
-          .transform = item.transform,
-          .tint = item.tint,
-          .layer = item.layer,
-        }
-      );
-    }
-
-    std::ranges::stable_sort(
-      items, [](Item const& lhs, Item const& rhs) -> bool {
-        return lhs.layer < rhs.layer;
-      }
-    );
-  }
+  auto clear() -> void { items.clear(); }
 };
 
 } // namespace ecs
