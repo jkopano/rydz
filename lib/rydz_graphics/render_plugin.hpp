@@ -74,15 +74,18 @@ struct RenderPlugin {
 
     app.init_resource<RenderGraph>();
     if (auto* graph = app.world().get_resource<RenderGraph>()) {
-      graph->add_pass<ClearPass>();
+      auto const main_target = graph->create_texture({}, "MainTarget");
+      auto const screen = graph->import_backbuffer("Screen");
+
+      graph->add_pass<ClearPass>(main_target);
       graph->add_pass<ShadowPass>();
-      graph->add_pass<DepthPrepass>();
+      graph->add_pass<DepthPrepass>(main_target);
       graph->add_pass<ClusterBuildPass>();
-      graph->add_pass<SkyboxPass>();
-      graph->add_pass<OpaquePass>();
-      graph->add_pass<TransparentPass>();
-      graph->add_pass<PostProcessPassNode>();
-      graph->add_pass<UiPass>();
+      graph->add_pass<SkyboxPass>(main_target);
+      graph->add_pass<OpaquePass>(main_target);
+      graph->add_pass<TransparentPass>(main_target);
+      graph->add_pass<PostProcessPassNode>(main_target, screen);
+      graph->add_pass<UiPass>(main_target, screen);
     }
 
     if (auto* server = app.world().get_resource<AssetServer>()) {
@@ -152,11 +155,8 @@ struct RenderPlugin {
       )
 
       .add_systems(RenderExtractSet::Prepare, group(Prepare::prepare_meshes))
-
       .add_systems(RenderPassSet::Setup, FramePass::begin)
-
       .add_systems(RenderPassSet::Main, FramePass::execute_graph)
-
       .add_systems(RenderPassSet::Cleanup, FramePass::end);
 
     register_material<StandardMaterial>(app);

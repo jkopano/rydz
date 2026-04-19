@@ -4,11 +4,10 @@
 #include "rydz_graphics/gl/mod.hpp"
 #include "rydz_graphics/render_phase.hpp"
 #include "rydz_log/mod.hpp"
-#include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace ecs {
@@ -28,10 +27,41 @@ struct TextureDesc {
   }
 };
 
-using RenderResourceHandle = std::string;
+struct RenderGraphTexture {};
+using RenderTextureHandle = Handle<RenderGraphTexture>;
+
+struct DebugOverlaySettings;
+struct ExtractedLights;
+struct ExtractedView;
+struct RenderExecutionState;
+struct ShaderCache;
+struct SlotProviderRegistry;
+
+struct RenderFrameContext {
+  NonSendMarker marker;
+  gl::RenderState& render_state;
+  u32 framebuffer_width = 1280;
+  u32 framebuffer_height = 720;
+
+  RenderExecutionState* execution_state = nullptr;
+  ShadowPhase const* shadow_phase = nullptr;
+  OpaquePhase const* opaque_phase = nullptr;
+  TransparentPhase const* transparent_phase = nullptr;
+  UiPhase const* ui_phase = nullptr;
+
+  Assets<Mesh> const* mesh_assets = nullptr;
+  Assets<Texture> const* texture_assets = nullptr;
+  ShaderCache* shader_cache = nullptr;
+  SlotProviderRegistry const* slot_registry = nullptr;
+  ExtractedView const* view = nullptr;
+  ExtractedLights const* lights = nullptr;
+  ClusterConfig const* cluster_config = nullptr;
+  ClusteredLightingState* cluster_state = nullptr;
+  Time const* time = nullptr;
+};
 
 struct RenderPassContext {
-  World& world;
+  RenderFrameContext& frame;
   gl::RenderState& render_state;
   NonSendMarker marker;
 };
@@ -53,25 +83,45 @@ class RenderGraphBuilder {
 public:
   virtual ~RenderGraphBuilder() = default;
 
-  virtual auto read(RenderResourceHandle const& name) -> void = 0;
-  virtual auto write(RenderResourceHandle const& name, TextureDesc const& desc)
-    -> void = 0;
-  virtual auto write_backbuffer(RenderResourceHandle const& name) -> void = 0;
+  virtual auto read(RenderTextureHandle handle) -> void = 0;
+  virtual auto write(RenderTextureHandle handle) -> void = 0;
 };
 
 class RenderGraphRuntime {
 public:
   virtual ~RenderGraphRuntime() = default;
 
-  [[nodiscard]] virtual auto get_texture(RenderResourceHandle const& name) const
+  [[nodiscard]] virtual auto get_texture(RenderTextureHandle handle) const
     -> gl::Texture const& = 0;
-  [[nodiscard]] virtual auto get_target(RenderResourceHandle const& name) const
+  [[nodiscard]] virtual auto get_target(RenderTextureHandle handle) const
     -> gl::RenderTarget const& = 0;
 };
 
 class RenderGraph {
 public:
   using T = Resource;
+
+  auto create_texture(
+    TextureDesc desc = {}, std::string debug_name = {}
+  ) -> RenderTextureHandle {
+    RenderTextureHandle handle{static_cast<u32>(resources_.size())};
+    resources_.push_back(ResourceInfo{
+      .debug_name = std::move(debug_name),
+      .desc = desc,
+      .backbuffer = false,
+    });
+    return handle;
+  }
+
+  auto import_backbuffer(std::string debug_name = {}) -> RenderTextureHandle {
+    RenderTextureHandle handle{static_cast<u32>(resources_.size())};
+    resources_.push_back(ResourceInfo{
+      .debug_name = std::move(debug_name),
+      .desc = {},
+      .backbuffer = true,
+    });
+    return handle;
+  }
 
   auto add_pass(std::unique_ptr<RenderPass> pass) -> void {
     passes_.push_back(std::move(pass));
@@ -83,14 +133,12 @@ public:
     add_pass(std::make_unique<PassT>(std::forward<Args>(args)...));
   }
 
-  auto compile(World& world) -> void {
+  auto compile() -> void {
     if (compiled_) {
       return;
     }
 
     nodes_.clear();
-    resource_descriptors_.clear();
-    backbuffer_resources_.clear();
 
     for (auto& pass : passes_) {
       PassNode node;
@@ -99,36 +147,25 @@ public:
       BuilderImpl builder(node);
       node.pass->setup(builder);
 
-      for (auto const& [name, desc] : builder.descriptors) {
-        resource_descriptors_[name] = desc;
-      }
-      for (auto const& name : builder.backbuffers) {
-        backbuffer_resources_.insert(name);
-      }
-
       nodes_.push_back(std::move(node));
     }
 
-    // proste sortowanie topologiczne (obecnie zakładamy kolejność dodawania,
-    // nie ma pełnego sortowania)
-    // sort_nodes();
+    sort_nodes();
 
     passes_.clear();
     compiled_ = true;
   }
 
-  auto execute(
-    World& world, gl::RenderState& render_state, NonSendMarker marker
-  ) -> void {
+  auto execute(RenderFrameContext& frame) -> void {
     if (!compiled_) {
       info("RenderGraph: compiling");
-      compile(world);
+      compile();
     }
 
-    ensure_resources(world);
+    ensure_resources(frame.framebuffer_width, frame.framebuffer_height);
 
     RenderPassContext ctx{
-      .world = world, .render_state = render_state, .marker = marker
+      .frame = frame, .render_state = frame.render_state, .marker = frame.marker
     };
 
     for (auto& node : nodes_) {
@@ -145,40 +182,38 @@ public:
   auto clear() -> void {
     passes_.clear();
     nodes_.clear();
+    for (auto& target : runtime_.targets) {
+      target.unload();
+    }
     runtime_.targets.clear();
-    resource_descriptors_.clear();
-    backbuffer_resources_.clear();
+    resources_.clear();
     compiled_ = false;
   }
 
 private:
+  struct ResourceInfo {
+    std::string debug_name;
+    TextureDesc desc{};
+    bool backbuffer = false;
+  };
+
   struct PassNode {
     std::unique_ptr<RenderPass> pass;
-    std::vector<RenderResourceHandle> inputs;
-    std::vector<RenderResourceHandle> outputs;
+    std::vector<RenderTextureHandle> inputs;
+    std::vector<RenderTextureHandle> outputs;
   };
 
   class BuilderImpl : public RenderGraphBuilder {
   public:
     explicit BuilderImpl(PassNode& node) : node_(node) {}
 
-    auto read(RenderResourceHandle const& name) -> void override {
-      node_.inputs.push_back(name);
+    auto read(RenderTextureHandle handle) -> void override {
+      node_.inputs.push_back(handle);
     }
 
-    auto write(RenderResourceHandle const& name, TextureDesc const& desc)
-      -> void override {
-      node_.outputs.push_back(name);
-      descriptors[name] = desc;
+    auto write(RenderTextureHandle handle) -> void override {
+      node_.outputs.push_back(handle);
     }
-
-    auto write_backbuffer(RenderResourceHandle const& name) -> void override {
-      node_.outputs.push_back(name);
-      backbuffers.insert(name);
-    }
-
-    std::unordered_map<RenderResourceHandle, TextureDesc> descriptors;
-    std::unordered_set<RenderResourceHandle> backbuffers;
 
   private:
     PassNode& node_;
@@ -186,38 +221,50 @@ private:
 
   class RuntimeImpl : public RenderGraphRuntime {
   public:
-    [[nodiscard]] auto get_texture(RenderResourceHandle const& name) const
+    [[nodiscard]] auto get_texture(RenderTextureHandle handle) const
       -> gl::Texture const& override {
-      auto it = targets.find(name);
-      if (it != targets.end()) {
-        return it->second.texture;
+      if (handle.is_valid() && handle.id < targets.size()) {
+        return targets[handle.id].texture;
       }
       static gl::Texture empty{};
       return empty;
     }
 
-    [[nodiscard]] auto get_target(RenderResourceHandle const& name) const
+    [[nodiscard]] auto get_target(RenderTextureHandle handle) const
       -> gl::RenderTarget const& override {
-      return targets.at(name);
+      if (handle.is_valid() && handle.id < targets.size()) {
+        return targets[handle.id];
+      }
+      static gl::RenderTarget empty{};
+      return empty;
     }
 
-    std::unordered_map<RenderResourceHandle, gl::RenderTarget> targets;
+    std::vector<gl::RenderTarget> targets;
   };
 
+  std::vector<ResourceInfo> resources_;
   std::vector<std::unique_ptr<RenderPass>> passes_;
   std::vector<PassNode> nodes_;
   RuntimeImpl runtime_;
-  std::unordered_map<RenderResourceHandle, TextureDesc> resource_descriptors_;
-  std::unordered_set<RenderResourceHandle> backbuffer_resources_;
   bool compiled_ = false;
 
-  auto ensure_resources(World& world) -> void {
-    auto* window = world.get_resource<Window>();
-    u32 const default_w = window ? static_cast<u32>(window->width) : 1280;
-    u32 const default_h = window ? static_cast<u32>(window->height) : 720;
+  [[nodiscard]] auto has_resource(RenderTextureHandle handle) const -> bool {
+    return handle.is_valid() && handle.id < resources_.size();
+  }
 
-    for (auto const& [name, desc] : resource_descriptors_) {
-      auto& target = runtime_.targets[name];
+  auto ensure_resources(u32 default_w, u32 default_h) -> void {
+    if (runtime_.targets.size() < resources_.size()) {
+      runtime_.targets.resize(resources_.size());
+    }
+
+    for (u32 index = 0; index < resources_.size(); ++index) {
+      auto const& resource = resources_[index];
+      if (resource.backbuffer) {
+        continue;
+      }
+
+      auto const& desc = resource.desc;
+      auto& target = runtime_.targets[index];
       u32 const w = desc.width > 0 ? desc.width : default_w;
       u32 const h = desc.height > 0 ? desc.height : default_h;
 
@@ -231,7 +278,7 @@ private:
       if (target.ready()) {
         info(
           "RenderGraph: allocated target '{}' ({}x{}) [ID {}]",
-          name,
+          resource.debug_name.empty() ? "<unnamed>" : resource.debug_name,
           w,
           h,
           target.id
@@ -242,7 +289,121 @@ private:
   }
 
   auto sort_nodes() -> void {
-    // TODO: Pelny sort topologiczny
+    struct ResourceUsage {
+      std::vector<usize> readers;
+      std::vector<usize> writers;
+    };
+
+    usize const node_count = nodes_.size();
+    std::vector<ResourceUsage> usages(resources_.size());
+    for (usize index = 0; index < node_count; ++index) {
+      for (auto const& input : nodes_[index].inputs) {
+        if (!has_resource(input)) {
+          warn("RenderGraph: pass reads invalid resource '{}'", input.id);
+          continue;
+        }
+        usages[input.id].readers.push_back(index);
+      }
+      for (auto const& output : nodes_[index].outputs) {
+        if (!has_resource(output)) {
+          warn("RenderGraph: pass writes invalid resource '{}'", output.id);
+          continue;
+        }
+        usages[output.id].writers.push_back(index);
+      }
+    }
+
+    std::vector<std::vector<usize>> edges(node_count);
+    std::vector<std::unordered_set<usize>> edge_sets(node_count);
+    std::vector<usize> indegree(node_count, 0);
+
+    auto add_edge = [&](usize from, usize to) -> void {
+      if (from == to) {
+        return;
+      }
+      auto [_, inserted] = edge_sets[from].insert(to);
+      if (!inserted) {
+        return;
+      }
+      edges[from].push_back(to);
+      ++indegree[to];
+    };
+
+    for (auto const& usage : usages) {
+      for (usize writer_index = 1; writer_index < usage.writers.size();
+           ++writer_index) {
+        add_edge(usage.writers[writer_index - 1], usage.writers[writer_index]);
+      }
+
+      for (usize reader : usage.readers) {
+        usize previous_writer = USIZE_MAX;
+        usize next_writer = USIZE_MAX;
+
+        for (usize writer : usage.writers) {
+          if (writer < reader) {
+            previous_writer = writer;
+            continue;
+          }
+          if (writer > reader) {
+            next_writer = writer;
+            break;
+          }
+        }
+
+        if (previous_writer != USIZE_MAX) {
+          add_edge(previous_writer, reader);
+          if (next_writer != USIZE_MAX) {
+            add_edge(reader, next_writer);
+          }
+        } else if (next_writer != USIZE_MAX) {
+          add_edge(next_writer, reader);
+        }
+      }
+    }
+
+    std::vector<usize> sorted_indices;
+    sorted_indices.reserve(node_count);
+    std::vector<bool> emitted(node_count, false);
+
+    for (usize emitted_count = 0; emitted_count < node_count;) {
+      usize selected = USIZE_MAX;
+      for (usize index = 0; index < node_count; ++index) {
+        if (!emitted[index] && indegree[index] == 0) {
+          selected = index;
+          break;
+        }
+      }
+
+      if (selected == USIZE_MAX) {
+        warn(
+          "RenderGraph: dependency cycle detected; preserving remaining pass "
+          "order"
+        );
+        for (usize index = 0; index < node_count; ++index) {
+          if (!emitted[index]) {
+            sorted_indices.push_back(index);
+            emitted[index] = true;
+            ++emitted_count;
+          }
+        }
+        break;
+      }
+
+      sorted_indices.push_back(selected);
+      emitted[selected] = true;
+      ++emitted_count;
+
+      for (usize dependent : edges[selected]) {
+        --indegree[dependent];
+      }
+    }
+
+    std::vector<PassNode> sorted_nodes;
+    sorted_nodes.reserve(node_count);
+    for (usize index : sorted_indices) {
+      sorted_nodes.push_back(std::move(nodes_[index]));
+    }
+    nodes_ = std::move(sorted_nodes);
   }
 };
 

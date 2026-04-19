@@ -69,6 +69,67 @@ static constexpr auto CLUSTER_RECORD_SIZE = 48;
 static_assert(sizeof(GpuPointLight) == POINT_LIGHT_SIZE);
 static_assert(sizeof(ClusterGpuRecord) == CLUSTER_RECORD_SIZE);
 
+class ComputeProgram {
+public:
+  ComputeProgram() = default;
+  ComputeProgram(ComputeProgram const&) = delete;
+  auto operator=(ComputeProgram const&) -> ComputeProgram& = delete;
+
+  ComputeProgram(ComputeProgram&& other) noexcept
+      : id_(std::exchange(other.id_, 0)) {}
+  auto operator=(ComputeProgram&& other) noexcept -> ComputeProgram& {
+    if (this == &other) {
+      return *this;
+    }
+
+    reset();
+    id_ = std::exchange(other.id_, 0);
+    return *this;
+  }
+
+  ~ComputeProgram() { reset(); }
+
+  [[nodiscard]] auto ready() const -> bool { return id_ != 0; }
+  [[nodiscard]] auto id() const -> u32 { return id_; }
+
+  auto reset() -> void {
+    if (id_ != 0) {
+      rl::rlUnloadShaderProgram(id_);
+      id_ = 0;
+    }
+  }
+
+  auto load(char const* path) -> bool {
+    reset();
+
+    char* source = rl::LoadFileText(path);
+    if (source == nullptr) {
+      warn("Forward+: failed to load compute shader '{}'", path);
+      return false;
+    }
+
+    u32 const shader_id = rl::rlCompileShader(source, RL_COMPUTE_SHADER);
+    rl::UnloadFileText(source);
+    if (shader_id == 0) {
+      warn("Forward+: failed to compile compute shader '{}'", path);
+      return false;
+    }
+
+    id_ = rl::rlLoadComputeShaderProgram(shader_id);
+    glDeleteShader(shader_id);
+
+    if (id_ == 0) {
+      warn("Forward+: failed to link compute shader '{}'", path);
+      return false;
+    }
+
+    return true;
+  }
+
+private:
+  u32 id_ = 0;
+};
+
 struct ClusterConfigSnapshot {
   i32 tile_count_x = 0;
   i32 tile_count_y = 0;
@@ -208,10 +269,10 @@ struct ClusteredLightingState {
   SSBO cluster_buffer{};
   SSBO light_index_buffer{};
   SSBO overflow_buffer{};
+  ComputeProgram cluster_build_program{};
 
   std::vector<GpuPointLight> point_lights_cpu;
   std::vector<ClusterGpuRecord> clusters_cpu;
-  std::vector<u32> light_indices_cpu;
 
   math::Mat4 last_proj = math::Mat4::IDENTITY;
   ClusterConfigSnapshot last_config{};
@@ -223,6 +284,7 @@ struct ClusteredLightingState {
   u32 point_light_buffer_bytes = 0;
   u32 cluster_buffer_bytes = 0;
   u32 light_index_buffer_bytes = 0;
+  bool cluster_build_program_failed = false;
 
 public:
   ClusteredLightingState() = default;
@@ -268,6 +330,19 @@ public:
     }
   }
 
+  [[nodiscard]] auto ensure_compute_program() -> bool {
+    if (cluster_build_program.ready()) {
+      return true;
+    }
+    if (cluster_build_program_failed) {
+      return false;
+    }
+
+    cluster_build_program_failed =
+      !cluster_build_program.load("res/shaders/cluster_build.comp");
+    return !cluster_build_program_failed;
+  }
+
   auto build_cluster_buffers(
     ecs::NonSendMarker marker,
     ecs::ExtractedView const& view,
@@ -275,7 +350,6 @@ public:
     ClusterConfig const& config
   ) -> void {
     (void) marker;
-    static u32 last_reported_overflow = U32_MAX;
 
     ensure_buffers(config);
 
@@ -307,9 +381,6 @@ public:
       clusters_cpu.clear();
       clusters_cpu.resize(config.cluster_count());
     }
-
-    light_indices_cpu.clear();
-    light_indices_cpu.resize(config.max_light_indices(), 0);
 
     usize const point_light_count = std::min(
       lights.point_lights.size(), static_cast<usize>(config.max_point_lights)
@@ -373,46 +444,6 @@ public:
 
     u32 overflow_count = 0;
 
-    for (u32 light_index = 0;
-         light_index < static_cast<u32>(point_lights_cpu.size());
-         ++light_index) {
-      auto const& light = point_lights_cpu[light_index];
-      math::Vec3 const view_position_math =
-        view.camera_view.view *
-        math::Vec3(
-          light.position_range.x, light.position_range.y, light.position_range.z
-        );
-      auto const view_position = math::to_rl(view_position_math);
-
-      for (auto& cluster : clusters_cpu) {
-        f32 const closest_x = std::clamp(
-          view_position.x, cluster.min_bounds.x, cluster.max_bounds.x
-        );
-        f32 const closest_y = std::clamp(
-          view_position.y, cluster.min_bounds.y, cluster.max_bounds.y
-        );
-        f32 const closest_z = std::clamp(
-          view_position.z, cluster.min_bounds.z, cluster.max_bounds.z
-        );
-        f32 const dx = view_position.x - closest_x;
-        f32 const dy = view_position.y - closest_y;
-        f32 const dz = view_position.z - closest_z;
-        if ((dx * dx) + (dy * dy) + dz * dz >
-            light.position_range.w * light.position_range.w) {
-          continue;
-        }
-
-        if (cluster.meta[1] >= config.max_lights_per_cluster_clamped()) {
-          ++overflow_count;
-          continue;
-        }
-
-        u32 const offset = cluster.meta[0] + cluster.meta[1];
-        light_indices_cpu[offset] = light_index;
-        ++cluster.meta[1];
-      }
-    }
-
     if (!point_lights_cpu.empty()) {
       point_light_buffer.update(
         point_lights_cpu.data(),
@@ -427,23 +458,10 @@ public:
       0
     );
 
-    light_index_buffer.update(
-      light_indices_cpu.data(),
-      static_cast<u32>(light_indices_cpu.size() * sizeof(u32)),
-      0
-    );
-
     overflow_buffer.update(&overflow_count, sizeof(overflow_count), 0);
 
-    if (overflow_count > 0) {
-      if (last_reported_overflow != overflow_count) {
-        warn(
-          "Forward+: cluster light list overflowed {} writes", overflow_count
-        );
-        last_reported_overflow = overflow_count;
-      }
-    } else {
-      last_reported_overflow = U32_MAX;
+    if (!point_lights_cpu.empty() && ensure_compute_program()) {
+      dispatch_cluster_build(view, config);
     }
   }
 
@@ -460,6 +478,51 @@ public:
     if (overflow_buffer.ready()) {
       overflow_buffer.bind(3);
     }
+  }
+
+private:
+  auto dispatch_cluster_build(
+    ecs::ExtractedView const& view, ClusterConfig const& config
+  ) -> void {
+    u32 const point_light_count =
+      static_cast<u32>(point_lights_cpu.size());
+    u32 const workgroups = (point_light_count + 63U) / 64U;
+    if (workgroups == 0) {
+      return;
+    }
+
+    point_light_buffer.bind(0);
+    cluster_buffer.bind(1);
+    light_index_buffer.bind(2);
+    overflow_buffer.bind(3);
+
+    u32 const program_id = cluster_build_program.id();
+    rl::rlEnableShader(program_id);
+
+    auto set_uint = [program_id](char const* name, u32 value) -> void {
+      i32 const location = rl::rlGetLocationUniform(program_id, name);
+      if (location >= 0) {
+        rl::rlSetUniform(location, &value, SHADER_UNIFORM_UINT, 1);
+      }
+    };
+
+    set_uint("u_point_light_count", point_light_count);
+    set_uint("u_cluster_count", config.cluster_count());
+    set_uint(
+      "u_max_lights_per_cluster", config.max_lights_per_cluster_clamped()
+    );
+
+    i32 const view_location = rl::rlGetLocationUniform(program_id, "u_view");
+    if (view_location >= 0) {
+      Matrix const view_matrix = math::to_rl(view.camera_view.view);
+      rl::rlSetUniformMatrix(view_location, view_matrix);
+    }
+
+    rl::rlComputeShaderDispatch(workgroups, 1, 1);
+    glMemoryBarrier(
+      GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT
+    );
+    rl::rlDisableShader();
   }
 };
 

@@ -18,8 +18,6 @@
 
 namespace ecs {
 
-inline constexpr char const* K_MAIN_TARGET = "MainTarget";
-
 struct RenderExecutionState {
   using T = Resource;
   bool scene_active = false;
@@ -148,23 +146,29 @@ struct RenderContext {
 
 class ClearPass : public RenderPass {
 public:
+  explicit ClearPass(RenderTextureHandle main_target)
+      : main_target_(main_target) {}
+
   [[nodiscard]] auto name() const -> std::string override {
     return "ClearPass";
   }
   auto setup(RenderGraphBuilder& builder) -> void override {
-    builder.write(K_MAIN_TARGET, {});
+    builder.write(main_target_);
   }
   auto execute(RenderPassContext& ctx, RenderGraphRuntime& runtime)
     -> void override {
-    auto const* view = ctx.world.get_resource<ExtractedView>();
+    auto const* view = ctx.frame.view;
     if (view == nullptr) {
       return;
     }
-    auto const& target = runtime.get_target(K_MAIN_TARGET);
+    auto const& target = runtime.get_target(main_target_);
     target.begin();
     rl::ClearBackground(view->clear_color);
     target.end();
   }
+
+private:
+  RenderTextureHandle main_target_;
 };
 
 class ShadowPass : public RenderPass {
@@ -174,7 +178,7 @@ public:
   }
   auto setup(RenderGraphBuilder&) -> void override {}
   auto execute(RenderPassContext& ctx, RenderGraphRuntime&) -> void override {
-    auto* phase = ctx.world.get_resource<ShadowPhase>();
+    auto const* phase = ctx.frame.shadow_phase;
     if ((phase == nullptr) || phase->commands.empty()) {
       return;
     }
@@ -184,23 +188,26 @@ public:
 
 class SkyboxPass : public RenderPass {
 public:
+  explicit SkyboxPass(RenderTextureHandle main_target)
+      : main_target_(main_target) {}
+
   [[nodiscard]] auto name() const -> std::string override {
     return "SkyboxPass";
   }
   auto setup(RenderGraphBuilder& builder) -> void override {
-    builder.read(K_MAIN_TARGET);
-    builder.write(K_MAIN_TARGET, {});
+    builder.read(main_target_);
+    builder.write(main_target_);
   }
 
   auto execute(RenderPassContext& ctx, RenderGraphRuntime& runtime)
     -> void override {
-    auto const* view = ctx.world.get_resource<ExtractedView>();
+    auto const* view = ctx.frame.view;
     if ((view == nullptr) || (view->active_skybox == nullptr) ||
         !view->active_skybox->loaded) {
       return;
     }
 
-    auto const& target = runtime.get_target(K_MAIN_TARGET);
+    auto const& target = runtime.get_target(main_target_);
     target.begin();
     ctx.render_state.begin_view(ctx.render_state.view());
     auto const& active_view = ctx.render_state.view();
@@ -209,33 +216,39 @@ public:
     target.end();
     ctx.render_state.reset();
   }
+
+private:
+  RenderTextureHandle main_target_;
 };
 
 class OpaquePass : public RenderPass {
 public:
+  explicit OpaquePass(RenderTextureHandle main_target)
+      : main_target_(main_target) {}
+
   [[nodiscard]] auto name() const -> std::string override {
     return "OpaquePass";
   }
   auto setup(RenderGraphBuilder& builder) -> void override {
-    builder.write(K_MAIN_TARGET, {});
+    builder.write(main_target_);
   }
 
   auto execute(RenderPassContext& ctx, RenderGraphRuntime& runtime)
     -> void override {
-    auto* state = ctx.world.get_resource<RenderExecutionState>();
+    auto* state = ctx.frame.execution_state;
     if ((state == nullptr) || !state->world_pass_active) {
       return;
     }
 
-    auto* phase = ctx.world.get_resource<OpaquePhase>();
-    auto* mesh_assets = ctx.world.get_resource<Assets<Mesh>>();
-    auto* texture_assets = ctx.world.get_resource<Assets<Texture>>();
-    auto* shader_cache = ctx.world.get_resource<ShaderCache>();
-    auto* slot_registry = ctx.world.get_resource<SlotProviderRegistry>();
-    auto* view = ctx.world.get_resource<ExtractedView>();
-    auto* lights = ctx.world.get_resource<ExtractedLights>();
-    auto* cluster_config = ctx.world.get_resource<ClusterConfig>();
-    auto* cluster_state = ctx.world.get_resource<ClusteredLightingState>();
+    auto const* phase = ctx.frame.opaque_phase;
+    auto const* mesh_assets = ctx.frame.mesh_assets;
+    auto const* texture_assets = ctx.frame.texture_assets;
+    auto* shader_cache = ctx.frame.shader_cache;
+    auto const* slot_registry = ctx.frame.slot_registry;
+    auto const* view = ctx.frame.view;
+    auto const* lights = ctx.frame.lights;
+    auto const* cluster_config = ctx.frame.cluster_config;
+    auto const* cluster_state = ctx.frame.cluster_state;
 
     if ((phase == nullptr) || (nullptr == mesh_assets) ||
         (nullptr == texture_assets) || (shader_cache == nullptr) ||
@@ -245,7 +258,7 @@ public:
       return;
     }
 
-    auto const& target = runtime.get_target(K_MAIN_TARGET);
+    auto const& target = runtime.get_target(main_target_);
     target.begin();
     ctx.render_state.begin_view(ctx.render_state.view());
 
@@ -270,34 +283,40 @@ public:
     ctx.render_state.end_view();
     target.end();
   }
+
+private:
+  RenderTextureHandle main_target_;
 };
 
 class TransparentPass : public RenderPass {
 public:
+  explicit TransparentPass(RenderTextureHandle main_target)
+      : main_target_(main_target) {}
+
   [[nodiscard]] auto name() const -> std::string override {
     return "TransparentPass";
   }
   auto setup(RenderGraphBuilder& builder) -> void override {
-    builder.read(K_MAIN_TARGET);
-    builder.write(K_MAIN_TARGET, {});
+    builder.read(main_target_);
+    builder.write(main_target_);
   }
 
   auto execute(RenderPassContext& ctx, RenderGraphRuntime& runtime)
     -> void override {
-    auto* state = ctx.world.get_resource<RenderExecutionState>();
+    auto* state = ctx.frame.execution_state;
     if ((state == nullptr) || !state->world_pass_active) {
       return;
     }
 
-    auto* phase = ctx.world.get_resource<TransparentPhase>();
-    auto* mesh_assets = ctx.world.get_resource<Assets<Mesh>>();
-    auto* texture_assets = ctx.world.get_resource<Assets<Texture>>();
-    auto* shader_cache = ctx.world.get_resource<ShaderCache>();
-    auto* slot_registry = ctx.world.get_resource<SlotProviderRegistry>();
-    auto* view = ctx.world.get_resource<ExtractedView>();
-    auto* lights = ctx.world.get_resource<ExtractedLights>();
-    auto* cluster_config = ctx.world.get_resource<ClusterConfig>();
-    auto* cluster_state = ctx.world.get_resource<ClusteredLightingState>();
+    auto const* phase = ctx.frame.transparent_phase;
+    auto const* mesh_assets = ctx.frame.mesh_assets;
+    auto const* texture_assets = ctx.frame.texture_assets;
+    auto* shader_cache = ctx.frame.shader_cache;
+    auto const* slot_registry = ctx.frame.slot_registry;
+    auto const* view = ctx.frame.view;
+    auto const* lights = ctx.frame.lights;
+    auto const* cluster_config = ctx.frame.cluster_config;
+    auto const* cluster_state = ctx.frame.cluster_state;
 
     if ((phase == nullptr) || (nullptr == mesh_assets) ||
         (texture_assets == nullptr) || (shader_cache == nullptr) ||
@@ -307,7 +326,7 @@ public:
       return;
     }
 
-    auto const& target = runtime.get_target(K_MAIN_TARGET);
+    auto const& target = runtime.get_target(main_target_);
     target.begin();
     ctx.render_state.begin_view(ctx.render_state.view());
 
@@ -332,32 +351,38 @@ public:
     ctx.render_state.end_view();
     target.end();
   }
+
+private:
+  RenderTextureHandle main_target_;
 };
 
 class DepthPrepass : public RenderPass {
 public:
+  explicit DepthPrepass(RenderTextureHandle main_target)
+      : main_target_(main_target) {}
+
   [[nodiscard]] auto name() const -> std::string override {
     return "DepthPrepass";
   }
   auto setup(RenderGraphBuilder& builder) -> void override {
-    builder.write(K_MAIN_TARGET, {});
+    builder.write(main_target_);
   }
   auto execute(RenderPassContext& ctx, RenderGraphRuntime& runtime)
     -> void override {
-    auto* state = ctx.world.get_resource<RenderExecutionState>();
+    auto* state = ctx.frame.execution_state;
     if (!state || !state->world_pass_active) {
       return;
     }
 
-    auto* phase = ctx.world.get_resource<OpaquePhase>();
-    auto* mesh_assets = ctx.world.get_resource<Assets<Mesh>>();
-    auto* texture_assets = ctx.world.get_resource<Assets<Texture>>();
-    auto* shader_cache = ctx.world.get_resource<ShaderCache>();
-    auto* slot_registry = ctx.world.get_resource<SlotProviderRegistry>();
-    auto* view = ctx.world.get_resource<ExtractedView>();
-    auto* lights = ctx.world.get_resource<ExtractedLights>();
-    auto* cluster_config = ctx.world.get_resource<ClusterConfig>();
-    auto* cluster_state = ctx.world.get_resource<ClusteredLightingState>();
+    auto const* phase = ctx.frame.opaque_phase;
+    auto const* mesh_assets = ctx.frame.mesh_assets;
+    auto const* texture_assets = ctx.frame.texture_assets;
+    auto* shader_cache = ctx.frame.shader_cache;
+    auto const* slot_registry = ctx.frame.slot_registry;
+    auto const* view = ctx.frame.view;
+    auto const* lights = ctx.frame.lights;
+    auto const* cluster_config = ctx.frame.cluster_config;
+    auto const* cluster_state = ctx.frame.cluster_state;
 
     if (!phase || !mesh_assets || !texture_assets || !shader_cache ||
         !slot_registry || !view || !lights || !cluster_config ||
@@ -365,7 +390,7 @@ public:
       return;
     }
 
-    auto const& target = runtime.get_target(K_MAIN_TARGET);
+    auto const& target = runtime.get_target(main_target_);
     target.begin();
     ctx.render_state.begin_view(ctx.render_state.view());
 
@@ -397,6 +422,8 @@ private:
       ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth.frag");
     return SPEC;
   }
+
+  RenderTextureHandle main_target_;
 };
 
 class ClusterBuildPass : public RenderPass {
@@ -404,15 +431,15 @@ public:
   auto name() const -> std::string override { return "ClusterBuildPass"; }
   auto setup(RenderGraphBuilder&) -> void override {}
   auto execute(RenderPassContext& ctx, RenderGraphRuntime&) -> void override {
-    auto* state = ctx.world.get_resource<RenderExecutionState>();
+    auto* state = ctx.frame.execution_state;
     if (!state || !state->world_pass_active) {
       return;
     }
 
-    auto* view = ctx.world.get_resource<ExtractedView>();
-    auto* lights = ctx.world.get_resource<ExtractedLights>();
-    auto* cluster_config = ctx.world.get_resource<ClusterConfig>();
-    auto* cluster_state = ctx.world.get_resource<ClusteredLightingState>();
+    auto const* view = ctx.frame.view;
+    auto const* lights = ctx.frame.lights;
+    auto const* cluster_config = ctx.frame.cluster_config;
+    auto* cluster_state = ctx.frame.cluster_state;
 
     if (!view || !lights || !cluster_config || !cluster_state) {
       return;
@@ -500,10 +527,44 @@ struct FramePass {
   static auto execute_graph(
     ResMut<RenderGraph> graph,
     ResMut<gl::RenderState> render_state,
-    World& world,
+    ResMut<RenderExecutionState> state,
+    Res<Window> window,
+    Res<ShadowPhase> shadow_phase,
+    Res<OpaquePhase> opaque_phase,
+    Res<TransparentPhase> transparent_phase,
+    Res<UiPhase> ui_phase,
+    Res<Assets<Mesh>> mesh_assets,
+    Res<Assets<Texture>> texture_assets,
+    ResMut<ShaderCache> shader_cache,
+    Res<SlotProviderRegistry> slot_registry,
+    Res<ExtractedView> view,
+    Res<ExtractedLights> lights,
+    Res<ClusterConfig> cluster_config,
+    ResMut<ClusteredLightingState> cluster_state,
+    Res<Time> time,
     NonSendMarker marker
   ) -> void {
-    graph->execute(world, *render_state, marker);
+    RenderFrameContext frame{
+      .marker = marker,
+      .render_state = *render_state,
+      .framebuffer_width = static_cast<u32>(window->width),
+      .framebuffer_height = static_cast<u32>(window->height),
+      .execution_state = state.ptr,
+      .shadow_phase = shadow_phase.ptr,
+      .opaque_phase = opaque_phase.ptr,
+      .transparent_phase = transparent_phase.ptr,
+      .ui_phase = ui_phase.ptr,
+      .mesh_assets = mesh_assets.ptr,
+      .texture_assets = texture_assets.ptr,
+      .shader_cache = shader_cache.ptr,
+      .slot_registry = slot_registry.ptr,
+      .view = view.ptr,
+      .lights = lights.ptr,
+      .cluster_config = cluster_config.ptr,
+      .cluster_state = cluster_state.ptr,
+      .time = time.ptr,
+    };
+    graph->execute(frame);
   }
 
   static auto end(
@@ -538,19 +599,24 @@ struct FramePass {
 
 class PostProcessPassNode : public RenderPass {
 public:
+  PostProcessPassNode(
+    RenderTextureHandle main_target, RenderTextureHandle screen
+  )
+      : main_target_(main_target), screen_(screen) {}
+
   [[nodiscard]] auto name() const -> std::string override {
     return "PostProcessPass";
   }
   auto setup(RenderGraphBuilder& builder) -> void override {
-    builder.read(K_MAIN_TARGET);
-    builder.write_backbuffer("Screen");
+    builder.read(main_target_);
+    builder.write(screen_);
   }
   auto execute(RenderPassContext& ctx, RenderGraphRuntime& runtime)
     -> void override {
-    auto* state = ctx.world.get_resource<RenderExecutionState>();
-    auto* shader_cache = ctx.world.get_resource<ShaderCache>();
-    auto* view = ctx.world.get_resource<ExtractedView>();
-    auto* time = ctx.world.get_resource<Time>();
+    auto* state = ctx.frame.execution_state;
+    auto* shader_cache = ctx.frame.shader_cache;
+    auto const* view = ctx.frame.view;
+    auto const* time = ctx.frame.time;
 
     if (!state || !shader_cache || !view || !time) {
       return;
@@ -571,7 +637,7 @@ public:
       return;
     }
 
-    auto const& main_color = runtime.get_texture(K_MAIN_TARGET);
+    auto const& main_color = runtime.get_texture(main_target_);
     if (!main_color.ready()) {
       return;
     }
@@ -633,6 +699,9 @@ private:
       draw_world_target_to_screen(source_texture, view);
     });
   }
+
+  RenderTextureHandle main_target_;
+  RenderTextureHandle screen_;
 };
 
 struct PostProcessPass {
@@ -652,15 +721,18 @@ struct PostProcessPass {
 
 class UiPass : public RenderPass {
 public:
+  UiPass(RenderTextureHandle main_target, RenderTextureHandle screen)
+      : main_target_(main_target), screen_(screen) {}
+
   [[nodiscard]] auto name() const -> std::string override { return "UiPass"; }
   auto setup(RenderGraphBuilder& builder) -> void override {
-    builder.read(K_MAIN_TARGET); // UI draws on top of everything
-    builder.write_backbuffer("Screen");
+    builder.read(main_target_); // UI draws on top of everything
+    builder.write(screen_);
   }
   auto execute(RenderPassContext& ctx, RenderGraphRuntime&) -> void override {
-    auto* phase = ctx.world.get_resource<UiPhase>();
-    auto* texture_assets = ctx.world.get_resource<Assets<Texture>>();
-    auto* state = ctx.world.get_resource<RenderExecutionState>();
+    auto const* phase = ctx.frame.ui_phase;
+    auto const* texture_assets = ctx.frame.texture_assets;
+    auto* state = ctx.frame.execution_state;
 
     if (!phase || !texture_assets || !state) {
       return;
@@ -717,6 +789,9 @@ private:
     return std::atan2(siny_cosp, cosy_cosp) *
            (180.0F / std::numbers::pi_v<float>);
   }
+
+  RenderTextureHandle main_target_;
+  RenderTextureHandle screen_;
 };
 
 } // namespace ecs

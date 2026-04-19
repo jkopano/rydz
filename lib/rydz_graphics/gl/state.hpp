@@ -222,7 +222,7 @@ public:
       return;
     }
     flush_batch();
-    rl::rlEnableShader(id);
+    rl::rlSetShader(id, shader.raw().locs);
     shader_id_ = id;
   }
 
@@ -231,7 +231,7 @@ public:
       return;
     }
     flush_batch();
-    rl::rlDisableShader();
+    rl::rlSetShader(rl::rlGetShaderIdDefault(), rl::rlGetShaderLocsDefault());
     shader_id_ = 0;
   }
 
@@ -296,12 +296,12 @@ public:
   auto flush_batch() const -> void { rl::rlDrawRenderBatchActive(); }
 
   auto reset() -> void {
+    clear_shader();
     depth_.reset();
     blend_.reset();
     cull_.reset();
     polygon_.reset();
     color_mask_.reset();
-    shader_id_ = 0;
   }
 
 private:
