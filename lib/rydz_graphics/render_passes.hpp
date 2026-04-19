@@ -17,6 +17,20 @@
 
 namespace ecs {
 
+struct PreparedMaterialCache {
+  using T = Resource;
+
+  struct Entry {
+    PreparedMaterial prepared;
+    size_t compiled_hash = 0;
+  };
+
+  std::unordered_map<RenderMaterialKey, std::unordered_map<ShaderSpec, Entry>>
+    entries;
+
+  void clear() { entries.clear(); }
+};
+
 struct RenderExecutionState {
   using T = Resource;
   bool scene_active = false;
@@ -47,6 +61,117 @@ struct FramePass {
   ) -> void;
 };
 
+struct RenderContext {
+  NonSendMarker marker;
+  gl::RenderState& render_state;
+  Assets<Mesh> const& mesh_assets;
+  Assets<Texture> const& texture_assets;
+  ShaderCache& shader_cache;
+  SlotProviderRegistry const& slot_registry;
+  ExtractedView const& view;
+  ExtractedLights const& lights;
+  ClusterConfig const& cluster_config;
+  ClusteredLightingState const& cluster_state;
+
+  RenderConfig pass_config{};
+  ShaderProgram* last_shader = nullptr;
+  CompiledMaterial const* last_material = nullptr;
+  PreparedMaterial last_prepared{};
+  RenderSlotContext render_slot_ctx;
+
+  RenderContext(
+    NonSendMarker marker,
+    gl::RenderState& render_state,
+    Assets<Mesh> const& mesh_assets,
+    Assets<Texture> const& texture_assets,
+    ShaderCache& shader_cache,
+    SlotProviderRegistry const& slot_registry,
+    ExtractedView const& view,
+    ExtractedLights const& lights,
+    ClusterConfig const& cluster_config,
+    ClusteredLightingState const& cluster_state
+  ) : marker(marker),
+      render_state(render_state),
+      mesh_assets(mesh_assets),
+      texture_assets(texture_assets),
+      shader_cache(shader_cache),
+      slot_registry(slot_registry),
+      view(view),
+      lights(lights),
+      cluster_config(cluster_config),
+      cluster_state(cluster_state),
+      render_slot_ctx{
+        &view, &lights, &cluster_config, &cluster_state, true
+      } {}
+
+  auto begin_pass(RenderConfig const& config) -> void {
+    pass_config = config;
+    last_shader = nullptr;
+    last_material = nullptr;
+    last_prepared = {};
+  }
+
+  template <typename BatchT>
+  auto draw_batch(BatchT const& batch, ShaderSpec const& shader_spec) -> void {
+    auto const* mesh = mesh_assets.get(batch.key.mesh);
+    if (!mesh) {
+      return;
+    }
+
+    pass_config.cull = batch.material.cull_state();
+    render_state.apply(pass_config);
+
+    ShaderProgram& shader = resolve_shader(marker, shader_cache, shader_spec);
+    bool shader_changed = (last_shader != &shader);
+
+    if (shader_changed) {
+      last_shader = &shader;
+      apply_slot_uniforms_per_view(
+        slot_registry, render_slot_ctx, batch.material, shader
+      );
+    }
+
+    bool material_changed = shader_changed || last_material == nullptr ||
+                            (*last_material != batch.material);
+    if (material_changed) {
+      last_material = &batch.material;
+
+      SlotPrepareContext prepare_ctx{
+        .texture_assets = &texture_assets,
+        .instanced = true,
+      };
+
+      prepare_material(
+        marker,
+        batch.material,
+        texture_assets,
+        shader_cache,
+        slot_registry,
+        prepare_ctx,
+        shader_spec,
+        last_prepared
+      );
+
+      batch.material.apply(shader);
+
+      apply_slot_uniforms_per_material(
+        slot_registry, render_slot_ctx, batch.material, last_prepared, shader
+      );
+    }
+
+    ecs::draw_batch(shader, *mesh, last_prepared.material, batch);
+  }
+
+  template <typename BatchT>
+  auto draw_batch(BatchT const& batch) -> void {
+    draw_batch(batch, batch.material.shader);
+  }
+
+  auto end_pass(RenderConfig const& config = RenderConfig{}) -> void {
+    render_state.apply(config);
+  }
+};
+
 struct WorldPass {
   static auto shadow(
     Res<RenderExecutionState>,
@@ -73,32 +198,16 @@ struct WorldPass {
       return;
     }
 
-    RenderConfig const config = RenderConfig::depth_prepass();
-    ShaderProgram* last_shader = nullptr;
-    CompiledMaterial const* last_material = nullptr;
-    PreparedMaterial last_prepared{};
-    
+    RenderContext ctx{
+      marker, *render_state, *mesh_assets, *texture_assets, *shader_cache,
+      *slot_registry, *view, *lights, *cluster_config, *cluster_state
+    };
+
+    ctx.begin_pass(RenderConfig::depth_prepass());
     for (auto const& batch : phase->batches) {
-      draw_batch_common(
-        marker,
-        *render_state,
-        config,
-        batch,
-        *mesh_assets,
-        *texture_assets,
-        *shader_cache,
-        *slot_registry,
-        *view,
-        *lights,
-        *cluster_config,
-        *cluster_state,
-        depth_prepass_shader_spec(),
-        last_shader,
-        last_material,
-        last_prepared
-      );
+      ctx.draw_batch(batch, depth_prepass_shader_spec());
     }
-    render_state->apply(RenderConfig::post_depth_prepass());
+    ctx.end_pass(RenderConfig::post_depth_prepass());
   }
 
   static auto cluster_build(
@@ -136,32 +245,16 @@ struct WorldPass {
       return;
     }
 
-    RenderConfig const config = RenderConfig::opaque();
-    ShaderProgram* last_shader = nullptr;
-    CompiledMaterial const* last_material = nullptr;
-    PreparedMaterial last_prepared{};
-    
+    RenderContext ctx{
+      marker, *render_state, *mesh_assets, *texture_assets, *shader_cache,
+      *slot_registry, *view, *lights, *cluster_config, *cluster_state
+    };
+
+    ctx.begin_pass(RenderConfig::opaque());
     for (auto const& batch : phase->batches) {
-      draw_batch_common(
-        marker,
-        *render_state,
-        config,
-        batch,
-        *mesh_assets,
-        *texture_assets,
-        *shader_cache,
-        *slot_registry,
-        *view,
-        *lights,
-        *cluster_config,
-        *cluster_state,
-        batch.material.shader,
-        last_shader,
-        last_material,
-        last_prepared
-      );
+      ctx.draw_batch(batch);
     }
-    render_state->apply(RenderConfig{});
+    ctx.end_pass();
   }
 
   static void transparent(
@@ -182,32 +275,16 @@ struct WorldPass {
       return;
     }
 
-    RenderConfig const config = RenderConfig::transparent();
-    ShaderProgram* last_shader = nullptr;
-    CompiledMaterial const* last_material = nullptr;
-    PreparedMaterial last_prepared{};
-    
+    RenderContext ctx{
+      marker, *render_state, *mesh_assets, *texture_assets, *shader_cache,
+      *slot_registry, *view, *lights, *cluster_config, *cluster_state
+    };
+
+    ctx.begin_pass(RenderConfig::transparent());
     for (auto const& batch : phase->batches) {
-      draw_batch_common(
-        marker,
-        *render_state,
-        config,
-        batch,
-        *mesh_assets,
-        *texture_assets,
-        *shader_cache,
-        *slot_registry,
-        *view,
-        *lights,
-        *cluster_config,
-        *cluster_state,
-        batch.material.shader,
-        last_shader,
-        last_material,
-        last_prepared
-      );
+      ctx.draw_batch(batch);
     }
-    render_state->apply(RenderConfig{});
+    ctx.end_pass();
   }
 
   static auto begin(
@@ -249,79 +326,6 @@ private:
     static ShaderSpec const SPEC =
       ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth.frag");
     return SPEC;
-  }
-
-  template <typename BatchT>
-  static auto draw_batch_common(
-    NonSendMarker marker,
-    gl::RenderState& render_state,
-    RenderConfig pass_config,
-    BatchT const& batch,
-    Assets<Mesh> const& mesh_assets,
-    Assets<Texture> const& texture_assets,
-    ShaderCache& shader_cache,
-    SlotProviderRegistry const& slot_registry,
-    ExtractedView const& view,
-    ExtractedLights const& lights,
-    ClusterConfig const& cluster_config,
-    ClusteredLightingState const& cluster_state,
-    ShaderSpec const& shader_spec,
-    ShaderProgram*& last_shader,
-    CompiledMaterial const*& last_material,
-    PreparedMaterial& prepared
-  ) -> void {
-    auto const* mesh = mesh_assets.get(batch.key.mesh);
-    if (!mesh) {
-      return;
-    }
-
-    pass_config.cull = batch.material.cull_state();
-    render_state.apply(pass_config);
-
-    ShaderProgram& shader = resolve_shader(marker, shader_cache, shader_spec);
-    bool shader_changed = (last_shader != &shader);
-    
-    RenderSlotContext render_ctx{
-      .view_data = &view,
-      .lights_data = &lights,
-      .cluster_config_data = &cluster_config,
-      .cluster_state_data = &cluster_state,
-      .instanced = true,
-    };
-
-    if (shader_changed) {
-      last_shader = &shader;
-      apply_slot_uniforms_per_view(slot_registry, render_ctx, batch.material, shader);
-    }
-
-    bool material_changed = shader_changed || last_material == nullptr || (*last_material != batch.material);
-    if (material_changed) {
-      last_material = &batch.material;
-
-      SlotPrepareContext prepare_ctx{
-        .texture_assets = &texture_assets,
-        .instanced = true,
-      };
-      
-      prepare_material(
-        marker,
-        batch.material,
-        texture_assets,
-        shader_cache,
-        slot_registry,
-        prepare_ctx,
-        shader_spec,
-        prepared
-      );
-
-      batch.material.apply(shader);
-
-      apply_slot_uniforms_per_material(
-        slot_registry, render_ctx, batch.material, prepared, shader
-      );
-    }
-
-    draw_batch(shader, *mesh, prepared.material, batch);
   }
 };
 

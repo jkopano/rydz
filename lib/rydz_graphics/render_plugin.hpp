@@ -8,6 +8,7 @@
 #include "render_phase.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/assets/loaders.hpp"
 #include "rydz_graphics/assets/scene_runtime.hpp"
 
@@ -69,6 +70,7 @@ struct RenderPlugin {
       .init_resource<OpaquePhase>()
       .init_resource<TransparentPhase>()
       .init_resource<UiPhase>()
+      .init_resource<PreparedMaterialCache>()
       .init_resource<RenderExecutionState>();
 
     if (auto* server = app.world().get_resource<AssetServer>()) {
