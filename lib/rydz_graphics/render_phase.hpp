@@ -9,21 +9,6 @@
 
 namespace ecs {
 
-namespace detail {
-inline auto prepare_mesh(Handle<Mesh> const& handle, Assets<Mesh>& mesh_assets)
-  -> bool {
-  auto* mesh = mesh_assets.get(handle);
-  if ((mesh == nullptr) || mesh->vertex_count() <= 0 ||
-      mesh->vertex_data() == nullptr) {
-    return false;
-  }
-  if (!mesh->uploaded()) {
-    mesh->upload(false);
-  }
-  return true;
-}
-} // namespace detail
-
 struct ShadowPhase {
   using T = Resource;
 
@@ -229,28 +214,6 @@ struct UiPhase {
         return lhs.layer < rhs.layer;
       }
     );
-  }
-};
-
-struct Prepare {
-  template <typename P> static void build_batches(ResMut<P> phase) {
-    phase->build_batches();
-  };
-
-  static auto prepare_meshes(
-    Res<ExtractedMeshes> extracted,
-    ResMut<Assets<Mesh>> mesh_assets,
-    NonSendMarker
-  ) -> void {
-    std::unordered_set<u32> seen;
-
-    for (auto const& item : extracted->items) {
-      if (!seen.insert(item.mesh.id).second) {
-        continue;
-      }
-
-      detail::prepare_mesh(item.mesh, *mesh_assets);
-    }
   }
 };
 

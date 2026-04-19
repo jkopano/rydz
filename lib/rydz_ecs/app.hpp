@@ -372,6 +372,19 @@ public:
     apply_commands();
     schedules_.run(ScheduleLabel::PostUpdate, world_);
     apply_commands();
+
+    // Fixed-timestep loop: accumulate delta, run FixedUpdate N times
+    if (auto* fixed = world_.get_resource<FixedTime>()) {
+      fixed->accumulator += delta_seconds;
+      f32 const step = fixed->step();
+      while (fixed->accumulator >= step) {
+        fixed->accumulator -= step;
+        schedules_.run(ScheduleLabel::FixedUpdate, world_);
+        apply_commands();
+      }
+      fixed->overstep = fixed->accumulator / step;
+    }
+
     schedules_.run(ScheduleLabel::ExtractRender, world_);
     apply_commands();
     schedules_.run(ScheduleLabel::Render, world_);

@@ -13,8 +13,12 @@ if is_plat("windows") then
 	set_toolchains("clang-cl")
 elseif is_plat("linux") then
 	set_toolchains("clang")
-	add_cxflags("-stdlib=libc++")
-	add_ldflags("-stdlib=libc++")
+	if os.getenv("NIX_PATH") then
+		add_ldflags("-fuse-ld=mold", { force = true })
+	else
+		add_cxflags("-stdlib=libc++")
+		add_ldflags("-stdlib=libc++")
+	end
 end
 
 -- helpers
@@ -188,6 +192,7 @@ local examples = {
 	"10_custom_material",
 	"11_sets",
 	"12_observers",
+	"13_physics",
 }
 
 for _, name in ipairs(examples) do
