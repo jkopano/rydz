@@ -1,3 +1,5 @@
+//Definiuje funkcjê rejestruj¹c¹ gobalne API silnika w VM Lua oraz strukturê LuaResource ktora jest zasobem ECS opakowuj¹cym VM Lua
+
 #pragma once
 
 extern "C" {
@@ -14,6 +16,7 @@ extern "C" {
 
 namespace scripting {
 
+	//Rejestracja metatabeli w globalnym rejestrze Lua, tworzenie globalnej tabeli Rydz oraz globalnej tablicy z polami etykiet harmonogramów
 	inline void register_rydz_api(lua_State* L) {
 		register_world_metatable(L);
 
@@ -26,6 +29,7 @@ namespace scripting {
 		lua_setglobal(L, "Schedule");
 	}
 
+	//Zasób przechowuj¹cy maszynê wirtualn¹ Lua
 	struct LuaResource {
 
 		using T = ecs::Resource;
@@ -51,7 +55,7 @@ namespace scripting {
 
 		LuaResource() = default;
 
-		//init - stworzenie vm, otwarcie bibliotek
+		//init - stworzenie vm, otwarcie bibliotek i rejestracja api silnika
 		void init() {
 			L = luaL_newstate();
 			luaL_openlibs(L);
