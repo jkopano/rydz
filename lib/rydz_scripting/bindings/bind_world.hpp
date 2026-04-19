@@ -9,6 +9,8 @@ extern "C" {
 
 #include <rydz_ecs/world.hpp>
 #include "bind_entity.hpp"
+#include "rydz_scripting/lua_component.hpp"
+#include "rydz_scripting/lua_resource.hpp"
 
 namespace scripting {
 
@@ -75,7 +77,72 @@ namespace scripting {
 		lua_pushcfunction(L, lua_world_is_alive);
 		lua_setfield(L, -2, "is_alive");
 
-		//W przyszlosci kolejne ...
+		//world:get_lua_component(entity)
+		lua_pushcfunction(L, [](lua_State* L) -> int {
+			ecs::World* world = check_world(L, 1);
+			ecs::Entity e = check_entity(L, 2);
+
+			auto* comp = world->get_component<scripting::LuaComponent>(e);
+			if (!comp) {
+				lua_pushnil(L);
+				return 1;
+			}
+			comp->push(L);
+			return 1;
+		});
+		lua_setfield(L, -2, "get_lua_component");
+
+		//world:set_lua_component(entity, table)
+		lua_pushcfunction(L, [](lua_State* L) -> int {
+			ecs::World* world = check_world(L, 1);
+			ecs::Entity e = check_entity(L, 2);
+			luaL_checktype(L, 3, LUA_TTABLE);
+
+			lua_pushvalue(L, 3);
+			int new_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+			auto* comp = world->get_component<scripting::LuaComponent>(e);
+			if (comp) {
+				comp->release(L);
+				comp->table_ref = new_ref;
+			}
+			else {
+				world->insert_component(e, scripting::LuaComponent{ new_ref });
+			}
+			return 0;
+			});
+		lua_setfield(L, -2, "set_lua_component");
+
+		// world:each_lua()
+		lua_pushcfunction(L, [](lua_State* L) -> int {
+			ecs::World* world = check_world(L, 1);
+
+			auto* storage = world->get_storage<scripting::LuaComponent>();
+
+			lua_newtable(L); 
+			if (storage) {
+				int i = 1;
+				for (const ecs::Entity& e : storage->entities()) {
+					push_entity(L, e);
+					lua_rawseti(L, -2, i++);
+				}
+			}
+			lua_pushinteger(L, 0); 
+
+			lua_pushcclosure(L, [](lua_State* L) -> int {
+				lua_Integer idx = lua_tointeger(L, lua_upvalueindex(2)) + 1;
+				lua_rawgeti(L, lua_upvalueindex(1), (int)idx);
+				if (lua_isnil(L, -1)) {
+					return 1; 
+				}
+				lua_pushinteger(L, idx);
+				lua_replace(L, lua_upvalueindex(2)); 
+				return 1;
+				}, 2);
+
+			return 1;
+			});
+		lua_setfield(L, -2, "each_lua");
 
 		lua_setfield(L, -2, "__index");
 
