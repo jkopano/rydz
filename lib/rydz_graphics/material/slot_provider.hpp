@@ -70,11 +70,16 @@ struct SlotProvider {
     prepare;
   std::function<void(
     RenderSlotContext const&,
+    ShaderProgram&
+  )>
+    apply_per_view;
+  std::function<void(
+    RenderSlotContext const&,
     CompiledMaterial const&,
     PreparedMaterial const&,
     ShaderProgram&
   )>
-    apply;
+    apply_per_material;
 };
 
 struct SlotProviderRegistry {

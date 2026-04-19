@@ -198,7 +198,21 @@ inline auto prepare_material(
   return shader;
 }
 
-inline auto apply_slot_uniforms(
+inline auto apply_slot_uniforms_per_view(
+  SlotProviderRegistry const& slot_registry,
+  RenderSlotContext const& render_ctx,
+  CompiledMaterial const& material,
+  ShaderProgram& shader
+) -> void {
+  for (auto const& slot : material.slots) {
+    auto const& provider = lookup_slot_provider(slot_registry, slot, material);
+    if (provider.apply_per_view) {
+      provider.apply_per_view(render_ctx, shader);
+    }
+  }
+}
+
+inline auto apply_slot_uniforms_per_material(
   SlotProviderRegistry const& slot_registry,
   RenderSlotContext const& render_ctx,
   CompiledMaterial const& material,
@@ -207,20 +221,18 @@ inline auto apply_slot_uniforms(
 ) -> void {
   for (auto const& slot : material.slots) {
     auto const& provider = lookup_slot_provider(slot_registry, slot, material);
-    if (provider.apply) {
-      provider.apply(render_ctx, material, prepared, shader);
+    if (provider.apply_per_material) {
+      provider.apply_per_material(render_ctx, material, prepared, shader);
     }
   }
 }
 
 inline auto HasCamera::slot_provider() -> SlotProvider {
   SlotProvider provider;
-  provider.apply = [](
-                     RenderSlotContext const& ctx,
-                     CompiledMaterial const&,
-                     PreparedMaterial const&,
-                     ShaderProgram& shader
-                   ) -> void {
+  provider.apply_per_view = [](
+                              RenderSlotContext const& ctx,
+                              ShaderProgram& shader
+                            ) -> void {
     shader.set(CameraUniform::Position, ctx.view().camera_view.position);
     shader.set(CameraUniform::ViewMatrix, ctx.view().camera_view.view);
     shader.set(CameraUniform::ProjectionMatrix, ctx.view().camera_view.proj);
@@ -230,12 +242,10 @@ inline auto HasCamera::slot_provider() -> SlotProvider {
 
 inline auto HasTime::slot_provider() -> SlotProvider {
   SlotProvider provider;
-  provider.apply = [](
-                     RenderSlotContext const& ctx,
-                     CompiledMaterial const&,
-                     PreparedMaterial const&,
-                     ShaderProgram& shader
-                   ) -> void {
+  provider.apply_per_view = [](
+                              RenderSlotContext const& ctx,
+                              ShaderProgram& shader
+                            ) -> void {
     shader.set("u_time", ctx.view().camera_view.position);
   };
   return provider;
@@ -252,12 +262,10 @@ inline auto HasPBR::slot_provider() -> SlotProvider {
     apply_pbr_defaults(prepared.material);
     apply_pbr_fallback_textures(prepared.material);
   };
-  provider.apply = [](
-                     RenderSlotContext const& ctx,
-                     CompiledMaterial const&,
-                     PreparedMaterial const&,
-                     ShaderProgram& shader
-                   ) -> void {
+  provider.apply_per_view = [](
+                              RenderSlotContext const& ctx,
+                              ShaderProgram& shader
+                            ) -> void {
     auto const& view = ctx.view();
     auto const& lights = ctx.lights();
     auto const& cluster_config = ctx.cluster_config();

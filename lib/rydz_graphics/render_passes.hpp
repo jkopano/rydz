@@ -74,6 +74,10 @@ struct WorldPass {
     }
 
     RenderConfig const config = RenderConfig::depth_prepass();
+    ShaderProgram* last_shader = nullptr;
+    CompiledMaterial const* last_material = nullptr;
+    PreparedMaterial last_prepared{};
+    
     for (auto const& batch : phase->batches) {
       draw_batch_common(
         marker,
@@ -88,7 +92,10 @@ struct WorldPass {
         *lights,
         *cluster_config,
         *cluster_state,
-        depth_prepass_shader_spec()
+        depth_prepass_shader_spec(),
+        last_shader,
+        last_material,
+        last_prepared
       );
     }
     render_state->apply(RenderConfig::post_depth_prepass());
@@ -130,6 +137,10 @@ struct WorldPass {
     }
 
     RenderConfig const config = RenderConfig::opaque();
+    ShaderProgram* last_shader = nullptr;
+    CompiledMaterial const* last_material = nullptr;
+    PreparedMaterial last_prepared{};
+    
     for (auto const& batch : phase->batches) {
       draw_batch_common(
         marker,
@@ -144,7 +155,10 @@ struct WorldPass {
         *lights,
         *cluster_config,
         *cluster_state,
-        batch.material.shader
+        batch.material.shader,
+        last_shader,
+        last_material,
+        last_prepared
       );
     }
     render_state->apply(RenderConfig{});
@@ -169,6 +183,10 @@ struct WorldPass {
     }
 
     RenderConfig const config = RenderConfig::transparent();
+    ShaderProgram* last_shader = nullptr;
+    CompiledMaterial const* last_material = nullptr;
+    PreparedMaterial last_prepared{};
+    
     for (auto const& batch : phase->batches) {
       draw_batch_common(
         marker,
@@ -183,7 +201,10 @@ struct WorldPass {
         *lights,
         *cluster_config,
         *cluster_state,
-        batch.material.shader
+        batch.material.shader,
+        last_shader,
+        last_material,
+        last_prepared
       );
     }
     render_state->apply(RenderConfig{});
@@ -244,7 +265,10 @@ private:
     ExtractedLights const& lights,
     ClusterConfig const& cluster_config,
     ClusteredLightingState const& cluster_state,
-    ShaderSpec const& shader_spec
+    ShaderSpec const& shader_spec,
+    ShaderProgram*& last_shader,
+    CompiledMaterial const*& last_material,
+    PreparedMaterial& prepared
   ) -> void {
     auto const* mesh = mesh_assets.get(batch.key.mesh);
     if (!mesh) {
@@ -254,22 +278,9 @@ private:
     pass_config.cull = batch.material.cull_state();
     render_state.apply(pass_config);
 
-    PreparedMaterial prepared{};
-    SlotPrepareContext prepare_ctx{
-      .texture_assets = &texture_assets,
-      .instanced = true,
-    };
-    ShaderProgram& shader = prepare_material(
-      marker,
-      batch.material,
-      texture_assets,
-      shader_cache,
-      slot_registry,
-      prepare_ctx,
-      shader_spec,
-      prepared
-    );
-    batch.material.apply(shader);
+    ShaderProgram& shader = resolve_shader(marker, shader_cache, shader_spec);
+    bool shader_changed = (last_shader != &shader);
+    
     RenderSlotContext render_ctx{
       .view_data = &view,
       .lights_data = &lights,
@@ -277,9 +288,39 @@ private:
       .cluster_state_data = &cluster_state,
       .instanced = true,
     };
-    apply_slot_uniforms(
-      slot_registry, render_ctx, batch.material, prepared, shader
-    );
+
+    if (shader_changed) {
+      last_shader = &shader;
+      apply_slot_uniforms_per_view(slot_registry, render_ctx, batch.material, shader);
+    }
+
+    bool material_changed = shader_changed || last_material == nullptr || (*last_material != batch.material);
+    if (material_changed) {
+      last_material = &batch.material;
+
+      SlotPrepareContext prepare_ctx{
+        .texture_assets = &texture_assets,
+        .instanced = true,
+      };
+      
+      prepare_material(
+        marker,
+        batch.material,
+        texture_assets,
+        shader_cache,
+        slot_registry,
+        prepare_ctx,
+        shader_spec,
+        prepared
+      );
+
+      batch.material.apply(shader);
+
+      apply_slot_uniforms_per_material(
+        slot_registry, render_ctx, batch.material, prepared, shader
+      );
+    }
+
     draw_batch(shader, *mesh, prepared.material, batch);
   }
 };
