@@ -7,18 +7,17 @@
  */
 
 #include "math.hpp"
-#include "rl.hpp"
 #include "rydz_camera/camera3d.hpp"
-#include "rydz_camera/rydz_camera.hpp"
 #include "rydz_ecs/fwd.hpp"
 #include "rydz_ecs/params.hpp"
 #include "rydz_ecs/query.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/render_plugin.hpp"
-#include "rydz_graphics/rydz_graphics.hpp"
+#include "rydz_graphics/mod.hpp"
 #include "rydz_graphics/transform.hpp"
+#include "rydz_console/command_api.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -79,5 +78,31 @@ struct IsometricCameraBundle {
             .target = target, .offset = offset, .follow_speed = follow_speed}};
   }
 };
+
+inline void camera_plugin(App& app) {
+    app.add_systems(ScheduleLabel::Update, isometric_camera_system);
+
+    app.add_systems(ScheduleLabel::Startup, [](World& world) {
+
+        engine::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
+            return [zoom_level](Query<Mut<Camera3DComponent>> query) {
+                for (auto [cam] : query.iter()) {
+                    if (cam->is_orthographic()) {
+                        cam->orthographic_height = zoom_level;
+                    }
+                }
+                };
+            });
+
+        engine::BindCommand<float>::to(world, "set_cam_speed", [](float speed) {
+            return [speed](Query<Mut<IsometricCamera>> query) {
+                for (auto [iso_cam] : query.iter()) {
+                    iso_cam->follow_speed = speed;
+                }
+                };
+            });
+
+        });
+}
 
 } // namespace ecs

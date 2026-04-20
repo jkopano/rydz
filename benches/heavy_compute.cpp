@@ -24,9 +24,7 @@ struct Velocity {
   math::Vec3 value;
 };
 
-static World make_world() {
-  World world;
-
+static void populate_world(World &world) {
   // Create rotation matrix around X axis (1.2 radians), matching Rust's
   // Matrix4::from_angle_x(Rad(1.2))
   float c = std::cos(1.2f);
@@ -42,12 +40,11 @@ static World make_world() {
     world.insert_component(e, Rotation{math::Vec3(1, 0, 0)});
     world.insert_component(e, Velocity{math::Vec3(1, 0, 0)});
   }
-
-  return world;
 }
 
 static void BM_HeavyCompute(benchmark::State &state) {
-  auto world = make_world();
+  World world;
+  populate_world(world);
 
   for (auto _ : state) {
     Query<Mut<Transform>, Mut<Position>> query(world);

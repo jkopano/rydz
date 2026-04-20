@@ -22,7 +22,7 @@ inline std::string demangle(const char *mangled) {
 #else
   int status = 0;
   char *demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &status);
-  if (status == 0 && demangled) {
+  if (status == 0 && (demangled != nullptr)) {
     std::string result(demangled);
     std::free(demangled);
     return result;
@@ -57,8 +57,6 @@ template <typename Fn> std::string system_name_of(Fn &&fn) {
     return demangle(typeid(D).name());
   }
 }
-
-namespace views = std::ranges::views;
 
 inline constexpr auto range = std::ranges::views::iota;
 

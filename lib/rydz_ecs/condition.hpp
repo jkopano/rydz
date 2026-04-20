@@ -3,6 +3,7 @@
 #include "system.hpp"
 #include <algorithm>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -115,8 +116,7 @@ inline std::string set_names(const std::vector<SetId> &ids) {
   return result;
 }
 
-template <typename... Args>
-std::vector<SetId> make_set_ids(Args &&...args) {
+template <typename... Args> std::vector<SetId> make_set_ids(Args &&...args) {
   std::vector<SetId> ids;
   ids.reserve(sizeof...(Args));
   (ids.push_back(to_set_id(std::forward<Args>(args))), ...);
@@ -145,9 +145,14 @@ struct SystemOrdering {
 
 class ICondition {
 public:
+  ICondition() = default;
+  ICondition(const ICondition &) = default;
+  ICondition(ICondition &&) = delete;
+  ICondition &operator=(const ICondition &) = default;
+  ICondition &operator=(ICondition &&) = delete;
   virtual ~ICondition() = default;
   virtual bool is_true(World &world) = 0;
-  virtual SystemAccess access() const = 0;
+  [[nodiscard]] virtual SystemAccess access() const = 0;
 };
 
 template <typename F> class FunctionCondition : public ICondition {
@@ -168,14 +173,15 @@ public:
   bool is_true(World &world) override {
     ensure_param_states(world);
 
-    SystemContext ctx{Tick{0}, world.read_change_tick()};
+    SystemContext ctx{.last_run = Tick{0},
+                      .this_run = world.read_change_tick()};
     return function_traits<F>::apply([&]<SystemParameter... Args>() {
       return evaluate_with_args<Args...>(world, ctx,
                                          std::index_sequence_for<Args...>{});
     });
   }
 
-  SystemAccess access() const override {
+  [[nodiscard]] SystemAccess access() const override {
     SystemAccess acc;
     function_traits<F>::apply([&]<SystemParameter... Args>() {
       (SystemParamTraits<bare_t<Args>>::access(acc), ...);
@@ -185,8 +191,9 @@ public:
 
 private:
   void ensure_param_states(World &world) {
-    if (state_world_ == &world)
+    if (state_world_ == &world) {
       return;
+    }
 
     function_traits<F>::apply([&]<SystemParameter... Args>() {
       param_states_ = Tuple<typename SystemParamTraits<bare_t<Args>>::State...>{
@@ -214,25 +221,73 @@ private:
   }
 };
 
+class SharedConditionGate {
+  std::shared_ptr<ICondition> condition_;
+  usize member_count_;
+  mutable std::mutex mutex_;
+  u64 active_run_id_{};
+  usize remaining_members_{};
+  bool cached_result_ = false;
+
+public:
+  SharedConditionGate(std::shared_ptr<ICondition> condition, usize member_count)
+      : condition_(std::move(condition)), member_count_(member_count) {}
+
+  bool is_true(World &world) {
+    std::lock_guard lock(mutex_);
+
+    const u64 run_id = world.read_schedule_run_id();
+    if (run_id != active_run_id_ || remaining_members_ == 0) {
+      cached_result_ = condition_->is_true(world);
+      active_run_id_ = run_id;
+      remaining_members_ = member_count_;
+    }
+
+    if (remaining_members_ > 0) {
+      remaining_members_--;
+    }
+
+    return cached_result_;
+  }
+
+  SystemAccess access() const { return condition_->access(); }
+};
+
 class ConditionedSystem : public ISystem {
   std::unique_ptr<ISystem> system_;
   std::shared_ptr<ICondition> condition_;
+  std::shared_ptr<SharedConditionGate> shared_condition_;
 
 public:
+  ConditionedSystem(std::unique_ptr<ISystem> system,
+                    std::unique_ptr<ICondition> condition)
+      : system_(std::move(system)),
+        condition_(std::shared_ptr<ICondition>(std::move(condition))) {}
+
   ConditionedSystem(std::unique_ptr<ISystem> system,
                     std::shared_ptr<ICondition> condition)
       : system_(std::move(system)), condition_(std::move(condition)) {}
 
+  ConditionedSystem(std::unique_ptr<ISystem> system,
+                    std::shared_ptr<SharedConditionGate> shared_condition)
+      : system_(std::move(system)),
+        shared_condition_(std::move(shared_condition)) {}
+
   void run(World &world) override {
-    if (condition_->is_true(world)) {
+    const bool should_run = shared_condition_
+                                ? shared_condition_->is_true(world)
+                                : condition_->is_true(world);
+
+    if (should_run) {
       system_->run(world);
     }
   }
 
-  std::string name() const override { return system_->name(); }
+  [[nodiscard]] std::string name() const override { return system_->name(); }
 
-  SystemAccess access() const override {
-    auto acc = condition_->access();
+  [[nodiscard]] SystemAccess access() const override {
+    auto acc =
+        shared_condition_ ? shared_condition_->access() : condition_->access();
     acc.merge(system_->access());
     return acc;
   }
@@ -244,7 +299,7 @@ template <typename F> std::unique_ptr<ICondition> make_condition(F &&func) {
 
 inline std::unique_ptr<ICondition> run_once() {
   struct RunOnceCondition : ICondition {
-    bool fired = false;
+    bool fired{};
     bool is_true(World & /*world*/) override {
       if (!fired) {
         fired = true;
@@ -252,7 +307,7 @@ inline std::unique_ptr<ICondition> run_once() {
       }
       return false;
     }
-    SystemAccess access() const override { return {}; }
+    [[nodiscard]] SystemAccess access() const override { return {}; }
   };
   return std::make_unique<RunOnceCondition>();
 }
@@ -355,18 +410,25 @@ public:
     std::vector<GroupSystemEntry> result;
 
     std::shared_ptr<ICondition> shared_cond = std::move(condition_);
+    std::shared_ptr<SharedConditionGate> shared_gate;
+    if (shared_cond) {
+      shared_gate =
+          std::make_shared<SharedConditionGate>(shared_cond, systems_.size());
+    }
 
     std::string prev_name;
     for (auto &sys : systems_) {
       SystemOrdering entry_ordering = ordering_;
 
-      if (chained_ && !prev_name.empty())
+      if (chained_ && !prev_name.empty()) {
         entry_ordering.after.push_back(prev_name);
+      }
 
       prev_name = sys->name();
 
-      if (shared_cond)
-        sys = std::make_unique<ConditionedSystem>(std::move(sys), shared_cond);
+      if (shared_gate) {
+        sys = std::make_unique<ConditionedSystem>(std::move(sys), shared_gate);
+      }
 
       result.push_back({std::move(sys), std::move(entry_ordering)});
     }
@@ -403,9 +465,10 @@ class SetConfigDescriptor {
   SetConfig config_;
 
 public:
-  explicit SetConfigDescriptor(SetId id) : config_{id, {}, {}, nullptr} {}
+  explicit SetConfigDescriptor(SetId id)
+      : config_{.id = id, .after = {}, .before = {}, .condition = nullptr} {}
 
-  const SetId &id() const { return config_.id; }
+  [[nodiscard]] const SetId &id() const { return config_.id; }
 
   SetConfigDescriptor &&before(SetId id) && {
     config_.before.push_back(id);
@@ -438,7 +501,7 @@ public:
   explicit ChainedSetConfigDescriptor(std::vector<SetId> ids)
       : ids_(std::move(ids)) {}
 
-  const std::vector<SetId> &ids() const { return ids_; }
+  [[nodiscard]] const std::vector<SetId> &ids() const { return ids_; }
 
   ChainedSetConfigDescriptor &&chain() && {
     chained_ = true;
@@ -456,7 +519,8 @@ public:
     std::vector<SetConfig> configs;
     configs.reserve(ids_.size());
     for (usize i = 0; i < ids_.size(); ++i) {
-      SetConfig config{ids_[i], {}, {}, nullptr};
+      SetConfig config{
+          .id = ids_[i], .after = {}, .before = {}, .condition = nullptr};
       if (i + 1 < ids_.size()) {
         config.before.push_back(ids_[i + 1]);
       }
@@ -473,7 +537,7 @@ SetConfigDescriptor configure(E value) {
 }
 
 template <typename S>
-  requires std::is_same_v<typename S::T, Set> || std::is_base_of<Set, S>::value
+  requires std::is_same_v<typename S::T, Set> || std::is_base_of_v<Set, S>
 SetConfigDescriptor configure() {
   return SetConfigDescriptor(set<S>());
 }
@@ -482,9 +546,8 @@ template <typename A, typename B, typename... Rest>
   requires(detail::is_set_argument_v<A> && detail::is_set_argument_v<B> &&
            (... && detail::is_set_argument_v<Rest>))
 ChainedSetConfigDescriptor configure(A &&a, B &&b, Rest &&...rest) {
-  return ChainedSetConfigDescriptor(
-      detail::make_set_ids(std::forward<A>(a), std::forward<B>(b),
-                           std::forward<Rest>(rest)...));
+  return ChainedSetConfigDescriptor(detail::make_set_ids(
+      std::forward<A>(a), std::forward<B>(b), std::forward<Rest>(rest)...));
 }
 
 template <typename A, typename B, typename... Rest>

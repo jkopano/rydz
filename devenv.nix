@@ -31,6 +31,7 @@ let
     vcpkg
     luajit
     sol2
+    glm
   ];
 
   typstDeps = with pkgs; [

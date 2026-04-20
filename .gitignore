@@ -14,6 +14,7 @@ build/**
 
 # for vs
 vsxmake2026/**
+vsxmake2022/**
 .vs/**
 
 # compile

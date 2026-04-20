@@ -7,6 +7,7 @@
 #include "rydz_ecs/bundle.hpp"
 #include "storage.hpp"
 #include "ticks.hpp"
+#include <atomic>
 #include <cassert>
 #include <memory>
 #include <ranges>
@@ -23,6 +24,7 @@ public:
 private:
   std::unordered_map<std::type_index, std::unique_ptr<IStorage>> storages_;
   Tick change_tick_{1};
+  std::atomic<u64> schedule_run_id_{0};
   bool multithreaded_ = true;
 
   template <typename R> void insert_if_missing(Entity entity) {
@@ -43,6 +45,12 @@ public:
   void set_multithreaded(bool v) { multithreaded_ = v; }
 
   Tick read_change_tick() const { return change_tick_; }
+  u64 read_schedule_run_id() const {
+    return schedule_run_id_.load(std::memory_order_relaxed);
+  }
+  u64 begin_schedule_run() {
+    return schedule_run_id_.fetch_add(1, std::memory_order_relaxed) + 1;
+  }
   Tick increment_change_tick() {
     change_tick_.value++;
     return change_tick_;
@@ -91,9 +99,9 @@ public:
     using TargetStorage = storage_t<T>;
 
     auto key = std::type_index(typeid(T));
-    auto it = storages_.find(key);
-    if (it != storages_.end()) {
-      return *static_cast<TargetStorage *>(it->second.get());
+    auto iter = storages_.find(key);
+    if (iter != storages_.end()) {
+      return *static_cast<TargetStorage *>(iter->second.get());
     }
 
     auto storage = std::make_unique<TargetStorage>();
@@ -118,52 +126,50 @@ public:
   }
 
   template <typename T, typename Self>
-  auto *get_component(this Self &&self, Entity entity) {
+  auto *get_component(this Self &self, Entity entity) {
     auto *storage = self.template get_storage<T>();
     return (storage == nullptr) ? nullptr : storage->get(entity);
   }
 
   template <typename T> void remove_component(Entity entity) {
     auto key = std::type_index(typeid(T));
-    auto it = storages_.find(key);
-    if (it == storages_.end()) {
+    auto iter = storages_.find(key);
+    if (iter == storages_.end()) {
       return;
     }
 
-    it->second->remove(entity);
+    iter->second->remove(entity);
   }
 
   template <typename T> bool has_component(Entity entity) const {
     auto key = std::type_index(typeid(T));
-    auto it = storages_.find(key);
-    if (it == storages_.end())
+    auto iter = storages_.find(key);
+    if (iter == storages_.end()) {
       return false;
-    return it->second->has(entity);
+    }
+    return iter->second->has(entity);
   }
 
   template <typename T>
   std::optional<ComponentTicks> get_component_ticks(Entity entity) const {
     auto key = std::type_index(typeid(T));
-    auto it = storages_.find(key);
-    if (it == storages_.end()) {
+    auto iter = storages_.find(key);
+    if (iter == storages_.end()) {
       return std::nullopt;
     }
-    return it->second->get_ticks(entity);
+    return iter->second->get_ticks(entity);
   }
 
-  template <typename T, typename Self> auto *get_storage(this Self &&self) {
+  template <typename T, typename Self> auto *get_storage(this Self &self) {
     using StripT = std::remove_cv_t<T>;
     using ReturnT = copy_const_t<Self, storage_t<StripT>>;
 
-    auto it = self.storages_.find(std::type_index(typeid(StripT)));
-    return (it == self.storages_.end())
+    auto iter = self.storages_.find(std::type_index(typeid(StripT)));
+    return (iter == self.storages_.end())
                ? nullptr
-               : static_cast<ReturnT *>(it->second.get());
+               : static_cast<ReturnT *>(iter->second.get());
   }
 };
-
-// ── deferred definitions from bundle.hpp ──────────────────────────────
-// These need the full World definition, so they live here.
 
 namespace detail {
 
@@ -188,13 +194,14 @@ template <std::ranges::input_range R>
   requires Spawnable<std::ranges::range_value_t<R>>
 std::vector<Entity> spawn_batch(World &world, R &&_range) {
   std::vector<Entity> spawned;
-  if constexpr (std::ranges::sized_range<R>)
+  if constexpr (std::ranges::sized_range<R>) {
     spawned.reserve(std::ranges::size(_range));
+  }
 
   for (auto &&item : std::forward<R>(_range)) {
-    Entity e = world.spawn();
-    insert_bundle(world, e, std::forward<decltype(item)>(item));
-    spawned.push_back(e);
+    Entity entity = world.spawn();
+    insert_bundle(world, entity, std::forward<decltype(item)>(item));
+    spawned.push_back(entity);
   }
   return spawned;
 }

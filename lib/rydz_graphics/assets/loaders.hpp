@@ -1,61 +1,61 @@
 #pragma once
-#include "gltf_asset.hpp"
-#include "rl.hpp"
+
 #include "rydz_ecs/asset.hpp"
+#include "rydz_graphics/assets/gltf.hpp"
+#include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/gl/resources.hpp"
 
 namespace ecs {
 
-class TextureLoader : public AssetLoader<TextureLoader, rl::Texture2D> {
-private:
-  std::string path_;
+using gl::Sound;
+using gl::Texture;
 
-public:
+struct TextureLoader : public AssetLoader<TextureLoader, Texture> {
   std::vector<std::string> extensions() const override {
     return {"png", "jpg", "jpeg", "bmp", "tga", "gif"};
   }
 
   bool is_async() const override { return false; }
 
-  rl::Texture2D load_asset(const std::vector<uint8_t> & /*data*/,
-                           const std::string &path) {
-    rl::Texture2D tex{};
-    tex.id = 0;
+  Texture load_asset(const std::vector<uint8_t> & /*data*/,
+                     const std::string &path) {
     path_ = path;
-    return tex;
+    return {};
   }
 
   void insert_into_world(World &world, uint32_t handle_id,
                          std::any asset) override {
     auto path = std::any_cast<std::string>(std::move(asset));
-    auto *assets = world.get_resource<Assets<rl::Texture2D>>();
+    auto *assets = world.get_resource<Assets<Texture>>();
     if (assets) {
-      rl::Texture2D tex = rl::LoadTexture(path.c_str());
-      assets->set(Handle<rl::Texture2D>{handle_id}, tex);
+      auto texture = gl::load_texture(path);
+      assets->set(Handle<Texture>{handle_id}, texture);
     }
   }
+
+private:
+  std::string path_;
 };
 
-class SoundLoader : public AssetLoader<SoundLoader, rl::Sound> {
-public:
+struct SoundLoader : public AssetLoader<SoundLoader, Sound> {
   std::vector<std::string> extensions() const override {
     return {"wav", "ogg", "mp3"};
   }
 
   bool is_async() const override { return true; }
 
-  rl::Sound load_asset(const std::vector<uint8_t> & /*data*/,
-                       const std::string &path) {
-    rl::Sound s{};
+  Sound load_asset(const std::vector<uint8_t> & /*data*/,
+                   const std::string &path) {
     path_ = path;
-    return s;
+    return {};
   }
 
   void insert_into_world(World &world, uint32_t handle_id,
                          std::any /*asset*/) override {
-    auto *assets = world.get_resource<Assets<rl::Sound>>();
+    auto *assets = world.get_resource<Assets<Sound>>();
     if (assets) {
-      rl::Sound snd = rl::LoadSound(path_.c_str());
-      assets->set(Handle<rl::Sound>{handle_id}, snd);
+      auto sound = gl::load_sound(path_);
+      assets->set(Handle<Sound>{handle_id}, sound);
     }
   }
 

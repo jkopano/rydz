@@ -1,4 +1,6 @@
 #pragma once
+#include "math.hpp"
+#include "rl.hpp"
 #include "rydz_ecs/app.hpp"
 #include "types.hpp"
 #include <unordered_set>
@@ -16,7 +18,7 @@ struct MouseState {
 struct Input {
   static void install(App &app) {
     app.insert_resource(Input{});
-    app.add_systems(ScheduleLabel::First, input_polling_system);
+    app.add_systems(First, input_polling_system);
   }
 
   using T = Resource;
@@ -24,8 +26,8 @@ struct Input {
   bool key_pressed(KeyCode key) const { return keys_pressed_.contains(key); }
   bool key_released(KeyCode key) const { return keys_released_.contains(key); }
 
-  Vector2 mouse_delta() const {
-    return Vector2{mouse_.delta_x, mouse_.delta_y};
+  math::Vec2 mouse_delta() const {
+    return math::Vec2{mouse_.delta_x, mouse_.delta_y};
   }
   f32 mouse_delta_x() const { return mouse_.delta_x; }
   f32 mouse_delta_y() const { return mouse_.delta_y; }
@@ -59,11 +61,6 @@ public:
 
   std::unordered_set<KeyCode> &keys_down() { return keys_down_; }
 
-  std::unordered_set<KeyCode> keys_down_;
-  std::unordered_set<KeyCode> keys_pressed_;
-  std::unordered_set<KeyCode> keys_released_;
-  MouseState mouse_;
-
   static void input_polling_system(ResMut<Input> input, NonSendMarker) {
     input->clear_frame();
 
@@ -86,6 +83,12 @@ public:
     rl::Vector2 md = rl::GetMouseDelta();
     input->set_mouse_delta(md.x, md.y);
   }
+
+private:
+  std::unordered_set<KeyCode> keys_down_;
+  std::unordered_set<KeyCode> keys_pressed_;
+  std::unordered_set<KeyCode> keys_released_;
+  MouseState mouse_;
 };
 
 } // namespace ecs

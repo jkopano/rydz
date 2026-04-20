@@ -282,7 +282,7 @@ TEST(SystemSetTest, AppRoutesSetSystemsToConfiguredSchedule) {
   App app;
   app.insert_resource(Log{});
 
-  app.configure_set(ScheduleLabel::Startup, configure(GameSet::Input))
+  app.configure_set(Startup, configure(GameSet::Input))
       .add_systems(GameSet::Input, group(sys_input));
 
   app.startup();
@@ -297,7 +297,7 @@ TEST(SystemSetTest, AppAllowsConfigureAfterAddUntilRun) {
   app.insert_resource(Log{});
 
   app.add_systems(GameSet::Input, group(sys_input));
-  app.configure_set(ScheduleLabel::Startup, configure(GameSet::Input));
+  app.configure_set(Startup, configure(GameSet::Input));
 
   app.startup();
 
@@ -318,9 +318,9 @@ TEST(SystemSetTest, AppMissingSetConfigurationThrowsOnRun) {
 TEST(SystemSetTest, AppRejectsConflictingSetSchedules) {
   App app;
 
-  app.configure_set(ScheduleLabel::Startup, configure(GameSet::Input));
+  app.configure_set(Startup, configure(GameSet::Input));
   EXPECT_THROW(
-      app.configure_set(ScheduleLabel::Update, configure(GameSet::Input)),
+      app.configure_set(Update, configure(GameSet::Input)),
       std::runtime_error);
 }
 
@@ -329,7 +329,7 @@ TEST(SystemSetTest, ConfigureChainOrdersSetsSequentially) {
   app.insert_resource(Log{});
 
   app.configure_set(
-         ScheduleLabel::Startup,
+         Startup,
          configure(GameSet::Input, GameSet::Logic, GameSet::Render).chain())
       .add_systems(GameSet::Render, group(sys_render))
       .add_systems(GameSet::Logic, group(sys_logic))

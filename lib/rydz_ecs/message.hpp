@@ -12,6 +12,39 @@ struct MessageId {
   usize id = 0;
 };
 
+template <typename E> class MessageRange {
+  std::vector<const E *> messages_;
+
+public:
+  explicit MessageRange(std::vector<const E *> messages)
+      : messages_(std::move(messages)) {}
+
+  class iterator {
+    typename std::vector<const E *>::const_iterator it_;
+
+  public:
+    explicit iterator(typename std::vector<const E *>::const_iterator iter)
+        : it_(iter) {}
+
+    const E &operator*() const { return **it_; }
+    const E *operator->() const { return *it_; }
+
+    iterator &operator++() {
+      ++it_;
+      return *this;
+    }
+
+    bool operator==(const iterator &other) const { return it_ == other.it_; }
+    bool operator!=(const iterator &other) const { return it_ != other.it_; }
+  };
+
+  iterator begin() const { return iterator{messages_.begin()}; }
+  iterator end() const { return iterator{messages_.end()}; }
+
+  [[nodiscard]] bool empty() const { return messages_.empty(); }
+  [[nodiscard]] usize size() const { return messages_.size(); }
+};
+
 template <typename E> class Messages {
 public:
   using T = Resource;
@@ -63,37 +96,40 @@ public:
   }
 
   usize register_reader() {
-    usize id = next_reader_id_++;
-    usize start =
-        buffers_.prev.empty() ? message_count_ : buffers_.prev.front().second.id;
-    reader_cursors_[id] = MessageId{start};
-    return id;
+    usize idx = next_reader_id_++;
+    usize start = buffers_.prev.empty() ? message_count_
+                                        : buffers_.prev.front().second.id;
+    reader_cursors_[idx] = MessageId{start};
+    return idx;
   }
 
-  template <typename Func> void read(usize reader_id, Func &&func) {
+  MessageRange<E> iter(usize reader_id) {
     auto &cursor = reader_cursors_[reader_id];
     usize start_id = cursor.id;
+    std::vector<const E *> unread;
+    unread.reserve(total_count());
 
     for (auto &[message, id] : buffers_.prev) {
       if (id.id >= start_id) {
-        func(message);
+        unread.push_back(&message);
       }
     }
     for (auto &[message, id] : buffers_.current) {
       if (id.id >= start_id) {
-        func(message);
+        unread.push_back(&message);
       }
     }
 
     cursor.id = message_count_;
+    return MessageRange<E>{std::move(unread)};
   }
 
   bool has_unread(usize reader_id) const {
-    auto it = reader_cursors_.find(reader_id);
-    if (it == reader_cursors_.end()) {
+    auto iter = reader_cursors_.find(reader_id);
+    if (iter == reader_cursors_.end()) {
       return !is_empty();
     }
-    return it->second.id < message_count_;
+    return iter->second.id < message_count_;
   }
 };
 

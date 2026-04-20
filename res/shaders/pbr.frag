@@ -37,6 +37,11 @@ uniform vec2 u_cluster_near_far;
 uniform int u_cluster_max_lights;
 uniform int u_is_orthographic;
 uniform float u_alpha_cutoff;
+uniform int u_render_method;
+
+const int RENDER_METHOD_OPAQUE = 0;
+const int RENDER_METHOD_TRANSPARENT = 1;
+const int RENDER_METHOD_ALPHA_CUTOUT = 2;
 
 struct GpuPointLight {
   vec4 position_range;
@@ -176,8 +181,12 @@ void main() {
   vec4 baseColor = colDiffuse;
   vec4 diffTex = texture(texture0, TexCoord);
   baseColor *= diffTex;
-  if (baseColor.a < u_alpha_cutoff) {
+  if (u_render_method != RENDER_METHOD_OPAQUE && baseColor.a < u_alpha_cutoff) {
     discard;
+  }
+  float outputAlpha = baseColor.a;
+  if (u_render_method != RENDER_METHOD_TRANSPARENT) {
+    outputAlpha = 1.0;
   }
   vec3 albedo = pow(baseColor.rgb, vec3(2.2));
 
@@ -249,5 +258,5 @@ void main() {
   color = color / (color + vec3(1.0));
   color = pow(color, vec3(1.0 / 2.2));
 
-  FragColor = vec4(color, baseColor.a);
+  FragColor = vec4(color, outputAlpha);
 }

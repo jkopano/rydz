@@ -9,10 +9,12 @@
 namespace ecs {
 
 struct Entity {
-  u32 index_val = 0;
-  u32 generation_val = 0;
+  u32 index_val{};
+  u32 generation_val{};
 
-  static constexpr Entity from_raw(u32 idx, u32 gen) { return {idx, gen}; }
+  static constexpr Entity from_raw(u32 idx, u32 gen) {
+    return {.index_val = idx, .generation_val = gen};
+  }
 
   [[nodiscard]] constexpr u32 index() const noexcept { return index_val; }
   [[nodiscard]] constexpr u32 generation() const noexcept {
@@ -45,30 +47,30 @@ public:
   Entity reserve() {
     std::lock_guard lock(*mutex_);
 
-    Entity e;
+    Entity entity;
     if (free_list_.empty()) {
-      e = Entity::from_raw(next_id_++, 0);
+      entity = Entity::from_raw(next_id_++, 0);
     } else {
       auto [idx, gen] = free_list_.back();
       free_list_.pop_back();
-      e = Entity::from_raw(idx, gen);
+      entity = Entity::from_raw(idx, gen);
     }
 
-    reserved_.insert(e);
-    return e;
+    reserved_.insert(entity);
+    return entity;
   }
 
   Entity create() {
-    Entity e = reserve();
+    Entity entity = reserve();
     std::lock_guard lock(*mutex_);
-    reserved_.erase(e);
-    active_.insert(e);
-    return e;
+    reserved_.erase(entity);
+    active_.insert(entity);
+    return entity;
   }
 
   void activate(Entity entity) {
     std::lock_guard lock(*mutex_);
-    if (!reserved_.erase(entity)) {
+    if (reserved_.erase(entity) == 0U) {
       return;
     }
     active_.insert(entity);
@@ -76,13 +78,13 @@ public:
 
   void destroy(Entity entity) {
     std::lock_guard lock(*mutex_);
-    if (reserved_.erase(entity)) {
-      free_list_.push_back({entity.index(), entity.generation() + 1});
+    if (reserved_.erase(entity) != 0U) {
+      free_list_.emplace_back(entity.index(), entity.generation() + 1);
       return;
     }
 
-    if (active_.erase(entity)) {
-      free_list_.push_back({entity.index(), entity.generation() + 1});
+    if (active_.erase(entity) != 0U) {
+      free_list_.emplace_back(entity.index(), entity.generation() + 1);
     }
   }
 

@@ -13,6 +13,11 @@ namespace ecs {
 
 class ICommand {
 public:
+  ICommand() = default;
+  ICommand(const ICommand &) = default;
+  ICommand(ICommand &&) noexcept = default;
+  ICommand &operator=(const ICommand &) = default;
+  ICommand &operator=(ICommand &&) noexcept = default;
   virtual ~ICommand() = default;
   virtual void apply(World &world) = 0;
 };
@@ -33,7 +38,7 @@ public:
     }
   }
 
-  bool empty() const { return queue_.empty(); }
+  [[nodiscard]] bool empty() const { return queue_.empty(); }
 };
 
 class CommandQueues {
@@ -53,7 +58,7 @@ public:
     }
   }
 
-  bool empty() const { return queues_.empty(); }
+  [[nodiscard]] bool empty() const { return queues_.empty(); }
 
 private:
   std::unique_ptr<std::mutex> mutex_ = std::make_unique<std::mutex>();
@@ -145,8 +150,8 @@ public:
     static_assert(IsEntityEvent<EventT>,
                   "EntityCommands::observe requires On<E> where E is an "
                   "EntityEvent.");
-    queue_->push(detail::AddEntityObserverCommand<Fn>(entity_,
-                                                      std::forward<F>(func)));
+    queue_->push(
+        detail::AddEntityObserverCommand<Fn>(entity_, std::forward<F>(func)));
     return *this;
   }
 
@@ -165,7 +170,7 @@ public:
       : parent_(parent), entities_(entities) {}
 
   ~Cmd() {
-    if (parent_ && !queue_.empty()) {
+    if ((parent_ != nullptr) && !queue_.empty()) {
       parent_->submit(std::move(queue_));
     }
   }
@@ -179,13 +184,13 @@ public:
     Entity entity = entities_->reserve();
     queue_.push(detail::ActivateEntityCommand(entity));
     (queue_.push(detail::InsertCommand<Ts>(entity, std::move(items))), ...);
-    return EntityCommands(entity, &queue_);
+    return {entity, &queue_};
   }
 
   EntityCommands spawn_empty() {
     Entity entity = entities_->reserve();
     queue_.push(detail::ActivateEntityCommand(entity));
-    return EntityCommands(entity, &queue_);
+    return {entity, &queue_};
   }
 
   void spawn_batch(SpawnableRange auto &&_range) {
@@ -208,8 +213,7 @@ public:
   template <typename E>
     requires IsEvent<bare_t<E>>
   Cmd &trigger(E &&event) {
-    queue_.push(
-        detail::TriggerCommand<bare_t<E>>(std::forward<E>(event)));
+    queue_.push(detail::TriggerCommand<bare_t<E>>(std::forward<E>(event)));
     return *this;
   }
 
@@ -221,11 +225,11 @@ template <> struct SystemParamTraits<Cmd> : DefaultSystemParamState<Cmd> {
 
   static Item retrieve(World &world, const SystemContext &) {
     auto *queues = world.get_resource<CommandQueues>();
-    if (!queues) {
+    if (queues == nullptr) {
       throw std::runtime_error("CommandQueues resource not found");
     }
 
-    return Cmd(queues, &world.entities);
+    return {queues, &world.entities};
   }
 
   static bool available(const World &world) {

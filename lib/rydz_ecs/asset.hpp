@@ -19,7 +19,7 @@ namespace ecs {
 template <typename T> struct Handle {
   u32 id = UINT32_MAX;
 
-  bool is_valid() const { return id != UINT32_MAX; }
+  [[nodiscard]] bool is_valid() const { return id != UINT32_MAX; }
   bool operator==(const Handle &o) const { return id == o.id; }
   bool operator!=(const Handle &o) const { return id != o.id; }
 };
@@ -41,8 +41,9 @@ public:
   ~Assets() {
     if (deleter_) {
       for (auto &item : items_) {
-        if (item.has_value())
+        if (item.has_value()) {
           deleter_(item.value());
+        }
       }
     }
   }
@@ -90,15 +91,17 @@ public:
 
   AssetT *get(Handle<AssetT> handle) {
     if (!handle.is_valid() || handle.id >= items_.size() ||
-        !items_[handle.id].has_value())
+        !items_[handle.id].has_value()) {
       return nullptr;
+    }
     return &items_[handle.id].value();
   }
 
   const AssetT *get(Handle<AssetT> handle) const {
     if (!handle.is_valid() || handle.id >= items_.size() ||
-        !items_[handle.id].has_value())
+        !items_[handle.id].has_value()) {
       return nullptr;
+    }
     return &items_[handle.id].value();
   }
 
@@ -107,7 +110,7 @@ public:
            items_[handle.id].has_value();
   }
 
-  size_t count() const {
+  [[nodiscard]] size_t count() const {
     size_t n = 0;
     for (auto &s : items_)
       if (s.has_value())
@@ -115,14 +118,14 @@ public:
     return n;
   }
 
-  bool empty() const { return count() == 0; }
+  [[nodiscard]] bool empty() const { return count() == 0; }
 };
 
 class IAssetLoader {
 public:
   virtual ~IAssetLoader() = default;
-  virtual std::vector<std::string> extensions() const = 0;
-  virtual bool is_async() const = 0;
+  [[nodiscard]] virtual std::vector<std::string> extensions() const = 0;
+  [[nodiscard]] virtual bool is_async() const = 0;
   virtual std::any load(const std::vector<u8> &data,
                         const std::string &path) = 0;
   virtual void insert_into_world(World &world, u32 handle_id,
@@ -132,7 +135,7 @@ public:
 template <typename Derived, typename T>
 class AssetLoader : public IAssetLoader {
 public:
-  bool is_async() const override { return true; }
+  [[nodiscard]] bool is_async() const override { return true; }
 
   std::any load(const std::vector<u8> &data, const std::string &path) override {
     return std::any(static_cast<Derived *>(this)->load_asset(data, path));
@@ -184,7 +187,7 @@ public:
     return *this;
   }
 
-  void register_loader(std::shared_ptr<IAssetLoader> loader) {
+  void register_loader(const std::shared_ptr<IAssetLoader> &loader) {
     for (auto &ext : loader->extensions()) {
       loaders_[ext] = loader;
     }
@@ -212,12 +215,12 @@ public:
     }
 
     auto ext = get_extension(path);
-    auto it = loaders_.find(ext);
-    if (it == loaders_.end()) {
+    auto iter = loaders_.find(ext);
+    if (iter == loaders_.end()) {
       return handle;
     }
 
-    auto loader = it->second;
+    auto loader = iter->second;
     auto full_path = root_path_ + "/" + strip_fragment(path);
 
     if (!loader->is_async()) {
@@ -261,8 +264,9 @@ public:
 private:
   static std::string strip_fragment(const std::string &path) {
     auto hash = path.find('#');
-    if (hash == std::string::npos)
+    if (hash == std::string::npos) {
       return path;
+    }
     return path.substr(0, hash);
   }
 
@@ -276,15 +280,17 @@ private:
   static std::string get_extension(const std::string &path) {
     auto clean = strip_fragment(path);
     auto pos = clean.rfind('.');
-    if (pos == std::string::npos)
+    if (pos == std::string::npos) {
       return "";
+    }
     return clean.substr(pos + 1);
   }
 
   static std::vector<u8> read_file(const std::string &path) {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file.is_open())
+    if (!file.is_open()) {
       return {};
+    }
     auto size = file.tellg();
     file.seekg(0);
     std::vector<u8> data(static_cast<size_t>(size));
