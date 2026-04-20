@@ -10,6 +10,8 @@ extern "C" {
 
 #include <rydz_ecs/mod.hpp>
 #include <rydz_scripting/bindings/bind_world.hpp>
+#include "rydz_scripting/bindings/bind_transform.hpp"
+#include "rydz_scripting/component_registry.hpp"
 #include <string>
 #include <stdexcept>
 #include <filesystem>
@@ -18,11 +20,23 @@ namespace scripting {
 
 	//Rejestracja metatabeli w globalnym rejestrze Lua, tworzenie globalnej tabeli Rydz oraz globalnej tablicy z polami etykiet harmonogramów
 	inline void register_rydz_api(lua_State* L) {
+		//Metatabele
 		register_world_metatable(L);
+		register_transform_metatable(L);
 
+		//Rejestracja komponentów
+		register_transform_in_registry();
+
+		//globalna tabela Components
+		lua_newtable(L);
+		scripting::ComponentRegistry::get().fill_lua_table(L);
+		lua_setglobal(L, "Components");
+
+		//globalna tabela Rydz
 		lua_newtable(L);
 		lua_setglobal(L, "Rydz");
 
+		//Sta³e schedule
 		lua_newtable(L);
 		lua_pushstring(L, "Startup"); lua_setfield(L, -2, "Startup");
 		lua_pushstring(L, "Update");  lua_setfield(L, -2, "Update");

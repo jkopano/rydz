@@ -11,6 +11,7 @@ extern "C" {
 #include "bind_entity.hpp"
 #include "rydz_scripting/lua_component.hpp"
 #include "rydz_scripting/lua_resource.hpp"
+#include "rydz_scripting/component_registry.hpp"
 
 namespace scripting {
 
@@ -143,6 +144,44 @@ namespace scripting {
 			return 1;
 			});
 		lua_setfield(L, -2, "each_lua");
+
+		//world:get_component(entity, Components.Transform) -> proxy lub nil
+		lua_pushcfunction(L, [](lua_State* L) -> int {
+			ecs::World* world = check_world(L, 1);
+			ecs::Entity e = check_entity(L, 2);
+			int handle = (int)luaL_checkinteger(L, 3);
+
+			const auto* fns = ComponentRegistry::get().lookup(handle);
+			if (!fns) {
+				return luaL_error(L, "Invalid component handle: %d", handle);
+			}
+			if (!fns->has(world, e)) {
+				lua_pushnil(L);
+				return 1;
+			}
+			return fns->push(L, world, e);
+			});
+		lua_setfield(L, -2, "get_component");
+
+		//world:insert_component(entity, Components.Transform) -> boolean (true if inserted, false otherwise)
+		lua_pushcfunction(L, [](lua_State* L) -> int {
+			ecs::World* world = check_world(L, 1);
+			ecs::Entity e = check_entity(L, 2);
+			int handle = (int)luaL_checkinteger(L, 3);
+
+			const auto* fns = ComponentRegistry::get().lookup(handle);
+			if (!fns) {
+				return luaL_error(L, "Invalid component handle: %d", handle);
+			}
+
+			if (fns->insert && fns->insert(world, e)) {
+				lua_pushboolean(L, 1);
+			} else {
+				lua_pushboolean(L, 0);
+			}
+			return 1;
+			});
+		lua_setfield(L, -2, "insert_component");
 
 		lua_setfield(L, -2, "__index");
 
