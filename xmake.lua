@@ -13,8 +13,8 @@ if is_plat("windows") then
 	set_toolchains("clang-cl")
 elseif is_plat("linux") then
 	set_toolchains("clang")
-	add_cxflags("-stdlib=libc++")
-    add_ldflags("-stdlib=libc++")
+	-- add_cxflags("-stdlib=libc++")
+	--    add_ldflags("-stdlib=libc++")
 end
 
 -- helpers
@@ -159,7 +159,6 @@ add_headerfiles("lib/rydz_**/*.hpp")
 -- elseif is_plat("linux") then
 -- 	add_packages("luajit")
 -- end
-
 
 target("tests")
 set_kind("binary")
