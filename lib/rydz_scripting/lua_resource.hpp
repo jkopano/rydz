@@ -12,6 +12,7 @@ extern "C" {
 #include <rydz_scripting/bindings/bind_world.hpp>
 #include "rydz_scripting/bindings/bind_transform.hpp"
 #include "rydz_scripting/component_registry.hpp"
+#include "rydz_scripting/lua_system_registry.hpp"
 #include <string>
 #include <stdexcept>
 #include <filesystem>
@@ -34,6 +35,46 @@ namespace scripting {
 
 		//globalna tabela Rydz
 		lua_newtable(L);
+
+		// Rydz.register_system(schedule_name, function [, name])
+		lua_pushcfunction(L, [](lua_State* L) -> int {
+			const char* schedule = luaL_checkstring(L, 1);
+			luaL_checktype(L, 2, LUA_TFUNCTION);
+			const char* name = luaL_optstring(L, 3, schedule);
+
+			lua_pushvalue(L, 2);
+			int func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+			// Pobierz wskaŸnik do registry — ustawiany przez startup system w scene_new.hpp
+			lua_getfield(L, LUA_REGISTRYINDEX, "_sys_registry");
+			auto* reg = (scripting::LuaSystemRegistry*)lua_touserdata(L, -1);
+			lua_pop(L, 1);
+
+			if (reg) {
+				reg->register_system(schedule, name, func_ref);
+			}
+			else {
+				fprintf(stderr, "[Lua] register_system: wywolaj po ustawieniu _sys_registry!\n");
+			}
+			return 0;
+			});
+		lua_setfield(L, -2, "register_system");
+
+		// Rydz.on_startup(function) — skrót
+		lua_pushcfunction(L, [](lua_State* L) -> int {
+			luaL_checktype(L, 1, LUA_TFUNCTION);
+			lua_pushvalue(L, 1);
+			int func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+			lua_getfield(L, LUA_REGISTRYINDEX, "_sys_registry");
+			auto* reg = (scripting::LuaSystemRegistry*)lua_touserdata(L, -1);
+			lua_pop(L, 1);
+
+			if (reg) reg->register_system("Startup", "startup", func_ref);
+			return 0;
+			});
+		lua_setfield(L, -2, "on_startup");
+
 		lua_setglobal(L, "Rydz");
 
 		//Sta³e schedule

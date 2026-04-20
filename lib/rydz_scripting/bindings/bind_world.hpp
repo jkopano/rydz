@@ -7,7 +7,7 @@ extern "C" {
 #include "lauxlib.h"
 }
 
-#include <rydz_ecs/world.hpp>
+#include <rydz_ecs/mod.hpp>
 #include "bind_entity.hpp"
 #include "rydz_scripting/lua_component.hpp"
 #include "rydz_scripting/lua_resource.hpp"

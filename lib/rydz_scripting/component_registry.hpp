@@ -7,8 +7,7 @@ extern "C" {
 #include "lauxlib.h"
 }
 
-#include <rydz_ecs/world.hpp>
-#include <rydz_ecs/entity.hpp>
+#include <rydz_ecs/mod.hpp>
 #include <type_traits>
 #include <vector>
 #include <functional>

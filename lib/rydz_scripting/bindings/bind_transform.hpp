@@ -5,7 +5,7 @@ extern "C" {
 #include "lauxlib.h"
 }
 
-#include <rydz_ecs/world.hpp>
+#include <rydz_ecs/mod.hpp>
 #include "bind_entity.hpp"
 #include "../component_registry.hpp"
 #include "rydz_math/mod.hpp"
