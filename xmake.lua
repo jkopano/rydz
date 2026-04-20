@@ -13,8 +13,8 @@ if is_plat("windows") then
 	set_toolchains("clang-cl")
 elseif is_plat("linux") then
 	set_toolchains("clang")
-	add_cxflags("-stdlib=libc++")
-	add_ldflags("-stdlib=libc++")
+	-- add_cxflags("-stdlib=libc++")
+	-- add_ldflags("-stdlib=libc++")
 end
 
 -- helpers
@@ -106,7 +106,7 @@ if is_mode("release") or is_mode("profile") then
 end
 
 -- targets
-target("raylib")
+target("raylib_local")
 set_kind("static")
 set_default(false)
 set_languages("c11")
@@ -146,7 +146,7 @@ set_kind("binary")
 set_default(true)
 set_rundir("$(projectdir)")
 add_files("src/*.cpp")
-add_deps("raylib")
+add_deps("raylib_local")
 add_packages("taskflow", "joltphysics", "sol2", "glaze", "glm", "spdlog", "fmt")
 if is_plat("windows") then
 	add_packages("luajit")
@@ -165,14 +165,14 @@ target("tests")
 set_kind("binary")
 set_default(false)
 add_files("tests/*.cpp")
-add_deps("raylib")
+add_deps("raylib_local")
 add_packages("gtest", "taskflow", "joltphysics", "glaze", "glm", "spdlog", "fmt")
 
 target("bench")
 set_kind("binary")
 set_default(false)
 add_files("benches/*.cpp")
-add_deps("raylib")
+add_deps("raylib_local")
 add_packages("benchmark", "taskflow", "joltphysics", "glaze", "glm", "spdlog", "fmt")
 
 local examples = {
@@ -196,7 +196,7 @@ for _, name in ipairs(examples) do
 	set_default(false)
 	set_rundir("$(projectdir)")
 	add_files("examples/" .. name .. "/main.cpp")
-	add_deps("raylib")
+	add_deps("raylib_local")
 	add_packages("taskflow", "joltphysics", "sol2", "glaze", "glm", "spdlog", "fmt")
 	if is_plat("windows") then
 		add_packages("luajit")
