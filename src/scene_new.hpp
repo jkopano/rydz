@@ -344,7 +344,8 @@ inline void scene_plugin(App& app) {
       .run_if(is_gameplay_active)
   );
 
-  // app.add_systems(ecs::RenderPassSet::Cleanup,
-  //                 ecs::group(engine::ConsoleRenderSystem)
-  //                     .before(ecs::RenderPassSystems::Frame::end_frame));
+  app.add_systems(
+    RenderPassSet::Cleanup,
+    group(engine::ConsoleRenderSystem).before(FramePass::end)
+  );
 }

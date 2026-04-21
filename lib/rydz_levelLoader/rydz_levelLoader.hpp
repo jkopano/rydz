@@ -246,7 +246,7 @@ void spawn_entity_models(Cmd cmd, Res<AssetServer> server) {
     cmd.spawn(
       SceneRoot{server->load<Scene>("res/" + prop_static.modelPath)},
       ecs::Transform{
-        .translation = prop_static.position, .scale = {0.2f, 0.2f, 0.2f}
+        .translation = prop_static.position * 0.2f, .scale = {0.2f, 0.2f, 0.2f}
       }
     );
   }
