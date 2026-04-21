@@ -48,8 +48,8 @@ public:
     auto *white = world.get_resource<rydz::ui::UiWhiteTexture>();
     auto *textures = world.get_resource<ecs::Assets<ecs::Texture>>();
     auto *text_cache = world.get_resource<rydz::ui::UiTextCache>();
-
-    if (!white || !textures || !text_cache)
+    auto *font_cache = world.get_resource<rydz::ui::UiFontCache>();
+    if (!white || !textures || !text_cache || !font_cache)
       return;
 
     // --- Panele ---
@@ -102,8 +102,28 @@ public:
       const std::string key = make_label_cache_key(label);
       auto it = text_cache->items.find(key);
       if (it == text_cache->items.end()) {
-        rl::Image img = rl::ImageText(
-            label.text.c_str(), static_cast<int>(label.font_size), label.color);
+        rl::Font font;
+        if (label.font_path.empty()) {
+          font = rl::GetFontDefault();
+        } else {
+          auto fit = font_cache->items.find(label.font_path);
+          if (fit == font_cache->items.end()) {
+            rl::Font loaded = rl::LoadFont(label.font_path.c_str());
+            fit = font_cache->items.emplace(label.font_path, loaded).first;
+          }
+          font = fit->second;
+        }
+
+        rl::Vector2 text_size = rl::MeasureTextEx(
+            font, label.text.c_str(), label.font_size, label.spacing);
+
+        rl::Image img = rl::GenImageColor(
+            static_cast<int>(text_size.x), static_cast<int>(text_size.y),
+            rl::Color{0, 0, 0, 0}); // przezroczyste tło
+
+        rl::ImageDrawTextEx(&img, font, label.text.c_str(), {0.0f, 0.0f},
+                            label.font_size, label.spacing, label.color);
+
         gl::Texture raw_tex = rl::LoadTextureFromImage(img);
         rl::UnloadImage(img);
         it = text_cache->items.emplace(key, textures->add(raw_tex)).first;
@@ -134,6 +154,9 @@ public:
 
     if (!world.has_resource<rydz::ui::UiTextCache>())
       world.insert_resource(rydz::ui::UiTextCache{});
+
+    if (!world.has_resource<rydz::ui::UiFontCache>())
+      world.insert_resource(rydz::ui::UiFontCache{});
 
     app.add_systems(ecs::ScheduleLabel::Startup, ui_init_system);
     app.add_systems(rydz::ui::UiSystemSet::Prepare, ui_prepare_system)

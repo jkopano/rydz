@@ -26,6 +26,11 @@ struct UiTextCache {
   std::unordered_map<std::string, ecs::Handle<ecs::Texture>> items;
 };
 
+struct UiFontCache {
+  using T = ecs::Resource;
+  std::unordered_map<std::string, rl::Font> items;
+};
+
 struct UiQuadMesh {
   using T = ecs::Resource;
   ecs::Handle<ecs::Mesh> mesh;
@@ -88,13 +93,16 @@ struct Label {
   std::string text = "";
   float font_size = 16.0;
   rl::Color color = rl::Color{BLACK};
+  std::string font_path = "";
+  float spacing = 1.0f;
 };
 
 inline std::string make_label_cache_key(const Label &label) {
   return label.text + "|" + std::to_string(label.font_size) + "|" +
          std::to_string(label.color.r) + "," + std::to_string(label.color.g) +
          "," + std::to_string(label.color.b) + "," +
-         std::to_string(label.color.a);
+         std::to_string(label.color.a) + "|" + label.font_path + "|" +
+         std::to_string(label.spacing);
 }
 
 } // namespace rydz::ui

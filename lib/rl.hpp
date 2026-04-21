@@ -19,6 +19,7 @@ using ::Model;
 using ::Quaternion;
 using ::rlRectangle;
 using Rectangle = ::rlRectangle;
+using ::Font;
 using ::RenderTexture;
 using ::RenderTexture2D;
 using ::Shader;
@@ -43,8 +44,8 @@ using ::GetFrameTime;
 using ::InitWindow;
 using ::IsWindowReady;
 using ::LoadFileText;
-using ::SetTargetFPS;
 using ::SetShaderValueTexture;
+using ::SetTargetFPS;
 using ::SetTraceLogLevel;
 using ::TraceLog;
 using ::UnloadFileText;
@@ -53,8 +54,8 @@ using ::WindowShouldClose;
 // ---- Input ----
 using ::DisableCursor;
 using ::EnableCursor;
-using ::rlShowCursor;
 using ::rlHideCursor;
+using ::rlShowCursor;
 inline void ShowCursor() { ::rlShowCursor(); }
 inline void HideCursor() { ::rlHideCursor(); }
 using ::GetKeyPressed;
@@ -90,19 +91,25 @@ using ::UploadMesh;
 
 // ---- Textures / Images ----
 using ::GenImageColor;
+using ::ImageFormat;
 using ::ImageText;
 using ::ImageTextEx;
-using ::ImageFormat;
 using ::rlLoadImage;
 inline Image LoadImage(const char *fileName) { return ::rlLoadImage(fileName); }
+using ::LoadRenderTexture;
 using ::LoadTexture;
 using ::LoadTextureFromImage;
-using ::LoadRenderTexture;
 using ::SetTextureFilter;
 using ::SetTextureWrap;
 using ::UnloadImage;
 using ::UnloadRenderTexture;
 using ::UnloadTexture;
+
+// ---- Font ----
+using ::GetFontDefault;
+using ::ImageDrawTextEx;
+using ::LoadFont;
+using ::MeasureTextEx;
 
 // ---- Audio ----
 using ::LoadSound;
@@ -162,8 +169,8 @@ using ::rlSetBlendMode;
 using ::rlSetCullFace;
 using ::rlSetShader;
 using ::rlSetUniform;
-using ::rlSetUniformMatrix;
 using ::rlSetUniformMatrices;
+using ::rlSetUniformMatrix;
 using ::rlSetUniformSampler;
 using ::rlSetVertexAttribute;
 using ::rlUnloadShaderBuffer;
