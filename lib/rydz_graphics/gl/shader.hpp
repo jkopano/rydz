@@ -2,7 +2,7 @@
 
 #include "hash.hpp"
 #include "rydz_graphics/gl/core.hpp"
-#include "rydz_graphics/shader_bindings.hpp"
+#include "rydz_graphics/gl/shader_bindings.hpp"
 #include <algorithm>
 #include <array>
 #include <concepts>

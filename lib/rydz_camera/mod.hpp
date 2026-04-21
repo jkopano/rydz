@@ -16,8 +16,8 @@
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_graphics/render_plugin.hpp"
-#include "rydz_graphics/transform.hpp"
+#include "rydz_graphics/plugin.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
 #include <algorithm>
 #include <cmath>
 

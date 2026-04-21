@@ -4,7 +4,7 @@
 #include "slot_provider.hpp"
 #include "rydz_ecs/helpers.hpp"
 #include "rydz_graphics/gl/shader.hpp"
-#include "rydz_graphics/shader_bindings.hpp"
+#include "rydz_graphics/gl/shader_bindings.hpp"
 #include <algorithm>
 #include <concepts>
 #include <optional>

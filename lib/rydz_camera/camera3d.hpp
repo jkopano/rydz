@@ -1,8 +1,8 @@
 #pragma once
 #include "math.hpp"
 #include "rydz_ecs/requires.hpp"
-#include "rydz_graphics/color.hpp"
-#include "rydz_graphics/transform.hpp"
+#include "rydz_graphics/components/color.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
 #include <algorithm>
 
 namespace ecs {

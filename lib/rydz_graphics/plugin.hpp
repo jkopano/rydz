@@ -1,17 +1,17 @@
 #pragma once
 
-#include "clustered_lighting.hpp"
-#include "frustum.hpp"
-#include "pipeline/config.hpp"
-#include "extract/systems.hpp"
-#include "pipeline/graph.hpp"
-#include "passes/passes.hpp"
-#include "pipeline/phase.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/assets/loaders.hpp"
 #include "rydz_graphics/assets/scene_runtime.hpp"
+#include "rydz_graphics/extract/systems.hpp"
+#include "rydz_graphics/lighting/clustered_lighting.hpp"
+#include "rydz_graphics/passes/passes.hpp"
+#include "rydz_graphics/pipeline/config.hpp"
+#include "rydz_graphics/pipeline/graph.hpp"
+#include "rydz_graphics/pipeline/phase.hpp"
+#include "rydz_graphics/spatial/frustum.hpp"
 
 namespace ecs {
 

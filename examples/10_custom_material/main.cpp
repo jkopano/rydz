@@ -1,6 +1,6 @@
 // 10 - Custom Material
 
-#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/plugin.hpp"
 #include "rydz_platform/mod.hpp"
 #include <cmath>
 #include <string_view>

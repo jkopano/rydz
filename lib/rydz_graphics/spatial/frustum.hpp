@@ -3,9 +3,9 @@
 #include "math.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/mod.hpp"
-#include "rydz_graphics/mesh3d.hpp"
-#include "rydz_graphics/transform.hpp"
-#include "rydz_graphics/visibility.hpp"
+#include "rydz_graphics/components/mesh3d.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
+#include "rydz_graphics/spatial/visibility.hpp"
 #include "types.hpp"
 #include <array>
 #include <cfloat>

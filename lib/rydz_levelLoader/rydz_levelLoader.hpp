@@ -14,9 +14,9 @@
 #include "rydz_ecs/rydz_ecs.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
-#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/plugin.hpp"
 #include "rydz_graphics/rydz_graphics.hpp"
-#include "rydz_graphics/transform.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -173,14 +173,14 @@ std::vector<brushFace> parseVertices(const std::string& filename) {
 }
 
 //TODO:
-//Zoptymalizowaæ liczenie trójk¹tów poprzez indeksowanie (chwilowo duplikuj¹ siê 2 vertexy per plane)
+//Zoptymalizowaï¿½ liczenie trï¿½jkï¿½tï¿½w poprzez indeksowanie (chwilowo duplikujï¿½ siï¿½ 2 vertexy per plane)
 
 rl::Mesh createPlaneMesh(brushFace face) {
     Mesh mesh = { 0 };
 
     rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.y) + " Z: " + std::to_string(face.v0.z)).c_str());
 
-    //Raylib robi tutaj kalkulacje z rozdzielczoœci (do subdivision), ale my chyba nie potrzebujemy
+    //Raylib robi tutaj kalkulacje z rozdzielczoï¿½ci (do subdivision), ale my chyba nie potrzebujemy
     int vertexCount = 6;
 
     // Vertices definition

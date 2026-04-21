@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rydz_graphics/clustered_lighting.hpp"
+#include "rydz_graphics/lighting/clustered_lighting.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/gl/state.hpp"
 #include "rydz_graphics/material/slot_provider.hpp"

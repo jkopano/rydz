@@ -2,7 +2,7 @@
 
 #include "material3d.hpp"
 #include "rydz_ecs/asset.hpp"
-#include "rydz_graphics/color.hpp"
+#include "rydz_graphics/components/color.hpp"
 #include "rydz_graphics/gl/core.hpp"
 
 namespace ecs {

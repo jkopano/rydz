@@ -2,7 +2,7 @@
 
 #include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_ecs/world.hpp"
-#include "rydz_graphics/visibility.hpp"
+#include "rydz_graphics/spatial/visibility.hpp"
 
 using namespace ecs;
 

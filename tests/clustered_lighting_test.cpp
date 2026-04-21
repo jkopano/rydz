@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "rydz_graphics/clustered_lighting.hpp"
+#include "rydz_graphics/lighting/clustered_lighting.hpp"
 
 TEST(ClusteredLightingTest, ConfigClampsInvalidDimensions) {
   gl::ClusterConfig config{

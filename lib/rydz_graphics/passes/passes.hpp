@@ -1,16 +1,15 @@
 #pragma once
 
-#include "../clustered_lighting.hpp"
-#include "../pipeline/config.hpp"
-#include "../extract/systems.hpp"
-#include "../pipeline/graph.hpp"
-#include "../pipeline/phase.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/core/time.hpp"
+#include "rydz_graphics/extract/systems.hpp"
 #include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/gl/state.hpp"
+#include "rydz_graphics/lighting/clustered_lighting.hpp"
 #include "rydz_graphics/material/render_material.hpp"
 #include "rydz_graphics/pipeline/config.hpp"
+#include "rydz_graphics/pipeline/graph.hpp"
+#include "rydz_graphics/pipeline/phase.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>

@@ -4,7 +4,7 @@
 
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/plugin.hpp"
 #include "rydz_physics/mod.hpp"
 
 #include "rydz_camera/camera3d.hpp"

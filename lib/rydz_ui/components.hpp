@@ -5,7 +5,7 @@
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/entity.hpp"
 #include "rydz_ecs/fwd.hpp"
-#include "rydz_graphics/color.hpp"
+#include "rydz_graphics/components/color.hpp"
 #include <string>
 #include <unordered_map>
 

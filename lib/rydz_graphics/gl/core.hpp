@@ -3,8 +3,8 @@
 #include "math.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/params.hpp"
-#include "rydz_graphics/color.hpp"
-#include "rydz_graphics/shader_bindings.hpp"
+#include "rydz_graphics/components/color.hpp"
+#include "rydz_graphics/gl/shader_bindings.hpp"
 #include "types.hpp"
 #include <algorithm>
 #include <bit>

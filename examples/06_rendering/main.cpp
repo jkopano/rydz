@@ -6,7 +6,7 @@
 #include "rl.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/plugin.hpp"
 #include "rydz_platform/mod.hpp"
 
 using namespace ecs;

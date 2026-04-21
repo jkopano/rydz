@@ -2,7 +2,7 @@
 
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/material/material3d.hpp"
-#include "rydz_graphics/visibility.hpp"
+#include "rydz_graphics/spatial/visibility.hpp"
 
 namespace ecs {
 

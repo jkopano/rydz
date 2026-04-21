@@ -1,7 +1,7 @@
 #pragma once
 
 #include "math.hpp"
-#include "extract/systems.hpp"
+#include "rydz_graphics/extract/systems.hpp"
 #include "rydz_ecs/fwd.hpp"
 #include "rydz_graphics/gl/core.hpp"
 #include "rydz_log/mod.hpp"

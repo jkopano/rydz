@@ -3,7 +3,7 @@
 #include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_graphics/assets/scene_graph.hpp"
 #include "rydz_graphics/material/standard_material.hpp"
-#include "rydz_graphics/visibility.hpp"
+#include "rydz_graphics/spatial/visibility.hpp"
 #include <algorithm>
 #include <ranges>
 

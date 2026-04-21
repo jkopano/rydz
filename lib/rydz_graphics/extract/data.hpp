@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../color.hpp"
-#include "../light.hpp"
+#include "rydz_graphics/components/color.hpp"
+#include "rydz_graphics/components/light.hpp"
 #include "math.hpp"
-#include "../mesh3d.hpp"
+#include "rydz_graphics/components/mesh3d.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/gl/core.hpp"
@@ -11,7 +11,7 @@
 #include "rydz_graphics/material/material3d.hpp"
 #include "rydz_graphics/material/postprocess_material.hpp"
 #include "rydz_graphics/pipeline/batches.hpp"
-#include "../transform.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
 #include <vector>
 
 namespace ecs {

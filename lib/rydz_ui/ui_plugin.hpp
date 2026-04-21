@@ -1,7 +1,7 @@
 #pragma once
 #include "rydz_ecs/app.hpp"
 #include "rydz_graphics/extract/systems.hpp"
-#include "rydz_graphics/transform.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
 #include "rydz_ui.hpp"
 #include "rydz_ui/system_sets.hpp"
 
