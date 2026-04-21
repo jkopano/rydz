@@ -92,12 +92,12 @@ struct Panel {
 struct Label {
   std::string text = "";
   float font_size = 16.0;
-  rl::Color color = rl::Color{BLACK};
+  rlColor color = rlColor{rlColor{.r = 0, .g = 0, .b = 0, .a = 255}};
   std::string font_path = "";
   float spacing = 1.0f;
 };
 
-inline std::string make_label_cache_key(const Label &label) {
+inline std::string make_label_cache_key(Label const& label) {
   return label.text + "|" + std::to_string(label.font_size) + "|" +
          std::to_string(label.color.r) + "," + std::to_string(label.color.g) +
          "," + std::to_string(label.color.b) + "," +
