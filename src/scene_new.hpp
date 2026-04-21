@@ -10,6 +10,7 @@
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/mod.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include "rydz_levelLoader/rydz_levelLoader.hpp"
 #include "rydz_ui/mod.hpp"
 #include <algorithm>
 #include <print>
@@ -129,11 +130,13 @@ inline void setup_lighting(
   );
 }
 
-
-
-inline void spawn_ground(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
-                         ResMut<Assets<rl::Texture2D>> textures,
-                         NonSendMarker) {
+inline void spawn_ground(
+  Cmd cmd,
+  ResMut<Assets<ecs::Mesh>> meshes,
+  ResMut<Assets<ecs::Texture>> textures,
+  ResMut<Assets<ecs::Material>> materials,
+  NonSendMarker
+) {
   auto plane_h = meshes->add(mesh::plane(20.0f, 20.0f, 1, 1));
   auto plane_mat = materials->add(
     StandardMaterial::from_texture(
@@ -325,14 +328,11 @@ inline void scene_plugin(App& app) {
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
   app.add_systems(ScheduleLabel::Startup, setup_lighting);
-  app.add_systems(ScheduleLabel::Startup, spawn_ground);
+  // app.add_systems(ScheduleLabel::Startup, spawn_ground);
   app.add_systems(ScheduleLabel::Startup, spawn_player);
-  //app.add_systems(ScheduleLabel::Startup, load_level);
-  app.add_systems(ScheduleLabel::Startup, setupScene);
-  app.add_systems(ScheduleLabel::Update,
-      group(spawn_model).run_if(run_once()));
-  app.add_systems(ScheduleLabel::Update,
-      group(spawn_entity_models).run_if(run_once()));
+
+  app.add_systems(ScheduleLabel::Startup, spawn_model);
+  app.add_systems(ScheduleLabel::Startup, spawn_entity_models);
 
   app.add_systems(ScheduleLabel::Startup, setup_ui);
   app.add_systems(ScheduleLabel::Update, show_player_position_ui);
