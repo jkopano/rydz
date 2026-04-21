@@ -8,7 +8,7 @@
 #include "rydz_graphics/color.hpp"
 #include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/gl/shader.hpp"
-#include "rydz_graphics/render_config.hpp"
+#include "rydz_graphics/pipeline/config.hpp"
 #include "rydz_graphics/shader_bindings.hpp"
 #include <algorithm>
 #include <concepts>

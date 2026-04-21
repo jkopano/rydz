@@ -4,8 +4,8 @@
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/gl/state.hpp"
 #include "rydz_graphics/material/slot_provider.hpp"
-#include "rydz_graphics/render_batches.hpp"
-#include "rydz_graphics/extracted_data.hpp"
+#include "rydz_graphics/pipeline/batches.hpp"
+#include "rydz_graphics/extract/data.hpp"
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>

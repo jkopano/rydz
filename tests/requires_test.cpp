@@ -1,6 +1,6 @@
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/mod.hpp"
-#include "rydz_graphics/render_config.hpp"
+#include "rydz_graphics/pipeline/config.hpp"
 #include <gtest/gtest.h>
 
 using namespace ecs;

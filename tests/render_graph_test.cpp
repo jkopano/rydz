@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "rydz_graphics/render_graph.hpp"
+#include "rydz_graphics/pipeline/graph.hpp"
 #include <string>
 #include <utility>
 #include <vector>

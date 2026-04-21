@@ -2,7 +2,7 @@
 
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/gl/mod.hpp"
-#include "rydz_graphics/render_phase.hpp"
+#include "rydz_graphics/pipeline/phase.hpp"
 #include "rydz_log/mod.hpp"
 #include <memory>
 #include <string>

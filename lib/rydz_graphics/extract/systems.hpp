@@ -1,11 +1,11 @@
 #pragma once
 
-#include "color.hpp"
-#include "extracted_data.hpp"
-#include "light.hpp"
+#include "../color.hpp"
+#include "data.hpp"
+#include "../light.hpp"
 #include "math.hpp"
-#include "mesh3d.hpp"
-#include "render_phase.hpp"
+#include "../mesh3d.hpp"
+#include "../pipeline/phase.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/frustum.hpp"
@@ -14,9 +14,9 @@
 #include "rydz_graphics/material/material3d.hpp"
 #include "rydz_graphics/material/postprocess_material.hpp"
 #include "rydz_graphics/material/standard_material.hpp"
-#include "rydz_graphics/render_batches.hpp"
-#include "transform.hpp"
-#include "visibility.hpp"
+#include "rydz_graphics/pipeline/batches.hpp"
+#include "../transform.hpp"
+#include "../visibility.hpp"
 #include <array>
 #include <concepts>
 #include <unordered_map>
