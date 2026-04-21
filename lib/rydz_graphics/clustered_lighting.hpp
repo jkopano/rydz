@@ -42,8 +42,7 @@ struct ClusterConfig {
 
   [[nodiscard]] auto cluster_count() const -> u32 {
     return static_cast<u32>(
-      tile_count_x_clamped() * tile_count_y_clamped() *
-      slice_count_z_clamped()
+      tile_count_x_clamped() * tile_count_y_clamped() * slice_count_z_clamped()
     );
   }
 
@@ -160,9 +159,8 @@ inline auto cluster_slice_distance(
   constexpr auto MARGIN = 0.001F;
   f32 clamped_near = std::max(near_plane, MARGIN);
   f32 clamped_far = std::max(far_plane, clamped_near + MARGIN);
-  f32 alpha =
-    static_cast<f32>(slice_index) /
-    static_cast<f32>(config.slice_count_z_clamped());
+  f32 alpha = static_cast<f32>(slice_index) /
+              static_cast<f32>(config.slice_count_z_clamped());
 
   if (orthographic) {
     return clamped_near + ((clamped_far - clamped_near) * alpha);
@@ -195,8 +193,7 @@ inline auto build_cluster_record(
   ClusterGpuRecord record{};
   i32 const tile_count_x = config.tile_count_x_clamped();
   i32 const tile_count_y = config.tile_count_y_clamped();
-  u32 const max_lights_per_cluster =
-    config.max_lights_per_cluster_clamped();
+  u32 const max_lights_per_cluster = config.max_lights_per_cluster_clamped();
 
   u32 const cluster_index = static_cast<u32>(
     ((tile_z * tile_count_y + tile_y) * tile_count_x) + tile_x
@@ -206,12 +203,10 @@ inline auto build_cluster_record(
   record.meta[2] = 0;
   record.meta[3] = 0;
 
-  f32 const ndc_x0 =
-    -1.0F + (2.0F * static_cast<f32>(tile_x) / tile_count_x);
+  f32 const ndc_x0 = -1.0F + (2.0F * static_cast<f32>(tile_x) / tile_count_x);
   f32 const ndc_x1 =
     -1.0F + (2.0F * static_cast<f32>(tile_x + 1) / tile_count_x);
-  f32 const ndc_y0 =
-    -1.0F + (2.0F * static_cast<f32>(tile_y) / tile_count_y);
+  f32 const ndc_y0 = -1.0F + (2.0F * static_cast<f32>(tile_y) / tile_count_y);
   f32 const ndc_y1 =
     -1.0F + (2.0F * static_cast<f32>(tile_y + 1) / tile_count_y);
 
@@ -296,10 +291,9 @@ public:
     -> ClusteredLightingState& = default;
 
   auto ensure_buffers(ClusterConfig const& config) -> void {
-    u32 const point_light_bytes =
-      static_cast<u32>(
-        sizeof(GpuPointLight) * std::max(config.max_point_lights, 1U)
-      );
+    u32 const point_light_bytes = static_cast<u32>(
+      sizeof(GpuPointLight) * std::max(config.max_point_lights, 1U)
+    );
     u32 const cluster_bytes =
       static_cast<u32>(sizeof(ClusterGpuRecord) * config.cluster_count());
     u32 const light_index_bytes =
@@ -307,22 +301,16 @@ public:
 
     if (!point_light_buffer.ready() ||
         point_light_buffer_bytes != point_light_bytes) {
-      point_light_buffer = SSBO(
-        point_light_bytes, nullptr, RL_DYNAMIC_DRAW
-      );
+      point_light_buffer = SSBO(point_light_bytes, nullptr, RL_DYNAMIC_DRAW);
       point_light_buffer_bytes = point_light_bytes;
     }
     if (!cluster_buffer.ready() || cluster_buffer_bytes != cluster_bytes) {
-      cluster_buffer = SSBO(
-        cluster_bytes, nullptr, RL_DYNAMIC_DRAW
-      );
+      cluster_buffer = SSBO(cluster_bytes, nullptr, RL_DYNAMIC_DRAW);
       cluster_buffer_bytes = cluster_bytes;
     }
     if (!light_index_buffer.ready() ||
         light_index_buffer_bytes != light_index_bytes) {
-      light_index_buffer = SSBO(
-        light_index_bytes, nullptr, RL_DYNAMIC_DRAW
-      );
+      light_index_buffer = SSBO(light_index_bytes, nullptr, RL_DYNAMIC_DRAW);
       light_index_buffer_bytes = light_index_bytes;
     }
     if (!overflow_buffer.ready()) {
@@ -417,9 +405,8 @@ public:
       for (i32 z = 0; z < slice_count_z; ++z) {
         for (i32 y = 0; y < tile_count_y; ++y) {
           for (i32 x = 0; x < tile_count_x; ++x) {
-            u32 const cluster_index = static_cast<u32>(
-              ((z * tile_count_y + y) * tile_count_x) + x
-            );
+            u32 const cluster_index =
+              static_cast<u32>(((z * tile_count_y + y) * tile_count_x) + x);
             clusters_cpu[cluster_index] = gl::build_cluster_record(
               config,
               inverse_projection,
@@ -484,8 +471,7 @@ private:
   auto dispatch_cluster_build(
     ecs::ExtractedView const& view, ClusterConfig const& config
   ) -> void {
-    u32 const point_light_count =
-      static_cast<u32>(point_lights_cpu.size());
+    u32 const point_light_count = static_cast<u32>(point_lights_cpu.size());
     u32 const workgroups = (point_light_count + 63U) / 64U;
     if (workgroups == 0) {
       return;

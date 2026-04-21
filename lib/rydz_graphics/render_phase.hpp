@@ -9,7 +9,7 @@ namespace ecs {
 struct RenderCommand {
   Handle<Mesh> mesh{};
   CompiledMaterial material{};
-  std::vector<gl::Matrix> instances;
+  std::vector<rl::Matrix> instances;
   f32 sort_key = 0.0F;
 
   auto add_instance(Mat4 const& transform) -> void {
@@ -17,8 +17,7 @@ struct RenderCommand {
   }
 };
 
-template <typename Tag>
-struct RenderPhase {
+template <typename Tag> struct RenderPhase {
   using T = Resource;
 
   std::vector<RenderCommand> commands;

@@ -44,7 +44,7 @@ inline auto transform_from_cgltf_node(cgltf_node const& node) -> Transform {
   }
 
   if (node.has_matrix) {
-    gl::Matrix matrix = {
+    rl::Matrix matrix = {
       node.matrix[0],
       node.matrix[4],
       node.matrix[8],
