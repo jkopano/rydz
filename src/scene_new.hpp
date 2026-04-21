@@ -10,6 +10,7 @@
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/mod.hpp"
 #include "rydz_graphics/render_plugin.hpp"
+#include "rydz_levelLoader/rydz_levelLoader.hpp"
 #include "rydz_ui/mod.hpp"
 #include <algorithm>
 #include <print>
@@ -327,9 +328,11 @@ inline void scene_plugin(App& app) {
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
   app.add_systems(ScheduleLabel::Startup, setup_lighting);
-  app.add_systems(ScheduleLabel::Startup, spawn_ground);
+  // app.add_systems(ScheduleLabel::Startup, spawn_ground);
   app.add_systems(ScheduleLabel::Startup, spawn_player);
-  // app.add_systems(ScheduleLabel::Startup, load_level);
+
+  app.add_systems(ScheduleLabel::Startup, spawn_model);
+  app.add_systems(ScheduleLabel::Startup, spawn_entity_models);
 
   app.add_systems(ScheduleLabel::Startup, setup_ui);
   app.add_systems(ScheduleLabel::Update, show_player_position_ui);
