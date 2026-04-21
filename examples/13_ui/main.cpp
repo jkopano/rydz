@@ -1,7 +1,12 @@
-#pragma once
+#include "math.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/fwd.hpp"
+#include "rydz_ecs/mod.hpp"
+#include "rydz_graphics/mod.hpp"
+#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_platform/mod.hpp"
 #include "rydz_ui/mod.hpp"
+#include "rydz_ui/ui_plugin.hpp"
 
 using namespace ecs;
 using namespace math;
@@ -11,7 +16,7 @@ struct WasdKeyMarker {
   int keycode;
 };
 
-void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
+void setup(Res<rydz::ui::UiRoot> root, Cmd cmd) {
   if (!root.ptr)
     return;
 
@@ -96,10 +101,17 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
   spawn_key(KEY_D, "D");
 }
 
-// ── Plugin ───────────────────────────────────────────────────────────────────
-
-inline void scene_plugin(App &app) {
-  app.add_plugin(UiPlugin::install);
-
-  app.add_systems(ScheduleLabel::Startup, setup_ui);
+int main() {
+  App app;
+  app.add_plugin(rydz_platform::RayPlugin::install({
+                     .window = {.width = 800,
+                                .height = 600,
+                                .title = "13 - UI",
+                                .target_fps = 60},
+                 }))
+      .add_plugin(RenderPlugin::install)
+      .add_plugin(Input::install)
+      .add_plugin(UiPlugin::install)
+      .add_systems(Startup, setup)
+      .run();
 }

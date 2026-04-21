@@ -187,6 +187,7 @@ local examples = {
 	"10_custom_material",
 	"11_sets",
 	"12_observers",
+	"13_ui",
 }
 
 for _, name in ipairs(examples) do
