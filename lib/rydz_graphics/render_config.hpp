@@ -7,7 +7,7 @@ namespace ecs {
 
 struct RenderConfig {
   gl::Depth depth{};
-  gl::Blend blend = gl::Blend::disabled();
+  gl::Blend blend = gl::Blend::alpha();
   gl::Cull cull = gl::Cull::back();
   gl::Polygon polygon{};
   gl::ColorMask color_mask{};

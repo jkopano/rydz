@@ -562,12 +562,12 @@ inline auto to_rl(Mat4 value) -> ::Matrix {
 }
 
 inline auto from_rl(::Matrix const& value) -> Mat4 {
-  return Mat4(
+  return {
     Vec4(value.m0, value.m1, value.m2, value.m3),
     Vec4(value.m4, value.m5, value.m6, value.m7),
     Vec4(value.m8, value.m9, value.m10, value.m11),
     Vec4(value.m12, value.m13, value.m14, value.m15)
-  );
+  };
 }
 
 } // namespace rydz_math

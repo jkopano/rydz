@@ -157,6 +157,9 @@ TEST(MaterialTest, DoubleSidedMaterialDisablesCulling) {
 }
 
 TEST(MaterialTest, RenderConfigsBuildExpectedStateValues) {
+  auto default_config = ecs::RenderConfig::get_default();
+  EXPECT_EQ(default_config.blend, gl::Blend::alpha());
+
   auto opaque = ecs::RenderConfig::opaque();
   EXPECT_EQ(opaque.blend, gl::Blend::disabled());
   EXPECT_EQ(opaque.depth, (gl::Depth{.test = true, .write = true}));

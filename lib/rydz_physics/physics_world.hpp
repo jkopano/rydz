@@ -40,7 +40,7 @@ struct PhysicsSettings {
 
   f32 fixed_hz = 60.0f;
   f32 gravity_y = -9.81f;
-  u32 max_bodies = 4096;
+  u32 max_bodies = 4096 * 64;
   u32 num_body_mutexes = 0;
   u32 max_body_pairs = 65536;
   u32 max_contact_constraints = 10240;

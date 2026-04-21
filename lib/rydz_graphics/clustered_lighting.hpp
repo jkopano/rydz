@@ -6,6 +6,7 @@
 #include "rydz_graphics/gl/core.hpp"
 #include "rydz_log/mod.hpp"
 #include "types.hpp"
+#include <algorithm>
 #include <array>
 #include <cfloat>
 #include <cmath>
@@ -23,12 +24,30 @@ struct ClusterConfig {
   u32 max_point_lights = 1024;
   u32 max_lights_per_cluster = 128;
 
+  [[nodiscard]] auto tile_count_x_clamped() const -> i32 {
+    return std::max(tile_count_x, 1);
+  }
+
+  [[nodiscard]] auto tile_count_y_clamped() const -> i32 {
+    return std::max(tile_count_y, 1);
+  }
+
+  [[nodiscard]] auto slice_count_z_clamped() const -> i32 {
+    return std::max(slice_count_z, 1);
+  }
+
+  [[nodiscard]] auto max_lights_per_cluster_clamped() const -> u32 {
+    return std::max(max_lights_per_cluster, 1U);
+  }
+
   [[nodiscard]] auto cluster_count() const -> u32 {
-    return static_cast<u32>(tile_count_x * tile_count_y * slice_count_z);
+    return static_cast<u32>(
+      tile_count_x_clamped() * tile_count_y_clamped() * slice_count_z_clamped()
+    );
   }
 
   [[nodiscard]] auto max_light_indices() const -> u32 {
-    return cluster_count() * max_lights_per_cluster;
+    return cluster_count() * max_lights_per_cluster_clamped();
   }
 };
 
@@ -49,6 +68,87 @@ static constexpr auto CLUSTER_RECORD_SIZE = 48;
 static_assert(sizeof(GpuPointLight) == POINT_LIGHT_SIZE);
 static_assert(sizeof(ClusterGpuRecord) == CLUSTER_RECORD_SIZE);
 
+class ComputeProgram {
+public:
+  ComputeProgram() = default;
+  ComputeProgram(ComputeProgram const&) = delete;
+  auto operator=(ComputeProgram const&) -> ComputeProgram& = delete;
+
+  ComputeProgram(ComputeProgram&& other) noexcept
+      : id_(std::exchange(other.id_, 0)) {}
+  auto operator=(ComputeProgram&& other) noexcept -> ComputeProgram& {
+    if (this == &other) {
+      return *this;
+    }
+
+    reset();
+    id_ = std::exchange(other.id_, 0);
+    return *this;
+  }
+
+  ~ComputeProgram() { reset(); }
+
+  [[nodiscard]] auto ready() const -> bool { return id_ != 0; }
+  [[nodiscard]] auto id() const -> u32 { return id_; }
+
+  auto reset() -> void {
+    if (id_ != 0) {
+      rl::rlUnloadShaderProgram(id_);
+      id_ = 0;
+    }
+  }
+
+  auto load(char const* path) -> bool {
+    reset();
+
+    char* source = rl::LoadFileText(path);
+    if (source == nullptr) {
+      warn("Forward+: failed to load compute shader '{}'", path);
+      return false;
+    }
+
+    u32 const shader_id = rl::rlCompileShader(source, RL_COMPUTE_SHADER);
+    rl::UnloadFileText(source);
+    if (shader_id == 0) {
+      warn("Forward+: failed to compile compute shader '{}'", path);
+      return false;
+    }
+
+    id_ = rl::rlLoadComputeShaderProgram(shader_id);
+    glDeleteShader(shader_id);
+
+    if (id_ == 0) {
+      warn("Forward+: failed to link compute shader '{}'", path);
+      return false;
+    }
+
+    return true;
+  }
+
+private:
+  u32 id_ = 0;
+};
+
+struct ClusterConfigSnapshot {
+  i32 tile_count_x = 0;
+  i32 tile_count_y = 0;
+  i32 slice_count_z = 0;
+  u32 max_point_lights = 0;
+  u32 max_lights_per_cluster = 0;
+
+  auto operator==(ClusterConfigSnapshot const&) const -> bool = default;
+
+  static auto from(ClusterConfig const& config) -> ClusterConfigSnapshot {
+    return {
+      .tile_count_x = config.tile_count_x_clamped(),
+      .tile_count_y = config.tile_count_y_clamped(),
+      .slice_count_z = config.slice_count_z_clamped(),
+      .max_point_lights = config.max_point_lights,
+      .max_lights_per_cluster = config.max_lights_per_cluster_clamped(),
+    };
+  }
+};
+
 inline auto cluster_slice_distance(
   ClusterConfig const& config,
   f32 near_plane,
@@ -59,8 +159,8 @@ inline auto cluster_slice_distance(
   constexpr auto MARGIN = 0.001F;
   f32 clamped_near = std::max(near_plane, MARGIN);
   f32 clamped_far = std::max(far_plane, clamped_near + MARGIN);
-  f32 alpha =
-    static_cast<f32>(slice_index) / static_cast<f32>(config.slice_count_z);
+  f32 alpha = static_cast<f32>(slice_index) /
+              static_cast<f32>(config.slice_count_z_clamped());
 
   if (orthographic) {
     return clamped_near + ((clamped_far - clamped_near) * alpha);
@@ -91,23 +191,24 @@ inline auto build_cluster_record(
   i32 tile_z
 ) -> ClusterGpuRecord {
   ClusterGpuRecord record{};
+  i32 const tile_count_x = config.tile_count_x_clamped();
+  i32 const tile_count_y = config.tile_count_y_clamped();
+  u32 const max_lights_per_cluster = config.max_lights_per_cluster_clamped();
 
   u32 const cluster_index = static_cast<u32>(
-    ((tile_z * config.tile_count_y + tile_y) * config.tile_count_x) + tile_x
+    ((tile_z * tile_count_y + tile_y) * tile_count_x) + tile_x
   );
-  record.meta[0] = cluster_index * config.max_lights_per_cluster;
+  record.meta[0] = cluster_index * max_lights_per_cluster;
   record.meta[1] = 0;
   record.meta[2] = 0;
   record.meta[3] = 0;
 
-  f32 const ndc_x0 =
-    -1.0F + (2.0F * static_cast<f32>(tile_x) / config.tile_count_x);
+  f32 const ndc_x0 = -1.0F + (2.0F * static_cast<f32>(tile_x) / tile_count_x);
   f32 const ndc_x1 =
-    -1.0F + (2.0F * static_cast<f32>(tile_x + 1) / config.tile_count_x);
-  f32 const ndc_y0 =
-    -1.0F + (2.0F * static_cast<f32>(tile_y) / config.tile_count_y);
+    -1.0F + (2.0F * static_cast<f32>(tile_x + 1) / tile_count_x);
+  f32 const ndc_y0 = -1.0F + (2.0F * static_cast<f32>(tile_y) / tile_count_y);
   f32 const ndc_y1 =
-    -1.0F + (2.0F * static_cast<f32>(tile_y + 1) / config.tile_count_y);
+    -1.0F + (2.0F * static_cast<f32>(tile_y + 1) / tile_count_y);
 
   f32 const slice_near =
     cluster_slice_distance(config, near_plane, far_plane, orthographic, tile_z);
@@ -163,10 +264,22 @@ struct ClusteredLightingState {
   SSBO cluster_buffer{};
   SSBO light_index_buffer{};
   SSBO overflow_buffer{};
+  ComputeProgram cluster_build_program{};
 
   std::vector<GpuPointLight> point_lights_cpu;
   std::vector<ClusterGpuRecord> clusters_cpu;
-  std::vector<u32> light_indices_cpu;
+
+  math::Mat4 last_proj = math::Mat4::IDENTITY;
+  ClusterConfigSnapshot last_config{};
+  f32 last_near = -1.0F;
+  f32 last_far = -1.0F;
+  bool last_ortho = false;
+  bool last_config_valid = false;
+  bool clusters_dirty = true;
+  u32 point_light_buffer_bytes = 0;
+  u32 cluster_buffer_bytes = 0;
+  u32 light_index_buffer_bytes = 0;
+  bool cluster_build_program_failed = false;
 
 public:
   ClusteredLightingState() = default;
@@ -178,37 +291,44 @@ public:
     -> ClusteredLightingState& = default;
 
   auto ensure_buffers(ClusterConfig const& config) -> void {
-    if (!point_light_buffer.ready()) {
-      point_light_buffer = SSBO(
-        sizeof(GpuPointLight) * config.max_point_lights,
-        nullptr,
-        RL_DYNAMIC_DRAW
-      );
+    u32 const point_light_bytes = static_cast<u32>(
+      sizeof(GpuPointLight) * std::max(config.max_point_lights, 1U)
+    );
+    u32 const cluster_bytes =
+      static_cast<u32>(sizeof(ClusterGpuRecord) * config.cluster_count());
+    u32 const light_index_bytes =
+      static_cast<u32>(sizeof(u32) * config.max_light_indices());
+
+    if (!point_light_buffer.ready() ||
+        point_light_buffer_bytes != point_light_bytes) {
+      point_light_buffer = SSBO(point_light_bytes, nullptr, RL_DYNAMIC_DRAW);
+      point_light_buffer_bytes = point_light_bytes;
     }
-    if (!cluster_buffer.ready()) {
-      cluster_buffer = SSBO(
-        sizeof(ClusterGpuRecord) * config.cluster_count(),
-        nullptr,
-        RL_DYNAMIC_DRAW
-      );
+    if (!cluster_buffer.ready() || cluster_buffer_bytes != cluster_bytes) {
+      cluster_buffer = SSBO(cluster_bytes, nullptr, RL_DYNAMIC_DRAW);
+      cluster_buffer_bytes = cluster_bytes;
     }
-    if (!light_index_buffer.ready()) {
-      light_index_buffer = SSBO(
-        sizeof(u32) * config.max_light_indices(), nullptr, RL_DYNAMIC_DRAW
-      );
+    if (!light_index_buffer.ready() ||
+        light_index_buffer_bytes != light_index_bytes) {
+      light_index_buffer = SSBO(light_index_bytes, nullptr, RL_DYNAMIC_DRAW);
+      light_index_buffer_bytes = light_index_bytes;
     }
     if (!overflow_buffer.ready()) {
       overflow_buffer = SSBO(sizeof(u32), nullptr, RL_DYNAMIC_DRAW);
     }
   }
 
-  auto reset_cpu_storage(ClusterConfig const& config) -> void {
-    point_lights_cpu.clear();
-    point_lights_cpu.reserve(config.max_point_lights);
-    clusters_cpu.clear();
-    clusters_cpu.resize(config.cluster_count());
-    light_indices_cpu.clear();
-    light_indices_cpu.resize(config.max_light_indices(), 0);
+  [[nodiscard]] auto ensure_compute_program() -> bool {
+    if (cluster_build_program.ready()) {
+      return true;
+    }
+    if (cluster_build_program_failed) {
+      return false;
+    }
+
+    cluster_build_program_failed =
+      !cluster_build_program.load("res/shaders/cluster_build.comp");
+    return !cluster_build_program_failed;
   }
 
   auto build_cluster_buffers(
@@ -217,10 +337,38 @@ public:
     ecs::ExtractedLights const& lights,
     ClusterConfig const& config
   ) -> void {
-    static u32 last_reported_overflow = U32_MAX;
+    (void) marker;
 
     ensure_buffers(config);
-    reset_cpu_storage(config);
+
+    ClusterConfigSnapshot const config_snapshot =
+      ClusterConfigSnapshot::from(config);
+    if (!last_config_valid || last_config != config_snapshot) {
+      clusters_dirty = true;
+      last_config = config_snapshot;
+      last_config_valid = true;
+    }
+
+    if (clusters_cpu.size() != config.cluster_count()) {
+      clusters_dirty = true;
+    }
+
+    if (last_proj != view.camera_view.proj || last_near != view.near_plane ||
+        last_far != view.far_plane || last_ortho != view.orthographic) {
+      clusters_dirty = true;
+      last_proj = view.camera_view.proj;
+      last_near = view.near_plane;
+      last_far = view.far_plane;
+      last_ortho = view.orthographic;
+    }
+
+    point_lights_cpu.clear();
+    point_lights_cpu.reserve(config.max_point_lights);
+
+    if (clusters_dirty) {
+      clusters_cpu.clear();
+      clusters_cpu.resize(config.cluster_count());
+    }
 
     usize const point_light_count = std::min(
       lights.point_lights.size(), static_cast<usize>(config.max_point_lights)
@@ -248,68 +396,40 @@ public:
       );
     }
 
-    math::Mat4 const inverse_projection = view.camera_view.proj.inverse();
-    for (i32 z = 0; z < config.slice_count_z; ++z) {
-      for (i32 y = 0; y < config.tile_count_y; ++y) {
-        for (i32 x = 0; x < config.tile_count_x; ++x) {
-          u32 const cluster_index = static_cast<u32>(
-            ((z * config.tile_count_y + y) * config.tile_count_x) + x
-          );
-          clusters_cpu[cluster_index] = gl::build_cluster_record(
-            config,
-            inverse_projection,
-            view.orthographic,
-            view.near_plane,
-            view.far_plane,
-            x,
-            y,
-            z
-          );
+    if (clusters_dirty) {
+      math::Mat4 const inverse_projection = view.camera_view.proj.inverse();
+      i32 const tile_count_x = config.tile_count_x_clamped();
+      i32 const tile_count_y = config.tile_count_y_clamped();
+      i32 const slice_count_z = config.slice_count_z_clamped();
+
+      for (i32 z = 0; z < slice_count_z; ++z) {
+        for (i32 y = 0; y < tile_count_y; ++y) {
+          for (i32 x = 0; x < tile_count_x; ++x) {
+            u32 const cluster_index =
+              static_cast<u32>(((z * tile_count_y + y) * tile_count_x) + x);
+            clusters_cpu[cluster_index] = gl::build_cluster_record(
+              config,
+              inverse_projection,
+              view.orthographic,
+              view.near_plane,
+              view.far_plane,
+              x,
+              y,
+              z
+            );
+          }
         }
+      }
+      clusters_dirty = false;
+    } else {
+      for (auto& cluster : clusters_cpu) {
+        cluster.meta[1] = 0;
+        cluster.meta[2] = 0;
+        cluster.meta[3] = 0;
       }
     }
 
     u32 overflow_count = 0;
-
-    for (u32 light_index = 0;
-         light_index < static_cast<u32>(point_lights_cpu.size());
-         ++light_index) {
-      auto const& light = point_lights_cpu[light_index];
-      math::Vec3 const view_position_math =
-        view.camera_view.view *
-        math::Vec3(
-          light.position_range.x, light.position_range.y, light.position_range.z
-        );
-      auto const view_position = math::to_rl(view_position_math);
-
-      for (auto& cluster : clusters_cpu) {
-        f32 const closest_x = std::clamp(
-          view_position.x, cluster.min_bounds.x, cluster.max_bounds.x
-        );
-        f32 const closest_y = std::clamp(
-          view_position.y, cluster.min_bounds.y, cluster.max_bounds.y
-        );
-        f32 const closest_z = std::clamp(
-          view_position.z, cluster.min_bounds.z, cluster.max_bounds.z
-        );
-        f32 const dx = view_position.x - closest_x;
-        f32 const dy = view_position.y - closest_y;
-        f32 const dz = view_position.z - closest_z;
-        if ((dx * dx) + (dy * dy) + dz * dz >
-            light.position_range.w * light.position_range.w) {
-          continue;
-        }
-
-        if (cluster.meta[1] >= config.max_lights_per_cluster) {
-          ++overflow_count;
-          continue;
-        }
-
-        u32 const offset = cluster.meta[0] + cluster.meta[1];
-        light_indices_cpu[offset] = light_index;
-        ++cluster.meta[1];
-      }
-    }
 
     if (!point_lights_cpu.empty()) {
       point_light_buffer.update(
@@ -325,23 +445,10 @@ public:
       0
     );
 
-    light_index_buffer.update(
-      light_indices_cpu.data(),
-      static_cast<u32>(light_indices_cpu.size() * sizeof(u32)),
-      0
-    );
-
     overflow_buffer.update(&overflow_count, sizeof(overflow_count), 0);
 
-    if (overflow_count > 0) {
-      if (last_reported_overflow != overflow_count) {
-        warn(
-          "Forward+: cluster light list overflowed {} writes", overflow_count
-        );
-        last_reported_overflow = overflow_count;
-      }
-    } else {
-      last_reported_overflow = U32_MAX;
+    if (!point_lights_cpu.empty() && ensure_compute_program()) {
+      dispatch_cluster_build(view, config);
     }
   }
 
@@ -358,6 +465,50 @@ public:
     if (overflow_buffer.ready()) {
       overflow_buffer.bind(3);
     }
+  }
+
+private:
+  auto dispatch_cluster_build(
+    ecs::ExtractedView const& view, ClusterConfig const& config
+  ) -> void {
+    u32 const point_light_count = static_cast<u32>(point_lights_cpu.size());
+    u32 const workgroups = (point_light_count + 63U) / 64U;
+    if (workgroups == 0) {
+      return;
+    }
+
+    point_light_buffer.bind(0);
+    cluster_buffer.bind(1);
+    light_index_buffer.bind(2);
+    overflow_buffer.bind(3);
+
+    u32 const program_id = cluster_build_program.id();
+    rl::rlEnableShader(program_id);
+
+    auto set_uint = [program_id](char const* name, u32 value) -> void {
+      i32 const location = rl::rlGetLocationUniform(program_id, name);
+      if (location >= 0) {
+        rl::rlSetUniform(location, &value, SHADER_UNIFORM_UINT, 1);
+      }
+    };
+
+    set_uint("u_point_light_count", point_light_count);
+    set_uint("u_cluster_count", config.cluster_count());
+    set_uint(
+      "u_max_lights_per_cluster", config.max_lights_per_cluster_clamped()
+    );
+
+    i32 const view_location = rl::rlGetLocationUniform(program_id, "u_view");
+    if (view_location >= 0) {
+      Matrix const view_matrix = math::to_rl(view.camera_view.view);
+      rl::rlSetUniformMatrix(view_location, view_matrix);
+    }
+
+    rl::rlComputeShaderDispatch(workgroups, 1, 1);
+    glMemoryBarrier(
+      GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT
+    );
+    rl::rlDisableShader();
   }
 };
 

@@ -38,6 +38,11 @@ local tracy_enabled = false
 local function add_tracy()
 	if tracy_enabled then
 		add_packages("tracy")
+		if is_plat("linux") then
+			-- system_name_of() uses dladdr(); exported executable symbols are
+			-- needed so Tracy gets function names instead of raw addresses.
+			add_ldflags("-rdynamic", { force = true })
+		end
 	end
 end
 

@@ -40,7 +40,7 @@ void setup_scene(
   cmd.spawn(
     Camera3d::perspective(),
     ActiveCamera{},
-    Transform::from_xyz(-5.0f, 8.0f, -5.0f).look_at(Vec3(0.0f, 5.0f, 0.0f)),
+    Transform::from_xyz(-55.0f, 48.0f, -55.0f).look_at(Vec3(0.0f, 0.0f, 0.0f)),
     Skybox::from("textures/skybox")
   );
 
@@ -66,8 +66,8 @@ void spawn_cubes(
   auto cube_mat =
     materials->add(StandardMaterial::from_color(Color{200, 60, 60}));
 
-  for (auto x : range(-10u, 10u)) {
-    for (auto y : range(-10u, 10u)) {
+  for (auto x : range(-10, 10)) {
+    for (auto y : range(-10, 10)) {
       cmd.spawn(
         Transform::from_xyz(2.f * x, 20.f, 2.f * y),
         RigidBody{},

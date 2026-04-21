@@ -4,10 +4,12 @@
 #include "frustum.hpp"
 #include "pipeline.hpp"
 #include "render_extract.hpp"
+#include "render_graph.hpp"
 #include "render_passes.hpp"
 #include "render_phase.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/assets/loaders.hpp"
 #include "rydz_graphics/assets/scene_runtime.hpp"
 
@@ -63,13 +65,28 @@ struct RenderPlugin {
       .init_resource<ShaderCache>()
       .init_resource<SlotProviderRegistry>()
       .init_resource<DebugOverlaySettings>()
-      .init_resource<PipelineState>()
       .init_resource<gl::RenderState>()
       .init_resource<ShadowPhase>()
       .init_resource<OpaquePhase>()
       .init_resource<TransparentPhase>()
       .init_resource<UiPhase>()
       .init_resource<RenderExecutionState>();
+
+    app.init_resource<RenderGraph>();
+    if (auto* graph = app.world().get_resource<RenderGraph>()) {
+      auto const main_target = graph->create_texture({}, "MainTarget");
+      auto const screen = graph->import_backbuffer("Screen");
+
+      graph->add_pass<ClearPass>(main_target);
+      graph->add_pass<ShadowPass>();
+      graph->add_pass<DepthPrepass>(main_target);
+      graph->add_pass<ClusterBuildPass>();
+      graph->add_pass<SkyboxPass>(main_target);
+      graph->add_pass<OpaquePass>(main_target);
+      graph->add_pass<TransparentPass>(main_target);
+      graph->add_pass<PostProcessPassNode>(main_target, screen);
+      graph->add_pass<UiPass>(main_target, screen);
+    }
 
     if (auto* server = app.world().get_resource<AssetServer>()) {
       register_default_loaders(*server);
@@ -96,11 +113,7 @@ struct RenderPlugin {
       .configure_set(
         Render,
         configure(
-          RenderPassSet::Setup,
-          RenderPassSet::Main,
-          RenderPassSet::PostProcess,
-          RenderPassSet::Ui,
-          RenderPassSet::Cleanup
+          RenderPassSet::Setup, RenderPassSet::Main, RenderPassSet::Cleanup
         )
           .chain()
       );
@@ -137,42 +150,13 @@ struct RenderPlugin {
 
       .add_systems(
         RenderExtractSet::Queue,
-        group(
-          Queue::queue<ExtractedMeshes, ShadowPhase>,
-          Queue::queue<ExtractedMeshes, OpaquePhase>,
-          Queue::queue<ExtractedMeshes, TransparentPhase>,
-          Queue::queue<ExtractedUi, UiPhase>
-        )
+        group(Queue::shadow, Queue::opaque, Queue::transparent, Queue::ui)
           .chain()
       )
 
-      .add_systems(
-        RenderExtractSet::Prepare,
-        group(
-          Prepare::prepare_meshes,
-          Prepare::build_batches<OpaquePhase>,
-          Prepare::build_batches<TransparentPhase>
-        )
-          .chain()
-      );
-
-    app
+      .add_systems(RenderExtractSet::Prepare, group(Prepare::prepare_meshes))
       .add_systems(RenderPassSet::Setup, FramePass::begin)
-
-      .add_systems(
-        RenderPassSet::Main,
-        group(
-          WorldPass::shadow,
-          WorldPass::depth_prepass,
-          WorldPass::cluster_build,
-          WorldPass::opaque,
-          WorldPass::transparent
-        )
-          .chain()
-      )
-
-      .add_systems(RenderPassSet::PostProcess, PostProcessPass::postprocess)
-      .add_systems(RenderPassSet::Ui, UiPass::ui)
+      .add_systems(RenderPassSet::Main, FramePass::execute_graph)
       .add_systems(RenderPassSet::Cleanup, FramePass::end);
 
     register_material<StandardMaterial>(app);
