@@ -4,7 +4,7 @@ in vec2 fragTexCoord;
 
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
-uniform float u_alpha_cutoff;
+uniform float alphaCutoff;
 uniform int u_render_method;
 
 const int RENDER_METHOD_OPAQUE = 0;
@@ -15,7 +15,7 @@ out vec4 finalColor;
 void main() {
   vec4 texelColor = texture(texture0, fragTexCoord);
   finalColor = texelColor * colDiffuse;
-  if (u_render_method != RENDER_METHOD_OPAQUE && finalColor.a < u_alpha_cutoff) {
+  if (u_render_method != RENDER_METHOD_OPAQUE && finalColor.a < alphaCutoff) {
     discard;
   }
   if (u_render_method != RENDER_METHOD_TRANSPARENT) {

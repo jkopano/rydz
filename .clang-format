@@ -1,0 +1,30 @@
+---
+BasedOnStyle: LLVM
+IndentWidth: 2
+ColumnLimit: 80
+Standard: Latest
+
+AllowShortFunctionsOnASingleLine: All
+AllowShortLambdasOnASingleLine: All
+AlwaysBreakAfterReturnType: None
+AlignAfterOpenBracket: BlockIndent
+
+BinPackParameters: false
+BinPackArguments: false
+PenaltyReturnTypeOnItsOwnLine: 10000000
+
+Cpp11BracedListStyle: true
+SpaceAfterCStyleCast: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCpp11BracedList: false
+
+SortIncludes: CaseSensitive
+MaxEmptyLinesToKeep: 1
+
+DerivePointerAlignment: false
+PointerAlignment: Left
+
+ContinuationIndentWidth: 2
+QualifierAlignment: Custom
+QualifierOrder: ['static', 'inline', 'type', 'const', 'volatile']
+...

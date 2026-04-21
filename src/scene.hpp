@@ -39,100 +39,119 @@ struct CameraController {
   bool enabled = true;
 };
 
-inline void
-camera_controller_system(Query<Mut<Transform>, CameraController> query,
-                         Res<Time> time, Res<Input> input) {
+inline auto camera_controller_system(
+  Query<Mut<Transform>, CameraController> query,
+  Res<Time> time,
+  Res<Input> input
+) -> void {
 
   for (auto [t, ctrl] : query.iter()) {
-    if (!ctrl->enabled)
+    if (!ctrl->enabled) {
       return;
+    }
 
     f32 dt = time->delta_seconds;
     f32 speed = ctrl->move_speed;
 
-    Vec3 move = Vec3::sZero();
+    Vec3 move = Vec3::ZERO;
     Vec3 forward = t->forward();
     Vec3 right = t->right();
 
-    if (input->key_down(KEY_LEFT_CONTROL))
+    if (input->key_down(KEY_LEFT_CONTROL)) {
       speed *= 3.0f;
-    if (input->key_down(KEY_W))
+    }
+    if (input->key_down(KEY_W)) {
       move += forward;
-    if (input->key_down(KEY_S))
+    }
+    if (input->key_down(KEY_S)) {
       move -= forward;
-    if (input->key_down(KEY_D))
+    }
+    if (input->key_down(KEY_D)) {
       move += right;
-    if (input->key_down(KEY_A))
+    }
+    if (input->key_down(KEY_A)) {
       move -= right;
-    if (input->key_down(KEY_SPACE))
+    }
+    if (input->key_down(KEY_SPACE)) {
       move += Vec3(0, 1, 0);
-    if (input->key_down(KEY_LEFT_SHIFT))
+    }
+    if (input->key_down(KEY_LEFT_SHIFT)) {
       move -= Vec3(0, 1, 0);
+    }
 
-    if (move.LengthSq() > 0.0f) {
-      move = move.Normalized();
+    if (move.length_sq() > 0.0f) {
+      move = move.normalized();
       t->translation = t->translation + move * (speed * dt);
     }
   }
 }
 
-inline void
-camera_mouse_system(Query<Mut<CameraController>, Mut<Transform>> query,
-                    Res<Input> input) {
+inline void camera_mouse_system(
+  Query<Mut<CameraController>, Mut<Transform>> query, Res<Input> input
+) {
   Vec2 m = input->mouse_delta();
 
   for (auto [ctrl, t] : query.iter()) {
-    if (!ctrl->enabled || (m.x == 0 && m.y == 0))
+    if (!ctrl->enabled || (m.x == 0 && m.y == 0)) {
       return;
+    }
 
-    ctrl->yaw -= m.x * ctrl->mouse_sensitivity * 57.f;
-    ctrl->pitch -= m.y * ctrl->mouse_sensitivity * 57.f;
+    ctrl->yaw -= m.x * ctrl->mouse_sensitivity * 57.0f;
+    ctrl->pitch -= m.y * ctrl->mouse_sensitivity * 57.0f;
 
-    if (ctrl->pitch > 89.0f)
-      ctrl->pitch = 89.0f;
-    if (ctrl->pitch < -89.0f)
-      ctrl->pitch = -89.0f;
+    ctrl->pitch = std::min(ctrl->pitch, 89.0f);
+    ctrl->pitch = std::max(ctrl->pitch, -89.0f);
 
-    t->rotation = Quat::sEulerAngles(
-        Vec3(ctrl->pitch * DEG2RAD, ctrl->yaw * DEG2RAD, 0.0f));
+    t->rotation =
+      Quat::from_euler(Vec3(ctrl->pitch * DEG2RAD, DEG2RAD * ctrl->yaw, 0.0f));
   }
 }
 
-inline void spawn_map(Cmd cmd, Res<AssetServer> asset_server) {
-  cmd.spawn(MapTag{}, CameraState{FreeLook{}},
-            SceneRoot{asset_server->load<Scene>("res/models/sponza.glb")},
-            Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}});
+inline auto spawn_map(Cmd cmd, Res<AssetServer> asset_server) -> void {
+  cmd.spawn(
+    MapTag{},
+    CameraState{FreeLook{}},
+    SceneRoot{asset_server->load<Scene>("res/models/sponza.glb")},
+    Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}}
+  );
 }
 
-inline void spawn_model(Cmd cmd, Res<AssetServer> asset_server) {
-  cmd.spawn(SceneRoot{asset_server->load<Scene>("res/models/hot_sun.glb")},
-            Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}});
+inline auto spawn_model(Cmd cmd, Res<AssetServer> asset_server) -> void {
+  cmd.spawn(
+    SceneRoot{asset_server->load<Scene>("res/models/hot_sun.glb")},
+    Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}}
+  );
 }
 
-inline void some_shit(Query<CameraState> q) {
+inline auto some_shit(Query<CameraState> q) -> void {
   if (auto x = q.single(); x) {
-    auto state = *x;
+    auto const* state = *x;
 
-    std::visit(over{[&](const FreeLook &fl) {
-                      // std::print("Kamera w trybie FreeLook\n");
-                    },
-                    [&](const Cinematic &c) {
-                      // std::print("Kamera w trybie Cinematic\n");
-                    },
-                    [&](const Locked &l) {
-                      // std::print("Kamera śledzi encję: {}\n", 10);
-                    }},
-               *state);
+    std::visit(
+      over{
+        [&](FreeLook const& fl) -> void { info("Kamera w trybie FreeLook\n"); },
+        [&](Cinematic const& c) -> void {
+          info("Kamera w trybie Cinematic\n");
+        },
+        [&](Locked const& l) -> void { info("Kamera śledzi encję: {}\n", 10); }
+      },
+      *state
+    );
   }
 }
 
-inline void spawn_some_texture(Cmd cmd, ResMut<Assets<ecs::Texture>> textures,
-                               NonSendMarker) {
-  auto stone_tex = textures->add(gl::load_texture("res/textures/stone.jpg"));
-  cmd.spawn(ecs::Sprite{stone_tex}, Transform{
-                                        .translation = Vec3(10.0f, 10.0f, 0.0f),
-                                        .scale = Vec3::sReplicate(1.0f),
-                                    });
+inline auto spawn_some_texture(
+  Cmd cmd, ResMut<Assets<ecs::Texture>> textures, NonSendMarker
+) -> void {
+  cmd.spawn(
+    ecs::Sprite{
+      .handle = textures->add(gl::load_texture("res/textures/stone.jpg"))
+    },
+    Transform{
+      .translation = Vec3(10.0f, 10.0f, 0.0f),
+      .scale = Vec3::splat(1.0f),
+    }
+  );
 }
 
 struct LightsSpawned {
@@ -140,57 +159,73 @@ struct LightsSpawned {
   bool done = false;
 };
 
-inline void spawn_lights_on_input(Cmd cmd,
-                                  ResMut<Assets<ecs::Texture>> textures,
-                                  ResMut<Assets<ecs::Mesh>> meshes,
-                                  ResMut<Assets<ecs::Material>> materials,
-                                  ResMut<LightsSpawned> lights,
-                                  Res<Input> input, NonSendMarker) {
-  if (lights->done || !input->key_pressed(KEY_L))
+inline auto spawn_lights_on_input(
+  Cmd cmd,
+  ResMut<Assets<ecs::Texture>> textures,
+  ResMut<Assets<ecs::Mesh>> meshes,
+  ResMut<Assets<ecs::Material>> materials,
+  ResMut<LightsSpawned> lights,
+  Res<Input> input,
+  NonSendMarker
+) -> void {
+  if (lights->done || !input->key_pressed(KEY_L)) {
     return;
+  }
 
-  cmd.spawn(DirectionalLight{
+  cmd.spawn(
+    DirectionalLight{
       .color = {255, 242, 230, 255},
       .direction = Vec3(-0.3f, -1.0f, -0.5f),
       .intensity = 0.5f,
-  });
+    }
+  );
 
   auto stone_tex = textures->add(gl::load_texture("res/textures/stone.jpg"));
   auto stone_mat = materials->add(StandardMaterial::from_texture(stone_tex));
 
   auto cube_h = meshes->add(mesh::cube());
 
-  cmd.spawn(Mesh3d{cube_h},
-            PointLight{.color = {255, 0, 0, 255},
-                       .intensity = 8800.0f,
-                       .range = 2000.0f},
-            Transform::from_xyz(-50.0f, 50.0f, 0.0f));
+  cmd.spawn(
+    Mesh3d{cube_h},
+    PointLight{
+      .color = {255, 0, 0, 255}, .intensity = 8800.0f, .range = 2000.0f
+    },
+    Transform::from_xyz(-50.0f, 50.0f, 0.0f)
+  );
 
   auto cube_h2 = meshes->add(mesh::cube());
 
-  cmd.spawn(Mesh3d{cube_h2}, MeshMaterial3d{stone_mat},
-            Transform::from_xyz(50.0f, 50.0f, 0.0f));
+  cmd.spawn(
+    Mesh3d{cube_h2},
+    MeshMaterial3d{stone_mat},
+    Transform::from_xyz(50.0f, 50.0f, 0.0f)
+  );
 
-  cmd.spawn(PointLight{.color = {75, 75, 255, 255},
-                       .intensity = 800.0f,
-                       .range = 200.0f},
-            Transform::from_xyz(100.0f, 100.0f, 0.0f));
+  cmd.spawn(
+    PointLight{
+      .color = {75, 75, 255, 255}, .intensity = 800.0f, .range = 200.0f
+    },
+    Transform::from_xyz(100.0f, 100.0f, 0.0f)
+  );
 
   lights->done = true;
 }
 
-inline void setup_camera(Cmd cmd, NonSendMarker) {
-  cmd.spawn(Camera3DComponent::perspective(), ActiveCamera{},
-            Transform::from_xyz(8, 6, 8).look_at(Vec3::sZero()),
-            CameraController{},
-            PostProcessMaterial{DefaultPostProcessMaterial{}},
-            Skybox::from("res/hdri/skybox"));
+inline auto setup_camera(Cmd cmd, NonSendMarker) -> void {
+  cmd.spawn(
+    Camera3d::perspective(),
+    ActiveCamera{},
+    Transform::from_xyz(8, 6, 8).look_at(Vec3::ZERO),
+    CameraController{},
+    PostProcessMaterial{DefaultPostProcessMaterial{}},
+    Skybox::from("res/hdri/skybox")
+  );
   rl::DisableCursor();
 }
 
-inline void scene_plugin(App &app) {
+inline void scene_plugin(App& app) {
   app.add_plugin(system_multithreading({true}));
-  app.insert_resource(LightsSpawned{});
+  app.init_resource<LightsSpawned>();
 
   app.add_systems(Startup, setup_camera);
   app.add_systems(Startup, spawn_some_texture);
@@ -198,7 +233,7 @@ inline void scene_plugin(App &app) {
 
   app.add_systems(Update, camera_controller_system);
   app.add_systems(Update, camera_mouse_system);
-  app.add_systems(Update, some_shit);
+  // app.add_systems(Update, some_shit);
 
   app.add_systems(Update, spawn_lights_on_input);
 }

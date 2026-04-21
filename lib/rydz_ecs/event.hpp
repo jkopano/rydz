@@ -8,8 +8,8 @@
 #include <optional>
 #include <stdexcept>
 #include <tuple>
-#include <typeindex>
 #include <type_traits>
+#include <typeindex>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -18,15 +18,17 @@
 namespace ecs {
 
 template <typename E> struct On {
-  const E *event{};
+  E const* event{};
   Entity observer{};
   std::optional<Entity> target;
 
-  const E &operator*() const { return *event; }
-  const E *operator->() const { return event; }
+  auto operator*() const -> E const& { return *event; }
+  auto operator->() const -> E const* { return event; }
 
-  [[nodiscard]] Entity observer_entity() const { return observer; }
-  [[nodiscard]] std::optional<Entity> target_entity() const { return target; }
+  [[nodiscard]] auto observer_entity() const -> Entity { return observer; }
+  [[nodiscard]] auto target_entity() const -> std::optional<Entity> {
+    return target;
+  }
 };
 
 struct ObservedBy {
@@ -36,13 +38,17 @@ struct ObservedBy {
 class IObserver {
 public:
   IObserver() = default;
-  IObserver(const IObserver &) = default;
-  IObserver(IObserver &&) = delete;
-  IObserver &operator=(const IObserver &) = default;
-  IObserver &operator=(IObserver &&) = delete;
+  IObserver(IObserver const&) = default;
+  IObserver(IObserver&&) = delete;
+  auto operator=(IObserver const&) -> IObserver& = default;
+  auto operator=(IObserver&&) -> IObserver& = delete;
   virtual ~IObserver() = default;
-  virtual void run(World &world, const void *event, Entity observer,
-                   std::optional<Entity> target) = 0;
+  virtual auto run(
+    World& world,
+    void const* event,
+    Entity observer,
+    std::optional<Entity> target
+  ) -> void = 0;
 };
 
 namespace detail {
@@ -50,7 +56,7 @@ namespace detail {
 template <typename... Args> struct observer_function_traits_impl {
   using args_tuple = Tuple<Args...>;
 
-  template <typename Fn> static decltype(auto) apply(Fn &&fn) {
+  template <typename Fn> static auto apply(Fn&& fn) -> decltype(auto) {
     return std::forward<Fn>(fn).template operator()<Args...>();
   }
 };
@@ -84,28 +90,28 @@ struct observer_function_traits<R (*)(Args...)>
     : observer_function_traits_impl<Args...> {};
 
 template <typename T>
-concept HasStatefulObserverParamRetrieve =
-    requires(World &w, const SystemContext &ctx,
-             typename SystemParamTraits<bare_t<T>>::State &state) {
-      SystemParamTraits<bare_t<T>>::retrieve(w, ctx, state);
-    };
+concept HasStatefulObserverParamRetrieve = requires(
+  World& w,
+  SystemContext const& ctx,
+  typename SystemParamTraits<bare_t<T>>::State& state
+) { SystemParamTraits<bare_t<T>>::retrieve(w, ctx, state); };
 
 template <typename T>
 concept HasStatelessObserverParamRetrieve =
-    requires(World &w, const SystemContext &ctx) {
-      SystemParamTraits<bare_t<T>>::retrieve(w, ctx);
-    };
+  requires(World& w, SystemContext const& ctx) {
+    SystemParamTraits<bare_t<T>>::retrieve(w, ctx);
+  };
 
 template <typename T>
 concept ObserverSystemParameter =
-    requires(World &w, SystemAccess &acc) {
-      typename SystemParamTraits<bare_t<T>>::State;
-      {
-        SystemParamTraits<bare_t<T>>::init_state(w)
-      } -> std::same_as<typename SystemParamTraits<bare_t<T>>::State>;
-      SystemParamTraits<bare_t<T>>::access(acc);
-    } && (HasStatefulObserverParamRetrieve<T> ||
-          HasStatelessObserverParamRetrieve<T>);
+  requires(World& w, SystemAccess& acc) {
+    typename SystemParamTraits<bare_t<T>>::State;
+    {
+      SystemParamTraits<bare_t<T>>::init_state(w)
+    } -> std::same_as<typename SystemParamTraits<bare_t<T>>::State>;
+    SystemParamTraits<bare_t<T>>::access(acc);
+  } &&
+  (HasStatefulObserverParamRetrieve<T> || HasStatelessObserverParamRetrieve<T>);
 
 template <typename T> struct is_on_param : std::false_type {};
 template <typename E> struct is_on_param<On<E>> : std::true_type {};
@@ -138,8 +144,8 @@ struct first_on_type_selector<false, First, Rest...> {
 
 template <typename First, typename... Rest>
 struct first_on_type_impl<First, Rest...> {
-  using type = typename first_on_type_selector<is_on_param_v<First>, First,
-                                               Rest...>::type;
+  using type =
+    typename first_on_type_selector<is_on_param_v<First>, First, Rest...>::type;
 };
 
 template <typename TupleT> struct observer_traits;
@@ -150,27 +156,32 @@ template <typename... Args> struct observer_traits<Tuple<Args...>> {
 
 template <typename F>
 using observer_event_t = typename observer_traits<
-    typename observer_function_traits<decay_t<F>>::args_tuple>::event_type;
+  typename observer_function_traits<decay_t<F>>::args_tuple>::event_type;
 
 template <typename F>
 inline constexpr usize observer_on_count_v = observer_traits<
-    typename observer_function_traits<decay_t<F>>::args_tuple>::on_count;
+  typename observer_function_traits<decay_t<F>>::args_tuple>::on_count;
 
 template <typename T>
-using observer_state_t =
-    std::conditional_t<is_on_param_v<T>, std::monostate,
-                       typename SystemParamTraits<bare_t<T>>::State>;
+using observer_state_t = std::conditional_t<
+  is_on_param_v<T>,
+  std::monostate,
+  typename SystemParamTraits<bare_t<T>>::State>;
 
 template <typename T>
 concept ObserverParameter = is_on_param_v<T> || ObserverSystemParameter<T>;
 
-template <typename E> Entity entity_event_target(const E &event) {
+template <typename E> auto entity_event_target(E const& event) -> Entity {
   auto tuple = to_tuple(event);
-  static_assert(std::tuple_size_v<decltype(tuple)> > 0,
-                "EntityEvent must have Entity as its first field.");
+  static_assert(
+    std::tuple_size_v<decltype(tuple)> > 0,
+    "EntityEvent must have Entity as its first field."
+  );
   using First = bare_t<std::tuple_element_t<0, decltype(tuple)>>;
-  static_assert(std::same_as<First, Entity>,
-                "EntityEvent must have Entity as its first field.");
+  static_assert(
+    std::same_as<First, Entity>,
+    "EntityEvent must have Entity as its first field."
+  );
   return std::get<0>(tuple);
 }
 
@@ -185,33 +196,43 @@ template <typename F> class FunctionObserver final : public IObserver {
 
   F func_;
   typename ParamStateTuple<ParamTuple>::type param_states_{};
-  World *state_world_ = nullptr;
+  World* state_world_ = nullptr;
   Tick last_run_{};
 
 public:
   explicit FunctionObserver(F func) : func_(std::move(func)) {
-    static_assert(observer_on_count_v<F> == 1,
-                  "Observer callback must have exactly one On<E> parameter.");
-    static_assert(IsEvent<EventT>,
-                  "Observer On<E> parameter must use an Event or EntityEvent.");
+    static_assert(
+      observer_on_count_v<F> == 1,
+      "Observer callback must have exactly one On<E> parameter."
+    );
+    static_assert(
+      IsEvent<EventT>,
+      "Observer On<E> parameter must use an Event or EntityEvent."
+    );
   }
 
-  void run(World &world, const void *event, Entity observer,
-           std::optional<Entity> target) override {
+  auto run(
+    World& world,
+    void const* event,
+    Entity observer,
+    std::optional<Entity> target
+  ) -> void override {
     ensure_param_states(world);
 
     Tick this_run = world.read_change_tick();
     SystemContext ctx{.last_run = last_run_, .this_run = this_run};
-    const auto &typed_event = *static_cast<const EventT *>(event);
-    observer_function_traits<F>::apply([&]<ObserverParameter... Args>() {
-      run_with_args<Args...>(world, ctx, typed_event, observer, target);
-    });
+    auto const& typed_event = *static_cast<EventT const*>(event);
+    observer_function_traits<F>::apply(
+      [&]<ObserverParameter... Args>() -> auto {
+        run_with_args<Args...>(world, ctx, typed_event, observer, target);
+      }
+    );
     last_run_ = this_run;
   }
 
 private:
   template <typename Arg>
-  static observer_state_t<Arg> init_param_state(World &world) {
+  static auto init_param_state(World& world) -> observer_state_t<Arg> {
     if constexpr (is_on_param_v<Arg>) {
       return {};
     } else {
@@ -219,23 +240,29 @@ private:
     }
   }
 
-  void ensure_param_states(World &world) {
+  auto ensure_param_states(World& world) -> void {
     if (state_world_ == &world) {
       return;
     }
 
-    observer_function_traits<F>::apply([&]<ObserverParameter... Args>() {
-      param_states_ =
+    observer_function_traits<F>::apply(
+      [&]<ObserverParameter... Args>() -> auto {
+        param_states_ =
           Tuple<observer_state_t<Args>...>{init_param_state<Args>(world)...};
-    });
+      }
+    );
     state_world_ = &world;
   }
 
   template <ObserverParameter Arg>
-  static decltype(auto) retrieve_param(World &world, const SystemContext &ctx,
-                                       observer_state_t<Arg> &state,
-                                       const EventT &event, Entity observer,
-                                       std::optional<Entity> target) {
+  static auto retrieve_param(
+    World& world,
+    SystemContext const& ctx,
+    observer_state_t<Arg>& state,
+    EventT const& event,
+    Entity observer,
+    std::optional<Entity> target
+  ) -> decltype(auto) {
     using Raw = bare_t<Arg>;
 
     if constexpr (is_on_param_v<Raw>) {
@@ -248,24 +275,37 @@ private:
   }
 
   template <ObserverParameter... Args>
-  void run_with_args(World &world, const SystemContext &ctx,
-                     const EventT &event, Entity observer,
-                     std::optional<Entity> target) {
-    run_with_args_impl<Args...>(world, ctx, event, observer, target,
-                                std::index_sequence_for<Args...>{});
+  auto run_with_args(
+    World& world,
+    SystemContext const& ctx,
+    EventT const& event,
+    Entity observer,
+    std::optional<Entity> target
+  ) -> void {
+    run_with_args_impl<Args...>(
+      world, ctx, event, observer, target, std::index_sequence_for<Args...>{}
+    );
   }
 
   template <ObserverParameter... Args, std::size_t... I>
-  void run_with_args_impl(World &world, const SystemContext &ctx,
-                          const EventT &event, Entity observer,
-                          std::optional<Entity> target,
-                          std::index_sequence<I...>) {
-    func_(retrieve_param<Args>(world, ctx, std::get<I>(param_states_), event,
-                               observer, target)...);
+  auto run_with_args_impl(
+    World& world,
+    SystemContext const& ctx,
+    EventT const& event,
+    Entity observer,
+    std::optional<Entity> target,
+    std::index_sequence<I...>
+  ) -> void {
+    func_(
+      retrieve_param<Args>(
+        world, ctx, std::get<I>(param_states_), event, observer, target
+      )...
+    );
   }
 };
 
-template <typename F> std::unique_ptr<IObserver> make_observer(F &&func) {
+template <typename F>
+auto make_observer(F&& func) -> std::unique_ptr<IObserver> {
   using Fn = decay_t<F>;
   return std::make_unique<FunctionObserver<Fn>>(std::forward<F>(func));
 }
@@ -286,69 +326,82 @@ private:
   std::unordered_set<std::type_index> registered_events_;
   std::unordered_map<Entity, ObserverEntry> observers_;
   std::unordered_map<std::type_index, std::vector<Entity>> global_observers_;
-  std::unordered_map<std::type_index,
-                     std::unordered_map<Entity, std::vector<Entity>>>
-      entity_observers_;
+  std::unordered_map<
+    std::type_index,
+    std::unordered_map<Entity, std::vector<Entity>>>
+    entity_observers_;
   std::unordered_map<Entity, std::vector<Entity>> observers_by_target_;
 
-  static void erase_observer_id(std::vector<Entity> &items, Entity observer) {
+  static auto erase_observer_id(std::vector<Entity>& items, Entity observer)
+    -> void {
     std::erase(items, observer);
   }
 
-  void ensure_registered(std::type_index event_type) const {
+  auto ensure_registered(std::type_index event_type) const -> void {
     if (!registered_events_.contains(event_type)) {
-      throw std::runtime_error("Reactive event type was not registered via "
-                               "add_event<T>().");
+      throw std::runtime_error(
+        "Reactive event type was not registered via "
+        "add_event<T>()."
+      );
     }
   }
 
 public:
   template <typename E>
     requires IsEvent<bare_t<E>>
-  void register_event() {
+  auto register_event() -> void {
     registered_events_.insert(std::type_index(typeid(bare_t<E>)));
   }
 
   template <typename E>
     requires IsEvent<bare_t<E>>
-  bool has_event() const {
+  auto has_event() const -> bool {
     return registered_events_.contains(std::type_index(typeid(bare_t<E>)));
   }
 
-  bool has_event(std::type_index event_type) const {
+  auto has_event(std::type_index event_type) const -> bool {
     return registered_events_.contains(event_type);
   }
 
-  bool has_observer(Entity observer) const {
+  auto has_observer(Entity observer) const -> bool {
     return observers_.contains(observer);
   }
 
-  std::vector<Entity> observers_for_target(Entity target) const {
+  auto observers_for_target(Entity target) const -> std::vector<Entity> {
     auto iter = observers_by_target_.find(target);
     return (iter == observers_by_target_.end()) ? std::vector<Entity>{}
                                                 : iter->second;
   }
 
-  void insert_global(Entity observer, std::type_index event_type,
-                     std::unique_ptr<IObserver> callback) {
+  auto insert_global(
+    Entity observer,
+    std::type_index event_type,
+    std::unique_ptr<IObserver> callback
+  ) -> void {
     ensure_registered(event_type);
-    observers_[observer] = ObserverEntry{.event_type = event_type,
-                                         .callback = std::move(callback),
-                                         .target = {}};
+    observers_[observer] = ObserverEntry{
+      .event_type = event_type, .callback = std::move(callback), .target = {}
+    };
     global_observers_[event_type].push_back(observer);
   }
 
-  void insert_targeted(World &world, Entity observer, Entity target,
-                       std::type_index event_type,
-                       std::unique_ptr<IObserver> callback) {
+  auto insert_targeted(
+    World& world,
+    Entity observer,
+    Entity target,
+    std::type_index event_type,
+    std::unique_ptr<IObserver> callback
+  ) -> void {
     ensure_registered(event_type);
-    observers_[observer] = ObserverEntry{.event_type = event_type,
-                                         .callback = std::move(callback),
-                                         .target = target};
+    observers_[observer] = ObserverEntry{
+      .event_type = event_type,
+      .callback = std::move(callback),
+      .target = target
+    };
     entity_observers_[event_type][target].push_back(observer);
     observers_by_target_[target].push_back(observer);
 
-    auto *observed_by = world.get_component<ObservedBy>(target);
+    auto* observed_by = world.get_component<ObservedBy>(target);
     if (observed_by == nullptr) {
       world.insert_component(target, ObservedBy{});
       observed_by = world.get_component<ObservedBy>(target);
@@ -356,7 +409,7 @@ public:
     observed_by->observers.push_back(observer);
   }
 
-  void remove_observer(World &world, Entity observer) {
+  auto remove_observer(World& world, Entity observer) -> void {
     auto it = observers_.find(observer);
     if (it == observers_.end()) {
       return;
@@ -388,7 +441,7 @@ public:
         }
       }
 
-      if (auto *observed_by = world.get_component<ObservedBy>(*target)) {
+      if (auto* observed_by = world.get_component<ObservedBy>(*target)) {
         erase_observer_id(observed_by->observers, observer);
         if (observed_by->observers.empty()) {
           world.remove_component<ObservedBy>(*target);
@@ -407,13 +460,15 @@ public:
 
   template <typename E>
     requires IsEvent<bare_t<E>>
-  void trigger(World &world, E &event) {
+  auto trigger(World& world, E& event) -> void {
     using EventT = bare_t<E>;
     auto event_type = std::type_index(typeid(EventT));
     ensure_registered(event_type);
 
-    auto run_ids = [&](const std::vector<Entity> &ids,
-                       std::optional<Entity> target) {
+    auto run_ids = [&](
+                     std::vector<Entity> const& ids,
+                     std::optional<Entity> target
+                   ) -> auto {
       auto pending = ids;
       for (Entity observer : pending) {
         auto iter = observers_.find(observer);
@@ -442,8 +497,8 @@ public:
   }
 };
 
-inline ObserverRegistry &World::ensure_observer_registry() {
-  auto *registry = get_resource<ObserverRegistry>();
+inline auto World::ensure_observer_registry() -> ObserverRegistry& {
+  auto* registry = get_resource<ObserverRegistry>();
   if (registry == nullptr) {
     insert_resource(ObserverRegistry{});
     registry = get_resource<ObserverRegistry>();
@@ -451,27 +506,27 @@ inline ObserverRegistry &World::ensure_observer_registry() {
   return *registry;
 }
 
-inline const ObserverRegistry *World::observer_registry() const {
+inline auto World::observer_registry() const -> ObserverRegistry const* {
   return get_resource<ObserverRegistry>();
 }
 
-inline void World::despawn_immediate(Entity entity) {
-  for (auto &[_, storage] : storages_) {
+inline auto World::despawn_immediate(Entity entity) -> void {
+  for (auto& [_, storage] : storages_) {
     storage->remove(entity);
   }
   entities.destroy(entity);
 }
 
-inline void World::despawn(Entity entity) {
+inline auto World::despawn(Entity entity) -> void {
   std::vector<Entity> attached_observers;
   bool is_observer = false;
 
-  if (const auto *registry = observer_registry()) {
+  if (auto const* registry = observer_registry()) {
     attached_observers = registry->observers_for_target(entity);
     is_observer = registry->has_observer(entity);
   }
 
-  auto &registry = ensure_observer_registry();
+  auto& registry = ensure_observer_registry();
   for (Entity observer : attached_observers) {
     registry.remove_observer(*this, observer);
     despawn_immediate(observer);
@@ -486,26 +541,30 @@ inline void World::despawn(Entity entity) {
 
 template <typename E>
   requires IsEvent<bare_t<E>>
-inline void World::add_event() {
+inline auto World::add_event() -> void {
   ensure_observer_registry().template register_event<bare_t<E>>();
 }
 
-template <typename F> inline Entity World::add_observer(F &&func) {
+template <typename F> inline auto World::add_observer(F&& func) -> Entity {
   using EventT = detail::observer_event_t<F>;
 
   Entity observer = spawn();
   ensure_observer_registry().insert_global(
-      observer, std::type_index(typeid(EventT)),
-      detail::make_observer(std::forward<F>(func)));
+    observer,
+    std::type_index(typeid(EventT)),
+    detail::make_observer(std::forward<F>(func))
+  );
   return observer;
 }
 
 template <typename F>
-inline Entity World::add_observer(Entity target, F &&func) {
+inline auto World::add_observer(Entity target, F&& func) -> Entity {
   using EventT = detail::observer_event_t<F>;
-  static_assert(IsEntityEvent<EventT>,
-                "Entity-targeted observers require On<E> where E is an "
-                "EntityEvent.");
+  static_assert(
+    IsEntityEvent<EventT>,
+    "Entity-targeted observers require On<E> where E is an "
+    "EntityEvent."
+  );
 
   if (!entities.is_alive(target)) {
     throw std::runtime_error("Cannot add an observer to a dead entity.");
@@ -513,15 +572,19 @@ inline Entity World::add_observer(Entity target, F &&func) {
 
   Entity observer = spawn();
   ensure_observer_registry().insert_targeted(
-      *this, observer, target, std::type_index(typeid(EventT)),
-      detail::make_observer(std::forward<F>(func)));
+    *this,
+    observer,
+    target,
+    std::type_index(typeid(EventT)),
+    detail::make_observer(std::forward<F>(func))
+  );
   return observer;
 }
 
 template <typename E>
   requires IsEvent<bare_t<E>>
-inline void World::trigger(E &&event) {
-  if constexpr (std::is_lvalue_reference_v<E &&>) {
+inline auto World::trigger(E&& event) -> void {
+  if constexpr (std::is_lvalue_reference_v<E&&>) {
     ensure_observer_registry().trigger(*this, event);
   } else {
     bare_t<E> local_event = std::forward<E>(event);

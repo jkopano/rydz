@@ -2,6 +2,7 @@
 
 #include "rydz_graphics/gl/shader.hpp"
 #include <concepts>
+#include <string>
 #include <unordered_map>
 #include <utility>
 
@@ -12,14 +13,14 @@ using gl::Uniform;
 
 struct PostProcessDescriptor {
   ShaderSpec shader;
-  std::unordered_map<std::string_view, Uniform> _uniforms;
+  std::unordered_map<std::string, Uniform> _uniforms;
   bool enabled = true;
 
-  bool operator==(const PostProcessDescriptor &o) const = default;
+  auto operator==(PostProcessDescriptor const& o) const -> bool = default;
 };
 
 template <typename M>
-concept IsPostProcess = requires(const M &m) {
+concept IsPostProcess = requires(M const& m) {
   { m.describe() } -> std::same_as<PostProcessDescriptor>;
 };
 
@@ -43,10 +44,11 @@ struct DefaultPostProcessMaterial {
   float grain = 0.015F;
 
   [[nodiscard]]
-  PostProcessDescriptor describe() const {
+  auto describe() const -> PostProcessDescriptor {
     PostProcessDescriptor descriptor;
-    descriptor.shader = ShaderSpec::from("res/shaders/postprocess.vert",
-                                         "res/shaders/postprocess.frag");
+    descriptor.shader = ShaderSpec::from(
+      "res/shaders/postprocess.vert", "res/shaders/postprocess.frag"
+    );
     descriptor.enabled = enabled;
     descriptor._uniforms.insert_or_assign("u_exposure", Uniform{exposure});
     descriptor._uniforms.insert_or_assign("u_contrast", Uniform{contrast});

@@ -174,8 +174,7 @@ inline void measure_node(ecs::World &world, ecs::Entity entity) {
       auto it = text_cache->items.find(key);
       if (it == text_cache->items.end()) {
         rl::Image img = rl::ImageText(l->text.c_str(),
-                                      static_cast<int>(l->font_size),
-                                      l->color);
+                                      static_cast<int>(l->font_size), l->color);
         rl::Texture2D tex = rl::LoadTextureFromImage(img);
         rl::UnloadImage(img);
         auto handle = textures->add(tex);
@@ -183,9 +182,8 @@ inline void measure_node(ecs::World &world, ecs::Entity entity) {
       }
 
       if (const rl::Texture2D *t = textures->get(it->second)) {
-        c->content_size =
-            math::Vec2(static_cast<float>(t->width),
-                       static_cast<float>(t->height));
+        c->content_size = math::Vec2(static_cast<float>(t->width),
+                                     static_cast<float>(t->height));
         return;
       }
     }

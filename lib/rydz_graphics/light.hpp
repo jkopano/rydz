@@ -8,19 +8,19 @@ namespace ecs {
 using namespace math;
 
 struct PointLight {
-  Color color = kWhite;
+  Color color = Color::WHITE;
   float intensity = 1.0f;
   float range = 10.0f;
 };
 
 struct DirectionalLight {
-  Color color = kWhite;
+  Color color = Color::WHITE;
   Vec3 direction = Vec3(-1, -1, -1);
   float intensity = 1.0f;
 };
 
 struct AmbientLight {
-  Color color = {40, 40, 40, 255};
+  Color color = Color::RAYWHITE;
   float intensity = 0.3f;
 };
 

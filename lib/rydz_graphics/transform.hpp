@@ -12,8 +12,9 @@ using namespace math;
 using Transform = math::Transform;
 using GlobalTransform = math::GlobalTransform;
 
-inline void propagate_transforms(
-    Query<Entity, Transform, Opt<Parent>, Mut<GlobalTransform>> query) {
+inline auto propagate_transforms(
+  Query<Entity, Transform, Opt<Parent>, Mut<GlobalTransform>> query
+) -> void {
 
   std::unordered_map<Entity, Mat4> local_matrices;
   std::unordered_map<Entity, Entity> parents;
@@ -27,13 +28,13 @@ inline void propagate_transforms(
 
   std::unordered_map<Entity, GlobalTransform> cache;
   std::function<GlobalTransform(Entity)> compute =
-      [&](Entity entity) -> GlobalTransform {
+    [&](Entity entity) -> GlobalTransform {
     auto it = cache.find(entity);
     if (it != cache.end()) {
       return it->second;
     }
 
-    Mat4 local_mat = Mat4::sIdentity();
+    Mat4 local_mat = Mat4::IDENTITY;
     auto lit = local_matrices.find(entity);
     if (lit != local_matrices.end()) {
       local_mat = lit->second;
@@ -52,7 +53,7 @@ inline void propagate_transforms(
     return result;
   };
 
-  for (auto &[entity, _] : local_matrices) {
+  for (auto& [entity, _] : local_matrices) {
     compute(entity);
   }
 

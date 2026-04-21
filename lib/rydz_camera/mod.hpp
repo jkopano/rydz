@@ -8,16 +8,16 @@
 
 #include "math.hpp"
 #include "rydz_camera/camera3d.hpp"
+#include "rydz_console/command_api.hpp"
 #include "rydz_ecs/fwd.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "rydz_ecs/params.hpp"
 #include "rydz_ecs/query.hpp"
-#include "rydz_ecs/mod.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
-#include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/mod.hpp"
+#include "rydz_graphics/render_plugin.hpp"
 #include "rydz_graphics/transform.hpp"
-#include "rydz_console/command_api.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -28,16 +28,16 @@ using namespace math;
 struct IsometricCamera {
   using Storage = SparseSetStorage<IsometricCamera>;
 
-  Vec3 target = Vec3::sZero();
+  Vec3 target = Vec3::ZERO;
   Vec3 offset = Vec3(10.0f, 10.0f, 10.0f);
 
   f32 follow_speed = 5.0f;
   bool smooth_follow = true;
 };
 
-inline void
-isometric_camera_system(Query<Mut<Transform>, IsometricCamera> query,
-                        Res<Time> time) {
+inline void isometric_camera_system(
+  Query<Mut<Transform>, IsometricCamera> query, Res<Time> time
+) {
 
   for (auto [t, cam] : query.iter()) {
     f32 dt = time->delta_seconds;
@@ -58,51 +58,54 @@ isometric_camera_system(Query<Mut<Transform>, IsometricCamera> query,
 
 struct IsometricCameraBundle {
   using T = Bundle;
-  Camera3DComponent camera_component;
+  Camera3d camera_component;
   ActiveCamera active_camera;
   Transform transform;
   IsometricCamera iso;
 
-  static IsometricCameraBundle setup(Vec3 target = Vec3::sZero(),
-                                     Vec3 offset = Vec3(10.0f, 10.0f, 10.0f),
-                                     f32 ortho_height = 20.0f,
-                                     f32 follow_speed = 5.0f) {
+  static auto setup(
+    Vec3 target = Vec3::ZERO,
+    Vec3 offset = Vec3(10.0f, 10.0f, 10.0f),
+    f32 ortho_height = 20.0f,
+    f32 follow_speed = 5.0f
+  ) -> IsometricCameraBundle {
     return IsometricCameraBundle{
-        .camera_component = Camera3DComponent::orthographic(ortho_height),
-        .active_camera = ActiveCamera{},
-        .transform = Transform::from_xyz(target.GetX() + offset.GetX(),
-                                         target.GetY() + offset.GetY(),
-                                         target.GetZ() + offset.GetZ())
-                         .look_at(target),
-        .iso = IsometricCamera{
-            .target = target, .offset = offset, .follow_speed = follow_speed}};
+      .camera_component = Camera3d::orthographic(ortho_height),
+      .active_camera = ActiveCamera{},
+      .transform =
+        Transform::from_xyz(
+          target.x + offset.x, target.y + offset.y, target.z + offset.z
+        )
+          .look_at(target),
+      .iso = IsometricCamera{
+        .target = target, .offset = offset, .follow_speed = follow_speed
+      }
+    };
   }
 };
 
-inline void camera_plugin(App& app) {
-    app.add_systems(ScheduleLabel::Update, isometric_camera_system);
+inline auto camera_plugin(App& app) -> void {
+  app.add_systems(ScheduleLabel::Update, isometric_camera_system);
 
-    app.add_systems(ScheduleLabel::Startup, [](World& world) {
+  app.add_systems(ScheduleLabel::Startup, [](World& world) -> void {
+    engine::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
+      return [zoom_level](Query<Mut<Camera3d>> query) -> void {
+        for (auto [cam] : query.iter()) {
+          if (cam->is_orthographic()) {
+            cam->orthographic_height = zoom_level;
+          }
+        }
+      };
+    });
 
-        engine::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
-            return [zoom_level](Query<Mut<Camera3DComponent>> query) {
-                for (auto [cam] : query.iter()) {
-                    if (cam->is_orthographic()) {
-                        cam->orthographic_height = zoom_level;
-                    }
-                }
-                };
-            });
-
-        engine::BindCommand<float>::to(world, "set_cam_speed", [](float speed) {
-            return [speed](Query<Mut<IsometricCamera>> query) {
-                for (auto [iso_cam] : query.iter()) {
-                    iso_cam->follow_speed = speed;
-                }
-                };
-            });
-
-        });
+    engine::BindCommand<float>::to(world, "set_cam_speed", [](float speed) {
+      return [speed](Query<Mut<IsometricCamera>> query) -> void {
+        for (auto [iso_cam] : query.iter()) {
+          iso_cam->follow_speed = speed;
+        }
+      };
+    });
+  });
 }
 
 } // namespace ecs

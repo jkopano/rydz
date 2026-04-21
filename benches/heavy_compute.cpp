@@ -50,9 +50,9 @@ static void BM_HeavyCompute(benchmark::State &state) {
     Query<Mut<Transform>, Mut<Position>> query(world);
     query.each([](Transform *t, Position *p) {
       for (int i = 0; i < 100; i++) {
-        t->matrix = t->matrix.Inversed();
+        t->matrix = t->matrix.inverse();
       }
-      p->value = t->matrix.Multiply3x3(p->value);
+      p->value = t->matrix.transform_vector3(p->value);
     });
   }
 }

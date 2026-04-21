@@ -7,66 +7,70 @@
 #include <string>
 
 template <typename... Args>
-void trace(fmt::format_string<Args...> fmt, Args &&...args) {
+auto trace(fmt::format_string<Args...> fmt, Args&&... args) -> void {
   spdlog::trace(fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void debug(fmt::format_string<Args...> fmt, Args &&...args) {
+auto debug(fmt::format_string<Args...> fmt, Args&&... args) -> void {
   spdlog::debug(fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void info(fmt::format_string<Args...> fmt, Args &&...args) {
+auto info(fmt::format_string<Args...> fmt, Args&&... args) -> void {
   spdlog::info(fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void warn(fmt::format_string<Args...> fmt, Args &&...args) {
+auto warn(fmt::format_string<Args...> fmt, Args&&... args) -> void {
   spdlog::warn(fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void error(fmt::format_string<Args...> fmt, Args &&...args) {
+auto error(fmt::format_string<Args...> fmt, Args&&... args) -> void {
   spdlog::error(fmt, std::forward<Args>(args)...);
 }
 
 // Runtime format string support
 template <typename... Args>
-void trace(fmt::runtime_format_string<Args...> fmt, Args &&...args) {
+auto trace(fmt::runtime_format_string<Args...> fmt, Args&&... args) -> void {
   spdlog::trace(fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void debug(fmt::runtime_format_string<Args...> fmt, Args &&...args) {
+auto debug(fmt::runtime_format_string<Args...> fmt, Args&&... args) -> void {
   spdlog::debug(fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void info(fmt::runtime_format_string<Args...> fmt, Args &&...args) {
+auto info(fmt::runtime_format_string<Args...> fmt, Args&&... args) -> void {
   spdlog::info(fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void warn(fmt::runtime_format_string<Args...> fmt, Args &&...args) {
+auto warn(fmt::runtime_format_string<Args...> fmt, Args&&... args) -> void {
   spdlog::warn(fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void error(fmt::runtime_format_string<Args...> fmt, Args &&...args) {
+auto error(fmt::runtime_format_string<Args...> fmt, Args&&... args) -> void {
   spdlog::error(fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void log(spdlog::level::level_enum level,
-         fmt::runtime_format_string<Args...> fmt, Args &&...args) {
+auto log(
+  spdlog::level::level_enum level,
+  fmt::runtime_format_string<Args...> fmt,
+  Args&&... args
+) -> void {
   spdlog::log(level, fmt, std::forward<Args>(args)...);
 }
 
-inline void init_logging() {
+namespace detail {
+inline auto init_logging() -> void {
   spdlog::set_pattern("%^[%T] [%l] %v%$");
 
-  const char *env_level = std::getenv("RYDZ_LOG");
+  char const* env_level = std::getenv("RYDZ_LOG");
 
   spdlog::level::level_enum level = spdlog::level::info;
 
@@ -92,12 +96,12 @@ inline void init_logging() {
 
   spdlog::set_level(level);
 
-  spdlog::info("Logging level set to: {}",
-               spdlog::level::to_string_view(level));
+  spdlog::info(
+    "Logging level set to: {}", spdlog::level::to_string_view(level)
+  );
 }
+} // namespace detail
 
 struct LogPlugin : public ecs::IPlugin {
-  void build(ecs::App &) override { init_logging(); }
+  auto build(ecs::App&) -> void override { detail::init_logging(); }
 };
-
-inline void log_plugin(ecs::App &) { init_logging(); }
