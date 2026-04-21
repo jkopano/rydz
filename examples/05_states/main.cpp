@@ -2,22 +2,17 @@
 // Pokazuje: init_state, in_state, NextState, OnEnter, OnExit, OnTransition
 
 #include "math.hpp"
-#include "rydz_ecs/core/input.hpp"
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rl.hpp"
+#include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/render_plugin.hpp"
-#include "rydz_graphics/rydz_graphics.hpp"
+#include "rydz_graphics/mod.hpp"
+#include "rydz_platform/mod.hpp"
 #include <print>
 
 using namespace ecs;
 using namespace math;
 
-enum struct GameState { Menu, Playing, Paused };
-
-// struct GameState {
-//   struct Menu;
-//   struct Playing;
-//   struct Paused;
-// };
+enum class GameState { Menu, Playing, Paused };
 
 void on_enter_menu(Cmd cmd) { std::println("[STATE] entered: Menu"); }
 void on_enter_playing(Cmd cmd) { std::println("[STATE] entered: Playing"); }
@@ -58,7 +53,9 @@ void menu_logic() {}
 
 int main() {
   App app;
-  app.add_plugin(Window::install({800, 600, "05 - States (Enter/P/M)", 60}))
+  app.add_plugin(rydz_platform::RayPlugin::install({
+          .window = {800, 600, "05 - States (Enter/P/M)", 60},
+      }))
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)
@@ -72,10 +69,10 @@ int main() {
       // OnTransition - uruchamiane przy każdej zmianie stanu
       .add_systems(OnTransition<GameState>{}, on_any_transition)
       // Systemy z warunkiem in_state
-      .add_systems(ScheduleLabel::Update, state_input)
-      .add_systems(ScheduleLabel::Update,
+      .add_systems(Update, state_input)
+      .add_systems(Update,
                    group(game_logic).run_if(in_state(GameState::Playing)))
-      .add_systems(ScheduleLabel::Update,
+      .add_systems(Update,
                    group(menu_logic).run_if(in_state(GameState::Menu)))
       .run();
 }

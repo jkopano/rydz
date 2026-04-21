@@ -13,8 +13,9 @@ if is_plat("windows") then
 	set_toolchains("clang-cl")
 elseif is_plat("linux") then
 	set_toolchains("clang")
-	add_cxflags("-stdlib=libc++")
-    add_ldflags("-stdlib=libc++")
+	if os.getenv("NIX_PATH") then
+		add_ldflags("-fuse-ld=mold", { force = true })
+	end
 end
 
 -- helpers
@@ -29,10 +30,16 @@ local function is_msvc_like()
 	return tc == "msvc" or tc == "clang-cl"
 end
 
-local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
+-- local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
+local tracy_enabled = false
 local function add_tracy()
 	if tracy_enabled then
 		add_packages("tracy")
+		if is_plat("linux") then
+			-- system_name_of() uses dladdr(); exported executable symbols are
+			-- needed so Tracy gets function names instead of raw addresses.
+			add_ldflags("-rdynamic", { force = true })
+		end
 	end
 end
 
@@ -41,9 +48,21 @@ set_languages("c++23")
 add_includedirs("lib")
 set_warnings("all", "extra")
 
+if is_plat("windows") then
+	-- Dla clang-cl / msvc (jeśli używasz clang-cl, to zrozumie te flagi)
+	add_cxflags("-Wfloat-conversion", "-Wconstant-conversion")
+else
+	-- Dla czystego Clanga na Linuxie
+	add_cxflags("-Wfloat-conversion", "-Wconversion")
+end
+
 -- common dependencies
-add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze")
-add_requires("sol2 v3.3.0", { configs = { includes_lua = false, lua_version = "5.1" } })
+add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")
+add_requires("fmt", "spdlog", { configs = { external_fmt = true } })
+
+if is_plat("windows") then
+    add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", {force = true})
+end
 
 if tracy_enabled then
 	add_requires("tracy")
@@ -115,7 +134,7 @@ add_files(
 add_includedirs("lib/external/raylib/src", { public = true })
 add_includedirs("lib/external/raylib/src/external/glfw/include", { private = true })
 -- defines
-add_defines("PLATFORM_DESKTOP", "GRAPHICS_API_OPENGL_33", { public = true })
+add_defines("PLATFORM_DESKTOP", "GRAPHICS_API_OPENGL_43", { public = true })
 add_defines("SUPPORT_GPU_SKINNING", { public = true })
 
 -- platform syslinks
@@ -138,7 +157,7 @@ set_default(true)
 set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
-add_packages("taskflow", "joltphysics", "sol2", "glaze")
+add_packages("taskflow", "joltphysics", "glaze", "glm", "spdlog", "fmt")
 if is_plat("windows") then
 	add_packages("luajit")
 elseif is_plat("linux") then
@@ -147,19 +166,31 @@ end
 add_tracy()
 set_pcxxheader("lib/pch.hpp")
 
+target("modules")
+set_kind("phony")
+set_default(false)
+add_headerfiles("lib/rydz_**/*.hpp")
+-- add_deps("raylib")
+-- add_packages("taskflow", "joltphysics", "glaze")
+-- if is_plat("windows") then
+-- 	add_packages("luajit")
+-- elseif is_plat("linux") then
+-- 	add_packages("luajit")
+-- end
+
 target("tests")
 set_kind("binary")
 set_default(false)
 add_files("tests/*.cpp")
 add_deps("raylib")
-add_packages("gtest", "taskflow", "joltphysics", "glaze")
+add_packages("gtest", "taskflow", "joltphysics", "glaze", "glm", "spdlog", "fmt")
 
 target("bench")
 set_kind("binary")
 set_default(false)
 add_files("benches/*.cpp")
 add_deps("raylib")
-add_packages("benchmark", "taskflow", "joltphysics", "glaze")
+add_packages("benchmark", "taskflow", "joltphysics", "glaze", "glm", "spdlog", "fmt")
 
 local examples = {
 	"01_hello_window",
@@ -174,6 +205,7 @@ local examples = {
 	"10_custom_material",
 	"11_sets",
 	"12_observers",
+	"13_physics",
 }
 
 for _, name in ipairs(examples) do
@@ -183,7 +215,7 @@ for _, name in ipairs(examples) do
 	set_rundir("$(projectdir)")
 	add_files("examples/" .. name .. "/main.cpp")
 	add_deps("raylib")
-	add_packages("taskflow", "joltphysics", "sol2", "glaze")
+	add_packages("taskflow", "joltphysics", "glaze", "glm", "spdlog", "fmt")
 	if is_plat("windows") then
 		add_packages("luajit")
 	elseif is_plat("linux") then

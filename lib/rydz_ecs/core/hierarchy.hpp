@@ -12,8 +12,8 @@ struct Parent {
 struct Children {
   std::vector<Entity> entities;
 
-  size_t size() const { return entities.size(); }
-  bool empty() const { return entities.empty(); }
+  auto size() const -> size_t { return entities.size(); }
+  auto empty() const -> bool { return entities.empty(); }
 
   auto begin() const { return entities.begin(); }
   auto end() const { return entities.end(); }
@@ -21,14 +21,14 @@ struct Children {
   auto cend() const { return entities.cend(); }
 };
 
-inline Children children_of(const World &world, Entity parent) {
+inline auto children_of(const World &world, Entity parent) -> Children {
   Children result;
 
   auto *storage = world.get_storage<Parent>();
   if (!storage)
     return result;
 
-  storage->for_each([&](Entity entity, const Parent &p) {
+  storage->for_each([&](Entity entity, const Parent &p) -> void {
     if (p.entity == parent) {
       result.entities.push_back(entity);
     }

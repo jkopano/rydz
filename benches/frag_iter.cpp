@@ -47,8 +47,7 @@ static void populate(World &world, int n) {
   }
 }
 
-static World make_world() {
-  World world;
+static void populate_world(World &world) {
   const int n = 20;
   populate<A>(world, n);
   populate<B>(world, n);
@@ -76,11 +75,11 @@ static World make_world() {
   populate<X>(world, n);
   populate<Y>(world, n);
   populate<Z>(world, n);
-  return world;
 }
 
 static void BM_FragIter(benchmark::State &state) {
-  auto world = make_world();
+  World world;
+  populate_world(world);
 
   for (auto _ : state) {
     Query<Mut<Data>> query(world);

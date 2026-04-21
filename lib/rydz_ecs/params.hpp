@@ -15,58 +15,58 @@ namespace ecs {
 struct NonSendMarker {};
 
 template <typename T> struct Local {
-  T *ptr = nullptr;
+  T* ptr{};
 
-  T &operator*() { return *ptr; }
-  T *operator->() { return ptr; }
-  const T &operator*() const { return *ptr; }
-  const T *operator->() const { return ptr; }
+  auto operator*() -> T& { return *ptr; }
+  auto operator->() -> T* { return ptr; }
+  auto operator*() const -> T const& { return *ptr; }
+  auto operator->() const -> T const* { return ptr; }
 };
 
 template <typename T> struct Res {
-  const T *ptr = nullptr;
+  T const* ptr{};
 
-  const T &operator*() const { return *ptr; }
-  const T *operator->() const { return ptr; }
+  auto operator*() const -> T const& { return *ptr; }
+  auto operator->() const -> T const* { return ptr; }
 };
 
 template <typename T> struct ResMut {
-  T *ptr = nullptr;
+  T* ptr{};
 
-  T &operator*() { return *ptr; }
-  T *operator->() { return ptr; }
-  const T &operator*() const { return *ptr; }
-  const T *operator->() const { return ptr; }
+  auto operator*() -> T& { return *ptr; }
+  auto operator->() -> T* { return ptr; }
+  auto operator*() const -> T const& { return *ptr; }
+  auto operator->() const -> T const* { return ptr; }
 };
 
 template <typename E> class MessageWriter {
-  Messages<E> *messages_;
+  Messages<E>* messages_;
 
 public:
-  explicit MessageWriter(Messages<E> *messages) : messages_(messages) {}
+  explicit MessageWriter(Messages<E>* messages) : messages_(messages) {}
 
-  void send(const E &message) { messages_->send(message); }
-  void send(E &&message) { messages_->send(std::move(message)); }
+  auto send(E const& message) -> void { messages_->send(message); }
+  auto send(E&& message) -> void { messages_->send(std::move(message)); }
 };
 
 template <typename E> class MessageReader {
-  Messages<E> *messages_;
+  Messages<E>* messages_;
   usize reader_id_;
 
 public:
-  explicit MessageReader(Messages<E> *messages)
+  explicit MessageReader(Messages<E>* messages)
       : messages_(messages), reader_id_(messages->register_reader()) {}
 
-  template <typename Func> void for_each(Func &&func) {
-    messages_->read(reader_id_, std::forward<Func>(func));
-  }
+  auto iter() { return messages_->iter(reader_id_); }
 
-  bool is_empty() const { return !messages_->has_unread(reader_id_); }
+  [[nodiscard]] auto is_empty() const -> bool {
+    return !messages_->has_unread(reader_id_);
+  }
 };
 
 template <typename P> struct DefaultSystemParamState {
   using State = std::monostate;
-  static State init_state(World &) { return {}; }
+  static auto init_state(World&) -> State { return {}; }
 };
 
 template <typename P> struct SystemParamTraits : DefaultSystemParamState<P> {};
@@ -75,46 +75,54 @@ template <typename T>
 struct SystemParamTraits<Res<T>> : DefaultSystemParamState<Res<T>> {
   using Item = Res<T>;
 
-  static Item retrieve(World &world, const SystemContext &) {
-    const T *ptr = world.get_resource<T>();
-    if (!ptr) {
-      throw std::runtime_error(std::string("Resource not found: ") +
-                               typeid(T).name());
+  static auto retrieve(World& world, SystemContext const&) -> Item {
+    T const* ptr = world.get_resource<T>();
+    if (ptr == nullptr) {
+      throw std::runtime_error(
+        std::string("Resource not found: ") + typeid(T).name()
+      );
     }
     return Res<T>{ptr};
   }
 
-  static bool available(const World &world) { return world.has_resource<T>(); }
-  static void access(SystemAccess &acc) { acc.add_resource_read<T>(); }
+  static auto available(World const& world) -> bool {
+    return world.has_resource<T>();
+  }
+  static auto access(SystemAccess& acc) -> void { acc.add_resource_read<T>(); }
 };
 
 template <typename T>
 struct SystemParamTraits<ResMut<T>> : DefaultSystemParamState<ResMut<T>> {
   using Item = ResMut<T>;
 
-  static Item retrieve(World &world, const SystemContext &) {
-    T *ptr = world.get_resource<T>();
-    if (!ptr) {
-      throw std::runtime_error(std::string("Resource not found: ") +
-                               typeid(T).name());
+  static auto retrieve(World& world, SystemContext const&) -> Item {
+    T* ptr = world.get_resource<T>();
+    if (ptr == nullptr) {
+      throw std::runtime_error(
+        std::string("Resource not found: ") + typeid(T).name()
+      );
     }
     return ResMut<T>{ptr};
   }
 
-  static bool available(const World &world) { return world.has_resource<T>(); }
-  static void access(SystemAccess &acc) { acc.add_resource_write<T>(); }
+  static auto available(World const& world) -> bool {
+    return world.has_resource<T>();
+  }
+  static auto access(SystemAccess& acc) -> void { acc.add_resource_write<T>(); }
 };
 
 template <> struct SystemParamTraits<World> : DefaultSystemParamState<World> {
-  using Item = World &;
+  using Item = World&;
 
-  static void access(SystemAccess &acc) {
+  static auto access(SystemAccess& acc) -> void {
     acc.set_exclusive();
     acc.set_main_thread_only();
   }
 
-  static Item retrieve(World &world, const SystemContext &) { return world; }
-  static bool available(const World &) { return true; }
+  static auto retrieve(World& world, SystemContext const&) -> Item {
+    return world;
+  }
+  static auto available(World const&) -> bool { return true; }
 };
 
 template <>
@@ -122,13 +130,13 @@ struct SystemParamTraits<NonSendMarker>
     : DefaultSystemParamState<NonSendMarker> {
   using Item = NonSendMarker;
 
-  static void access(SystemAccess &acc) {
+  static auto access(SystemAccess& acc) -> void {
     acc.set_exclusive();
     acc.set_main_thread_only();
   }
 
-  static Item retrieve(World &, const SystemContext &) { return {}; }
-  static bool available(const World &) { return true; }
+  static auto retrieve(World&, SystemContext const&) -> Item { return {}; }
+  static auto available(World const&) -> bool { return true; }
 };
 
 template <typename E>
@@ -136,18 +144,19 @@ struct SystemParamTraits<MessageWriter<E>>
     : DefaultSystemParamState<MessageWriter<E>> {
   using Item = MessageWriter<E>;
 
-  static Item retrieve(World &world, const SystemContext &) {
-    auto *messages = world.get_resource<Messages<E>>();
-    if (!messages)
+  static auto retrieve(World& world, SystemContext const&) -> Item {
+    auto* messages = world.get_resource<Messages<E>>();
+    if (messages == nullptr) {
       throw std::runtime_error("Messages resource not found");
+    }
     return MessageWriter<E>(messages);
   }
 
-  static bool available(const World &world) {
+  static auto available(World const& world) -> bool {
     return world.has_resource<Messages<E>>();
   }
 
-  static void access(SystemAccess &acc) {
+  static auto access(SystemAccess& acc) -> void {
     acc.add_resource_write<Messages<E>>();
   }
 };
@@ -157,18 +166,19 @@ struct SystemParamTraits<MessageReader<E>>
     : DefaultSystemParamState<MessageReader<E>> {
   using Item = MessageReader<E>;
 
-  static Item retrieve(World &world, const SystemContext &) {
-    auto *messages = world.get_resource<Messages<E>>();
-    if (!messages)
+  static auto retrieve(World& world, SystemContext const&) -> Item {
+    auto* messages = world.get_resource<Messages<E>>();
+    if (messages == nullptr) {
       throw std::runtime_error("Messages resource not found");
+    }
     return MessageReader<E>(messages);
   }
 
-  static bool available(const World &world) {
+  static auto available(World const& world) -> bool {
     return world.has_resource<Messages<E>>();
   }
 
-  static void access(SystemAccess &acc) {
+  static auto access(SystemAccess& acc) -> void {
     acc.add_resource_read<Messages<E>>();
   }
 };
@@ -177,18 +187,20 @@ template <typename T> struct SystemParamTraits<Local<T>> {
   using Item = Local<T>;
   using State = T;
 
-  static State init_state(World &) {
-    static_assert(std::default_initializable<T>,
-                  "Local<T> requires T to be default-initializable");
+  static auto init_state(World&) -> State {
+    static_assert(
+      std::default_initializable<T>,
+      "Local<T> requires T to be default-initializable"
+    );
     return T{};
   }
 
-  static Item retrieve(World &, const SystemContext &, State &state) {
+  static auto retrieve(World&, SystemContext const&, State& state) -> Item {
     return Local<T>{&state};
   }
 
-  static bool available(const World &) { return true; }
-  static void access(SystemAccess &) {}
+  static auto available(World const&) -> bool { return true; }
+  static auto access(SystemAccess&) -> void {}
 };
 
 template <typename E> void message_update_system(ResMut<Messages<E>> messages) {

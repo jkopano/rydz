@@ -8,16 +8,18 @@ namespace rl {
 // ---- Types ----
 using ::Camera2D;
 using ::Camera3D;
-using ::Color;
 using ::GltfScene;
 using ::Image;
 using ::Material;
-using ::MaterialMap;
 using ::Matrix;
-using ::Mesh;
 using ::Model;
 using ::Quaternion;
-using ::Rectangle;
+using ::rlColor;
+using ::rlMaterialMap;
+using ::rlMesh;
+using ::rlRectangle;
+using Rectangle = ::rlRectangle;
+using ::Font;
 using ::RenderTexture;
 using ::RenderTexture2D;
 using ::Shader;
@@ -32,7 +34,8 @@ using ::BeginDrawing;
 using ::BeginShaderMode;
 using ::BeginTextureMode;
 using ::ClearBackground;
-using ::CloseWindow;
+using ::rlCloseWindow;
+inline void CloseWindow() { ::rlCloseWindow(); }
 using ::DrawFPS;
 using ::EndDrawing;
 using ::EndShaderMode;
@@ -41,8 +44,8 @@ using ::GetFrameTime;
 using ::InitWindow;
 using ::IsWindowReady;
 using ::LoadFileText;
-using ::SetTargetFPS;
 using ::SetShaderValueTexture;
+using ::SetTargetFPS;
 using ::SetTraceLogLevel;
 using ::TraceLog;
 using ::UnloadFileText;
@@ -51,6 +54,10 @@ using ::WindowShouldClose;
 // ---- Input ----
 using ::DisableCursor;
 using ::EnableCursor;
+using ::rlHideCursor;
+using ::rlShowCursor;
+inline void ShowCursor() { ::rlShowCursor(); }
+inline void HideCursor() { ::rlHideCursor(); }
 using ::GetKeyPressed;
 using ::GetMouseDelta;
 using ::IsKeyDown;
@@ -84,18 +91,27 @@ using ::UploadMesh;
 
 // ---- Textures / Images ----
 using ::GenImageColor;
+using ::ImageFormat;
 using ::ImageText;
 using ::ImageTextEx;
-using ::ImageFormat;
-using ::LoadImage;
+using ::rlLoadImage;
+inline auto LoadImage(char const* fileName) -> Image {
+  return ::rlLoadImage(fileName);
+}
+using ::LoadRenderTexture;
 using ::LoadTexture;
 using ::LoadTextureFromImage;
-using ::LoadRenderTexture;
 using ::SetTextureFilter;
 using ::SetTextureWrap;
 using ::UnloadImage;
 using ::UnloadRenderTexture;
 using ::UnloadTexture;
+
+// ---- Font ----
+using ::GetFontDefault;
+using ::ImageDrawTextEx;
+using ::LoadFont;
+using ::MeasureTextEx;
 
 // ---- Audio ----
 using ::LoadSound;
@@ -114,7 +130,10 @@ using ::SetShaderValueV;
 
 // ---- rlgl functions ----
 using ::rlActiveTextureSlot;
+using ::rlBegin;
 using ::rlBindShaderBuffer;
+using ::rlCheckRenderBatchLimit;
+using ::rlColor4ub;
 using ::rlColorMask;
 using ::rlCompileShader;
 using ::rlComputeShaderDispatch;
@@ -123,18 +142,28 @@ using ::rlDisableColorBlend;
 using ::rlDisableDepthMask;
 using ::rlDisableDepthTest;
 using ::rlDisableShader;
+using ::rlDisableTexture;
 using ::rlDisableTextureCubemap;
 using ::rlDisableVertexArray;
+using ::rlDisableVertexAttribute;
+using ::rlDisableVertexBuffer;
+using ::rlDisableVertexBufferElement;
 using ::rlDisableWireMode;
 using ::rlDrawVertexArray;
+using ::rlDrawVertexArrayElements;
+using ::rlDrawVertexArrayElementsInstanced;
+using ::rlDrawVertexArrayInstanced;
 using ::rlEnableBackfaceCulling;
 using ::rlEnableColorBlend;
 using ::rlEnableDepthMask;
 using ::rlEnableDepthTest;
 using ::rlEnableShader;
+using ::rlEnableTexture;
 using ::rlEnableTextureCubemap;
 using ::rlEnableVertexArray;
 using ::rlEnableVertexAttribute;
+using ::rlEnableVertexBuffer;
+using ::rlEnableVertexBufferElement;
 using ::rlEnableWireMode;
 using ::rlGetShaderIdDefault;
 using ::rlGetShaderLocsDefault;
@@ -144,24 +173,36 @@ using ::rlLoadShaderBuffer;
 using ::rlLoadTextureCubemap;
 using ::rlLoadVertexArray;
 using ::rlLoadVertexBuffer;
+using ::rlLoadVertexBufferElement;
+using ::rlNormal3f;
 using ::rlReadShaderBuffer;
 using ::rlSetBlendMode;
 using ::rlSetCullFace;
 using ::rlSetShader;
+using ::rlSetTexture;
 using ::rlSetUniform;
-using ::rlSetUniformMatrix;
 using ::rlSetUniformMatrices;
+using ::rlSetUniformMatrix;
 using ::rlSetUniformSampler;
 using ::rlSetVertexAttribute;
+using ::rlSetVertexAttributeDivisor;
+using ::rlTexCoord2f;
 using ::rlUnloadShaderBuffer;
 using ::rlUnloadShaderProgram;
 using ::rlUnloadTexture;
 using ::rlUnloadVertexArray;
 using ::rlUnloadVertexBuffer;
 using ::rlUpdateShaderBuffer;
+using ::rlVertex2f;
 
 // ---- rlgl: Matrix / Batch ----
 using ::rlDrawRenderBatchActive;
+using ::rlEnd;
+using ::rlGetLocationAttrib;
+using ::rlGetLocationUniform;
+using ::rlGetMatrixModelview;
+using ::rlGetMatrixProjection;
+using ::rlGetMatrixTransform;
 using ::rlLoadIdentity;
 using ::rlMatrixMode;
 using ::rlMultMatrixf;

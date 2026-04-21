@@ -1,110 +1,60 @@
 #pragma once
-#include "material3d.hpp"
-#include "rl.hpp"
+
+#include "hash.hpp"
 #include "rydz_ecs/asset.hpp"
+#include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/material/material3d.hpp"
 #include <cstdint>
 #include <functional>
+#include <typeindex>
 #include <vector>
 
 namespace ecs {
 
-struct RenderBatchKey {
-  Handle<rl::Mesh> mesh{};
-  MaterialDescriptor material;
+using gl::Mesh;
 
-  bool operator==(const RenderBatchKey &o) const {
+struct RenderMaterialKey {
+  std::type_index asset_type{typeid(void)};
+  u32 id = UINT32_MAX;
+
+  auto operator==(RenderMaterialKey const&) const -> bool = default;
+};
+
+template <typename M>
+auto render_material_key(Handle<M> material) -> RenderMaterialKey {
+  return RenderMaterialKey{
+    .asset_type = std::type_index(typeid(bare_t<M>)),
+    .id = material.id,
+  };
+}
+
+struct RenderBatchKey {
+  Handle<Mesh> mesh{};
+  RenderMaterialKey material{};
+
+  auto operator==(RenderBatchKey const& o) const -> bool {
     return mesh == o.mesh && material == o.material;
   }
 };
 
-struct OpaqueBatch {
-  RenderBatchKey key;
-  std::vector<rl::Matrix> transforms;
-};
-
 } // namespace ecs
-
-namespace {
-inline void hash_combine(std::size_t &seed, std::size_t value) noexcept {
-  seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
-}
-} // namespace
 
 namespace std {
 
-template <> struct hash<ecs::ShaderSpec> {
-  size_t operator()(const ecs::ShaderSpec &k) const noexcept {
+template <> struct hash<ecs::RenderMaterialKey> {
+  auto operator()(ecs::RenderMaterialKey const& k) const noexcept -> size_t {
     size_t seed = 0;
-    ::hash_combine(seed, std::hash<std::string>{}(k.vertex_path));
-    ::hash_combine(seed, std::hash<std::string>{}(k.fragment_path));
-    return seed;
-  }
-};
-
-template <> struct hash<ecs::Uniform> {
-  size_t operator()(const ecs::Uniform &k) const noexcept {
-    size_t seed = 0;
-    ::hash_combine(seed, std::hash<std::string>{}(k.name));
-    ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.type)));
-    ::hash_combine(seed, std::hash<int>{}(k.count));
-    for (float value : k.float_data) {
-      ::hash_combine(seed, std::hash<float>{}(value));
-    }
-    for (int value : k.int_data) {
-      ::hash_combine(seed, std::hash<int>{}(value));
-    }
-    return seed;
-  }
-};
-
-template <> struct hash<ecs::MaterialMapBinding> {
-  size_t operator()(const ecs::MaterialMapBinding &k) const noexcept {
-    size_t seed = 0;
-    ::hash_combine(seed, std::hash<int>{}(k.map_type));
-    ::hash_combine(seed, std::hash<uint32_t>{}(k.texture.id));
-    ::hash_combine(seed, std::hash<unsigned char>{}(k.color.r));
-    ::hash_combine(seed, std::hash<unsigned char>{}(k.color.g));
-    ::hash_combine(seed, std::hash<unsigned char>{}(k.color.b));
-    ::hash_combine(seed, std::hash<unsigned char>{}(k.color.a));
-    ::hash_combine(seed, std::hash<float>{}(k.value));
-    ::hash_combine(seed, std::hash<bool>{}(k.has_texture));
-    ::hash_combine(seed, std::hash<bool>{}(k.has_color));
-    ::hash_combine(seed, std::hash<bool>{}(k.has_value));
-    return seed;
-  }
-};
-
-template <> struct hash<ecs::MaterialFlags> {
-  size_t operator()(const ecs::MaterialFlags &k) const noexcept {
-    size_t seed = 0;
-    ::hash_combine(seed, std::hash<bool>{}(k.transparent));
-    ::hash_combine(seed, std::hash<bool>{}(k.casts_shadows));
-    ::hash_combine(seed, std::hash<bool>{}(k.double_sided));
-    return seed;
-  }
-};
-
-template <> struct hash<ecs::MaterialDescriptor> {
-  size_t operator()(const ecs::MaterialDescriptor &k) const noexcept {
-    size_t seed = 0;
-    ::hash_combine(seed, std::hash<ecs::ShaderSpec>{}(k.shader));
-    ::hash_combine(seed, std::hash<ecs::MaterialFlags>{}(k.flags));
-    ::hash_combine(seed, std::hash<int>{}(static_cast<int>(k.shading_model)));
-    for (const auto &map : k.maps) {
-      ::hash_combine(seed, std::hash<ecs::MaterialMapBinding>{}(map));
-    }
-    for (const auto &uniform : k.uniforms) {
-      ::hash_combine(seed, std::hash<ecs::Uniform>{}(uniform));
-    }
+    rydz::hash_combine(seed, k.asset_type.hash_code());
+    rydz::hash_combine(seed, std::hash<uint32_t>{}(k.id));
     return seed;
   }
 };
 
 template <> struct hash<ecs::RenderBatchKey> {
-  size_t operator()(const ecs::RenderBatchKey &k) const noexcept {
+  auto operator()(ecs::RenderBatchKey const& k) const noexcept -> size_t {
     size_t seed = 0;
-    ::hash_combine(seed, std::hash<uint32_t>{}(k.mesh.id));
-    ::hash_combine(seed, std::hash<ecs::MaterialDescriptor>{}(k.material));
+    rydz::hash_combine(seed, std::hash<uint32_t>{}(k.mesh.id));
+    rydz::hash_combine(seed, std::hash<ecs::RenderMaterialKey>{}(k.material));
     return seed;
   }
 };

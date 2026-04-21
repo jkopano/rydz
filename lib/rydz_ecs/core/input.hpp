@@ -1,4 +1,6 @@
 #pragma once
+#include "math.hpp"
+#include "rl.hpp"
 #include "rydz_ecs/app.hpp"
 #include "types.hpp"
 #include <unordered_set>
@@ -14,57 +16,56 @@ struct MouseState {
 };
 
 struct Input {
-  static void install(App &app) {
+  static auto install(App &app) -> void {
     app.insert_resource(Input{});
-    app.add_systems(ScheduleLabel::First, input_polling_system);
+    app.add_systems(First, input_polling_system);
   }
 
   using T = Resource;
-  bool key_down(KeyCode key) const { return keys_down_.contains(key); }
-  bool key_pressed(KeyCode key) const { return keys_pressed_.contains(key); }
-  bool key_released(KeyCode key) const { return keys_released_.contains(key); }
-
-  Vector2 mouse_delta() const {
-    return Vector2{mouse_.delta_x, mouse_.delta_y};
+  auto key_down(KeyCode key) const -> bool { return keys_down_.contains(key); }
+  auto key_pressed(KeyCode key) const -> bool {
+    return keys_pressed_.contains(key);
   }
-  f32 mouse_delta_x() const { return mouse_.delta_x; }
-  f32 mouse_delta_y() const { return mouse_.delta_y; }
+  auto key_released(KeyCode key) const -> bool {
+    return keys_released_.contains(key);
+  }
+
+  auto mouse_delta() const -> math::Vec2 {
+    return math::Vec2{mouse_.delta_x, mouse_.delta_y};
+  }
+  auto mouse_delta_x() const -> f32 { return mouse_.delta_x; }
+  auto mouse_delta_y() const -> f32 { return mouse_.delta_y; }
 
 public:
-  void clear_frame() {
+  auto clear_frame() -> void {
     keys_pressed_.clear();
     keys_released_.clear();
     mouse_.delta_x = 0.0f;
     mouse_.delta_y = 0.0f;
   }
 
-  void set_key_down(KeyCode key) {
+  auto set_key_down(KeyCode key) -> void {
     if (!keys_down_.contains(key)) {
       keys_pressed_.insert(key);
     }
     keys_down_.insert(key);
   }
 
-  void set_key_up(KeyCode key) {
+  auto set_key_up(KeyCode key) -> void {
     if (keys_down_.contains(key)) {
       keys_released_.insert(key);
     }
     keys_down_.erase(key);
   }
 
-  void set_mouse_delta(f32 dx, f32 dy) {
+  auto set_mouse_delta(f32 dx, f32 dy) -> void {
     mouse_.delta_x = dx;
     mouse_.delta_y = dy;
   }
 
-  std::unordered_set<KeyCode> &keys_down() { return keys_down_; }
+  auto keys_down() -> std::unordered_set<KeyCode> & { return keys_down_; }
 
-  std::unordered_set<KeyCode> keys_down_;
-  std::unordered_set<KeyCode> keys_pressed_;
-  std::unordered_set<KeyCode> keys_released_;
-  MouseState mouse_;
-
-  static void input_polling_system(ResMut<Input> input, NonSendMarker) {
+  static auto input_polling_system(ResMut<Input> input, NonSendMarker) -> void {
     input->clear_frame();
 
     i32 key;
@@ -86,6 +87,12 @@ public:
     rl::Vector2 md = rl::GetMouseDelta();
     input->set_mouse_delta(md.x, md.y);
   }
+
+private:
+  std::unordered_set<KeyCode> keys_down_;
+  std::unordered_set<KeyCode> keys_pressed_;
+  std::unordered_set<KeyCode> keys_released_;
+  MouseState mouse_;
 };
 
 } // namespace ecs

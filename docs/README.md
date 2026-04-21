@@ -44,7 +44,7 @@ Namespace: `ecs`
 ## Szybki start
 
 ```cpp
-#include "rydz_ecs/rydz_ecs.hpp"
+#include "rydz_ecs/mod.hpp"
 
 struct Position { f32 x, y; };
 struct Velocity { f32 x, y; };
@@ -64,8 +64,8 @@ void movement(ecs::Query<ecs::Mut<Position>, Velocity> q, ecs::Res<ecs::Time> ti
 int main() {
     ecs::App app;
     app.add_plugin(ecs::window_plugin({800, 600, "Demo", 60}))
-       .add_systems(ecs::ScheduleLabel::Startup, setup)
-       .add_systems(ecs::ScheduleLabel::Update, movement)
+       .add_systems(ecs::Startup, setup)
+       .add_systems(ecs::Update, movement)
        .run();
 }
 ```
@@ -358,9 +358,9 @@ void attack_system(ecs::EventWriter<DamageEvent> writer) {
 
 ```cpp
 void damage_system(ecs::EventReader<DamageEvent> reader) {
-    reader.for_each([](const DamageEvent &e) {
+    for (const auto &e : reader.iter()) {
         // obsługa
-    });
+    }
 }
 ```
 
@@ -407,8 +407,8 @@ Dostępne etykiety (`ScheduleLabel`):
 Dodawanie systemów:
 
 ```cpp
-app.add_systems(ScheduleLabel::Update, my_system);
-app.add_systems(ScheduleLabel::Startup, setup);
+app.add_systems(Update, my_system);
+app.add_systems(Startup, setup);
 ```
 
 ---
@@ -418,14 +418,14 @@ app.add_systems(ScheduleLabel::Startup, setup);
 ### group — pojedynczy system z opcjami
 
 ```cpp
-app.add_systems(ScheduleLabel::Update,
+app.add_systems(Update,
     group(my_system).after(other_system).before(third_system));
 ```
 
 ### group — wiele systemów
 
 ```cpp
-app.add_systems(ScheduleLabel::Update,
+app.add_systems(Update,
     group(system_a, system_b, system_c));
 ```
 
@@ -433,18 +433,18 @@ app.add_systems(ScheduleLabel::Update,
 
 ```cpp
 // system_a → system_b → system_c (gwarantowana kolejność)
-app.add_systems(ScheduleLabel::Update,
+app.add_systems(Update,
     group(system_a, system_b, system_c).chain());
 
 // Alternatywnie:
-app.add_systems(ScheduleLabel::Update,
+app.add_systems(Update,
     chain(system_a, system_b, system_c));
 ```
 
 ### Zależności jawne
 
 ```cpp
-app.add_systems(ScheduleLabel::Update,
+app.add_systems(Update,
     group(physics).after(input_handler).before(render_prep));
 ```
 
@@ -458,25 +458,26 @@ System może mieć warunek — jeśli zwróci `false`, system się nie wykona:
 
 ```cpp
 // Lambda z parametrami systemowymi
-app.add_systems(ScheduleLabel::Update,
+app.add_systems(Update,
     group(debug_draw).run_if([](ecs::Res<ecs::Input> input) {
         return input->key_down(KEY_F3);
     }));
 
 // Jednorazowe wykonanie
-app.add_systems(ScheduleLabel::Update,
+app.add_systems(Update,
     group(init_once).run_if(ecs::run_once()));
 
 // Warunek stanu
-app.add_systems(ScheduleLabel::Update,
+app.add_systems(Update,
     group(gameplay_logic).run_if(ecs::in_state(GameState::Playing)));
 
 // Warunek na grupę
-app.add_systems(ScheduleLabel::Update,
+app.add_systems(Update,
     group(sys_a, sys_b, sys_c).run_if(some_condition));
 ```
 
 Warunek to funkcja o takiej samej sygnaturze jak system (może przyjmować `Res`, `ResMut` itd.), zwracająca `bool`.
+Dla grup wielosystemowych warunek jest oceniany raz na przebieg grupy w schedule; jeśli zwróci `true`, uruchamiane są wszystkie systemy z grupy.
 
 ---
 
@@ -494,11 +495,11 @@ app.add_systems(GameSets::Input, group(handle_input));
 app.add_systems(GameSets::Logic, group(update_physics, update_ai));
 
 // Konfiguracja kolejności setów
-app.configure_set(ScheduleLabel::Update,
+app.configure_set(Update,
     ecs::configure(GameSets::Input, GameSets::Logic, GameSets::Render).chain());
 
 // Warunek na cały set
-app.configure_set(ScheduleLabel::Update,
+app.configure_set(Update,
     ecs::configure(GameSets::Logic).run_if(ecs::in_state(GameState::Playing)));
 ```
 
@@ -546,7 +547,7 @@ Po sortowaniu topologicznym, systemy bez kolizji są grupowane w batche i urucha
 world.set_multithreaded(false);  // Sekwencyjne wykonanie
 
 // Lub przez system na starcie:
-app.add_systems(ScheduleLabel::Startup,
+app.add_systems(Startup,
     ecs::system_multithreading(ecs::TaskPoolOptions{.multithreaded = false}));
 ```
 
@@ -673,7 +674,7 @@ Plugin to funkcja lub klasa konfigurująca App:
 // Funkcja
 void physics_plugin(ecs::App &app) {
     app.insert_resource(PhysicsConfig{});
-    app.add_systems(ecs::ScheduleLabel::Update, physics_step);
+    app.add_systems(ecs::Update, physics_step);
 }
 
 app.add_plugin(physics_plugin);
@@ -721,11 +722,11 @@ app
     .add_event<DamageEvent>()
 
     // Systemy
-    .add_systems(ecs::ScheduleLabel::Startup, setup)
-    .add_systems(ecs::ScheduleLabel::Update, group(input, logic, render).chain())
+    .add_systems(ecs::Startup, setup)
+    .add_systems(ecs::Update, group(input, logic, render).chain())
 
     // Konfiguracja setów
-    .configure_set(ecs::ScheduleLabel::Update,
+    .configure_set(ecs::Update,
         ecs::configure(GameSets::Input, GameSets::Logic).chain())
 
     // Start

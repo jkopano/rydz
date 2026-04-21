@@ -13,47 +13,52 @@ namespace ecs {
 
 class ICommand {
 public:
+  ICommand() = default;
+  ICommand(ICommand const&) = default;
+  ICommand(ICommand&&) noexcept = default;
+  auto operator=(ICommand const&) -> ICommand& = default;
+  auto operator=(ICommand&&) noexcept -> ICommand& = default;
   virtual ~ICommand() = default;
-  virtual void apply(World &world) = 0;
+  virtual auto apply(World& world) -> void = 0;
 };
 
 class CommandQueue {
   std::vector<std::unique_ptr<ICommand>> queue_;
 
 public:
-  template <typename Cmd> void push(Cmd &&cmd) {
+  template <typename Cmd> void push(Cmd&& cmd) {
     queue_.push_back(std::make_unique<bare_t<Cmd>>(std::forward<Cmd>(cmd)));
   }
 
-  void apply(World &world) {
+  auto apply(World& world) -> void {
     auto commands = std::move(queue_);
     queue_.clear();
-    for (auto &cmd : commands) {
+    for (auto& cmd : commands) {
       cmd->apply(world);
     }
   }
 
-  bool empty() const { return queue_.empty(); }
+  [[nodiscard]] auto empty() const -> bool { return queue_.empty(); }
 };
 
 class CommandQueues {
 public:
   using T = Resource;
 
-  void submit(CommandQueue queue) {
+  auto submit(CommandQueue queue) -> void {
     std::lock_guard lock(*mutex_);
     queues_.push_back(std::move(queue));
   }
 
-  void apply(World &world) {
+  auto apply(World& world) -> void {
     auto queues = std::move(queues_);
     queues_.clear();
-    for (auto &q : queues) {
+    for (auto& q : queues) {
       q.apply(world);
     }
   }
 
-  bool empty() const { return queues_.empty(); }
+  [[nodiscard]] auto empty() const -> bool { return queues_.empty(); }
 
 private:
   std::unique_ptr<std::mutex> mutex_ = std::make_unique<std::mutex>();
@@ -65,14 +70,14 @@ namespace detail {
 struct ActivateEntityCommand : ICommand {
   Entity entity;
   explicit ActivateEntityCommand(Entity e) : entity(e) {}
-  void apply(World &world) override { world.entities.activate(entity); }
+  auto apply(World& world) -> void override { world.entities.activate(entity); }
 };
 
 template <typename T> struct InsertCommand : ICommand {
   Entity entity;
   T item;
   InsertCommand(Entity e, T i) : entity(e), item(std::move(i)) {}
-  void apply(World &world) override {
+  auto apply(World& world) -> void override {
     insert_bundle(world, entity, std::move(item));
   }
 };
@@ -80,19 +85,21 @@ template <typename T> struct InsertCommand : ICommand {
 struct DespawnCommand : ICommand {
   Entity entity;
   DespawnCommand(Entity e) : entity(e) {}
-  void apply(World &world) override { world.despawn(entity); }
+  auto apply(World& world) -> void override { world.despawn(entity); }
 };
 
 template <typename T> struct RemoveComponentCommand : ICommand {
   Entity entity;
   RemoveComponentCommand(Entity e) : entity(e) {}
-  void apply(World &world) override { world.remove_component<T>(entity); }
+  auto apply(World& world) -> void override {
+    world.remove_component<T>(entity);
+  }
 };
 
 template <typename T> struct InsertResourceCommand : ICommand {
   T resource;
   InsertResourceCommand(T r) : resource(std::move(r)) {}
-  void apply(World &world) override {
+  auto apply(World& world) -> void override {
     world.insert_resource(std::move(resource));
   }
 };
@@ -100,7 +107,9 @@ template <typename T> struct InsertResourceCommand : ICommand {
 template <typename F> struct AddObserverCommand : ICommand {
   F func;
   AddObserverCommand(F f) : func(std::move(f)) {}
-  void apply(World &world) override { world.add_observer(std::move(func)); }
+  auto apply(World& world) -> void override {
+    world.add_observer(std::move(func));
+  }
 };
 
 template <typename F> struct AddEntityObserverCommand : ICommand {
@@ -108,7 +117,7 @@ template <typename F> struct AddEntityObserverCommand : ICommand {
   F func;
   AddEntityObserverCommand(Entity target, F f)
       : target(target), func(std::move(f)) {}
-  void apply(World &world) override {
+  auto apply(World& world) -> void override {
     world.add_observer(target, std::move(func));
   }
 };
@@ -116,123 +125,127 @@ template <typename F> struct AddEntityObserverCommand : ICommand {
 template <typename E> struct TriggerCommand : ICommand {
   E event;
   TriggerCommand(E event) : event(std::move(event)) {}
-  void apply(World &world) override { world.trigger(std::move(event)); }
+  auto apply(World& world) -> void override { world.trigger(std::move(event)); }
 };
 
 } // namespace detail
 
 class EntityCommands {
   Entity entity_;
-  CommandQueue *queue_;
+  CommandQueue* queue_;
 
 public:
-  EntityCommands(Entity entity, CommandQueue *queue)
+  EntityCommands(Entity entity, CommandQueue* queue)
       : entity_(entity), queue_(queue) {}
 
-  template <Spawnable T> EntityCommands &insert(T item) {
+  template <Spawnable T> auto insert(T item) -> EntityCommands& {
     queue_->push(detail::InsertCommand<T>(entity_, std::move(item)));
     return *this;
   }
 
-  template <typename T> EntityCommands &remove() {
+  template <typename T> auto remove() -> EntityCommands& {
     queue_->push(detail::RemoveComponentCommand<T>(entity_));
     return *this;
   }
 
-  template <typename F> EntityCommands &observe(F &&func) {
+  template <typename F> auto observe(F&& func) -> EntityCommands& {
     using Fn = decay_t<F>;
     using EventT = detail::observer_event_t<Fn>;
-    static_assert(IsEntityEvent<EventT>,
-                  "EntityCommands::observe requires On<E> where E is an "
-                  "EntityEvent.");
-    queue_->push(detail::AddEntityObserverCommand<Fn>(entity_,
-                                                      std::forward<F>(func)));
+    static_assert(
+      IsEntityEvent<EventT>,
+      "EntityCommands::observe requires On<E> where E is an "
+      "EntityEvent."
+    );
+    queue_->push(
+      detail::AddEntityObserverCommand<Fn>(entity_, std::forward<F>(func))
+    );
     return *this;
   }
 
-  void despawn() { queue_->push(detail::DespawnCommand(entity_)); }
+  auto despawn() -> void { queue_->push(detail::DespawnCommand(entity_)); }
 
-  Entity id() const { return entity_; }
+  auto id() const -> Entity { return entity_; }
 };
 
 class Cmd {
   CommandQueue queue_;
-  CommandQueues *parent_;
-  EntityManager *entities_;
+  CommandQueues* parent_;
+  EntityManager* entities_;
 
 public:
-  Cmd(CommandQueues *parent, EntityManager *entities)
+  Cmd(CommandQueues* parent, EntityManager* entities)
       : parent_(parent), entities_(entities) {}
 
   ~Cmd() {
-    if (parent_ && !queue_.empty()) {
+    if ((parent_ != nullptr) && !queue_.empty()) {
       parent_->submit(std::move(queue_));
     }
   }
 
-  Cmd(Cmd &&) = default;
-  Cmd &operator=(Cmd &&) = default;
-  Cmd(const Cmd &) = delete;
-  Cmd &operator=(const Cmd &) = delete;
+  Cmd(Cmd&&) = default;
+  auto operator=(Cmd&&) -> Cmd& = default;
+  Cmd(Cmd const&) = delete;
+  auto operator=(Cmd const&) -> Cmd& = delete;
 
-  template <Spawnable... Ts> EntityCommands spawn(Ts... items) {
+  template <Spawnable... Ts> auto spawn(Ts... items) -> EntityCommands {
     Entity entity = entities_->reserve();
     queue_.push(detail::ActivateEntityCommand(entity));
     (queue_.push(detail::InsertCommand<Ts>(entity, std::move(items))), ...);
-    return EntityCommands(entity, &queue_);
+    return {entity, &queue_};
   }
 
-  EntityCommands spawn_empty() {
+  auto spawn_empty() -> EntityCommands {
     Entity entity = entities_->reserve();
     queue_.push(detail::ActivateEntityCommand(entity));
-    return EntityCommands(entity, &queue_);
+    return {entity, &queue_};
   }
 
-  void spawn_batch(SpawnableRange auto &&_range) {
-    for (auto &&item : _range) {
+  auto spawn_batch(SpawnableRange auto&& _range) -> void {
+    for (auto&& item : _range) {
       spawn(std::forward<decltype(item)>(item));
     }
   }
 
-  void despawn(Entity entity) { queue_.push(detail::DespawnCommand(entity)); }
+  auto despawn(Entity entity) -> void {
+    queue_.push(detail::DespawnCommand(entity));
+  }
 
   template <typename T> void insert_resource(T resource) {
     queue_.push(detail::InsertResourceCommand<T>(std::move(resource)));
   }
 
-  template <typename F> Cmd &add_observer(F &&func) {
+  template <typename F> auto add_observer(F&& func) -> Cmd& {
     queue_.push(detail::AddObserverCommand<decay_t<F>>(std::forward<F>(func)));
     return *this;
   }
 
   template <typename E>
     requires IsEvent<bare_t<E>>
-  Cmd &trigger(E &&event) {
-    queue_.push(
-        detail::TriggerCommand<bare_t<E>>(std::forward<E>(event)));
+  auto trigger(E&& event) -> Cmd& {
+    queue_.push(detail::TriggerCommand<bare_t<E>>(std::forward<E>(event)));
     return *this;
   }
 
-  EntityCommands entity(Entity e) { return EntityCommands(e, &queue_); }
+  auto entity(Entity e) -> EntityCommands { return EntityCommands(e, &queue_); }
 };
 
 template <> struct SystemParamTraits<Cmd> : DefaultSystemParamState<Cmd> {
   using Item = Cmd;
 
-  static Item retrieve(World &world, const SystemContext &) {
-    auto *queues = world.get_resource<CommandQueues>();
-    if (!queues) {
+  static auto retrieve(World& world, SystemContext const&) -> Item {
+    auto* queues = world.get_resource<CommandQueues>();
+    if (queues == nullptr) {
       throw std::runtime_error("CommandQueues resource not found");
     }
 
-    return Cmd(queues, &world.entities);
+    return {queues, &world.entities};
   }
 
-  static bool available(const World &world) {
+  static auto available(World const& world) -> bool {
     return world.has_resource<CommandQueues>();
   }
 
-  static void access(SystemAccess &acc) {
+  static auto access(SystemAccess& acc) -> void {
     acc.add_resource_read<CommandQueues>();
   }
 };

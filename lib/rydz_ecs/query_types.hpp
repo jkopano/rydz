@@ -4,46 +4,46 @@
 namespace ecs {
 
 template <typename T> struct Mut {
-  T *ptr = nullptr;
-  ComponentTicks *ticks = nullptr;
+  T* ptr{};
+  ComponentTicks* ticks{};
   Tick tick{};
-  bool marked = false;
+  bool marked{};
 
   Mut() = default;
-  Mut(T *p, ComponentTicks *t, Tick current_tick)
+  Mut(T* p, ComponentTicks* t, Tick current_tick)
       : ptr(p), ticks(t), tick(current_tick) {}
 
-  T &get() {
+  auto get() -> T& {
     mark();
     return *ptr;
   }
-  const T &get() const { return *ptr; }
+  auto get() const -> T const& { return *ptr; }
 
-  T *operator->() {
+  auto operator->() -> T* {
     mark();
     return ptr;
   }
-  const T *operator->() const { return ptr; }
+  auto operator->() const -> T const* { return ptr; }
 
-  T &operator*() {
+  auto operator*() -> T& {
     mark();
     return *ptr;
   }
-  const T &operator*() const { return *ptr; }
+  auto operator*() const -> T const& { return *ptr; }
 
   explicit operator bool() const { return ptr != nullptr; }
 
-  operator T *() {
+  operator T*() {
     mark();
     return ptr;
   }
-  operator const T *() const { return ptr; }
+  operator T const*() const { return ptr; }
 
-  T &bypass_change_detection() { return *ptr; }
+  auto bypass_change_detection() -> T& { return *ptr; }
 
 private:
-  void mark() {
-    if (!marked && ticks) {
+  auto mark() -> void {
+    if (!marked && (ticks != nullptr)) {
       ticks->changed = tick;
       marked = true;
     }

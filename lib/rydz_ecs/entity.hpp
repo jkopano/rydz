@@ -9,25 +9,30 @@
 namespace ecs {
 
 struct Entity {
-  u32 index_val = 0;
-  u32 generation_val = 0;
+  u32 index_val{};
+  u32 generation_val{};
 
-  static constexpr Entity from_raw(u32 idx, u32 gen) { return {idx, gen}; }
+  static constexpr auto from_raw(u32 idx, u32 gen) -> Entity {
+    return {.index_val = idx, .generation_val = gen};
+  }
 
-  [[nodiscard]] constexpr u32 index() const noexcept { return index_val; }
-  [[nodiscard]] constexpr u32 generation() const noexcept {
+  [[nodiscard]] constexpr auto index() const noexcept -> u32 {
+    return index_val;
+  }
+  [[nodiscard]] constexpr auto generation() const noexcept -> u32 {
     return generation_val;
   }
 
-  auto operator<=>(const Entity &) const = default;
+  auto operator<=>(Entity const&) const = default;
 };
 
 } // namespace ecs
 
 template <> struct std::hash<ecs::Entity> {
-  size_t operator()(const ecs::Entity &e) const noexcept {
-    return std::hash<u64>{}((static_cast<u64>(e.index_val) << 32) |
-                            e.generation_val);
+  auto operator()(ecs::Entity const& e) const noexcept -> size_t {
+    return std::hash<u64>{}(
+      (static_cast<u64>(e.index_val) << 32) | e.generation_val
+    );
   }
 };
 
@@ -42,61 +47,61 @@ private:
   std::unordered_set<Entity> active_;
 
 public:
-  Entity reserve() {
+  auto reserve() -> Entity {
     std::lock_guard lock(*mutex_);
 
-    Entity e;
+    Entity entity;
     if (free_list_.empty()) {
-      e = Entity::from_raw(next_id_++, 0);
+      entity = Entity::from_raw(next_id_++, 0);
     } else {
       auto [idx, gen] = free_list_.back();
       free_list_.pop_back();
-      e = Entity::from_raw(idx, gen);
+      entity = Entity::from_raw(idx, gen);
     }
 
-    reserved_.insert(e);
-    return e;
+    reserved_.insert(entity);
+    return entity;
   }
 
-  Entity create() {
-    Entity e = reserve();
+  auto create() -> Entity {
+    Entity entity = reserve();
     std::lock_guard lock(*mutex_);
-    reserved_.erase(e);
-    active_.insert(e);
-    return e;
+    reserved_.erase(entity);
+    active_.insert(entity);
+    return entity;
   }
 
-  void activate(Entity entity) {
+  auto activate(Entity entity) -> void {
     std::lock_guard lock(*mutex_);
-    if (!reserved_.erase(entity)) {
+    if (reserved_.erase(entity) == 0U) {
       return;
     }
     active_.insert(entity);
   }
 
-  void destroy(Entity entity) {
+  auto destroy(Entity entity) -> void {
     std::lock_guard lock(*mutex_);
-    if (reserved_.erase(entity)) {
-      free_list_.push_back({entity.index(), entity.generation() + 1});
+    if (reserved_.erase(entity) != 0U) {
+      free_list_.emplace_back(entity.index(), entity.generation() + 1);
       return;
     }
 
-    if (active_.erase(entity)) {
-      free_list_.push_back({entity.index(), entity.generation() + 1});
+    if (active_.erase(entity) != 0U) {
+      free_list_.emplace_back(entity.index(), entity.generation() + 1);
     }
   }
 
-  std::vector<Entity> entities() const {
+  auto entities() const -> std::vector<Entity> {
     std::lock_guard lock(*mutex_);
     return {active_.begin(), active_.end()};
   }
 
-  bool is_alive(Entity entity) const {
+  auto is_alive(Entity entity) const -> bool {
     std::lock_guard lock(*mutex_);
     return active_.contains(entity);
   }
 
-  size_t count() const {
+  auto count() const -> size_t {
     std::lock_guard lock(*mutex_);
     return active_.size();
   }
