@@ -19,6 +19,7 @@ using ::rlMaterialMap;
 using ::rlMesh;
 using ::rlRectangle;
 using Rectangle = ::rlRectangle;
+using ::Font;
 using ::RenderTexture;
 using ::RenderTexture2D;
 using ::Shader;
@@ -105,6 +106,12 @@ using ::SetTextureWrap;
 using ::UnloadImage;
 using ::UnloadRenderTexture;
 using ::UnloadTexture;
+
+// ---- Font ----
+using ::GetFontDefault;
+using ::ImageDrawTextEx;
+using ::LoadFont;
+using ::MeasureTextEx;
 
 // ---- Audio ----
 using ::LoadSound;
