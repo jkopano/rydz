@@ -15,9 +15,6 @@ elseif is_plat("linux") then
 	set_toolchains("clang")
 	if os.getenv("NIX_PATH") then
 		add_ldflags("-fuse-ld=mold", { force = true })
-	else
-		add_cxflags("-stdlib=libc++")
-		add_ldflags("-stdlib=libc++")
 	end
 end
 
@@ -176,7 +173,6 @@ add_headerfiles("lib/rydz_**/*.hpp")
 -- elseif is_plat("linux") then
 -- 	add_packages("luajit")
 -- end
-
 
 target("tests")
 set_kind("binary")
