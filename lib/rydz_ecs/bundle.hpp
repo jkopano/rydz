@@ -30,21 +30,21 @@ concept IsMessage = requires { typename T::T; } &&
                     std::is_same_v<typename type_tag_of<T>::type, Message>;
 
 template <typename T>
-concept IsEntityEvent = requires { typename T::T; } &&
-                        std::is_same_v<typename type_tag_of<T>::type,
-                                       EntityEvent>;
+concept IsEntityEvent = requires {
+  typename T::T;
+} && std::is_same_v<typename type_tag_of<T>::type, EntityEvent>;
 
 template <typename T>
-concept IsEvent =
-    requires { typename T::T; } &&
-    (std::is_same_v<typename type_tag_of<T>::type, Event> || IsEntityEvent<T>);
+concept IsEvent = requires {
+  typename T::T;
+} && (std::is_same_v<typename type_tag_of<T>::type, Event> || IsEntityEvent<T>);
 
 template <typename T>
 concept Spawnable = IsComponent<bare_t<T>> || IsBundle<bare_t<T>>;
 
 template <typename R>
 concept SpawnableRange =
-    std::ranges::input_range<R> && Spawnable<std::ranges::range_value_t<R>>;
+  std::ranges::input_range<R> && Spawnable<std::ranges::range_value_t<R>>;
 
 namespace detail {
 
@@ -56,7 +56,7 @@ template <typename T, typename... Args>
 concept aggregate_init = requires { T{std::declval<Args>()...}; };
 
 // clang-format off
-template <typename T> consteval int field_count() {
+template <typename T> consteval auto field_count() -> int {
   if constexpr (!std::is_aggregate_v<T>) return 0;
   else if constexpr (aggregate_init<T, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field>) return 16;
   else if constexpr (aggregate_init<T, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field, any_field>) return 15;
@@ -103,34 +103,33 @@ template <typename T> auto to_tuple(T &&t) {
 template <typename T> struct IsTuple : std::false_type {};
 template <typename... Ts> struct IsTuple<std::tuple<Ts...>> : std::true_type {};
 
-template <typename T> void insert_single(World &world, Entity entity, T &&item);
+template <typename T> void insert_single(World& world, Entity entity, T&& item);
 
 template <typename... Ts>
-void insert_tuple_items(World &world, Entity entity, Tuple<Ts...> &&tup) {
+auto insert_tuple_items(World& world, Entity entity, Tuple<Ts...>&& tup)
+  -> void {
   std::apply(
-      [&](auto &&...elems) {
-        (insert_single(world, entity, std::forward<decltype(elems)>(elems)),
-         ...);
-      },
-      std::move(tup));
+    [&](auto&&... elems) -> auto {
+      (insert_single(world, entity, std::forward<decltype(elems)>(elems)), ...);
+    },
+    std::move(tup)
+  );
 }
-
-template <typename T> void insert_single(World &world, Entity entity, T &&item);
 
 } // namespace detail
 
 template <typename T>
-void insert_bundle(World &world, Entity entity, T &&item) {
+auto insert_bundle(World& world, Entity entity, T&& item) -> void {
   detail::insert_single(world, entity, std::forward<T>(item));
 }
 
 template <typename... Ts>
-void insert_bundle(World &world, Entity entity, Ts &&...items) {
+auto insert_bundle(World& world, Entity entity, Ts&&... items) -> void {
   (detail::insert_single(world, entity, std::forward<Ts>(items)), ...);
 }
 
 template <std::ranges::input_range R>
   requires Spawnable<std::ranges::range_value_t<R>>
-std::vector<Entity> spawn_batch(World &world, R &&_range);
+auto spawn_batch(World& world, R&& _range) -> std::vector<Entity>;
 
 } // namespace ecs

@@ -13,12 +13,13 @@ namespace ecs {
 class IStorage {
 public:
   virtual ~IStorage() = default;
-  virtual void remove(Entity entity) = 0;
-  virtual bool has(Entity entity) const = 0;
-  virtual usize size() const = 0;
-  virtual bool empty() const = 0;
-  virtual std::optional<ComponentTicks> get_ticks(Entity entity) const = 0;
-  virtual std::span<const Entity> entities() const = 0;
+  virtual auto remove(Entity entity) -> void = 0;
+  [[nodiscard]] virtual auto has(Entity entity) const -> bool = 0;
+  [[nodiscard]] virtual auto size() const -> usize = 0;
+  [[nodiscard]] virtual auto empty() const -> bool = 0;
+  [[nodiscard]] virtual auto get_ticks(Entity entity) const
+    -> std::optional<ComponentTicks> = 0;
+  [[nodiscard]] virtual auto entities() const -> std::span<Entity const> = 0;
 };
 
 template <typename T> class SparseSetStorage : public IStorage {
@@ -27,7 +28,7 @@ template <typename T> class SparseSetStorage : public IStorage {
   std::vector<ComponentTicks> dense_ticks_;
   std::vector<Entity> dense_entities_;
 
-  std::optional<u32> get_dense_idx(Entity e) const {
+  [[nodiscard]] auto get_dense_idx(Entity e) const -> std::optional<u32> {
     u32 idx = e.index();
     if (idx < sparse_.size() && sparse_[idx] != UINT32_MAX &&
         dense_entities_[sparse_[idx]] == e) {
@@ -37,7 +38,7 @@ template <typename T> class SparseSetStorage : public IStorage {
   }
 
 public:
-  void insert(Entity entity, T component, Tick current_tick) {
+  auto insert(Entity entity, T component, Tick current_tick) -> void {
     if (auto d_idx = get_dense_idx(entity)) {
       dense_data_[*d_idx] = std::move(component);
       dense_ticks_[*d_idx].changed = current_tick;
@@ -45,8 +46,9 @@ public:
     }
 
     u32 idx = entity.index();
-    if (idx >= sparse_.size())
+    if (idx >= sparse_.size()) {
       sparse_.resize(idx + 1, UINT32_MAX);
+    }
 
     sparse_[idx] = static_cast<u32>(dense_data_.size());
     dense_data_.push_back(std::move(component));
@@ -54,33 +56,29 @@ public:
     dense_entities_.push_back(entity);
   }
 
-  T *get(Entity e) {
-    auto i = get_dense_idx(e);
-    return i ? &dense_data_[*i] : nullptr;
+  template <typename Self> auto get(this Self& self, Entity entity) -> auto* {
+    auto idx = self.get_dense_idx(entity);
+    return idx ? &self.dense_data_[*idx] : nullptr;
   }
 
-  const T *get(Entity e) const {
-    auto i = get_dense_idx(e);
-    return i ? &dense_data_[*i] : nullptr;
+  auto get_ticks_mut(Entity enitity) -> ComponentTicks* {
+    auto idx = get_dense_idx(enitity);
+    return idx ? &dense_ticks_[*idx] : nullptr;
   }
 
-  ComponentTicks *get_ticks_mut(Entity e) {
-    auto i = get_dense_idx(e);
-    return i ? &dense_ticks_[*i] : nullptr;
-  }
-
-  std::pair<T *, ComponentTicks *> get_with_ticks(Entity e) {
-    auto i = get_dense_idx(e);
-    if (i) {
-      return {&dense_data_[*i], &dense_ticks_[*i]};
+  auto get_with_ticks(Entity entity) -> std::pair<T*, ComponentTicks*> {
+    auto idx = get_dense_idx(entity);
+    if (idx) {
+      return {&dense_data_[*idx], &dense_ticks_[*idx]};
     }
     return {nullptr, nullptr};
   }
 
-  void remove(Entity entity) override {
+  auto remove(Entity entity) -> void override {
     auto d_idx = get_dense_idx(entity);
-    if (!d_idx)
+    if (!d_idx) {
       return;
+    }
 
     u32 last = static_cast<u32>(dense_data_.size() - 1);
     if (*d_idx != last) {
@@ -96,27 +94,31 @@ public:
     sparse_[entity.index()] = UINT32_MAX;
   }
 
-  bool has(Entity e) const override { return get_dense_idx(e).has_value(); }
-  usize size() const override { return dense_data_.size(); }
-  bool empty() const override { return dense_data_.empty(); }
-  std::span<const Entity> entities() const override { return dense_entities_; }
+  auto has(Entity e) const -> bool override {
+    return get_dense_idx(e).has_value();
+  }
+  auto size() const -> usize override { return dense_data_.size(); }
+  auto empty() const -> bool override { return dense_data_.empty(); }
+  auto entities() const -> std::span<Entity const> override {
+    return dense_entities_;
+  }
 
-  std::optional<ComponentTicks> get_ticks(Entity e) const override {
+  auto get_ticks(Entity e) const -> std::optional<ComponentTicks> override {
     auto i = get_dense_idx(e);
     return i ? std::optional(dense_ticks_[*i]) : std::nullopt;
   }
 
-  void mark_changed(Entity entity, Tick tick) {
+  auto mark_changed(Entity entity, Tick tick) -> void {
     if (auto i = get_dense_idx(entity))
       dense_ticks_[*i].changed = tick;
   }
 
-  template <typename F> void for_each(F &&func) const {
+  template <typename F> void for_each(F&& func) const {
     for (usize i = 0; i < dense_data_.size(); ++i)
       func(dense_entities_[i], dense_data_[i]);
   }
 
-  template <typename F> void for_each_mut(F &&func) {
+  template <typename F> void for_each_mut(F&& func) {
     for (usize i = 0; i < dense_data_.size(); ++i)
       func(dense_entities_[i], dense_data_[i]);
   }
@@ -128,34 +130,34 @@ template <typename T> class HashMapStorage : public IStorage {
   std::vector<Entity> entity_keys_;
 
 public:
-  void insert(Entity entity, T component, Tick current_tick) {
+  auto insert(Entity entity, T component, Tick current_tick) -> void {
     if (data_.find(entity) == data_.end())
       entity_keys_.push_back(entity);
     data_.insert_or_assign(entity, std::move(component));
     ticks_.insert_or_assign(entity, ComponentTicks{current_tick, current_tick});
   }
 
-  T *get(Entity entity) {
+  auto get(Entity entity) -> T* {
     auto it = data_.find(entity);
     return it != data_.end() ? &it->second : nullptr;
   }
 
-  const T *get(Entity entity) const {
+  auto get(Entity entity) const -> T const* {
     auto it = data_.find(entity);
     return it != data_.end() ? &it->second : nullptr;
   }
 
-  ComponentTicks *get_ticks_mut(Entity entity) {
+  auto get_ticks_mut(Entity entity) -> ComponentTicks* {
     auto it = ticks_.find(entity);
     return it != ticks_.end() ? &it->second : nullptr;
   }
 
-  const ComponentTicks *get_ticks_ptr(Entity entity) const {
+  auto get_ticks_ptr(Entity entity) const -> ComponentTicks const* {
     auto it = ticks_.find(entity);
     return it != ticks_.end() ? &it->second : nullptr;
   }
 
-  std::pair<T *, ComponentTicks *> get_with_ticks(Entity entity) {
+  auto get_with_ticks(Entity entity) -> std::pair<T*, ComponentTicks*> {
     auto it = data_.find(entity);
     if (it != data_.end()) {
       auto ticks_it = ticks_.find(entity);
@@ -164,37 +166,42 @@ public:
     return {nullptr, nullptr};
   }
 
-  void remove(Entity entity) override {
+  auto remove(Entity entity) -> void override {
     data_.erase(entity);
     ticks_.erase(entity);
     std::erase(entity_keys_, entity);
   }
 
-  bool has(Entity entity) const override { return data_.contains(entity); }
+  auto has(Entity entity) const -> bool override {
+    return data_.contains(entity);
+  }
 
-  template <typename F> void for_each(F &&func) const {
-    for (auto &[e, comp] : data_)
+  template <typename F> void for_each(F&& func) const {
+    for (auto& [e, comp] : data_)
       func(e, comp);
   }
 
-  template <typename F> void for_each_mut(F &&func) {
-    for (auto &[e, comp] : data_)
+  template <typename F> void for_each_mut(F&& func) {
+    for (auto& [e, comp] : data_)
       func(e, comp);
   }
 
-  usize size() const override { return data_.size(); }
-  bool empty() const override { return data_.empty(); }
-  usize data_size() const { return data_.size(); }
+  auto size() const -> usize override { return data_.size(); }
+  auto empty() const -> bool override { return data_.empty(); }
+  auto data_size() const -> usize { return data_.size(); }
 
-  std::span<const Entity> entities() const override { return entity_keys_; }
+  auto entities() const -> std::span<Entity const> override {
+    return entity_keys_;
+  }
 
-  std::optional<ComponentTicks> get_ticks(Entity entity) const override {
-    auto *t = get_ticks_ptr(entity);
+  auto get_ticks(Entity entity) const
+    -> std::optional<ComponentTicks> override {
+    auto* t = get_ticks_ptr(entity);
     return t ? std::optional(*t) : std::nullopt;
   }
 
-  void mark_changed(Entity entity, Tick tick) {
-    auto *t = get_ticks_mut(entity);
+  auto mark_changed(Entity entity, Tick tick) -> void {
+    auto* t = get_ticks_mut(entity);
     if (t)
       t->changed = tick;
   }

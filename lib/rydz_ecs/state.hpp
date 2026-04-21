@@ -13,7 +13,7 @@ template <typename S> struct State {
 
   explicit State(S v) : value(std::move(v)) {}
 
-  const S &get() const { return value; }
+  auto get() const -> S const& { return value; }
 };
 
 template <typename S> struct NextState {
@@ -22,8 +22,8 @@ template <typename S> struct NextState {
 
   NextState() = default;
 
-  void set(S state) { pending = std::move(state); }
-  void clear() { pending = std::nullopt; }
+  auto set(S state) -> void { pending = std::move(state); }
+  auto clear() -> void { pending = std::nullopt; }
 };
 
 template <typename S> struct OnEnter {
@@ -73,26 +73,29 @@ concept OnTransitionLabel = is_on_transition<bare_t<T>>::value;
 
 template <typename S> auto in_state(S target) {
   return
-      [target](Res<State<S>> state) -> bool { return state->get() == target; };
+    [target](Res<State<S>> state) -> bool { return state->get() == target; };
 }
 
 template <typename S> auto state_changed() {
   return
-      [](Res<StateTransitionEvent<S>> event) -> bool { return event->changed; };
+    [](Res<StateTransitionEvent<S>> event) -> bool { return event->changed; };
 }
 
-template <typename S> void check_state_transitions(World &world) {
-  auto *event = world.get_resource<StateTransitionEvent<S>>();
-  if (event)
+template <typename S> void check_state_transitions(World& world) {
+  auto* event = world.get_resource<StateTransitionEvent<S>>();
+  if (event) {
     event->changed = false;
+  }
 
-  auto *next = world.get_resource<NextState<S>>();
-  if (!next || !next->pending)
+  auto* next = world.get_resource<NextState<S>>();
+  if (!next || !next->pending) {
     return;
+  }
 
-  auto *state = world.get_resource<State<S>>();
-  if (!state)
+  auto* state = world.get_resource<State<S>>();
+  if (!state) {
     return;
+  }
 
   S new_value = std::move(*next->pending);
   next->pending = std::nullopt;
@@ -100,11 +103,12 @@ template <typename S> void check_state_transitions(World &world) {
   if (!(state->value == new_value)) {
     S old_value = std::move(state->value);
 
-    auto *schedules = world.get_resource<StateSchedules<S>>();
+    auto* schedules = world.get_resource<StateSchedules<S>>();
     if (schedules) {
       auto exit_it = schedules->on_exit.find(old_value);
-      if (exit_it != schedules->on_exit.end())
+      if (exit_it != schedules->on_exit.end()) {
         exit_it->second.run(world);
+      }
     }
 
     state->value = std::move(new_value);
@@ -113,12 +117,14 @@ template <typename S> void check_state_transitions(World &world) {
       schedules->on_transition.run(world);
 
       auto enter_it = schedules->on_enter.find(state->value);
-      if (enter_it != schedules->on_enter.end())
+      if (enter_it != schedules->on_enter.end()) {
         enter_it->second.run(world);
+      }
     }
 
-    if (event)
+    if (event) {
       event->changed = true;
+    }
   }
 }
 

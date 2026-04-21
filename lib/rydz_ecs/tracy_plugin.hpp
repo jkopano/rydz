@@ -2,7 +2,8 @@
 
 #ifdef TRACY_ENABLE
 #include <tracy/Tracy.hpp>
-#define ZoneScopedTransient(name) ZoneTransientN(___tracy_scoped_zone, name, true)
+#define ZoneScopedTransient(name)                                              \
+  ZoneTransientN(___tracy_scoped_zone, name, true)
 #else
 #define FrameMark
 #define FrameMarkNamed(x)

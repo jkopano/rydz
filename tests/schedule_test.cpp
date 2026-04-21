@@ -474,6 +474,22 @@ TEST(ScheduleOrderingTest, ChainWithRunIfFalse) {
   EXPECT_EQ(world.get_resource<Counter>()->value, 13);
 }
 
+TEST(ScheduleOrderingTest, GroupRunOnceWithChainRunsWholeGroupOnceInOrder) {
+  World world;
+  std::vector<int> order;
+
+  Schedule schedule;
+  schedule.add_system_fn(group([&]() { order.push_back(1); },
+                               [&]() { order.push_back(2); })
+                             .chain()
+                             .run_if(run_once()));
+
+  schedule.run(world);
+  schedule.run(world);
+
+  EXPECT_EQ(order, (std::vector<int>{1, 2}));
+}
+
 // ============================================================
 // Ordering + parallelism interaction
 // ============================================================

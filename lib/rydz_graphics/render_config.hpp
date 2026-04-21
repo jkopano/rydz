@@ -1,105 +1,90 @@
 #pragma once
-#include "rl.hpp"
+
+#include "rydz_ecs/params.hpp"
+#include "rydz_graphics/gl/state.hpp"
 
 namespace ecs {
 
-enum class DepthFunc {
-  Always,
-  Never,
-  Less,
-  LessEqual,
-  Greater,
-  GreaterEqual,
-  Equal,
-  NotEqual,
-};
-
-struct Depth {
-  bool test = true;
-  bool write = true;
-  DepthFunc func = DepthFunc::Less;
-};
-
-enum class BlendMode {
-  Alpha,
-  Additive,
-  Multiplied,
-  Custom,
-};
-
-enum class CullMode {
-  None,
-  Back,
-  Front,
-};
-
-enum class PolygonMode {
-  Fill,
-  Line,
-  Point,
-};
-
 struct RenderConfig {
-  Depth depth;
-  BlendMode blend = BlendMode::Alpha;
-  CullMode cull = CullMode::Back;
-  PolygonMode polygon_mode = PolygonMode::Fill;
-  bool wireframe = false;
+  gl::Depth depth{};
+  gl::Blend blend = gl::Blend::alpha();
+  gl::Cull cull = gl::Cull::back();
+  gl::Polygon polygon{};
+  gl::ColorMask color_mask{};
 
-  void apply() const {
+  static auto get_default() -> RenderConfig { return {}; }
 
-    if (depth.test) {
-      rl::rlEnableDepthTest();
-    } else {
-      rl::rlDisableDepthTest();
-    }
-    if (depth.write) {
-      rl::rlEnableDepthMask();
-    } else {
-      rl::rlDisableDepthMask();
-    }
-
-    switch (cull) {
-    case CullMode::Back:
-      rl::rlEnableBackfaceCulling();
-      rl::rlSetCullFace(RL_CULL_FACE_BACK);
-      break;
-    case CullMode::Front:
-      rl::rlEnableBackfaceCulling();
-      rl::rlSetCullFace(RL_CULL_FACE_FRONT);
-      break;
-    case CullMode::None:
-      rl::rlDisableBackfaceCulling();
-      break;
-    }
-
-    if (wireframe || polygon_mode == PolygonMode::Line) {
-      rl::rlEnableWireMode();
-    }
-
-    switch (blend) {
-    case BlendMode::Alpha:
-      rl::rlSetBlendMode(RL_BLEND_ALPHA);
-      break;
-    case BlendMode::Additive:
-      rl::rlSetBlendMode(RL_BLEND_ADDITIVE);
-      break;
-    case BlendMode::Multiplied:
-      rl::rlSetBlendMode(RL_BLEND_MULTIPLIED);
-      break;
-    case BlendMode::Custom:
-      break;
-    }
+  static auto depth_prepass() -> RenderConfig {
+    return {
+      .depth = {.test = true, .write = true},
+      .blend = gl::Blend::disabled(),
+      .cull = gl::Cull::back(),
+      .polygon = gl::Polygon::fill(),
+      .color_mask = {.r = false, .g = false, .b = false, .a = false},
+    };
   }
 
-  static void restore_defaults() {
-    rl::rlEnableDepthTest();
-    rl::rlEnableDepthMask();
-    rl::rlEnableBackfaceCulling();
-    rl::rlSetCullFace(RL_CULL_FACE_BACK);
-    rl::rlDisableWireMode();
-    rl::rlSetBlendMode(RL_BLEND_ALPHA);
+  static auto post_depth_prepass() -> RenderConfig { return get_default(); }
+
+  static auto opaque() -> RenderConfig {
+    return {
+      .depth = {.test = true, .write = true},
+      .blend = gl::Blend::disabled(),
+      .cull = gl::Cull::back(),
+      .polygon = gl::Polygon::fill(),
+      .color_mask = {},
+    };
+  }
+
+  static auto transparent() -> RenderConfig {
+    return {
+      .depth = {.test = true, .write = false},
+      .blend = gl::Blend::alpha(),
+      .cull = gl::Cull::back(),
+      .polygon = gl::Polygon::fill(),
+      .color_mask = {},
+    };
   }
 };
 
 } // namespace ecs
+
+namespace gl {
+
+inline auto RenderState::apply(ecs::RenderConfig const& config) -> void {
+  bool const color_mask_changed = color_mask_ != config.color_mask;
+  bool const depth_changed = depth_ != config.depth;
+  bool const blend_changed = blend_ != config.blend;
+  bool const cull_changed = cull_ != config.cull;
+  bool const polygon_changed = polygon_ != config.polygon;
+
+  if (!color_mask_changed && !depth_changed && !blend_changed &&
+      !cull_changed && !polygon_changed) {
+    return;
+  }
+
+  flush_batch();
+
+  if (color_mask_changed) {
+    config.color_mask.apply();
+    color_mask_ = config.color_mask;
+  }
+  if (depth_changed) {
+    config.depth.apply();
+    depth_ = config.depth;
+  }
+  if (blend_changed) {
+    config.blend.apply();
+    blend_ = config.blend;
+  }
+  if (cull_changed) {
+    config.cull.apply();
+    cull_ = config.cull;
+  }
+  if (polygon_changed) {
+    config.polygon.apply();
+    polygon_ = config.polygon;
+  }
+}
+
+} // namespace gl

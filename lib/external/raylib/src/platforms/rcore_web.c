@@ -903,7 +903,7 @@ Image GetClipboardImage(void)
 }
 
 // Show mouse cursor
-void ShowCursor(void)
+void rlShowCursor(void)
 {
     if (CORE.Input.Mouse.cursorHidden)
     {
@@ -914,7 +914,7 @@ void ShowCursor(void)
 }
 
 // Hides mouse cursor
-void HideCursor(void)
+void rlHideCursor(void)
 {
     if (!CORE.Input.Mouse.cursorHidden)
     {

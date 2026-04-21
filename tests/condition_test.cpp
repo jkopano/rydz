@@ -1,6 +1,8 @@
+#include <atomic>
 #include <gtest/gtest.h>
 
 #include "rydz_ecs/condition.hpp"
+#include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/system.hpp"
 #include "rydz_ecs/world.hpp"
 
@@ -168,4 +170,89 @@ TEST(ConditionTest, IntoSystemNoCondition) {
 
   system->run(world);
   EXPECT_EQ(run_count, 2);
+}
+
+// ============================================================
+// Group run_if() tests
+// ============================================================
+
+TEST(ConditionTest, GroupRunIfRunOnceRunsAllSystemsOnce) {
+  World world;
+  world.set_multithreaded(false);
+
+  int first_runs = 0;
+  int second_runs = 0;
+
+  Schedule schedule;
+  schedule.add_system_fn(group([&]() { first_runs++; }, [&]() { second_runs++; })
+                             .run_if(run_once()));
+
+  schedule.run(world);
+  EXPECT_EQ(first_runs, 1);
+  EXPECT_EQ(second_runs, 1);
+
+  schedule.run(world);
+  EXPECT_EQ(first_runs, 1);
+  EXPECT_EQ(second_runs, 1);
+}
+
+TEST(ConditionTest, GroupRunIfFalseRunsNoSystems) {
+  World world;
+  world.set_multithreaded(false);
+
+  int first_runs = 0;
+  int second_runs = 0;
+
+  Schedule schedule;
+  schedule.add_system_fn(
+      group([&]() { first_runs++; }, [&]() { second_runs++; })
+          .run_if([]() -> bool { return false; }));
+
+  schedule.run(world);
+
+  EXPECT_EQ(first_runs, 0);
+  EXPECT_EQ(second_runs, 0);
+}
+
+TEST(ConditionTest, GroupRunIfTrueRunsAllSystemsEveryTime) {
+  World world;
+  world.set_multithreaded(false);
+
+  int first_runs = 0;
+  int second_runs = 0;
+
+  Schedule schedule;
+  schedule.add_system_fn(
+      group([&]() { first_runs++; }, [&]() { second_runs++; })
+          .run_if([]() -> bool { return true; }));
+
+  schedule.run(world);
+  schedule.run(world);
+
+  EXPECT_EQ(first_runs, 2);
+  EXPECT_EQ(second_runs, 2);
+}
+
+TEST(ConditionTest, GroupRunIfStatefulConditionEvaluatedOncePerScheduleRun) {
+  World world;
+
+  std::atomic<int> condition_calls{0};
+  std::atomic<int> first_runs{0};
+  std::atomic<int> second_runs{0};
+
+  Schedule schedule;
+  schedule.add_system_fn(
+      group([&]() { first_runs.fetch_add(1, std::memory_order_relaxed); },
+            [&]() { second_runs.fetch_add(1, std::memory_order_relaxed); })
+          .run_if([&]() -> bool {
+            condition_calls.fetch_add(1, std::memory_order_relaxed);
+            return true;
+          }));
+
+  schedule.run(world);
+  schedule.run(world);
+
+  EXPECT_EQ(condition_calls.load(std::memory_order_relaxed), 2);
+  EXPECT_EQ(first_runs.load(std::memory_order_relaxed), 2);
+  EXPECT_EQ(second_runs.load(std::memory_order_relaxed), 2);
 }
