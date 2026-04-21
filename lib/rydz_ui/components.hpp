@@ -16,10 +16,10 @@ struct UiRoot {
   ecs::Entity root;
 };
 
-// struct UiWhiteTexture {
-//   using T = ecs::Resource;
-//   ecs::Handle<ecs::Material> material;
-// };
+struct UiWhiteTexture {
+  using T = ecs::Resource;
+  ecs::Handle<ecs::Texture> handle;
+};
 
 struct UiTextCache {
   using T = ecs::Resource;

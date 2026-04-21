@@ -8,16 +8,18 @@
 struct UiPlugin {
 public:
   static void ui_init_system(ecs::World &world) {
-    if (world.has_resource<rydz::ui::UiQuadMesh>())
+    if (world.has_resource<rydz::ui::UiWhiteTexture>())
       return;
 
-    auto *materials = world.get_resource<ecs::Assets<ecs::Material>>();
-    auto *meshes = world.get_resource<ecs::Assets<ecs::Mesh>>();
-    if (!materials || !meshes)
+    auto *textures = world.get_resource<ecs::Assets<ecs::Texture>>();
+    if (!textures)
       return;
 
-    auto quad_handle = meshes->add(ecs::mesh::plane(1.0f, 1.0f));
-    world.insert_resource(rydz::ui::UiQuadMesh{quad_handle});
+    rl::Image img = rl::GenImageColor(1, 1, rl::Color{255, 255, 255, 255});
+    gl::Texture tex = rl::LoadTextureFromImage(img);
+    rl::UnloadImage(img);
+
+    world.insert_resource(rydz::ui::UiWhiteTexture{textures->add(tex)});
   }
 
   static void ui_prepare_system(ecs::World &world) {
@@ -26,9 +28,8 @@ public:
       return;
 
     storage->for_each([&](ecs::Entity e, const rydz::ui::UiNode &) {
-      if (!world.has_component<rydz::ui::ComputedUiNode>(e)) {
+      if (!world.has_component<rydz::ui::ComputedUiNode>(e))
         world.insert_component(e, rydz::ui::ComputedUiNode{});
-      }
     });
   }
 
@@ -38,26 +39,20 @@ public:
     if (!root || !window)
       return;
 
-    math::Vec2 root_size{
-        static_cast<float>(window->width),
-        static_cast<float>(window->height),
-    };
-
-    rydz::ui::algorithms::compute_layout(world, root->root, root_size);
+    rydz::ui::algorithms::compute_layout(world, root->root,
+                                         {static_cast<float>(window->width),
+                                          static_cast<float>(window->height)});
   }
 
   static void ui_post_layout_system(ecs::World &world) {
-    // auto *white = world.get_resource<rydz::ui::UiWhiteTexture>();
-    auto *quad_res = world.get_resource<rydz::ui::UiQuadMesh>();
-    auto *materials = world.get_resource<ecs::Assets<ecs::Material>>();
+    auto *white = world.get_resource<rydz::ui::UiWhiteTexture>();
     auto *textures = world.get_resource<ecs::Assets<ecs::Texture>>();
     auto *text_cache = world.get_resource<rydz::ui::UiTextCache>();
 
-    if (!quad_res || !materials)
+    if (!white || !textures || !text_cache)
       return;
 
-    auto quad_handle = quad_res->mesh;
-
+    // --- Panele ---
     auto *panels = world.get_storage<rydz::ui::Panel>();
     if (panels) {
       panels->for_each([&](ecs::Entity e, const rydz::ui::Panel &panel) {
@@ -71,26 +66,25 @@ public:
         t->translation = math::Vec3(computed->pos.x, computed->pos.y, 0.0f);
         t->scale = math::Vec3(computed->size.x, computed->size.y, 1.0f);
 
-        if (!world.has_component<ecs::Mesh3d>(e))
-          world.insert_component(e, ecs::Mesh3d{quad_handle});
-        else
-          world.get_component<ecs::Mesh3d>(e)->mesh = quad_handle;
-
-        if (!world.has_component<ecs::MeshMaterial3d>(e))
-          world.insert_component(e, ecs::MeshMaterial3d{});
-        auto *mat_comp = world.get_component<ecs::MeshMaterial3d>(e);
-
-        auto color_mat = materials->add(
-            ecs::StandardMaterial::from_color(panel.background_color));
-        mat_comp->material = color_mat;
+        if (!world.has_component<ecs::Sprite>(e))
+          world.insert_component(e, ecs::Sprite{});
+        auto *sprite = world.get_component<ecs::Sprite>(e);
+        sprite->handle = white->handle;
+        sprite->tint = panel.background_color;
+        if (auto *node = world.get_component<rydz::ui::UiNode>(e))
+          sprite->layer = node->z_index;
       });
     }
 
+    // --- Labele ---
     auto *labels = world.get_storage<rydz::ui::Label>();
-    if (!labels || !textures || !text_cache)
+    if (!labels)
       return;
 
     labels->for_each([&](ecs::Entity e, const rydz::ui::Label &label) {
+      if (label.text.empty())
+        return;
+
       auto *computed = world.get_component<rydz::ui::ComputedUiNode>(e);
       if (!computed)
         return;
@@ -99,14 +93,11 @@ public:
         world.insert_component(e, ecs::Transform{});
       auto *t = world.get_component<ecs::Transform>(e);
       t->translation = math::Vec3(computed->pos.x, computed->pos.y, 0.0f);
-      t->scale = math::Vec3(computed->size.x, computed->size.y, 1.0f);
+      t->scale = math::Vec3(1.0f, 1.0f, 1.0f);
 
-      if (!world.has_component<ecs::Mesh3d>(e))
-        world.insert_component(e, ecs::Mesh3d{quad_handle});
-
-      if (!world.has_component<ecs::MeshMaterial3d>(e))
-        world.insert_component(e, ecs::MeshMaterial3d{});
-      auto *mat_comp = world.get_component<ecs::MeshMaterial3d>(e);
+      if (!world.has_component<ecs::Sprite>(e))
+        world.insert_component(e, ecs::Sprite{});
+      auto *sprite = world.get_component<ecs::Sprite>(e);
 
       const std::string key = make_label_cache_key(label);
       auto it = text_cache->items.find(key);
@@ -115,14 +106,13 @@ public:
             label.text.c_str(), static_cast<int>(label.font_size), label.color);
         gl::Texture raw_tex = rl::LoadTextureFromImage(img);
         rl::UnloadImage(img);
-
-        auto tex_handle = textures->add(raw_tex);
-        it = text_cache->items.emplace(key, tex_handle).first;
+        it = text_cache->items.emplace(key, textures->add(raw_tex)).first;
       }
 
-      auto label_mat = materials->add(
-          ecs::StandardMaterial::from_texture(it->second, label.color));
-      mat_comp->material = label_mat;
+      sprite->handle = it->second;
+      sprite->tint = rl::Color{255, 255, 255, 255};
+      if (auto *node = world.get_component<rydz::ui::UiNode>(e))
+        sprite->layer = node->z_index;
     });
   }
 
@@ -142,9 +132,8 @@ public:
       world.insert_resource(rydz::ui::UiRoot{root});
     }
 
-    if (!world.has_resource<rydz::ui::UiTextCache>()) {
+    if (!world.has_resource<rydz::ui::UiTextCache>())
       world.insert_resource(rydz::ui::UiTextCache{});
-    }
 
     app.add_systems(ecs::ScheduleLabel::Startup, ui_init_system);
     app.add_systems(rydz::ui::UiSystemSet::Prepare, ui_prepare_system)
