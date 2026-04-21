@@ -60,6 +60,10 @@ end
 add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")
 add_requires("fmt", "spdlog", { configs = { external_fmt = true } })
 
+if is_plat("windows") then
+    add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", {force = true})
+end
+
 if tracy_enabled then
 	add_requires("tracy")
 	add_defines("TRACY_ENABLE")
