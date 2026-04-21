@@ -24,231 +24,355 @@
 
 namespace ecs {
 
-using namespace math;
+    using namespace math;
 
-struct brushFace {
-    Vector3 v0;
-    Vector3 v1;
-    Vector3 v2;
-    Vector3 v3;
-    std::string texturePath;
-};
+    struct RotateTag {};
 
-rl::Mesh createPlaneMesh(brushFace face);
-std::vector<brushFace> parseVertices(const std::string& filename);
+    struct brushFace {
+        Vector3 v0;
+        Vector3 v1;
+        Vector3 v2;
+        Vector3 v3;
+        std::string texturePath;
+    };
 
+    struct entity_prop_static {
+        Vec3 position = { 0,0,0 };
+        std::string modelPath = "models/sun.glb";
+    };
 
-
-inline void load_level(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
-    ResMut<Assets<rl::Texture2D>> textures,
-    NonSendMarker) {
-
-
-    std::vector<brushFace> brushFaces = parseVertices("res/levels/testLevel.vmf");
+    rl::Mesh createPlaneMesh(brushFace face);
+    std::vector<brushFace> parseVertices(const std::string& filename);
 
 
 
-    //Spawn each face
-    for (auto& face : brushFaces)
-    {
-        //rl::TraceLog(LOG_DEBUG, "RENDERING NEW FACE");
-        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.z) + " Z: " + std::to_string(face.v0.y)).c_str());
-        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v1.x) + " Y: " + std::to_string(face.v1.z) + " Z: " + std::to_string(face.v1.y)).c_str());
-        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v2.x) + " Y: " + std::to_string(face.v2.z) + " Z: " + std::to_string(face.v2.y)).c_str());
-        //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v3.x) + " Y: " + std::to_string(face.v3.z) + " Z: " + std::to_string(face.v3.y)).c_str());
+    inline void load_level(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
+        ResMut<Assets<rl::Texture2D>> textures,
+        NonSendMarker) {
 
-        //OLD MODEL LOADING
-        //rl::Mesh cube_mesh = createPlaneMesh(face);
+
+        std::vector<brushFace> brushFaces = parseVertices("res/levels/testLevel.vmf");
+
+
+
+        //Spawn each face
+        for (auto& face : brushFaces)
+        {
+            //rl::TraceLog(LOG_DEBUG, "RENDERING NEW FACE");
+            //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.z) + " Z: " + std::to_string(face.v0.y)).c_str());
+            //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v1.x) + " Y: " + std::to_string(face.v1.z) + " Z: " + std::to_string(face.v1.y)).c_str());
+            //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v2.x) + " Y: " + std::to_string(face.v2.z) + " Z: " + std::to_string(face.v2.y)).c_str());
+            //rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v3.x) + " Y: " + std::to_string(face.v3.z) + " Z: " + std::to_string(face.v3.y)).c_str());
+
+            //OLD MODEL LOADING
+            //rl::Mesh cube_mesh = createPlaneMesh(face);
+            //rl::Model plane_model = rl::LoadModelFromMesh(cube_mesh);
+            //auto plane_h = models->add(std::move(plane_model));
+
+            rl::Mesh cube_mesh = createPlaneMesh(face);
+            auto plane_h = meshes->add(cube_mesh);
+
+            std::ifstream f(("res/textures/" + face.texturePath + ".png").c_str());
+            if (!f.good())
+            {
+                face.texturePath = "empty";
+            }
+            cmd.spawn(Mesh3d{ plane_h },
+                MeshMaterial3d{ StandardMaterial::from_texture(
+                    textures->add(rl::LoadTexture(("res/textures/" + face.texturePath + ".png").c_str()))) },
+
+                Transform{ });
+            //Transform{ (JPH::Vec3) { 5.0f, 0.0f, 10.0f } }
+        }
+
+        //rl::Mesh cube_mesh = rl::GenMeshCube(10.0f, 10.0f, 10.0f);
         //rl::Model plane_model = rl::LoadModelFromMesh(cube_mesh);
         //auto plane_h = models->add(std::move(plane_model));
 
-        rl::Mesh cube_mesh = createPlaneMesh(face);
-        auto plane_h = meshes->add(cube_mesh);
+        //cmd.spawn(Model3d{ plane_h },
+        //    Material3d{ StandardMaterial::from_texture(
+        //        textures->add(rl::LoadTexture("res/textures/texture_04_2.png"))) },
+        //    Transform{ (JPH::Vec3) { 0.0f, 5.0f, -10.0f } });
 
-        std::ifstream f(("res/textures/" + face.texturePath + ".png").c_str());
-        if(!f.good())
-        {
-            face.texturePath = "empty";
-        }
-        cmd.spawn(Mesh3d{ plane_h },
-            MeshMaterial3d{ StandardMaterial::from_texture(
-                textures->add(rl::LoadTexture(("res/textures/" + face.texturePath + ".png").c_str())))},
 
-            Transform{ });
-        //Transform{ (JPH::Vec3) { 5.0f, 0.0f, 10.0f } }
+
     }
 
-    //rl::Mesh cube_mesh = rl::GenMeshCube(10.0f, 10.0f, 10.0f);
-    //rl::Model plane_model = rl::LoadModelFromMesh(cube_mesh);
-    //auto plane_h = models->add(std::move(plane_model));
+    // Function to extract content between double quotes
+    std::string extractValue(const std::string& line) {
+        size_t first = line.find('"');
+        size_t second = line.find('"', first + 1);
+        size_t third = line.find('"', second + 1);
+        size_t fourth = line.find('"', third + 1);
 
-    //cmd.spawn(Model3d{ plane_h },
-    //    Material3d{ StandardMaterial::from_texture(
-    //        textures->add(rl::LoadTexture("res/textures/texture_04_2.png"))) },
-    //    Transform{ (JPH::Vec3) { 0.0f, 5.0f, -10.0f } });
+        // We want the content of the second quoted string (the value)
+        if (third != std::string::npos && fourth != std::string::npos) {
+            return line.substr(third + 1, fourth - third - 1);
+        }
+        return "";
+    }
 
+    // Function to extract the key (the first quoted string)
+    std::string extractKey(const std::string& line) {
+        size_t first = line.find('"');
+        size_t second = line.find('"', first + 1);
+        if (first != std::string::npos && second != std::string::npos) {
+            return line.substr(first + 1, second - first - 1);
+        }
+        return "";
+    }
 
+    std::vector<entity_prop_static> parseMapForProps(const std::string& filePath) {
+        std::ifstream file(filePath);
+        std::vector<entity_prop_static> props;
+        std::string line;
 
-}
+        while (std::getline(file, line)) {
+            if (line.find('{') != std::string::npos) {
+                entity_prop_static currentProp;
+                bool isTargetEntity = false;
+                bool insideBrush = false;
 
+                std::string originStr;
 
-std::vector<brushFace> parseVertices(const std::string& filename) {
-    std::vector<brushFace> allFaces;
-    std::ifstream file(filename);
+                while (std::getline(file, line) && line.find('}') == std::string::npos) {
+                    // Skip brush blocks within entities
+                    if (line.find('{') != std::string::npos) {
+                        insideBrush = true;
+                        continue;
+                    }
+                    if (insideBrush) {
+                        if (line.find('}') != std::string::npos) insideBrush = false;
+                        continue;
+                    }
 
-    if (!file.is_open()) {
-        std::cerr << "Cannot read file: " << filename << std::endl;
+                    std::string key = extractKey(line);
+                    std::string value = extractValue(line);
+
+                    if (key == "classname" && value == "prop_static") {
+                        isTargetEntity = true;
+                    }
+                    else if (key == "origin") {
+                        originStr = value; // Store the full "x y z" string
+                    }
+                    else if (key == "modelpath") {
+                        currentProp.modelPath = value;
+                    }
+                }
+
+                if (isTargetEntity) {
+                    // Now parse the full origin string into the Vec3
+                    std::stringstream ss(originStr);
+                    float x;
+                    float y;
+                    float z;
+                    ss >> x >> y >> z;
+                    currentProp.position = { x,z,-y};
+                    props.push_back(currentProp);
+                }
+            }
+        }
+        return props;
+    }
+
+    std::vector<brushFace> parseVertices(const std::string& filename) {
+        std::vector<brushFace> allFaces;
+        std::ifstream file(filename);
+
+        if (!file.is_open()) {
+            std::cerr << "Cannot read file: " << filename << std::endl;
+            return allFaces;
+        }
+
+        std::string line;
+        std::vector<Vector3> tempVertices;
+        std::string lastFoundTexture = "";
+
+        while (std::getline(file, line)) {
+
+            size_t matPos = line.find("\"material\"");
+            if (matPos != std::string::npos) {
+                size_t firstQuote = line.find("\"", matPos + 10);
+                size_t lastQuote = line.find("\"", firstQuote + 1);
+
+                if (firstQuote != std::string::npos && lastQuote != std::string::npos) {
+                    std::string fullPath = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+
+                    //lastFoundTexture = "empty";
+                    size_t lastSlash = fullPath.find_last_of("/\\");
+                    if (lastSlash != std::string::npos) {
+                        lastFoundTexture = fullPath.substr(lastSlash + 1);
+                    }
+                    else {
+                        lastFoundTexture = fullPath;
+                    }
+
+                    if (!allFaces.empty() && allFaces.back().texturePath.empty()) {
+                        allFaces.back().texturePath = lastFoundTexture;
+                    }
+                }
+            }
+
+            size_t vPos = line.find("\"v\"");
+            if (vPos != std::string::npos) {
+                size_t firstQuote = line.find("\"", vPos + 3);
+                size_t lastQuote = line.find("\"", firstQuote + 1);
+
+                if (firstQuote != std::string::npos && lastQuote != std::string::npos) {
+                    std::string coordsStr = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+
+                    std::stringstream ss(coordsStr);
+                    Vector3 v;
+                    if (ss >> v.x >> v.z >> v.y) {
+                        tempVertices.push_back(v);
+                    }
+                }
+            }
+
+            if (tempVertices.size() == 4) {
+                brushFace face;
+                face.v0 = tempVertices[0];
+                face.v1 = tempVertices[1];
+                face.v2 = tempVertices[2];
+                face.v3 = tempVertices[3];
+
+                rl::TraceLog(LOG_DEBUG, (("TEXTURE TO APPLY: " + lastFoundTexture).c_str()));
+                //face.texturePath = lastFoundTexture;
+
+                rl::TraceLog(LOG_DEBUG, "LOADING NEW FACE");
+                rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.z) + " Z: " + std::to_string(face.v0.y)).c_str());
+                rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v1.x) + " Y: " + std::to_string(face.v1.z) + " Z: " + std::to_string(face.v1.y)).c_str());
+                rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v2.x) + " Y: " + std::to_string(face.v2.z) + " Z: " + std::to_string(face.v2.y)).c_str());
+                rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v3.x) + " Y: " + std::to_string(face.v3.z) + " Z: " + std::to_string(face.v3.y)).c_str());
+                allFaces.push_back(face);
+
+                tempVertices.clear();
+                lastFoundTexture = "";
+            }
+        }
+
+        file.close();
         return allFaces;
     }
 
-    std::string line;
-    std::vector<Vector3> tempVertices;
-    std::string lastFoundTexture = "";
+    void spawn_model(Cmd cmd, Res<AssetServer> server) {
+        //auto model_handle = server->load<Scene>("res/models/old_house.glb");
+        cmd.spawn(SceneRoot{ server->load<Scene>("res/levels/testLevel.glb") },
+            ecs::Transform{ .scale = {1.0f, 1.0f, 1.0f} });
 
-    while (std::getline(file, line)) {
-       
-        size_t matPos = line.find("\"material\"");
-        if (matPos != std::string::npos) {
-            size_t firstQuote = line.find("\"", matPos + 10);
-            size_t lastQuote = line.find("\"", firstQuote + 1);
+        
 
-            if (firstQuote != std::string::npos && lastQuote != std::string::npos) {
-                std::string fullPath = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+    }
 
-                //lastFoundTexture = "empty";
-                size_t lastSlash = fullPath.find_last_of("/\\");
-                if (lastSlash != std::string::npos) {
-                    lastFoundTexture = fullPath.substr(lastSlash + 1);
-                }
-                else {
-                    lastFoundTexture = fullPath;
-                }
+    void spawn_entity_models(Cmd cmd, Res<AssetServer> server) {
+        //auto model_handle = server->load<Scene>("res/models/old_house.glb");
+        //entity_prop_static testProp;
+        //testProp.modelPath = "sun.glb";
+        //testProp.position = { 0.0f, 0.0f, 0.0f };
 
-                if (!allFaces.empty() && allFaces.back().texturePath.empty()) {
-                    allFaces.back().texturePath = lastFoundTexture;
-                }
-            }
+
+
+        std::vector<entity_prop_static> props_static = parseMapForProps("res/levels/testLevel.map");
+
+        for (auto& prop_static : props_static)
+        {
+            cmd.spawn(SceneRoot{ server->load<Scene>("res/" + prop_static.modelPath) },
+                ecs::Transform{ .translation = prop_static.position,
+                                    .scale = {1.0f, 1.0f, 1.0f}
+                });
         }
 
-        size_t vPos = line.find("\"v\"");
-        if (vPos != std::string::npos) {
-            size_t firstQuote = line.find("\"", vPos + 3);
-            size_t lastQuote = line.find("\"", firstQuote + 1);
 
-            if (firstQuote != std::string::npos && lastQuote != std::string::npos) {
-                std::string coordsStr = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+    }
 
-                std::stringstream ss(coordsStr);
-                Vector3 v;
-                if (ss >> v.x >> v.z >> v.y) {
-                    tempVertices.push_back(v);
-                }
-            }
+    // NonSendMarker musi byæ gdy funkcja musi byæ odpalona na g³ównym w¹tku
+    // (inn¹ opcj¹ jest dodanie do funkcji World world)
+    void setupScene(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker) {
+
+        // cube - czerwona
+        auto cube_h = meshes->add(mesh::cube(16, 5, 16));
+        cmd.spawn(Mesh3d{ cube_h }, MeshMaterial3d<>{StandardMaterial::from_color(RED)},
+            ecs::Transform::from_xyz(-24, -20, -24), RotateTag{});
+
+    }
+
+    //TODO:
+    //Zoptymalizowaæ liczenie trójk¹tów poprzez indeksowanie (chwilowo duplikuj¹ siê 2 vertexy per plane)
+
+    rl::Mesh createPlaneMesh(brushFace face) {
+        Mesh mesh = { 0 };
+
+        rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.y) + " Z: " + std::to_string(face.v0.z)).c_str());
+
+        //Raylib robi tutaj kalkulacje z rozdzielczoœci (do subdivision), ale my chyba nie potrzebujemy
+        int vertexCount = 6;
+
+        // Vertices definition
+        Vector3* vertices = (Vector3*)RL_MALLOC(vertexCount * sizeof(Vector3));
+        vertices[0] = face.v0;
+        vertices[1] = face.v1;
+        vertices[2] = face.v2;
+        vertices[3] = face.v3;
+        vertices[4] = vertices[0];
+        vertices[5] = vertices[2];
+
+        // Normals definition
+        Vector3* normals = (Vector3*)RL_MALLOC(vertexCount * sizeof(Vector3));
+        //for (int n = 0; n < vertexCount; n++) normals[n] = (Vector3){ 0.0f, 1.0f, 0.0f };   // Vector3.up;
+        for (int n = 0; n < vertexCount; n++) normals[n] = Vector3CrossProduct((vertices[1] - vertices[0]), (vertices[2] - vertices[0]));   // Vector3.up;
+
+        // TexCoords definition
+        Vector2* texcoords = (Vector2*)RL_MALLOC(vertexCount * sizeof(Vector2));
+        texcoords[0] = { -1.0f, 1.0f };
+        texcoords[1] = { 1.0f, 1.0f };
+        texcoords[2] = { 1.0f, -1.0f };
+        texcoords[3] = { -1.0f, -1.0f };
+        texcoords[4] = texcoords[0];
+        texcoords[5] = texcoords[2];
+
+        mesh.vertexCount = vertexCount;
+        mesh.triangleCount = 2;
+        mesh.vertices = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
+        mesh.texcoords = (float*)RL_MALLOC(mesh.vertexCount * 2 * sizeof(float));
+        mesh.normals = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
+        //mesh.indices = (unsigned short*)RL_MALLOC(mesh.triangleCount * 3 * sizeof(unsigned short));
+
+        // Mesh vertices position array
+        for (int i = 0; i < mesh.vertexCount; i++)
+        {
+            mesh.vertices[3 * i] = vertices[i].x;
+            mesh.vertices[3 * i + 1] = vertices[i].y;
+            mesh.vertices[3 * i + 2] = vertices[i].z;
         }
 
-        if (tempVertices.size() == 4) {
-            brushFace face;
-            face.v0 = tempVertices[0];
-            face.v1 = tempVertices[1];
-            face.v2 = tempVertices[2];
-            face.v3 = tempVertices[3];
-
-            rl::TraceLog(LOG_DEBUG, (("TEXTURE TO APPLY: " + lastFoundTexture).c_str()));
-            //face.texturePath = lastFoundTexture;
-
-            rl::TraceLog(LOG_DEBUG, "LOADING NEW FACE");
-            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.z) + " Z: " + std::to_string(face.v0.y)).c_str());
-            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v1.x) + " Y: " + std::to_string(face.v1.z) + " Z: " + std::to_string(face.v1.y)).c_str());
-            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v2.x) + " Y: " + std::to_string(face.v2.z) + " Z: " + std::to_string(face.v2.y)).c_str());
-            rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v3.x) + " Y: " + std::to_string(face.v3.z) + " Z: " + std::to_string(face.v3.y)).c_str());
-            allFaces.push_back(face);
-
-            tempVertices.clear();
-            lastFoundTexture = "";
+        // Mesh texcoords array
+        for (int i = 0; i < mesh.vertexCount; i++)
+        {
+            mesh.texcoords[2 * i] = texcoords[i].x;
+            mesh.texcoords[2 * i + 1] = texcoords[i].y;
         }
+
+        // Mesh normals array
+        for (int i = 0; i < mesh.vertexCount; i++)
+        {
+            mesh.normals[3 * i] = normals[i].x;
+            mesh.normals[3 * i + 1] = normals[i].y;
+            mesh.normals[3 * i + 2] = normals[i].z;
+        }
+
+        // Mesh indices array initialization
+        //for (int i = 0; i < mesh.triangleCount * 3; i++) mesh.indices[i] = triangles[i];
+
+        RL_FREE(vertices);
+        RL_FREE(normals);
+        RL_FREE(texcoords);
+        //RL_FREE(triangles);
+
+        // Upload vertex data to GPU (static mesh)
+        UploadMesh(&mesh, false);
+
+        return mesh;
     }
-
-    file.close();
-    return allFaces;
-}
-
-//TODO:
-//Zoptymalizowaæ liczenie trójk¹tów poprzez indeksowanie (chwilowo duplikuj¹ siê 2 vertexy per plane)
-
-rl::Mesh createPlaneMesh(brushFace face) {
-    Mesh mesh = { 0 };
-
-    rl::TraceLog(LOG_DEBUG, ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.y) + " Z: " + std::to_string(face.v0.z)).c_str());
-
-    //Raylib robi tutaj kalkulacje z rozdzielczoœci (do subdivision), ale my chyba nie potrzebujemy
-    int vertexCount = 6;
-
-    // Vertices definition
-    Vector3* vertices = (Vector3*)RL_MALLOC(vertexCount * sizeof(Vector3));
-    vertices[0] =  face.v0;
-    vertices[1] =  face.v1;
-    vertices[2] =  face.v2;
-    vertices[3] =  face.v3;
-    vertices[4] = vertices[0];
-    vertices[5] = vertices[2];
-
-    // Normals definition
-    Vector3* normals = (Vector3*)RL_MALLOC(vertexCount * sizeof(Vector3));
-    //for (int n = 0; n < vertexCount; n++) normals[n] = (Vector3){ 0.0f, 1.0f, 0.0f };   // Vector3.up;
-    for (int n = 0; n < vertexCount; n++) normals[n] = Vector3CrossProduct((vertices[1] - vertices[0]), (vertices[2] - vertices[0]));   // Vector3.up;
-
-    // TexCoords definition
-    Vector2* texcoords = (Vector2*)RL_MALLOC(vertexCount * sizeof(Vector2));
-    texcoords[0] = { -1.0f, 1.0f };
-    texcoords[1] = { 1.0f, 1.0f };
-    texcoords[2] = { 1.0f, -1.0f };
-    texcoords[3] = { -1.0f, -1.0f };
-    texcoords[4] = texcoords[0];
-    texcoords[5] = texcoords[2];
-
-    mesh.vertexCount = vertexCount;
-    mesh.triangleCount = 2;
-    mesh.vertices = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
-    mesh.texcoords = (float*)RL_MALLOC(mesh.vertexCount * 2 * sizeof(float));
-    mesh.normals = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
-    //mesh.indices = (unsigned short*)RL_MALLOC(mesh.triangleCount * 3 * sizeof(unsigned short));
-
-    // Mesh vertices position array
-    for (int i = 0; i < mesh.vertexCount; i++)
-    {
-        mesh.vertices[3 * i] = vertices[i].x;
-        mesh.vertices[3 * i + 1] = vertices[i].y;
-        mesh.vertices[3 * i + 2] = vertices[i].z;
-    }
-
-    // Mesh texcoords array
-    for (int i = 0; i < mesh.vertexCount; i++)
-    {
-        mesh.texcoords[2 * i] = texcoords[i].x;
-        mesh.texcoords[2 * i + 1] = texcoords[i].y;
-    }
-
-    // Mesh normals array
-    for (int i = 0; i < mesh.vertexCount; i++)
-    {
-        mesh.normals[3 * i] = normals[i].x;
-        mesh.normals[3 * i + 1] = normals[i].y;
-        mesh.normals[3 * i + 2] = normals[i].z;
-    }
-
-    // Mesh indices array initialization
-    //for (int i = 0; i < mesh.triangleCount * 3; i++) mesh.indices[i] = triangles[i];
-
-    RL_FREE(vertices);
-    RL_FREE(normals);
-    RL_FREE(texcoords);
-    //RL_FREE(triangles);
-
-    // Upload vertex data to GPU (static mesh)
-    UploadMesh(&mesh, false);
-
-    return mesh;
-}
 
 
 } // namespace ecs

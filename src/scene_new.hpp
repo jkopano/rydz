@@ -129,13 +129,11 @@ inline void setup_lighting(
   );
 }
 
-inline void spawn_ground(
-  Cmd cmd,
-  ResMut<Assets<ecs::Mesh>> meshes,
-  ResMut<Assets<ecs::Texture>> textures,
-  ResMut<Assets<ecs::Material>> materials,
-  NonSendMarker
-) {
+
+
+inline void spawn_ground(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes,
+                         ResMut<Assets<rl::Texture2D>> textures,
+                         NonSendMarker) {
   auto plane_h = meshes->add(mesh::plane(20.0f, 20.0f, 1, 1));
   auto plane_mat = materials->add(
     StandardMaterial::from_texture(
@@ -329,7 +327,12 @@ inline void scene_plugin(App& app) {
   app.add_systems(ScheduleLabel::Startup, setup_lighting);
   app.add_systems(ScheduleLabel::Startup, spawn_ground);
   app.add_systems(ScheduleLabel::Startup, spawn_player);
-  // app.add_systems(ScheduleLabel::Startup, load_level);
+  //app.add_systems(ScheduleLabel::Startup, load_level);
+  app.add_systems(ScheduleLabel::Startup, setupScene);
+  app.add_systems(ScheduleLabel::Update,
+      group(spawn_model).run_if(run_once()));
+  app.add_systems(ScheduleLabel::Update,
+      group(spawn_entity_models).run_if(run_once()));
 
   app.add_systems(ScheduleLabel::Startup, setup_ui);
   app.add_systems(ScheduleLabel::Update, show_player_position_ui);

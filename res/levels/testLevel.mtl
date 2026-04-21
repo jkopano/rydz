@@ -1,0 +1,9 @@
+newmtl brick
+map_Kd ../textures/brick.png
+
+newmtl dev_measure_64
+map_Kd ../textures/dev_measure_64.png
+
+newmtl measure
+map_Kd ../textures/measure.png
+
