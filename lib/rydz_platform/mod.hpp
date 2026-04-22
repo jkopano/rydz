@@ -62,8 +62,12 @@ private:
   auto run_app(ecs::App& app) const -> void {
     ecs::Window config = resolve_window(app);
 
+    if (config.is_fullscreen) {
+      rl::SetConfigFlags(FLAG_FULLSCREEN_MODE);
+    }
+
     app.add_plugin(LogPlugin{});
-    // init_logging();
+
     rl::InitWindow(
       static_cast<int>(config.width),
       static_cast<int>(config.height),

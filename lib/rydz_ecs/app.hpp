@@ -29,6 +29,7 @@ struct Window {
   u32 height{};
   std::string title = "ECS App";
   u32 target_fps{60};
+  bool is_fullscreen{};
 
 public:
   static auto install(Window config);
@@ -42,14 +43,12 @@ struct AppRunner {
 namespace detail {
 
 template <typename P>
-concept BuildPlugin = requires(P&& plugin, App& app) {
-  std::forward<P>(plugin).build(app);
-};
+concept BuildPlugin =
+  requires(P&& plugin, App& app) { std::forward<P>(plugin).build(app); };
 
 template <typename F>
-concept CallablePlugin = requires(F&& plugin_fn, App& app) {
-  std::forward<F>(plugin_fn)(app);
-};
+concept CallablePlugin =
+  requires(F&& plugin_fn, App& app) { std::forward<F>(plugin_fn)(app); };
 
 } // namespace detail
 

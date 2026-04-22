@@ -67,6 +67,7 @@ using ::IsKeyUp;
 // ---- Screen ----
 using ::GetScreenHeight;
 using ::GetScreenWidth;
+using ::SetConfigFlags;
 
 // ---- Models / Meshes ----
 using ::DrawMesh;
