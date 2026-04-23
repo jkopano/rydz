@@ -49,8 +49,17 @@ inline auto initialize_environment_renderer(
 
 class PassRenderer {
 public:
-  explicit PassRenderer(FrameResources& frame, bool instanced = true)
-      : frame_(frame), material_ctx_{.frame_data = &frame, .instanced = instanced} {}
+  explicit PassRenderer(
+    FrameResources& frame, RenderConfig const& config = {}, bool instanced = true
+  )
+      : frame_(frame), material_ctx_{.frame_data = &frame, .instanced = instanced},
+        pass_config_(config) {
+    last_prepared_ = {};
+    frame_.render_state.apply(pass_config_);
+  }
+  auto end(RenderConfig const& config = RenderConfig{}) -> void {
+    frame_.render_state.apply(config);
+  }
 
   static auto is_ready(FrameResources const& frame) -> bool {
     return frame.mesh_assets != nullptr && frame.texture_assets != nullptr &&
@@ -60,13 +69,7 @@ public:
            frame.time != nullptr;
   }
 
-  auto begin(RenderConfig const& config) -> void {
-    pass_config_ = config;
-    last_shader_ = nullptr;
-    last_material_ = nullptr;
-    last_prepared_ = {};
-    frame_.render_state.apply(pass_config_);
-  }
+  auto begin(RenderConfig const& config) -> void {}
 
   auto draw(RenderCommand const& cmd, ShaderSpec const& shader_spec) -> void {
     auto const* mesh = frame_.mesh_assets->get(cmd.mesh);
@@ -106,10 +109,6 @@ public:
   }
 
   auto draw(RenderCommand const& cmd) -> void { draw(cmd, cmd.material.shader); }
-
-  auto end(RenderConfig const& config = RenderConfig{}) -> void {
-    frame_.render_state.apply(config);
-  }
 
 private:
   FrameResources& frame_;
@@ -215,8 +214,7 @@ public:
     target.begin();
     frame.render_state.begin_view(frame.render_state.view());
 
-    PassRenderer renderer{frame};
-    renderer.begin(RenderConfig::opaque());
+    PassRenderer renderer{frame, RenderConfig::opaque()};
     for (auto const& cmd : phase->commands) {
       renderer.draw(cmd);
     }
@@ -255,7 +253,6 @@ public:
     frame.render_state.begin_view(frame.render_state.view());
 
     PassRenderer renderer{frame};
-    renderer.begin(RenderConfig::transparent());
     for (auto const& cmd : phase->commands) {
       renderer.draw(cmd);
     }
@@ -292,7 +289,6 @@ public:
     frame.render_state.begin_view(frame.render_state.view());
 
     PassRenderer renderer{frame};
-    renderer.begin(RenderConfig::depth_prepass());
     for (auto const& cmd : phase->commands) {
       renderer.draw(cmd, depth_prepass_shader_spec());
     }

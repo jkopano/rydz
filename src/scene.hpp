@@ -136,11 +136,10 @@ inline auto some_shit(Query<CameraState> q) -> void {
   }
 }
 
-inline auto spawn_some_texture(
-  Cmd cmd, ResMut<Assets<ecs::Texture>> textures, NonSendMarker
-) -> void {
+inline auto spawn_some_texture(Cmd cmd, Res<AssetServer> server, NonSendMarker) -> void {
+  auto tex = server->load<Texture>("res/textures/stone.jpg");
   cmd.spawn(
-    ecs::Sprite{.handle = textures->add(gl::load_texture("res/textures/stone.jpg"))},
+    ecs::Sprite{.handle = tex},
     Transform{
       .translation = Vec3(10.0f, 10.0f, 0.0f),
       .scale = Vec3::splat(1.0f),
@@ -155,7 +154,7 @@ struct LightsSpawned {
 
 inline auto spawn_lights_on_input(
   Cmd cmd,
-  ResMut<Assets<Texture>> textures,
+  Res<AssetServer> server,
   ResMut<Assets<Mesh>> meshes,
   ResMut<Assets<Material>> materials,
   ResMut<LightsSpawned> lights,
@@ -173,9 +172,8 @@ inline auto spawn_lights_on_input(
       .intensity = 0.5f,
     }
   );
-
-  auto stone_tex = textures->add(gl::load_texture("res/textures/stone.jpg"));
-  auto stone_mat = materials->add(StandardMaterial::from_texture(stone_tex));
+  auto tex = server->load<Texture>("res/textures/stone.jpg");
+  auto stone_mat = materials->add(StandardMaterial::from_texture(tex));
 
   auto cube_h = meshes->add(Mesh::cube());
 

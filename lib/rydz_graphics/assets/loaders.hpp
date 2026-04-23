@@ -2,7 +2,6 @@
 
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/assets/gltf.hpp"
-#include "rydz_graphics/gl/device.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 
 namespace ecs {
