@@ -191,6 +191,18 @@ namespace scripting {
 		});
 		lua_setfield(L, -2, "__tostring");
 
+		// world:add_transform(entity, x, y, z)
+		lua_pushcfunction(L, [](lua_State* L) -> int {
+			ecs::World* world = check_world(L, 1);
+			ecs::Entity e = check_entity(L, 2);
+			float x = (float)luaL_optnumber(L, 3, 0.0);
+			float y = (float)luaL_optnumber(L, 4, 0.0);
+			float z = (float)luaL_optnumber(L, 5, 0.0);
+			world->insert_component(e, rydz_math::Transform::from_xyz(x, y, z));
+			return 0;
+			});
+		lua_setfield(L, -2, "add_transform");
+
 		lua_pop(L, 1);
 	}
 

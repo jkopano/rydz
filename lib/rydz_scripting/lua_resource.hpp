@@ -11,6 +11,8 @@ extern "C" {
 #include <rydz_ecs/mod.hpp>
 #include <rydz_scripting/bindings/bind_world.hpp>
 #include "rydz_scripting/bindings/bind_transform.hpp"
+#include "rydz_scripting/bindings/bind_input.hpp"
+#include "rydz_scripting/bindings/bind_time.hpp"
 #include "rydz_scripting/component_registry.hpp"
 #include "rydz_scripting/lua_system_registry.hpp"
 #include <string>
@@ -27,6 +29,9 @@ namespace scripting {
 
 		//Rejestracja komponentów
 		register_transform_in_registry();
+
+		register_input_table(L);
+		register_time_table(L);
 
 		//globalna tabela Components
 		lua_newtable(L);

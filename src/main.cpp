@@ -1,6 +1,7 @@
 #define RLGL_ENABLE_OPENGL_DEBUG_CONTEXT 0
 #include "rydz_platform/mod.hpp"
-#include "scene_new.hpp"
+//#include "scene_new.hpp"
+#include "scene_lua.hpp"
 //#include "scene.hpp"
 
 int main() {
@@ -12,7 +13,7 @@ int main() {
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
       .add_plugin(Input::install)
-      .add_plugin(scene_plugin)
+      .add_plugin(scene_lua_plugin)
       .run();
 
   return 0;

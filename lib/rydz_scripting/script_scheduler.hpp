@@ -3,6 +3,8 @@
 #include "rydz_console/scripting.hpp"
 #include "lua_system_registry.hpp"
 #include "bindings/bind_world.hpp"
+#include "bindings/bind_input.hpp"
+#include "bindings/bind_time.hpp"
 
 namespace scripting {
 
@@ -32,6 +34,11 @@ namespace scripting {
 	}
 
 	inline void lua_update_runner(ecs::World& world) {
+		auto* lua_res = world.get_resource<engine::LuaResource>();
+		if (!lua_res) return;
+
+		update_time_table(lua_res->vm, world);
+
 		run_lua_systems(world, "Update");
 	}
 }
