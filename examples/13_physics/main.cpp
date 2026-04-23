@@ -19,7 +19,7 @@ void setup_scene(
   ResMut<Assets<ecs::Mesh>> meshes,
   ResMut<Assets<ecs::Material>> materials
 ) {
-  auto ground_mesh = meshes->add(mesh::cube(100.0f, 2.0f, 100.0f));
+  auto ground_mesh = meshes->add(Mesh::cube(100.0f, 2.0f, 100.0f));
   auto ground_mat =
     materials->add(StandardMaterial::from_color(Color{80, 120, 80}));
 
@@ -41,7 +41,7 @@ void setup_scene(
     Camera3d::perspective(),
     ActiveCamera{},
     Transform::from_xyz(-55.0f, 48.0f, -55.0f).look_at(Vec3(0.0f, 0.0f, 0.0f)),
-    Skybox::from("textures/skybox")
+    ecs::Environment::from_directory("textures/skybox")
   );
 
   cmd.spawn(
@@ -62,7 +62,7 @@ void spawn_cubes(
   if (!input->key_pressed(KEY_SPACE)) {
     return;
   }
-  auto cube_mesh = meshes->add(mesh::cube());
+  auto cube_mesh = meshes->add(Mesh::cube());
   auto cube_mat =
     materials->add(StandardMaterial::from_color(Color{200, 60, 60}));
 

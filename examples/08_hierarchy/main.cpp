@@ -27,7 +27,7 @@ void setup(
   );
 
   // podłoga
-  auto floor_h = meshes->add(mesh::plane(20, 20));
+  auto floor_h = meshes->add(Mesh::plane(20, 20));
   auto floor_mat =
     materials->add(StandardMaterial::from_color(ecs::Color::DARKGRAY));
   cmd.spawn(Mesh3d{floor_h}, MeshMaterial3d{floor_mat}, Transform{});
@@ -42,7 +42,7 @@ void setup(
   );
 
   // parent
-  auto cube_h = meshes->add(mesh::cube(1, 1, 1));
+  auto cube_h = meshes->add(Mesh::cube(1, 1, 1));
   auto yellow_mat =
     materials->add(StandardMaterial::from_color(ecs::Color::YELLOW));
   auto pivot = cmd.spawn(
@@ -53,7 +53,7 @@ void setup(
   );
 
   // child
-  auto arm_h = meshes->add(mesh::cube(3, 0.4f, 0.4f));
+  auto arm_h = meshes->add(Mesh::cube(3, 0.4f, 0.4f));
   auto red_mat = materials->add(StandardMaterial::from_color(ecs::Color::RED));
   auto arm = cmd.spawn(
     Mesh3d{arm_h},
@@ -64,7 +64,7 @@ void setup(
   );
 
   // child of child
-  auto tip_h = meshes->add(mesh::sphere(0.4f));
+  auto tip_h = meshes->add(Mesh::sphere(0.4f));
   auto blue_mat =
     materials->add(StandardMaterial::from_color(ecs::Color::BLUE));
   cmd.spawn(

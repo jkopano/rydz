@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rydz_audio/plugin.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/mod.hpp"
@@ -7,9 +8,9 @@
 #include "rydz_graphics/assets/scene_runtime.hpp"
 #include "rydz_graphics/extract/systems.hpp"
 #include "rydz_graphics/lighting/clustered_lighting.hpp"
-#include "rydz_graphics/passes/passes.hpp"
 #include "rydz_graphics/pipeline/config.hpp"
 #include "rydz_graphics/pipeline/graph.hpp"
+#include "rydz_graphics/pipeline/passes.hpp"
 #include "rydz_graphics/pipeline/phase.hpp"
 #include "rydz_graphics/spatial/frustum.hpp"
 
@@ -34,9 +35,7 @@ struct RenderPlugin {
     app.init_resource<Assets<M>>();
     app.add_systems(
       RenderExtractSet::Extract,
-      group(Extract::meshes<M>)
-        .after(Extract::clear_meshes)
-        .after(Extract::view)
+      group(Extract::meshes<M>).after(Extract::clear_meshes).after(Extract::view)
     );
   }
 
@@ -50,9 +49,7 @@ struct RenderPlugin {
 
   static auto install(App& app) -> void {
     app.init_resource<Assets<Mesh>>([](Mesh& mesh) -> void { mesh.unload(); })
-      .init_resource<Assets<Texture>>([](Texture& texture) -> void {
-        texture.unload();
-      })
+      .init_resource<Assets<Texture>>([](Texture& texture) -> void { texture.unload(); })
       .init_resource<Assets<Material>>()
       .init_resource<Assets<Scene>>()
       .init_resource<AssetServer>()
@@ -62,6 +59,7 @@ struct RenderPlugin {
       .init_resource<ExtractedUi>()
       .init_resource<ClusterConfig>()
       .init_resource<ClusteredLightingState>()
+      .init_resource<EnvironmentRenderer>()
       .init_resource<ShaderCache>()
       .init_resource<SlotProviderRegistry>()
       .init_resource<DebugOverlaySettings>()
@@ -81,7 +79,7 @@ struct RenderPlugin {
       graph->add_pass<ShadowPass>();
       graph->add_pass<DepthPrepass>(main_target);
       graph->add_pass<ClusterBuildPass>();
-      graph->add_pass<SkyboxPass>(main_target);
+      graph->add_pass<EnvironmentPass>(main_target);
       graph->add_pass<OpaquePass>(main_target);
       graph->add_pass<TransparentPass>(main_target);
       graph->add_pass<PostProcessPassNode>(main_target, screen);
@@ -89,8 +87,9 @@ struct RenderPlugin {
     }
 
     if (auto* server = app.world().get_resource<AssetServer>()) {
-      register_default_loaders(*server);
+      register_graphics_loaders(*server);
     }
+    rydz_audio::AudioPlugin::install(app);
     register_slot<HasCamera>(app, HasCamera::slot_provider());
     register_slot<HasPBR>(app, HasPBR::slot_provider());
 
@@ -104,24 +103,18 @@ struct RenderPlugin {
       .configure_set(
         ExtractRender,
         configure(
-          RenderExtractSet::Extract,
-          RenderExtractSet::Queue,
-          RenderExtractSet::Prepare
+          RenderExtractSet::Extract, RenderExtractSet::Queue, RenderExtractSet::Prepare
         )
           .chain()
       )
       .configure_set(
         Render,
-        configure(
-          RenderPassSet::Setup, RenderPassSet::Main, RenderPassSet::Cleanup
-        )
+        configure(RenderPassSet::Setup, RenderPassSet::Main, RenderPassSet::Cleanup)
           .chain()
       );
 
-    app
-      .add_systems(
-        First, SceneRuntimeSystems::cleanup_orphan_scene_entities_system
-      )
+    app.add_systems(First, SceneRuntimeSystems::cleanup_orphan_scene_entities_system)
+      .add_systems(Startup, initialize_environment_renderer)
 
       .add_systems(PreUpdate, SceneRuntimeSystems::sync_scene_roots_system)
 
@@ -150,8 +143,7 @@ struct RenderPlugin {
 
       .add_systems(
         RenderExtractSet::Queue,
-        group(Queue::shadow, Queue::opaque, Queue::transparent, Queue::ui)
-          .chain()
+        group(Queue::shadow, Queue::opaque, Queue::transparent, Queue::ui).chain()
       )
 
       .add_systems(RenderExtractSet::Prepare, group(Prepare::prepare_meshes))

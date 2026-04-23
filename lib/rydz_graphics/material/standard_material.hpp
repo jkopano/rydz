@@ -3,7 +3,6 @@
 #include "material3d.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/components/color.hpp"
-#include "rydz_graphics/gl/core.hpp"
 
 namespace ecs {
 
@@ -21,9 +20,7 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
   f32 normal_scale = -1.0f;
   f32 occlusion_strength = -1.0f;
 
-  static auto from_color(Color c) -> StandardMaterial {
-    return {.base_color = c};
-  }
+  static auto from_color(Color c) -> StandardMaterial { return {.base_color = c}; }
   static auto from_texture(Handle<Texture> tex, Color tint = Color::WHITE)
     -> StandardMaterial {
     return {.base_color = tint, .texture = tex};
@@ -33,13 +30,10 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
   static auto fragment_shader() -> ShaderRef { return "res/shaders/pbr.frag"; }
 
   [[nodiscard]] auto render_method() const -> RenderMethod {
-    return base_color.a < 255 ? RenderMethod::Transparent
-                              : RenderMethod::Opaque;
+    return base_color.a < 255 ? RenderMethod::Transparent : RenderMethod::Opaque;
   }
 
-  [[nodiscard]] auto enable_shadows() const -> bool {
-    return base_color.a == 255;
-  }
+  [[nodiscard]] auto enable_shadows() const -> bool { return base_color.a == 255; }
   [[nodiscard]] auto double_sided() const -> bool { return false; }
   [[nodiscard]] auto alpha_cutoff() const -> float { return 0.1F; }
 

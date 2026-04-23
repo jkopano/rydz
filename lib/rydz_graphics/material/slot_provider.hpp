@@ -1,6 +1,8 @@
 #pragma once
 
 #include "rydz_ecs/asset.hpp"
+#include "rydz_ecs/core/time.hpp"
+#include "rydz_graphics/gl/mesh.hpp"
 #include "rydz_graphics/gl/shader.hpp"
 #include <array>
 #include <functional>
@@ -23,58 +25,36 @@ using gl::Texture;
 struct CompiledMaterial;
 struct ExtractedLights;
 struct ExtractedView;
+struct FrameResources;
+struct SlotProviderRegistry;
 
 struct PreparedMaterial {
   std::array<gl::MaterialMap, K_MATERIAL_MAP_COUNT> local_maps{};
   gl::Material material;
 };
 
-struct SlotPrepareContext {
-  Assets<Texture> const* texture_assets = nullptr;
+struct MaterialContext {
+  FrameResources const* frame_data = nullptr;
   bool instanced = false;
 
-  [[nodiscard]] auto textures() const -> Assets<Texture> const& {
-    return *texture_assets;
-  }
-};
-
-struct RenderSlotContext {
-  ExtractedView const* view_data = nullptr;
-  ExtractedLights const* lights_data = nullptr;
-  ClusterConfig const* cluster_config_data = nullptr;
-  ClusteredLightingState const* cluster_state_data = nullptr;
-  bool instanced = false;
-
-  [[nodiscard]] auto view() const -> ExtractedView const& {
-    return *view_data;
-  }
-  [[nodiscard]] auto lights() const -> ExtractedLights const& {
-    return *lights_data;
-  }
-  [[nodiscard]] auto cluster_config() const -> ClusterConfig const& {
-    return *cluster_config_data;
-  }
-  [[nodiscard]] auto clustered_lighting() const
-    -> ClusteredLightingState const& {
-    return *cluster_state_data;
-  }
+  [[nodiscard]] auto frame() const -> FrameResources const&;
+  [[nodiscard]] auto textures() const -> Assets<Texture> const&;
+  [[nodiscard]] auto view() const -> ExtractedView const&;
+  [[nodiscard]] auto lights() const -> ExtractedLights const&;
+  [[nodiscard]] auto cluster_config() const -> ClusterConfig const&;
+  [[nodiscard]] auto clustered_lighting() const -> ClusteredLightingState const&;
+  [[nodiscard]] auto time() const -> Time const&;
+  [[nodiscard]] auto slots() const -> SlotProviderRegistry const&;
 };
 
 struct SlotProvider {
   std::function<void(
-    SlotPrepareContext const&,
-    CompiledMaterial const&,
-    PreparedMaterial&,
-    ShaderProgram&
+    MaterialContext const&, CompiledMaterial const&, PreparedMaterial&, ShaderProgram&
   )>
     prepare;
+  std::function<void(MaterialContext const&, ShaderProgram&)> apply_per_view;
   std::function<void(
-    RenderSlotContext const&,
-    ShaderProgram&
-  )>
-    apply_per_view;
-  std::function<void(
-    RenderSlotContext const&,
+    MaterialContext const&,
     CompiledMaterial const&,
     PreparedMaterial const&,
     ShaderProgram&

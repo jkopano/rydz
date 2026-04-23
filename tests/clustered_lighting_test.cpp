@@ -41,10 +41,10 @@ TEST(ClusteredLightingTest, ClusterRecordUsesClampedStrideAndClearsCount) {
     1
   );
 
-  EXPECT_EQ(record.meta[0], 28U);
-  EXPECT_EQ(record.meta[1], 0U);
-  EXPECT_EQ(record.meta[2], 0U);
-  EXPECT_EQ(record.meta[3], 0U);
+  EXPECT_EQ(record.light_index_offset, 28U);
+  EXPECT_EQ(record.light_count, 0U);
+  EXPECT_EQ(record._pad0, 0U);
+  EXPECT_EQ(record._pad1, 0U);
   EXPECT_LT(record.min_bounds.x, record.max_bounds.x);
   EXPECT_LT(record.min_bounds.y, record.max_bounds.y);
   EXPECT_LT(record.min_bounds.z, record.max_bounds.z);

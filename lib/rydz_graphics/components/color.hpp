@@ -5,92 +5,13 @@
 #include "rydz_ecs/fwd.hpp"
 #include "types.hpp"
 
-#ifdef LIGHTGRAY
-#undef LIGHTGRAY
-#endif
-#ifdef GRAY
-#undef GRAY
-#endif
-#ifdef DARKGRAY
-#undef DARKGRAY
-#endif
-#ifdef YELLOW
-#undef YELLOW
-#endif
-#ifdef GOLD
-#undef GOLD
-#endif
-#ifdef ORANGE
-#undef ORANGE
-#endif
-#ifdef PINK
-#undef PINK
-#endif
-#ifdef RED
-#undef RED
-#endif
-#ifdef MAROON
-#undef MAROON
-#endif
-#ifdef GREEN
-#undef GREEN
-#endif
-#ifdef LIME
-#undef LIME
-#endif
-#ifdef DARKGREEN
-#undef DARKGREEN
-#endif
-#ifdef SKYBLUE
-#undef SKYBLUE
-#endif
-#ifdef BLUE
-#undef BLUE
-#endif
-#ifdef DARKBLUE
-#undef DARKBLUE
-#endif
-#ifdef PURPLE
-#undef PURPLE
-#endif
-#ifdef VIOLET
-#undef VIOLET
-#endif
-#ifdef DARKPURPLE
-#undef DARKPURPLE
-#endif
-#ifdef BEIGE
-#undef BEIGE
-#endif
-#ifdef BROWN
-#undef BROWN
-#endif
-#ifdef DARKBROWN
-#undef DARKBROWN
-#endif
-#ifdef WHITE
-#undef WHITE
-#endif
-#ifdef BLACK
-#undef BLACK
-#endif
-#ifdef BLANK
-#undef BLANK
-#endif
-#ifdef MAGENTA
-#undef MAGENTA
-#endif
-#ifdef RAYWHITE
-#undef RAYWHITE
-#endif
-
 namespace ecs {
 
 struct Color {
-  u8 r = 255;
-  u8 g = 255;
-  u8 b = 255;
-  u8 a = 255;
+  u8 r{255};
+  u8 g{255};
+  u8 b{255};
+  u8 a{255};
 
   constexpr Color() = default;
   constexpr Color(u8 red, u8 green, u8 blue, u8 alpha = 255)

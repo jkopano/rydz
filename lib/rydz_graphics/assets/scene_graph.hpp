@@ -3,7 +3,6 @@
 #include "math.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/entity.hpp"
-#include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/components/mesh3d.hpp"
 #include "rydz_graphics/spatial/transform.hpp"
 #include <array>

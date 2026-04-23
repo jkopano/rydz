@@ -37,7 +37,7 @@ void setup(
   );
 
   // podłoga
-  auto floor_h = meshes->add(mesh::plane(30, 30));
+  auto floor_h = meshes->add(Mesh::plane(30, 30));
   auto floor_mat =
     materials->add(StandardMaterial::from_color(ecs::Color::DARKGRAY));
   cmd.spawn(Mesh3d{floor_h}, MeshMaterial3d{floor_mat}, Transform{});
@@ -56,7 +56,7 @@ void batch_spawn(
   if (!input->key_pressed(KEY_SPACE))
     return;
 
-  auto sphere_h = meshes->add(mesh::sphere(0.3f));
+  auto sphere_h = meshes->add(Mesh::sphere(0.3f));
 
   // budujemy wektor tupli — spawn_batch przyjmuje range
   std::vector<Tuple<BulletTag, Lifetime, Mesh3d, MeshMaterial3d<>, Transform>>

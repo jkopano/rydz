@@ -1,8 +1,9 @@
 #pragma once
 
 #include "hash.hpp"
-#include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/gl/primitives.hpp"
 #include "rydz_graphics/gl/shader_bindings.hpp"
+#include "rydz_graphics/gl/textures.hpp"
 #include <algorithm>
 #include <array>
 #include <concepts>
@@ -24,8 +25,7 @@ struct ShaderSpec {
 
   auto operator==(ShaderSpec const& other) const -> bool = default;
 
-  static auto from(std::string vertex_path, std::string fragment_path)
-    -> ShaderSpec {
+  static auto from(std::string vertex_path, std::string fragment_path) -> ShaderSpec {
     return {
       .vertex_path = std::move(vertex_path),
       .fragment_path = std::move(fragment_path),
@@ -73,17 +73,14 @@ struct Uniform {
     float_data[2] = z;
   }
 
-  Uniform(float x, float y, float z, float w)
-      : type(UniformType::Vec4), float_data{} {
+  Uniform(float x, float y, float z, float w) : type(UniformType::Vec4), float_data{} {
     float_data[0] = x;
     float_data[1] = y;
     float_data[2] = z;
     float_data[3] = w;
   }
 
-  explicit Uniform(int v) : type(UniformType::Int), int_data{} {
-    int_data[0] = v;
-  }
+  explicit Uniform(int v) : type(UniformType::Int), int_data{} { int_data[0] = v; }
 
   Uniform(int x, int y) : type(UniformType::IVec2), int_data{} {
     int_data[0] = x;
@@ -135,8 +132,7 @@ public:
   auto operator=(ShaderProgram const&) -> ShaderProgram& = delete;
 
   ShaderProgram(ShaderProgram&& other) noexcept
-      : shader_(other.shader_),
-        uniform_locations_(std::move(other.uniform_locations_)),
+      : shader_(other.shader_), uniform_locations_(std::move(other.uniform_locations_)),
         attribute_locations_(std::move(other.attribute_locations_)),
         owns_resource_(other.owns_resource_) {
     other.shader_ = Shader{};
@@ -298,10 +294,7 @@ public:
       break;
     case UniformType::Vec3:
       set(
-        name,
-        Vec3{
-          uniform.float_data[0], uniform.float_data[1], uniform.float_data[2]
-        }
+        name, Vec3{uniform.float_data[0], uniform.float_data[1], uniform.float_data[2]}
       );
       break;
     case UniformType::Vec4:
@@ -324,9 +317,7 @@ public:
     case UniformType::IVec3:
       set(
         name,
-        std::array<int, 3>{
-          uniform.int_data[0], uniform.int_data[1], uniform.int_data[2]
-        }
+        std::array<int, 3>{uniform.int_data[0], uniform.int_data[1], uniform.int_data[2]}
       );
       break;
     case UniformType::IVec4:
@@ -411,16 +402,14 @@ private:
   bool owns_resource_ = false;
 
   auto unload() -> void {
-    if (owns_resource_ && shader_.id != 0 &&
-        shader_.id != Shader::default_id()) {
+    if (owns_resource_ && shader_.id != 0 && shader_.id != Shader::default_id()) {
       ::UnloadShader(shader_);
     }
     shader_ = Shader{};
     owns_resource_ = false;
   }
 
-  auto set_value(std::string_view const name, void const* value, int type)
-    -> void {
+  auto set_value(std::string_view const name, void const* value, int type) -> void {
     int const location = uniform_location(name);
     if (location >= 0) {
       rl::SetShaderValue(shader_, location, value, type);
@@ -432,8 +421,7 @@ inline auto shader_location(Shader const& shader, char const* name) -> int {
   return rl::GetShaderLocation(shader, name);
 }
 
-inline auto shader_location_attrib(Shader const& shader, char const* name)
-  -> int {
+inline auto shader_location_attrib(Shader const& shader, char const* name) -> int {
   return rl::GetShaderLocationAttrib(shader, name);
 }
 

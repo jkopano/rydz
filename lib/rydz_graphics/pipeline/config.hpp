@@ -2,7 +2,6 @@
 
 #include "rydz_ecs/mod.hpp"
 #include "rydz_ecs/params.hpp"
-#include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/gl/state.hpp"
 #include <algorithm>
 

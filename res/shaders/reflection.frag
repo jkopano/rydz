@@ -4,12 +4,12 @@ in vec3 Normal;
 
 out vec4 FragColor;
 
-uniform vec3 cameraPos;
+uniform vec3 u_camera_pos;
 layout(binding = 5) uniform samplerCube u_environment;
 uniform float u_reflectivity;
 
 void main() {
-  vec3 I = normalize(FragPos - cameraPos);
+  vec3 I = normalize(FragPos - u_camera_pos);
   vec3 N = normalize(Normal);
 
   // Flip normal if we see the back face (double-sided support)

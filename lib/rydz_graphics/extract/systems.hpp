@@ -1,20 +1,19 @@
 #pragma once
 
-#include "rydz_graphics/components/color.hpp"
-#include "data.hpp"
-#include "rydz_graphics/components/light.hpp"
 #include "math.hpp"
-#include "rydz_graphics/components/mesh3d.hpp"
-#include "rydz_graphics/pipeline/phase.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/mod.hpp"
-#include "rydz_graphics/spatial/frustum.hpp"
-#include "rydz_graphics/gl/core.hpp"
-#include "rydz_graphics/gl/skybox.hpp"
+#include "rydz_graphics/components/color.hpp"
+#include "rydz_graphics/components/environment.hpp"
+#include "rydz_graphics/components/light.hpp"
+#include "rydz_graphics/components/mesh3d.hpp"
+#include "rydz_graphics/extract/data.hpp"
 #include "rydz_graphics/material/material3d.hpp"
 #include "rydz_graphics/material/postprocess_material.hpp"
 #include "rydz_graphics/material/standard_material.hpp"
 #include "rydz_graphics/pipeline/batches.hpp"
+#include "rydz_graphics/pipeline/phase.hpp"
+#include "rydz_graphics/spatial/frustum.hpp"
 #include "rydz_graphics/spatial/transform.hpp"
 #include "rydz_graphics/spatial/visibility.hpp"
 #include <array>
@@ -42,7 +41,7 @@ struct Extract {
       ActiveCamera,
       GlobalTransform,
       Opt<ClearColor>,
-      Opt<gl::Skybox>,
+      Opt<Environment>,
       Opt<PostProcessMaterial>> cam_query,
     Res<Window> window,
     ResMut<ExtractedView> view
@@ -57,13 +56,15 @@ struct Extract {
     float const aspect =
       compute_camera_aspect_ratio(view->viewport.width, view->viewport.height);
 
-    for (auto [cam_comp, _, cam_gt, clear_color, skybox, postprocess] :
+    for (auto [cam_comp, _, cam_gt, clear_color, environment, postprocess] :
          cam_query.iter()) {
       view->camera_view = compute_camera_view(*cam_gt, *cam_comp, aspect);
-      if (clear_color != nullptr) {
+      if (environment != nullptr) {
+        view->active_environment = environment;
+        view->clear_color = environment->clear_color;
+      } else if (clear_color != nullptr) {
         view->clear_color = clear_color->color;
       }
-      view->active_skybox = skybox;
       view->active = true;
       view->orthographic = cam_comp->is_orthographic();
       view->near_plane = cam_comp->near_plane;

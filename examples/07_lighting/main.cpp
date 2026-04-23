@@ -30,13 +30,13 @@ void setup(
   );
 
   // podłoga
-  auto floor_h = meshes->add(mesh::plane(30, 30));
+  auto floor_h = meshes->add(Mesh::plane(30, 30));
   auto floor_mat =
     materials->add(StandardMaterial::from_color({200, 200, 200, 255}));
   cmd.spawn(Mesh3d{floor_h}, MeshMaterial3d{floor_mat}, Transform{});
 
   // kilka obiektów na scenie
-  auto sphere_h = meshes->add(mesh::sphere(1.0f));
+  auto sphere_h = meshes->add(Mesh::sphere(1.0f));
   auto sphere_mat =
     materials->add(StandardMaterial::from_color(ecs::Color::WHITE));
   for (int i = -2; i <= 2; ++i) {
@@ -60,7 +60,7 @@ void setup(
     [&](
       ecs::Color color, f32 radius, f32 speed, f32 phase, f32 y, f32 intensity
     ) {
-      auto h = meshes->add(mesh::cube(0.3f, 0.3f, 0.3f));
+      auto h = meshes->add(Mesh::cube(0.3f, 0.3f, 0.3f));
       auto mat = materials->add(StandardMaterial::from_color(color));
       cmd.spawn(
         Mesh3d{h},

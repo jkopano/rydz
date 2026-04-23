@@ -30,7 +30,7 @@ void setup(
   );
 
   // ładowanko mesha
-  auto cube_mesh = meshes->add(mesh::cube(1, 1, 1));
+  auto cube_mesh = meshes->add(Mesh::cube(1, 1, 1));
   auto cube_mat =
     materials->add(StandardMaterial::from_color({255, 255, 255, 255}));
 

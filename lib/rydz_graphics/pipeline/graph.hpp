@@ -31,13 +31,14 @@ struct RenderGraphTexture {};
 using RenderTextureHandle = Handle<RenderGraphTexture>;
 
 struct DebugOverlaySettings;
+struct EnvironmentRenderer;
 struct ExtractedLights;
 struct ExtractedView;
 struct RenderExecutionState;
 struct ShaderCache;
 struct SlotProviderRegistry;
 
-struct RenderFrameContext {
+struct FrameResources {
   NonSendMarker marker;
   gl::RenderState& render_state;
   u32 framebuffer_width = 1280;
@@ -53,17 +54,12 @@ struct RenderFrameContext {
   Assets<Texture> const* texture_assets = nullptr;
   ShaderCache* shader_cache = nullptr;
   SlotProviderRegistry const* slot_registry = nullptr;
+  EnvironmentRenderer const* environment_renderer = nullptr;
   ExtractedView const* view = nullptr;
   ExtractedLights const* lights = nullptr;
   ClusterConfig const* cluster_config = nullptr;
   ClusteredLightingState* cluster_state = nullptr;
   Time const* time = nullptr;
-};
-
-struct RenderPassContext {
-  RenderFrameContext& frame;
-  gl::RenderState& render_state;
-  NonSendMarker marker;
 };
 
 class RenderGraphBuilder;
@@ -75,8 +71,7 @@ public:
   [[nodiscard]] virtual auto name() const -> std::string = 0;
 
   virtual auto setup(RenderGraphBuilder& builder) -> void = 0;
-  virtual auto execute(RenderPassContext& ctx, RenderGraphRuntime& runtime)
-    -> void = 0;
+  virtual auto execute(FrameResources& frame, RenderGraphRuntime& runtime) -> void = 0;
 };
 
 class RenderGraphBuilder {
@@ -156,7 +151,7 @@ public:
     compiled_ = true;
   }
 
-  auto execute(RenderFrameContext& frame) -> void {
+  auto execute(FrameResources& frame) -> void {
     if (!compiled_) {
       info("RenderGraph: compiling");
       compile();
@@ -164,13 +159,9 @@ public:
 
     ensure_resources(frame.framebuffer_width, frame.framebuffer_height);
 
-    RenderPassContext ctx{
-      .frame = frame, .render_state = frame.render_state, .marker = frame.marker
-    };
-
     for (auto& node : nodes_) {
       if (node.pass) {
-        node.pass->execute(ctx, runtime_);
+        node.pass->execute(frame, runtime_);
       }
     }
   }

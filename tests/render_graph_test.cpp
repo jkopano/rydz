@@ -31,7 +31,7 @@ public:
     }
   }
 
-  auto execute(RenderPassContext&, RenderGraphRuntime&) -> void override {
+  auto execute(FrameResources&, RenderGraphRuntime&) -> void override {
     execution_order_->push_back(name_);
   }
 
@@ -56,7 +56,7 @@ auto add_recording_pass(
 
 auto execute(RenderGraph& graph) -> void {
   gl::RenderState render_state;
-  RenderFrameContext frame{
+  FrameResources frame{
     .marker = NonSendMarker{},
     .render_state = render_state,
   };

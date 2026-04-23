@@ -2,7 +2,7 @@
 
 #include "rl.hpp"
 #include "rydz_ecs/fwd.hpp"
-#include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/components/color.hpp"
 #include "rydz_graphics/gl/shader.hpp"
 #include <optional>
 

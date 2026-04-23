@@ -23,8 +23,8 @@ uniform sampler2D u_occlusion_texture;
 uniform sampler2D u_emissive_texture;
 
 uniform vec4 u_color;
-uniform vec3 cameraPos;
-uniform mat4 matView;
+uniform vec3 u_camera_pos;
+uniform mat4 u_mat_view;
 
 uniform vec3 u_dir_light_direction;
 uniform float u_dir_light_intensity;
@@ -36,7 +36,7 @@ uniform vec2 u_cluster_screen_size;
 uniform vec2 u_cluster_near_far;
 uniform int u_cluster_max_lights;
 uniform int u_is_orthographic;
-uniform float alphaCutoff;
+uniform float u_alpha_cutoff;
 uniform int u_render_method;
 
 const int RENDER_METHOD_OPAQUE = 0;
@@ -176,12 +176,12 @@ int computeClusterIndex(vec3 viewPos) {
 
 void main() {
   vec3 normal = normalize(Normal);
-  vec3 viewDir = normalize(cameraPos - FragPos);
+  vec3 viewDir = normalize(u_camera_pos - FragPos);
 
   vec4 baseColor = colDiffuse;
   vec4 diffTex = texture(texture0, TexCoord);
   baseColor *= diffTex;
-  if (u_render_method != RENDER_METHOD_OPAQUE && baseColor.a < alphaCutoff) {
+  if (u_render_method != RENDER_METHOD_OPAQUE && baseColor.a < u_alpha_cutoff) {
     discard;
   }
   float outputAlpha = baseColor.a;
@@ -216,7 +216,7 @@ void main() {
         normal, viewDir, lightDir, radiance, albedo, metallic, roughness);
   }
 
-  vec3 viewPos = (matView * vec4(FragPos, 1.0)).xyz;
+  vec3 viewPos = (u_mat_view * vec4(FragPos, 1.0)).xyz;
   int clusterIndex = computeClusterIndex(viewPos);
   ClusterRecord cluster = u_clusters[clusterIndex];
   uint pointLightCount = min(cluster.meta.y, uint(max(u_cluster_max_lights, 0)));

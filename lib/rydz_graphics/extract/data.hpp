@@ -1,13 +1,12 @@
 #pragma once
 
-#include "rydz_graphics/components/color.hpp"
-#include "rydz_graphics/components/light.hpp"
 #include "math.hpp"
-#include "rydz_graphics/components/mesh3d.hpp"
 #include "rydz_camera/camera3d.hpp"
 #include "rydz_ecs/mod.hpp"
-#include "rydz_graphics/gl/core.hpp"
-#include "rydz_graphics/gl/skybox.hpp"
+#include "rydz_graphics/components/color.hpp"
+#include "rydz_graphics/components/environment.hpp"
+#include "rydz_graphics/components/light.hpp"
+#include "rydz_graphics/components/mesh3d.hpp"
 #include "rydz_graphics/material/material3d.hpp"
 #include "rydz_graphics/material/postprocess_material.hpp"
 #include "rydz_graphics/pipeline/batches.hpp"
@@ -25,7 +24,7 @@ struct ExtractedView {
     .position = Vec3{},
   };
   Color clear_color = ClearColor{}.color;
-  Skybox const* active_skybox{};
+  Environment const* active_environment{};
   PostProcessDescriptor postprocess{};
   bool active{};
   bool has_postprocess{};

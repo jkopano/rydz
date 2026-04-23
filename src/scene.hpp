@@ -40,9 +40,7 @@ struct CameraController {
 };
 
 inline auto camera_controller_system(
-  Query<Mut<Transform>, CameraController> query,
-  Res<Time> time,
-  Res<Input> input
+  Query<Mut<Transform>, CameraController> query, Res<Time> time, Res<Input> input
 ) -> void {
 
   for (auto [t, ctrl] : query.iter()) {
@@ -130,9 +128,7 @@ inline auto some_shit(Query<CameraState> q) -> void {
     std::visit(
       over{
         [&](FreeLook const& fl) -> void { info("Kamera w trybie FreeLook\n"); },
-        [&](Cinematic const& c) -> void {
-          info("Kamera w trybie Cinematic\n");
-        },
+        [&](Cinematic const& c) -> void { info("Kamera w trybie Cinematic\n"); },
         [&](Locked const& l) -> void { info("Kamera śledzi encję: {}\n", 10); }
       },
       *state
@@ -144,9 +140,7 @@ inline auto spawn_some_texture(
   Cmd cmd, ResMut<Assets<ecs::Texture>> textures, NonSendMarker
 ) -> void {
   cmd.spawn(
-    ecs::Sprite{
-      .handle = textures->add(gl::load_texture("res/textures/stone.jpg"))
-    },
+    ecs::Sprite{.handle = textures->add(gl::load_texture("res/textures/stone.jpg"))},
     Transform{
       .translation = Vec3(10.0f, 10.0f, 0.0f),
       .scale = Vec3::splat(1.0f),
@@ -161,9 +155,9 @@ struct LightsSpawned {
 
 inline auto spawn_lights_on_input(
   Cmd cmd,
-  ResMut<Assets<ecs::Texture>> textures,
-  ResMut<Assets<ecs::Mesh>> meshes,
-  ResMut<Assets<ecs::Material>> materials,
+  ResMut<Assets<Texture>> textures,
+  ResMut<Assets<Mesh>> meshes,
+  ResMut<Assets<Material>> materials,
   ResMut<LightsSpawned> lights,
   Res<Input> input,
   NonSendMarker
@@ -183,28 +177,22 @@ inline auto spawn_lights_on_input(
   auto stone_tex = textures->add(gl::load_texture("res/textures/stone.jpg"));
   auto stone_mat = materials->add(StandardMaterial::from_texture(stone_tex));
 
-  auto cube_h = meshes->add(mesh::cube());
+  auto cube_h = meshes->add(Mesh::cube());
 
   cmd.spawn(
     Mesh3d{cube_h},
-    PointLight{
-      .color = {255, 0, 0, 255}, .intensity = 8800.0f, .range = 2000.0f
-    },
+    PointLight{.color = {255, 0, 0, 255}, .intensity = 8800.0f, .range = 2000.0f},
     Transform::from_xyz(-50.0f, 50.0f, 0.0f)
   );
 
-  auto cube_h2 = meshes->add(mesh::cube());
+  auto cube_h2 = meshes->add(Mesh::cube());
 
   cmd.spawn(
-    Mesh3d{cube_h2},
-    MeshMaterial3d{stone_mat},
-    Transform::from_xyz(50.0f, 50.0f, 0.0f)
+    Mesh3d{cube_h2}, MeshMaterial3d{stone_mat}, Transform::from_xyz(50.0f, 50.0f, 0.0f)
   );
 
   cmd.spawn(
-    PointLight{
-      .color = {75, 75, 255, 255}, .intensity = 800.0f, .range = 200.0f
-    },
+    PointLight{.color = {75, 75, 255, 255}, .intensity = 800.0f, .range = 200.0f},
     Transform::from_xyz(100.0f, 100.0f, 0.0f)
   );
 
@@ -218,7 +206,7 @@ inline auto setup_camera(Cmd cmd, NonSendMarker) -> void {
     Transform::from_xyz(8, 6, 8).look_at(Vec3::ZERO),
     CameraController{},
     PostProcessMaterial{DefaultPostProcessMaterial{}},
-    Skybox::from("res/hdri/skybox")
+    ecs::Environment::from_directory("res/hdri/skybox")
   );
   rl::DisableCursor();
 }

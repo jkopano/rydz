@@ -74,8 +74,8 @@ auto setup(
     Transform::from_xyz(0, 3, 6).look_at(Vec3::ZERO)
   );
 
-  auto sphere = meshes->add(mesh::sphere(1.0f));
-  auto floor = meshes->add(mesh::plane(8.0f, 8.0f));
+  auto sphere = meshes->add(Mesh::sphere(1.0f));
+  auto floor = meshes->add(Mesh::plane(8.0f, 8.0f));
   auto toon =
     toon_materials->add(ToonMaterial{.base_color = ecs::Color::ORANGE});
   auto floor_mat =
@@ -106,7 +106,7 @@ auto main() -> int {
     )
     .add_plugin(time_plugin)
     .add_plugin(RenderPlugin::install)
-    .add_plugin(RenderPlugin::register_material<ToonMaterial>)
+    .add_plugin([](App& app) -> void { RenderPlugin::register_material<ToonMaterial>(app); })
     .add_systems(Startup, setup)
     .add_systems(Update, change_toon)
     .run();

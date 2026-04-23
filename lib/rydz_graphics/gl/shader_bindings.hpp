@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hpp"
+#include <array>
 #include <concepts>
 #include <string_view>
 #include <type_traits>
@@ -23,6 +24,14 @@ enum class MaterialMap : u8 {
 
 inline constexpr i32 K_MATERIAL_MAP_COUNT = 12;
 inline constexpr i32 K_RAYLIB_MAP_LOCATION_BASE = 15;
+inline constexpr std::array DEFAULT_MATERIAL_MAPS = {
+  MaterialMap::Albedo,
+  MaterialMap::Metalness,
+  MaterialMap::Normal,
+  MaterialMap::Roughness,
+  MaterialMap::Occlusion,
+  MaterialMap::Emission,
+};
 
 constexpr auto material_map_index(MaterialMap map) -> i32 {
   return static_cast<int>(map);
@@ -93,11 +102,10 @@ enum class StandardMaterialUniform {
   RenderMethod,
 };
 
-inline auto map_uniform_binding(StandardMaterialUniform uniform)
-  -> std::string_view {
+inline auto map_uniform_binding(StandardMaterialUniform uniform) -> std::string_view {
   switch (uniform) {
   case StandardMaterialUniform::AlphaCutoff:
-    return "alphaCutoff";
+    return "u_alpha_cutoff";
   case StandardMaterialUniform::RenderMethod:
     return "u_render_method";
   }
@@ -113,11 +121,11 @@ enum class CameraUniform {
 inline auto map_uniform_binding(CameraUniform uniform) -> std::string_view {
   switch (uniform) {
   case CameraUniform::Position:
-    return "cameraPos";
+    return "u_camera_pos";
   case CameraUniform::ViewMatrix:
-    return "matView";
+    return "u_mat_view";
   case CameraUniform::ProjectionMatrix:
-    return "matProjection";
+    return "u_mat_projection";
   }
   return "";
 }
@@ -134,8 +142,7 @@ enum class PbrLightingUniform {
   IsOrthographic,
 };
 
-inline auto map_uniform_binding(PbrLightingUniform uniform)
-  -> std::string_view {
+inline auto map_uniform_binding(PbrLightingUniform uniform) -> std::string_view {
   switch (uniform) {
   case PbrLightingUniform::HasDirectional:
     return "u_has_directional";

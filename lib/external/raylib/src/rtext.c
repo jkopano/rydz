@@ -447,7 +447,9 @@ Font LoadFont(char const* fileName) {
   {
     Image image = rlLoadImage(fileName);
     if (image.data != NULL)
-      font = LoadFontFromImage(image, MAGENTA, FONT_TTF_DEFAULT_FIRST_CHAR);
+      font = LoadFontFromImage(
+        image, (rlColor) {255, 0, 255, 255}, FONT_TTF_DEFAULT_FIRST_CHAR
+      );
     else
       font = GetFontDefault();
     UnloadImage(image);
@@ -611,7 +613,7 @@ Font LoadFontFromImage(Image image, rlColor key, int firstChar) {
   // TEXTURE_FILTER_TRILINEAR
   for (int i = 0; i < image.height * image.width; i++)
     if (COLOR_EQUAL(pixels[i], key))
-      pixels[i] = BLANK;
+      pixels[i] = RLBLANK;
 
   // Create a new image with the processed color data (key color replaced by
   // BLANK)
@@ -1624,13 +1626,13 @@ bool ExportFontAsCode(Font font, char const* fileName) {
 // Draw current FPS
 // NOTE: Uses default font
 void DrawFPS(int posX, int posY) {
-  rlColor color = LIME; // Good FPS
+  rlColor color = (rlColor) {0, 158, 47, 255}; // Good FPS
   int fps = GetFPS();
 
   if ((fps < 30) && (fps >= 15))
-    color = ORANGE; // Warning FPS
+    color = (rlColor) {255, 161, 0, 255}; // Warning FPS
   else if (fps < 15)
-    color = RED; // Low FPS
+    color = (rlColor) {230, 41, 55, 255}; // Low FPS
 
   rlDrawText(TextFormat("%2i FPS", fps), posX, posY, 20, color);
 }
@@ -3078,14 +3080,14 @@ static Font LoadBMFont(char const* fileName) {
   // NOTE: WARNING: This process could be really slow!
   if (pageCount > 1) {
     // Resize font atlas to draw additional images
-    ImageResizeCanvas(&fullFont, imWidth, imHeight * pageCount, 0, 0, BLACK);
+    ImageResizeCanvas(&fullFont, imWidth, imHeight * pageCount, 0, 0, RLBLACK);
 
     for (int i = 1; i < pageCount; i++) {
       rlRectangle srcRec = {0.0f, 0.0f, (float) imWidth, (float) imHeight};
       rlRectangle destRec = {
         0.0f, (float) imHeight * (float) i, (float) imWidth, (float) imHeight
       };
-      ImageDraw(&fullFont, imFonts[i], srcRec, destRec, WHITE);
+      ImageDraw(&fullFont, imFonts[i], srcRec, destRec, RLWHITE);
     }
   }
 
@@ -3146,7 +3148,7 @@ static Font LoadBMFont(char const* fileName) {
       font.glyphs[i].image = ImageFromImage(fullFont, font.recs[i]);
     } else {
       font.glyphs[i].image = GenImageColor(
-        (int) font.recs[i].width, (int) font.recs[i].height, BLACK
+        (int) font.recs[i].width, (int) font.recs[i].height, RLBLACK
       );
       TRACELOG(
         LOG_WARNING,

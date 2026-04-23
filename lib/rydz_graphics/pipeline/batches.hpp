@@ -2,7 +2,6 @@
 
 #include "hash.hpp"
 #include "rydz_ecs/asset.hpp"
-#include "rydz_graphics/gl/core.hpp"
 #include "rydz_graphics/material/material3d.hpp"
 #include <cstdint>
 #include <functional>

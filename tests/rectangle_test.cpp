@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/gl/primitives.hpp"
 
 TEST(RectangleTest, ConvertsToAndFromRaylibRectangle) {
   ::rlRectangle raw{1.0F, 2.0F, 3.0F, 4.0F};
