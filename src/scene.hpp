@@ -161,9 +161,8 @@ inline auto moving_lights_system(Query<Mut<Transform>, MovingLight> query, Res<T
     transform->translation.x =
       light->base_pos.x + (std::cos((t * light->speed) + light->offset) * light->radius);
     transform->translation.z =
-      light->base_pos.z + (std::sin((t * light->speed) + light->offset) * light->radius);
-    transform->translation.y =
-      light->base_pos.y + (std::sin(t * light->speed * 0.5f) * (light->radius * 0.5f));
+      light->base_pos.z +
+      (std::sin((t * light->speed) + light->offset) * light->radius / 4.0f);
   }
 }
 
@@ -199,11 +198,11 @@ inline auto spawn_lights_on_input(
         .range = 40.0f,
         .casts_shadows = true,
       },
-      Transform::from_xyz(0, 10, 0),
+      Transform::from_xyz(0, ((i % 2 == 0 ? 10.f : 50.f)), 0),
       MovingLight{
         .base_pos = Vec3(0, 20.0f + ((i % 5) * 5.0f), 0),
         .radius = radius,
-        .speed = 0.2f + ((i % 3) * 0.1f),
+        .speed = 0.2f,
         .offset = angle,
       }
     );

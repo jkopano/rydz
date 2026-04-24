@@ -209,6 +209,7 @@ struct Extract {
   static auto meshes(
     Query<
       Mesh3d,
+      MeshBounds,
       GlobalTransform,
       MeshMaterial3d<M>,
       Opt<ComputedVisibility>,
@@ -218,7 +219,7 @@ struct Extract {
     ResMut<MaterialCache> material_cache,
     ResMut<ExtractedMeshes> meshes
   ) -> void {
-    for (auto [mesh3d, global, material, computed_visibility, visibility] :
+    for (auto [mesh3d, bounds, global, material, computed_visibility, visibility] :
          query.iter()) {
       if (!mesh3d->mesh.is_valid() || !material->material.is_valid()) {
         continue;
@@ -252,6 +253,7 @@ struct Extract {
 
       auto const& material_item = meshes->materials[it->second];
       Vec3 camera_offset = global->translation() - view->camera_view.position;
+      AABox const world_bounds = transform_bbox(bounds->bbox, global->matrix);
 
       meshes->items.push_back(
         ExtractedMeshes::Item{
@@ -259,6 +261,7 @@ struct Extract {
           .material = material_item.key,
           .material_index = it->second,
           .world_transform = global->matrix,
+          .world_bounds = world_bounds,
           .distance_sq_to_camera = camera_offset.length_sq(),
           .visible_in_view = visibility != nullptr ? visibility->visible : true,
         }
@@ -351,6 +354,7 @@ struct Queue {
           .mesh = item.mesh,
           .material_index = item.material_index,
           .instances = {math::to_rl(item.world_transform)},
+          .world_bounds = item.world_bounds,
           .sort_key = item.distance_sq_to_camera,
         };
         phase->commands.push_back(std::move(cmd));
@@ -386,6 +390,7 @@ struct Queue {
         .mesh = item.mesh,
         .material_index = item.material_index,
         .instances = {math::to_rl(item.world_transform)},
+        .world_bounds = item.world_bounds,
         .sort_key = item.distance_sq_to_camera,
       };
       phase->commands.push_back(std::move(cmd));
@@ -409,6 +414,7 @@ struct Queue {
         .mesh = item.mesh,
         .material_index = item.material_index,
         .instances = {math::to_rl(item.world_transform)},
+        .world_bounds = item.world_bounds,
         .sort_key = item.distance_sq_to_camera,
       };
       phase->commands.push_back(std::move(cmd));

@@ -79,6 +79,7 @@ struct ExtractedMeshes {
     RenderMaterialKey material{};
     usize material_index{};
     Mat4 world_transform{Mat4::IDENTITY};
+    AABox world_bounds{};
     float distance_sq_to_camera{0.0F};
     bool visible_in_view{true};
   };

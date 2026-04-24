@@ -14,6 +14,7 @@ struct RenderCommand {
   Handle<Mesh> mesh{};
   usize material_index{};
   std::vector<rl::Matrix> instances;
+  AABox world_bounds{};
   f32 sort_key = 0.0F;
 
   auto add_instance(Mat4 const& transform) -> void {

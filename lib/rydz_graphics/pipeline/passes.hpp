@@ -233,14 +233,29 @@ private:
     return SPEC;
   }
 
+  static auto shadow_frustum_planes(ShadowView const& shadow_view)
+    -> std::array<FrustumPlane, 6> {
+    return extract_frustum_planes(shadow_view.view_projection);
+  }
+
+  static auto shadow_command_visible(
+    RenderCommand const& cmd, std::array<FrustumPlane, 6> const& planes
+  ) -> bool {
+    return aabb_in_frustum(cmd.world_bounds, planes);
+  }
+
   static auto render_shadow_commands(
     PassContext& ctx, ShadowView const& shadow_view, ShaderSpec const& shader_spec
   ) -> void {
+    auto const planes = shadow_frustum_planes(shadow_view);
     ctx.render_state.reset();
     ctx.render_state.begin_view(shadow_render_view(shadow_view));
 
     PassRenderer renderer{ctx, RenderConfig::depth_prepass()};
     for (auto const& cmd : ctx.shadow_phase.commands) {
+      if (!shadow_command_visible(cmd, planes)) {
+        continue;
+      }
       renderer.draw(cmd, shader_spec);
     }
     renderer.end(RenderConfig::post_depth_prepass());
@@ -255,11 +270,15 @@ private:
     ShaderSpec const& shader_spec
   ) -> void {
     auto const& shadow_view = point_shadow.faces[static_cast<usize>(face_index)];
+    auto const planes = shadow_frustum_planes(shadow_view);
     ctx.render_state.reset();
     ctx.render_state.begin_view(shadow_render_view(shadow_view));
 
     PassRenderer renderer{ctx, RenderConfig::depth_prepass()};
     for (auto const& cmd : ctx.shadow_phase.commands) {
+      if (!shadow_command_visible(cmd, planes)) {
+        continue;
+      }
       ShaderProgram& shader = resolve_shader(ctx.marker, ctx.shader_cache, shader_spec);
       shader.set("u_light_pos", point_shadow.position);
       shader.set("u_far_plane", point_shadow.far_plane);
