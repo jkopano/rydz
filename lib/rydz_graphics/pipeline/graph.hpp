@@ -2,6 +2,7 @@
 
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/gl/mod.hpp"
+#include "rydz_graphics/pipeline/pass_context.hpp"
 #include "rydz_graphics/pipeline/phase.hpp"
 #include "rydz_log/mod.hpp"
 #include <memory>
@@ -31,30 +32,6 @@ struct RenderExecutionState;
 struct ShaderCache;
 struct SlotProviderRegistry;
 
-struct FrameResources {
-  NonSendMarker marker;
-  gl::RenderState& render_state;
-  u32 framebuffer_width = 1280;
-  u32 framebuffer_height = 720;
-
-  RenderExecutionState* execution_state{};
-  ShadowPhase const* shadow_phase{};
-  OpaquePhase const* opaque_phase{};
-  TransparentPhase const* transparent_phase{};
-  UiPhase const* ui_phase{};
-
-  Assets<Mesh> const* mesh_assets{};
-  Assets<Texture> const* texture_assets{};
-  ShaderCache* shader_cache{};
-  SlotProviderRegistry const* slot_registry{};
-  EnvironmentRenderer const* environment_renderer{};
-  ExtractedView const* view{};
-  ExtractedLights const* lights{};
-  ClusterConfig const* cluster_config{};
-  ClusteredLightingState* cluster_state{};
-  Time const* time{};
-};
-
 class RenderGraphBuilder;
 class RenderGraphRuntime;
 
@@ -63,7 +40,7 @@ public:
   virtual ~RenderPass() = default;
 
   virtual auto setup(RenderGraphBuilder& builder) -> void = 0;
-  virtual auto execute(FrameResources& frame, RenderGraphRuntime& runtime) -> void = 0;
+  virtual auto execute(PassContext& ctx, RenderGraphRuntime& runtime) -> void = 0;
 };
 
 class RenderGraphBuilder {
@@ -145,17 +122,19 @@ public:
     compiled_ = true;
   }
 
-  auto execute(FrameResources& frame) -> void {
+  auto execute(PassContext& ctx) -> void {
     if (!compiled_) {
       info("RenderGraph: compiling");
       compile();
     }
 
-    ensure_resources(frame.framebuffer_width, frame.framebuffer_height);
+    ensure_resources(
+      static_cast<u32>(ctx.framebuffer.width), static_cast<u32>(ctx.framebuffer.height)
+    );
 
     for (auto& node : nodes_) {
       if (node.pass) {
-        node.pass->execute(frame, runtime_);
+        execute_node(node, ctx);
       }
     }
   }
@@ -233,6 +212,36 @@ private:
 
   [[nodiscard]] auto has_resource(RenderTextureHandle handle) const -> bool {
     return handle.is_valid() && handle.id < resources_.size();
+  }
+
+  [[nodiscard]] auto is_backbuffer(RenderTextureHandle handle) const -> bool {
+    return has_resource(handle) && resources_[handle.id].backbuffer;
+  }
+
+  auto execute_node(PassNode& node, PassContext& ctx) -> void {
+
+    for (auto const& output : node.outputs) {
+      if (!is_backbuffer(output)) {
+        runtime_.get_target(output).begin();
+      }
+    }
+
+    struct TargetGuard {
+      RuntimeImpl const& runtime;
+      std::vector<RenderTextureHandle> const& outputs;
+      std::vector<ResourceInfo> const& resources;
+
+      ~TargetGuard() {
+        for (auto const& output : outputs) {
+          if (output.is_valid() && output.id < resources.size() &&
+              !resources[output.id].backbuffer) {
+            runtime.get_target(output).end();
+          }
+        }
+      }
+    } guard{runtime_, node.outputs, resources_};
+
+    node.pass->execute(ctx, runtime_);
   }
 
   auto ensure_resources(u32 default_w, u32 default_h) -> void {

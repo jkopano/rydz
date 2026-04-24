@@ -6,6 +6,7 @@
 #include "rydz_graphics/lighting/clustered_lighting.hpp"
 #include "rydz_graphics/material/slot_provider.hpp"
 #include "rydz_graphics/pipeline/graph.hpp"
+#include "rydz_graphics/pipeline/pass_context.hpp"
 #include "rydz_graphics/pipeline/batches.hpp"
 #include <algorithm>
 #include <cstring>
@@ -26,37 +27,37 @@ struct ShaderCache {
   std::unordered_map<ShaderSpec, ShaderProgram> shaders;
 };
 
-inline auto MaterialContext::frame() const -> FrameResources const& {
+inline auto MaterialContext::frame() const -> PassContext const& {
   return *frame_data;
 }
 
 inline auto MaterialContext::textures() const -> Assets<Texture> const& {
-  return *frame().texture_assets;
+  return frame().texture_assets;
 }
 
 inline auto MaterialContext::view() const -> ExtractedView const& {
-  return *frame().view;
+  return frame().view;
 }
 
 inline auto MaterialContext::lights() const -> ExtractedLights const& {
-  return *frame().lights;
+  return frame().lights;
 }
 
 inline auto MaterialContext::cluster_config() const -> ClusterConfig const& {
-  return *frame().cluster_config;
+  return frame().cluster_config;
 }
 
 inline auto MaterialContext::clustered_lighting() const
   -> ClusteredLightingState const& {
-  return *frame().cluster_state;
+  return frame().cluster_state;
 }
 
 inline auto MaterialContext::time() const -> Time const& {
-  return *frame().time;
+  return frame().time;
 }
 
 inline auto MaterialContext::slots() const -> SlotProviderRegistry const& {
-  return *frame().slot_registry;
+  return frame().slot_registry;
 }
 
 inline auto pbr_fallback_textures() -> PbrFallbackTextures& {
@@ -196,7 +197,7 @@ inline auto prepare_material(
   prepared.material.maps = prepared.local_maps.data();
 
   ShaderProgram& shader = resolve_shader(
-    material_ctx.frame().marker, *material_ctx.frame().shader_cache, shader_spec
+    material_ctx.frame().marker, material_ctx.frame().shader_cache, shader_spec
   );
   initialize_material_map_locations(shader);
   prepared.material.shader = shader.raw();

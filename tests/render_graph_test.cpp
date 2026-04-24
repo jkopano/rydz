@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "rydz_graphics/pipeline/graph.hpp"
+#include "rydz_graphics/pipeline/pass_context.hpp"
+#include "rydz_graphics/pipeline/phase.hpp"
+#include "rydz_graphics/material/render_material.hpp"
 #include <string>
 #include <utility>
 #include <vector>
@@ -31,7 +34,7 @@ public:
     }
   }
 
-  auto execute(FrameResources&, RenderGraphRuntime&) -> void override {
+  auto execute(PassContext&, RenderGraphRuntime&) -> void override {
     execution_order_->push_back(name_);
   }
 
@@ -56,11 +59,38 @@ auto add_recording_pass(
 
 auto execute(RenderGraph& graph) -> void {
   gl::RenderState render_state;
-  FrameResources frame{
+  ExtractedView view{};
+  ExtractedLights lights{};
+  Time time{};
+  Assets<Mesh> mesh_assets;
+  Assets<Texture> texture_assets;
+  ShaderCache shader_cache;
+  SlotProviderRegistry slot_registry;
+  OpaquePhase opaque_phase{};
+  TransparentPhase transparent_phase{};
+  ShadowPhase shadow_phase{};
+  UiPhase ui_phase{};
+  gl::ClusterConfig cluster_config{};
+  gl::ClusteredLightingState cluster_state{};
+  PassContext ctx{
     .marker = NonSendMarker{},
     .render_state = render_state,
+    .framebuffer = {},
+    .view = view,
+    .lights = lights,
+    .time = time,
+    .mesh_assets = mesh_assets,
+    .texture_assets = texture_assets,
+    .shader_cache = shader_cache,
+    .slot_registry = slot_registry,
+    .opaque_phase = opaque_phase,
+    .transparent_phase = transparent_phase,
+    .shadow_phase = shadow_phase,
+    .ui_phase = ui_phase,
+    .cluster_config = cluster_config,
+    .cluster_state = cluster_state,
   };
-  graph.execute(frame);
+  graph.execute(ctx);
 }
 
 } // namespace

@@ -6,6 +6,8 @@
 #include "rydz_graphics/material/postprocess_material.hpp"
 #include "rydz_graphics/material/render_material.hpp"
 #include "rydz_graphics/material/standard_material.hpp"
+#include "rydz_graphics/pipeline/pass_context.hpp"
+#include "rydz_graphics/pipeline/phase.hpp"
 
 namespace {
 
@@ -116,14 +118,35 @@ TEST(MaterialTest, PrepareMaterialAppliesFallbackTexturesForDefaultedMaps) {
   ecs::SlotProviderRegistry registry;
   ecs::PreparedMaterial prepared;
   gl::RenderState render_state;
-  ecs::FrameResources frame{
+  ecs::ExtractedView view{};
+  ecs::ExtractedLights lights{};
+  ecs::Time time{};
+  ecs::Assets<ecs::Mesh> mesh_assets;
+  ecs::OpaquePhase opaque_phase{};
+  ecs::TransparentPhase transparent_phase{};
+  ecs::ShadowPhase shadow_phase{};
+  ecs::UiPhase ui_phase{};
+  gl::ClusterConfig cluster_config{};
+  gl::ClusteredLightingState cluster_state{};
+  ecs::PassContext ctx{
     .marker = ecs::NonSendMarker{},
     .render_state = render_state,
-    .texture_assets = &textures,
-    .shader_cache = &shader_cache,
-    .slot_registry = &registry,
+    .framebuffer = {},
+    .view = view,
+    .lights = lights,
+    .time = time,
+    .mesh_assets = mesh_assets,
+    .texture_assets = textures,
+    .shader_cache = shader_cache,
+    .slot_registry = registry,
+    .opaque_phase = opaque_phase,
+    .transparent_phase = transparent_phase,
+    .shadow_phase = shadow_phase,
+    .ui_phase = ui_phase,
+    .cluster_config = cluster_config,
+    .cluster_state = cluster_state,
   };
-  ecs::MaterialContext material_ctx{.frame_data = &frame};
+  ecs::MaterialContext material_ctx{.frame_data = &ctx};
 
   ecs::prepare_material(
     material_ctx,
@@ -192,14 +215,35 @@ TEST(MaterialTest, PrepareMaterialPreservesAuthoredTextureOverFallback) {
   ecs::SlotProviderRegistry registry;
   ecs::PreparedMaterial prepared;
   gl::RenderState render_state;
-  ecs::FrameResources frame{
+  ecs::ExtractedView view{};
+  ecs::ExtractedLights lights{};
+  ecs::Time time{};
+  ecs::Assets<ecs::Mesh> mesh_assets;
+  ecs::OpaquePhase opaque_phase{};
+  ecs::TransparentPhase transparent_phase{};
+  ecs::ShadowPhase shadow_phase{};
+  ecs::UiPhase ui_phase{};
+  gl::ClusterConfig cluster_config{};
+  gl::ClusteredLightingState cluster_state{};
+  ecs::PassContext ctx{
     .marker = ecs::NonSendMarker{},
     .render_state = render_state,
-    .texture_assets = &textures,
-    .shader_cache = &shader_cache,
-    .slot_registry = &registry,
+    .framebuffer = {},
+    .view = view,
+    .lights = lights,
+    .time = time,
+    .mesh_assets = mesh_assets,
+    .texture_assets = textures,
+    .shader_cache = shader_cache,
+    .slot_registry = registry,
+    .opaque_phase = opaque_phase,
+    .transparent_phase = transparent_phase,
+    .shadow_phase = shadow_phase,
+    .ui_phase = ui_phase,
+    .cluster_config = cluster_config,
+    .cluster_state = cluster_state,
   };
-  ecs::MaterialContext material_ctx{.frame_data = &frame};
+  ecs::MaterialContext material_ctx{.frame_data = &ctx};
 
   ecs::prepare_material(
     material_ctx,
