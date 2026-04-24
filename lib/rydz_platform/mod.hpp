@@ -55,6 +55,7 @@ private:
 
     window->width = static_cast<u32>(rl::GetScreenWidth());
     window->height = static_cast<u32>(rl::GetScreenHeight());
+    window->fullscreen = rl::IsWindowFullscreen();
   }
 
   auto run_app(ecs::App& app) const -> void {
@@ -62,15 +63,15 @@ private:
 
     app.add_plugin(LogPlugin{});
     // init_logging();
+    if (config.fullscreen) {
+      rl::SetConfigFlags(rl::FLAG_FULLSCREEN_MODE);
+    }
+
     rl::InitWindow(
       static_cast<int>(config.width),
       static_cast<int>(config.height),
       config.title.c_str()
     );
-
-    if (config.fullscreen) {
-      rl::ToggleFullscreen();
-    }
 
     rl::SetTargetFPS(static_cast<int>(config.target_fps));
     if (!rl::IsWindowReady()) {

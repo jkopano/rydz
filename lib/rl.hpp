@@ -43,14 +43,18 @@ using ::EndShaderMode;
 using ::EndTextureMode;
 using ::GetFrameTime;
 using ::InitWindow;
+using ::IsWindowFullscreen;
 using ::IsWindowReady;
 using ::LoadFileText;
+using ::SetConfigFlags;
 using ::SetShaderValueTexture;
 using ::SetTargetFPS;
 using ::SetTraceLogLevel;
 using ::TraceLog;
 using ::UnloadFileText;
 using ::WindowShouldClose;
+
+inline constexpr unsigned int FLAG_FULLSCREEN_MODE = ::FLAG_FULLSCREEN_MODE;
 
 using ::ColorFromHSV;
 

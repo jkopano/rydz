@@ -173,12 +173,7 @@ struct LightsSpawned {
 };
 
 inline auto spawn_lights_on_input(
-  Cmd cmd,
-  ResMut<Assets<Mesh>> meshes,
-  ResMut<Assets<Material>> materials,
-  ResMut<LightsSpawned> lights,
-  Res<Input> input,
-  NonSendMarker
+  Cmd cmd, ResMut<LightsSpawned> lights, Res<Input> input, NonSendMarker
 ) -> void {
   if (lights->done || !input->key_pressed(KEY_L)) {
     return;
@@ -192,17 +187,12 @@ inline auto spawn_lights_on_input(
     }
   );
 
-  auto cube_h = meshes->add(Mesh::cube());
-  auto material = materials->add(StandardMaterial{});
-
   for (int i = 0; i < 30; ++i) {
     f32 const angle = (static_cast<f32>(i) / 30.0f) * 2.0f * PI;
     f32 const radius = 50.0f + ((i % 3) * 20.0f);
     Color color = Color::from_hsv(static_cast<f32>(i * 12), 0.8f, 1.0f);
 
     cmd.spawn(
-      Mesh3d{cube_h},
-      MeshMaterial3d{material},
       PointLight{.color = color, .intensity = 500.0f, .range = 40.0f},
       Transform::from_xyz(0, 10, 0),
       MovingLight{
