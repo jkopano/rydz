@@ -9,7 +9,7 @@
 
 namespace rydz_platform {
 
-struct RayPlugin {
+struct RayPlugin : ecs::IPlugin {
   using T = ecs::Resource;
 
   ecs::Window window{
@@ -20,23 +20,21 @@ struct RayPlugin {
   };
   i32 trace_log_level = LOG_NONE;
 
-  static auto install(RayPlugin config) {
-    return [config = std::move(config)](ecs::App& app) mutable -> void {
-      app.insert_resource(config.window);
-      app.insert_resource(config);
-      app.insert_resource(
-        ecs::AppRunner{
-          .run = [](ecs::App& app_ref) -> void {
-            auto* runner = app_ref.world().get_resource<RayPlugin>();
-            if (!runner) {
-              std::fputs("RayPlugin not installed.\n", stderr);
-              return;
-            }
-            runner->run_app(app_ref);
-          },
-        }
-      );
-    };
+  void build(ecs::App& app) {
+    app.insert_resource(window);
+    app.insert_resource(*this);
+    app.insert_resource(
+      ecs::AppRunner{
+        .run = [](ecs::App& app_ref) -> void {
+          auto* runner = app_ref.world().get_resource<RayPlugin>();
+          if (!runner) {
+            std::println(stderr, "RayPlugin not installed.\n");
+            return;
+          }
+          runner->run_app(app_ref);
+        },
+      }
+    );
   }
 
 private:

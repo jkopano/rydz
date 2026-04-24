@@ -2,7 +2,6 @@
 #include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_ecs/entity.hpp"
 #include "rydz_ecs/world.hpp"
-#include <functional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -51,23 +50,26 @@ inline auto compute_visibility(World& world) -> void {
     }
   }
 
-  std::function<bool(Entity)> is_visible = [&](Entity entity) -> bool {
-    auto vit = visibilities.find(entity);
-    Visibility self_vis =
-      (vit != visibilities.end()) ? vit->second : Visibility::Inherited;
+  auto is_visible = [&](Entity start) -> bool {
+    Entity cur = start;
+    while (true) {
+      auto vit = visibilities.find(cur);
+      Visibility self_vis =
+        (vit != visibilities.end()) ? vit->second : Visibility::Inherited;
 
-    if (self_vis == Visibility::Hidden) {
-      return false;
-    }
-    if (self_vis == Visibility::Visible) {
-      return true;
-    }
+      if (self_vis == Visibility::Hidden) {
+        return false;
+      }
+      if (self_vis == Visibility::Visible) {
+        return true;
+      }
 
-    auto pit = parents.find(entity);
-    if (pit != parents.end()) {
-      return is_visible(pit->second);
+      auto pit = parents.find(cur);
+      if (pit == parents.end()) {
+        return true;
+      }
+      cur = pit->second;
     }
-    return true;
   };
 
   for (auto e : entity_set) {

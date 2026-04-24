@@ -42,14 +42,12 @@ struct AppRunner {
 namespace detail {
 
 template <typename P>
-concept BuildPlugin = requires(P&& plugin, App& app) {
-  std::forward<P>(plugin).build(app);
-};
+concept BuildPlugin =
+  requires(P&& plugin, App& app) { std::forward<P>(plugin).build(app); };
 
 template <typename F>
-concept CallablePlugin = requires(F&& plugin_fn, App& app) {
-  std::forward<F>(plugin_fn)(app);
-};
+concept CallablePlugin =
+  requires(F&& plugin_fn, App& app) { std::forward<F>(plugin_fn)(app); };
 
 } // namespace detail
 
@@ -58,8 +56,7 @@ class App {
     PendingSetSystemsBase() = default;
     PendingSetSystemsBase(PendingSetSystemsBase const&) = default;
     PendingSetSystemsBase(PendingSetSystemsBase&&) = delete;
-    auto operator=(PendingSetSystemsBase const&)
-      -> PendingSetSystemsBase& = default;
+    auto operator=(PendingSetSystemsBase const&) -> PendingSetSystemsBase& = default;
     auto operator=(PendingSetSystemsBase&&) -> PendingSetSystemsBase& = delete;
     virtual ~PendingSetSystemsBase() = default;
     virtual auto attach(App& app) -> void = 0;
@@ -74,9 +71,7 @@ class App {
 
     auto attach(App& app) -> void override {
       auto label = app.resolve_set_schedule(sets);
-      app.schedules_.entry(label).add_system_fn(
-        std::move(sets), std::move(func)
-      );
+      app.schedules_.entry(label).add_system_fn(std::move(sets), std::move(func));
     }
   };
 
@@ -152,16 +147,12 @@ public:
     detail::ensure_unique_sets(sets.ids, "add_systems(...)");
 
     if (auto label = try_resolve_set_schedule(sets)) {
-      schedules_.entry(*label).add_system_fn(
-        std::move(sets), std::forward<F>(func)
-      );
+      schedules_.entry(*label).add_system_fn(std::move(sets), std::forward<F>(func));
       return *this;
     }
 
     pending_set_systems_.push_back(
-      std::make_unique<PendingSetSystems<F>>(
-        std::move(sets), std::forward<F>(func)
-      )
+      std::make_unique<PendingSetSystems<F>>(std::move(sets), std::forward<F>(func))
     );
     return *this;
   }
@@ -182,8 +173,7 @@ public:
     return *this;
   }
 
-  auto configure_set(ScheduleLabel label, ChainedSetConfigDescriptor&& desc)
-    -> App& {
+  auto configure_set(ScheduleLabel label, ChainedSetConfigDescriptor&& desc) -> App& {
     auto configs = std::move(desc).take();
     for (auto const& config : configs) {
       register_set_schedule(label, config.id);
@@ -195,8 +185,7 @@ public:
   }
 
 private:
-  template <typename S>
-  auto get_or_init_state_schedules() -> StateSchedules<S>& {
+  template <typename S> auto get_or_init_state_schedules() -> StateSchedules<S>& {
     auto* schedules = world_.get_resource<StateSchedules<S>>();
     if (!schedules) {
       world_.insert_resource(StateSchedules<S>{});
@@ -244,9 +233,7 @@ public:
     requires SystemInput<F>
   auto add_systems(Label&&, F&& func) -> App& {
     using S = typename bare_t<Label>::state_type;
-    get_or_init_state_schedules<S>().on_transition.add_system_fn(
-      std::forward<F>(func)
-    );
+    get_or_init_state_schedules<S>().on_transition.add_system_fn(std::forward<F>(func));
     return *this;
   }
 
@@ -271,7 +258,7 @@ public:
     return *this;
   }
 
-  auto add_plugin(IPlugin& plugin) -> App& {
+  auto add_plugin(PluginTrait auto& plugin) -> App& {
     plugin.build(*this);
     return *this;
   }
@@ -281,8 +268,7 @@ public:
     return *this;
   }
 
-  template <typename R, typename... Args>
-  auto init_resource(Args&&... args) -> App& {
+  template <typename R, typename... Args> auto init_resource(Args&&... args) -> App& {
     if (!world_.has_resource<R>()) {
       world_.insert_resource(R{std::forward<Args>(args)...});
     }
@@ -316,8 +302,7 @@ public:
   template <IsMessage E> auto add_message() -> App& {
     if (!world_.has_resource<Messages<E>>()) {
       world_.insert_resource(Messages<E>{});
-      schedules_.entry(ScheduleLabel::First)
-        .add_system_fn(message_update_system<E>);
+      schedules_.entry(ScheduleLabel::First).add_system_fn(message_update_system<E>);
     }
     return *this;
   }
@@ -398,9 +383,7 @@ public:
   auto run() -> void {
     auto* runner = world_.get_resource<AppRunner>();
     if ((runner == nullptr) || !runner->run) {
-      std::println(
-        stderr, "App::run() called without an AppRunner resource.\n"
-      );
+      std::println(stderr, "App::run() called without an AppRunner resource.\n");
       return;
     }
     runner->run(*this);
@@ -490,12 +473,9 @@ private:
 inline auto time_plugin(App& app) -> void { app.init_resource<Time>(); }
 
 inline auto Window::install(Window config) {
-  return [config = std::move(config)](ecs::App& app) -> void {
-    app.insert_resource(config);
-  };
+  return
+    [config = std::move(config)](ecs::App& app) -> void { app.insert_resource(config); };
 }
 
-inline auto window_plugin(Window config) {
-  return Window::install(std::move(config));
-}
+inline auto window_plugin(Window config) { return Window::install(std::move(config)); }
 } // namespace ecs

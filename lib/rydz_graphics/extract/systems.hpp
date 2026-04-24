@@ -7,6 +7,7 @@
 #include "rydz_graphics/components/environment.hpp"
 #include "rydz_graphics/components/light.hpp"
 #include "rydz_graphics/components/mesh3d.hpp"
+#include "rydz_graphics/components/sprite.hpp"
 #include "rydz_graphics/extract/data.hpp"
 #include "rydz_graphics/material/material3d.hpp"
 #include "rydz_graphics/material/postprocess_material.hpp"
@@ -22,12 +23,6 @@
 #include <vector>
 
 namespace ecs {
-
-struct Sprite {
-  Handle<Texture> handle;
-  Color tint = Color::WHITE;
-  i32 layer{};
-};
 
 template <typename M>
 concept IsExtracted = requires(M const& m) {
@@ -102,14 +97,11 @@ struct Extract {
     }
   }
 
-  static auto clear_meshes(ResMut<ExtractedMeshes> meshes) -> void {
-    meshes->clear();
-  }
+  static auto clear_meshes(ResMut<ExtractedMeshes> meshes) -> void { meshes->clear(); }
 
   template <RenderMaterialAsset M>
   static auto meshes(
-    Query<Mesh3d, GlobalTransform, MeshMaterial3d<M>, Opt<ViewVisibility>>
-      query,
+    Query<Mesh3d, GlobalTransform, MeshMaterial3d<M>, Opt<ViewVisibility>> query,
     Res<ExtractedView> view,
     Res<Assets<M>> material_assets,
     ResMut<ExtractedMeshes> meshes
@@ -129,13 +121,10 @@ struct Extract {
         continue;
       }
 
-      auto [compiled_iter, inserted] =
-        material_cache.try_emplace(material->material.id);
+      auto [compiled_iter, inserted] = material_cache.try_emplace(material->material.id);
       if (inserted) {
-        CompiledMaterial compiled =
-          compile_render_material_asset(*material_asset);
-        bool const transparent =
-          compiled.render_method == RenderMethod::Transparent;
+        CompiledMaterial compiled = compile_render_material_asset(*material_asset);
+        bool const transparent = compiled.render_method == RenderMethod::Transparent;
         bool const casts_shadows = compiled.casts_shadows;
         compiled_iter->second = meshes->materials.size();
         meshes->materials.push_back(
@@ -157,14 +146,13 @@ struct Extract {
           .material = material_item.key,
           .material_index = compiled_iter->second,
           .world_transform = global->matrix,
-          .distance_to_camera = camera_offset.length_sq(),
+          .distance_sq_to_camera = camera_offset.length_sq(),
         }
       );
     }
   }
 
-  static auto ui(Query<Sprite, Transform> textures, ResMut<ExtractedUi> ui)
-    -> void {
+  static auto ui(Query<Sprite, Transform> textures, ResMut<ExtractedUi> ui) -> void {
     ui->clear();
 
     for (auto [texture, transform] : textures.iter()) {
@@ -183,18 +171,15 @@ struct Extract {
     }
   }
 
-  static auto overlay(
-    Query<Sprite, Transform> textures, ResMut<ExtractedUi> overlay
-  ) -> void {
+  static auto overlay(Query<Sprite, Transform> textures, ResMut<ExtractedUi> overlay)
+    -> void {
     ui(textures, overlay);
   }
 };
 namespace detail {
-inline auto prepare_mesh(Handle<Mesh> const& handle, Assets<Mesh>& mesh_assets)
-  -> bool {
+inline auto prepare_mesh(Handle<Mesh> const& handle, Assets<Mesh>& mesh_assets) -> bool {
   auto* mesh = mesh_assets.get(handle);
-  if ((mesh == nullptr) || mesh->vertex_count() <= 0 ||
-      mesh->vertex_data() == nullptr) {
+  if ((mesh == nullptr) || mesh->vertex_count() <= 0 || mesh->vertex_data() == nullptr) {
     return false;
   }
   if (!mesh->uploaded()) {
@@ -205,8 +190,7 @@ inline auto prepare_mesh(Handle<Mesh> const& handle, Assets<Mesh>& mesh_assets)
 } // namespace detail
 
 struct Queue {
-  static auto opaque(Res<ExtractedMeshes> meshes, ResMut<OpaquePhase> phase)
-    -> void {
+  static auto opaque(Res<ExtractedMeshes> meshes, ResMut<OpaquePhase> phase) -> void {
     phase->clear();
     std::unordered_map<RenderBatchKey, usize> batch_index;
 
@@ -225,7 +209,7 @@ struct Queue {
           .mesh = item.mesh,
           .material = material.material,
           .instances = {math::to_rl(item.world_transform)},
-          .sort_key = item.distance_to_camera,
+          .sort_key = item.distance_sq_to_camera,
         };
         phase->commands.push_back(std::move(cmd));
         batch_index.emplace(key, idx);
@@ -237,9 +221,8 @@ struct Queue {
     }
   }
 
-  static auto transparent(
-    Res<ExtractedMeshes> meshes, ResMut<TransparentPhase> phase
-  ) -> void {
+  static auto transparent(Res<ExtractedMeshes> meshes, ResMut<TransparentPhase> phase)
+    -> void {
     phase->clear();
 
     for (auto const& item : meshes->items) {
@@ -252,21 +235,19 @@ struct Queue {
         .mesh = item.mesh,
         .material = material.material,
         .instances = {math::to_rl(item.world_transform)},
-        .sort_key = item.distance_to_camera,
+        .sort_key = item.distance_sq_to_camera,
       };
       phase->commands.push_back(std::move(cmd));
     }
 
     std::ranges::sort(
-      phase->commands,
-      [](RenderCommand const& lhs, RenderCommand const& rhs) -> bool {
+      phase->commands, [](RenderCommand const& lhs, RenderCommand const& rhs) -> bool {
         return lhs.sort_key > rhs.sort_key;
       }
     );
   }
 
-  static auto shadow(Res<ExtractedMeshes> meshes, ResMut<ShadowPhase> phase)
-    -> void {
+  static auto shadow(Res<ExtractedMeshes> meshes, ResMut<ShadowPhase> phase) -> void {
     phase->clear();
     for (auto const& item : meshes->items) {
       auto const& material = meshes->materials[item.material_index];
@@ -277,7 +258,7 @@ struct Queue {
         .mesh = item.mesh,
         .material = material.material,
         .instances = {math::to_rl(item.world_transform)},
-        .sort_key = item.distance_to_camera,
+        .sort_key = item.distance_sq_to_camera,
       };
       phase->commands.push_back(std::move(cmd));
     }
@@ -306,9 +287,7 @@ struct Queue {
 
 struct Prepare {
   static auto prepare_meshes(
-    Res<ExtractedMeshes> extracted,
-    ResMut<Assets<Mesh>> mesh_assets,
-    NonSendMarker
+    Res<ExtractedMeshes> extracted, ResMut<Assets<Mesh>> mesh_assets, NonSendMarker
   ) -> void {
     std::unordered_set<u32> seen;
 

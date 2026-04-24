@@ -123,7 +123,6 @@ class ClearPass : public RenderPass {
 public:
   explicit ClearPass(RenderTextureHandle main_target) : main_target_(main_target) {}
 
-  [[nodiscard]] auto name() const -> std::string override { return "ClearPass"; }
   auto setup(RenderGraphBuilder& builder) -> void override {
     builder.write(main_target_);
   }
@@ -144,7 +143,6 @@ private:
 
 class ShadowPass : public RenderPass {
 public:
-  [[nodiscard]] auto name() const -> std::string override { return "ShadowPass"; }
   auto setup(RenderGraphBuilder&) -> void override {}
   auto execute(FrameResources& frame, RenderGraphRuntime&) -> void override {
     auto const* phase = frame.shadow_phase;
@@ -159,7 +157,6 @@ class EnvironmentPass : public RenderPass {
 public:
   explicit EnvironmentPass(RenderTextureHandle main_target) : main_target_(main_target) {}
 
-  [[nodiscard]] auto name() const -> std::string override { return "EnvironmentPass"; }
   auto setup(RenderGraphBuilder& builder) -> void override {
     builder.read(main_target_);
     builder.write(main_target_);
@@ -194,7 +191,6 @@ class OpaquePass : public RenderPass {
 public:
   explicit OpaquePass(RenderTextureHandle main_target) : main_target_(main_target) {}
 
-  [[nodiscard]] auto name() const -> std::string override { return "OpaquePass"; }
   auto setup(RenderGraphBuilder& builder) -> void override {
     builder.write(main_target_);
   }
@@ -231,7 +227,6 @@ class TransparentPass : public RenderPass {
 public:
   explicit TransparentPass(RenderTextureHandle main_target) : main_target_(main_target) {}
 
-  [[nodiscard]] auto name() const -> std::string override { return "TransparentPass"; }
   auto setup(RenderGraphBuilder& builder) -> void override {
     builder.read(main_target_);
     builder.write(main_target_);
@@ -269,7 +264,6 @@ class DepthPrepass : public RenderPass {
 public:
   explicit DepthPrepass(RenderTextureHandle main_target) : main_target_(main_target) {}
 
-  [[nodiscard]] auto name() const -> std::string override { return "DepthPrepass"; }
   auto setup(RenderGraphBuilder& builder) -> void override {
     builder.write(main_target_);
   }
@@ -309,7 +303,6 @@ private:
 
 class ClusterBuildPass : public RenderPass {
 public:
-  [[nodiscard]] auto name() const -> std::string override { return "ClusterBuildPass"; }
   auto setup(RenderGraphBuilder&) -> void override {}
   auto execute(FrameResources& frame, RenderGraphRuntime&) -> void override {
     auto* state = frame.execution_state;
@@ -477,7 +470,6 @@ public:
   PostProcessPassNode(RenderTextureHandle main_target, RenderTextureHandle screen)
       : main_target_(main_target), screen_(screen) {}
 
-  [[nodiscard]] auto name() const -> std::string override { return "PostProcessPass"; }
   auto setup(RenderGraphBuilder& builder) -> void override {
     builder.read(main_target_);
     builder.write(screen_);
@@ -588,7 +580,6 @@ public:
   UiPass(RenderTextureHandle main_target, RenderTextureHandle screen)
       : main_target_(main_target), screen_(screen) {}
 
-  [[nodiscard]] auto name() const -> std::string override { return "UiPass"; }
   auto setup(RenderGraphBuilder& builder) -> void override {
     builder.read(main_target_);
     builder.write(screen_);

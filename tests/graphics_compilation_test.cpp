@@ -1,17 +1,6 @@
 #include <gtest/gtest.h>
 
-// Test 8.2: Verify backward compatibility includes work
-// This test verifies that old include paths still work
-
-#include "rydz_graphics/frustum.hpp"
-#include "rydz_graphics/visibility.hpp"
-#include "rydz_graphics/transform.hpp"
-#include "rydz_graphics/clustered_lighting.hpp"
-#include "rydz_graphics/compute.hpp"
-#include "rydz_graphics/shader_bindings.hpp"
-
-// Test 8.3: Verify new organized includes work
-// This test verifies that new include paths work correctly
+// Test: Verify new organized includes work
 
 #include "rydz_graphics/spatial/frustum.hpp"
 #include "rydz_graphics/spatial/visibility.hpp"
@@ -27,20 +16,7 @@
 
 using namespace ecs;
 
-// Test 8.2: Backward compatibility includes
-TEST(GraphicsCompilation, BackwardCompatibilityIncludes) {
-  // Verify types are accessible through old include paths
-  Visibility v = Visibility::Visible;
-  Transform t;
-  ClusteredLightingState cl;
-  FrustumPlane fp;
-  MaterialMap mm = MaterialMap::Albedo;
-
-  // If we got here, all types are accessible
-  SUCCEED();
-}
-
-// Test 8.3: New organized includes
+// Test: New organized includes
 TEST(GraphicsCompilation, NewOrganizedIncludes) {
   // Verify types are accessible through new include paths
   Visibility v = Visibility::Visible;

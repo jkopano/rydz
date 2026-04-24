@@ -67,7 +67,7 @@ struct ExtractedMeshes {
     RenderMaterialKey material{};
     usize material_index{};
     Mat4 world_transform{Mat4::IDENTITY};
-    float distance_to_camera{0.0F};
+    float distance_sq_to_camera{0.0F};
   };
 
   std::vector<MaterialItem> materials;

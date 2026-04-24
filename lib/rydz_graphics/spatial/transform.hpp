@@ -27,8 +27,7 @@ inline auto propagate_transforms(
   }
 
   std::unordered_map<Entity, GlobalTransform> cache;
-  std::function<GlobalTransform(Entity)> compute =
-    [&](Entity entity) -> GlobalTransform {
+  std::function<GlobalTransform(Entity)> compute = [&](Entity entity) -> GlobalTransform {
     auto it = cache.find(entity);
     if (it != cache.end()) {
       return it->second;

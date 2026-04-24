@@ -18,13 +18,6 @@ struct TextureDesc {
   i32 format = gl::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
   bool use_depth = true;
   bool hdr = false;
-
-  static auto screen(Res<Window> const& window) -> TextureDesc {
-    return {
-      .width = static_cast<u32>(window->width),
-      .height = static_cast<u32>(window->height),
-    };
-  }
 };
 
 struct RenderGraphTexture {};
@@ -44,22 +37,22 @@ struct FrameResources {
   u32 framebuffer_width = 1280;
   u32 framebuffer_height = 720;
 
-  RenderExecutionState* execution_state = nullptr;
-  ShadowPhase const* shadow_phase = nullptr;
-  OpaquePhase const* opaque_phase = nullptr;
-  TransparentPhase const* transparent_phase = nullptr;
-  UiPhase const* ui_phase = nullptr;
+  RenderExecutionState* execution_state{};
+  ShadowPhase const* shadow_phase{};
+  OpaquePhase const* opaque_phase{};
+  TransparentPhase const* transparent_phase{};
+  UiPhase const* ui_phase{};
 
-  Assets<Mesh> const* mesh_assets = nullptr;
-  Assets<Texture> const* texture_assets = nullptr;
-  ShaderCache* shader_cache = nullptr;
-  SlotProviderRegistry const* slot_registry = nullptr;
-  EnvironmentRenderer const* environment_renderer = nullptr;
-  ExtractedView const* view = nullptr;
-  ExtractedLights const* lights = nullptr;
-  ClusterConfig const* cluster_config = nullptr;
-  ClusteredLightingState* cluster_state = nullptr;
-  Time const* time = nullptr;
+  Assets<Mesh> const* mesh_assets{};
+  Assets<Texture> const* texture_assets{};
+  ShaderCache* shader_cache{};
+  SlotProviderRegistry const* slot_registry{};
+  EnvironmentRenderer const* environment_renderer{};
+  ExtractedView const* view{};
+  ExtractedLights const* lights{};
+  ClusterConfig const* cluster_config{};
+  ClusteredLightingState* cluster_state{};
+  Time const* time{};
 };
 
 class RenderGraphBuilder;
@@ -68,7 +61,6 @@ class RenderGraphRuntime;
 class RenderPass {
 public:
   virtual ~RenderPass() = default;
-  [[nodiscard]] virtual auto name() const -> std::string = 0;
 
   virtual auto setup(RenderGraphBuilder& builder) -> void = 0;
   virtual auto execute(FrameResources& frame, RenderGraphRuntime& runtime) -> void = 0;
@@ -96,25 +88,28 @@ class RenderGraph {
 public:
   using T = Resource;
 
-  auto create_texture(
-    TextureDesc desc = {}, std::string debug_name = {}
-  ) -> RenderTextureHandle {
+  auto create_texture(TextureDesc desc = {}, std::string debug_name = {})
+    -> RenderTextureHandle {
     RenderTextureHandle handle{static_cast<u32>(resources_.size())};
-    resources_.push_back(ResourceInfo{
-      .debug_name = std::move(debug_name),
-      .desc = desc,
-      .backbuffer = false,
-    });
+    resources_.push_back(
+      ResourceInfo{
+        .debug_name = std::move(debug_name),
+        .desc = desc,
+        .backbuffer = false,
+      }
+    );
     return handle;
   }
 
   auto import_backbuffer(std::string debug_name = {}) -> RenderTextureHandle {
     RenderTextureHandle handle{static_cast<u32>(resources_.size())};
-    resources_.push_back(ResourceInfo{
-      .debug_name = std::move(debug_name),
-      .desc = {},
-      .backbuffer = true,
-    });
+    resources_.push_back(
+      ResourceInfo{
+        .debug_name = std::move(debug_name),
+        .desc = {},
+        .backbuffer = true,
+      }
+    );
     return handle;
   }
 
@@ -123,8 +118,7 @@ public:
     compiled_ = false;
   }
 
-  template <typename PassT, typename... Args>
-  auto add_pass(Args&&... args) -> void {
+  template <typename PassT, typename... Args> auto add_pass(Args&&... args) -> void {
     add_pass(std::make_unique<PassT>(std::forward<Args>(args)...));
   }
 
@@ -166,9 +160,7 @@ public:
     }
   }
 
-  [[nodiscard]] auto runtime() const -> RenderGraphRuntime const& {
-    return runtime_;
-  }
+  [[nodiscard]] auto runtime() const -> RenderGraphRuntime const& { return runtime_; }
 
   auto clear() -> void {
     passes_.clear();
@@ -321,8 +313,7 @@ private:
     };
 
     for (auto const& usage : usages) {
-      for (usize writer_index = 1; writer_index < usage.writers.size();
-           ++writer_index) {
+      for (usize writer_index = 1; writer_index < usage.writers.size(); ++writer_index) {
         add_edge(usage.writers[writer_index - 1], usage.writers[writer_index]);
       }
 

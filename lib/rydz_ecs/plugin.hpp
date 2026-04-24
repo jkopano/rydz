@@ -1,29 +1,25 @@
 #pragma once
+#include <concepts>
 #include <functional>
 
 namespace ecs {
 
 class App;
 
-class IPlugin {
-public:
-  IPlugin() = default;
-  IPlugin(IPlugin const&) = default;
-  IPlugin(IPlugin&&) = delete;
-  auto operator=(IPlugin const&) -> IPlugin& = default;
-  auto operator=(IPlugin&&) -> IPlugin& = delete;
-  virtual ~IPlugin() = default;
-  virtual auto build(App& app) -> void = 0;
+template <typename T>
+concept PluginTrait = std::derived_from<T, IPlugin> && requires(T t, App& app) {
+  { t.build(app) } -> std::same_as<void>;
 };
+
+class IPlugin {};
 
 class FunctionPlugin : public IPlugin {
   std::function<void(App&)> func_;
 
 public:
-  explicit FunctionPlugin(std::function<void(App&)> func)
-      : func_(std::move(func)) {}
+  explicit FunctionPlugin(std::function<void(App&)> func) : func_(std::move(func)) {}
 
-  auto build(App& app) -> void override { func_(app); }
+  auto build(App& app) -> void { func_(app); }
 };
 
 } // namespace ecs

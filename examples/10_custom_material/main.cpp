@@ -13,8 +13,7 @@ enum class ToonUniform {
   LightDir,
 };
 
-static inline auto map_uniform_binding(ToonUniform uniform)
-  -> std::string_view {
+static inline auto map_uniform_binding(ToonUniform uniform) -> std::string_view {
   switch (uniform) {
   case ToonUniform::RimStrength:
     return "u_rim_strength";
@@ -33,13 +32,10 @@ struct ToonMaterial : MaterialTrait<HasCamera> {
   static auto fragment_shader() -> ShaderRef { return "res/shaders/toon.frag"; }
 
   [[nodiscard]] auto render_method() const -> RenderMethod {
-    return base_color.a < 255 ? RenderMethod::Transparent
-                              : RenderMethod::Opaque;
+    return base_color.a < 255 ? RenderMethod::Transparent : RenderMethod::Opaque;
   }
 
-  [[nodiscard]] auto enable_shadows() const -> bool {
-    return base_color.a == 255;
-  }
+  [[nodiscard]] auto enable_shadows() const -> bool { return base_color.a == 255; }
 
   void bind(MaterialBuilder& builder) const {
     builder.color(MaterialMap::Albedo, base_color);
@@ -76,19 +72,14 @@ auto setup(
 
   auto sphere = meshes->add(Mesh::sphere(1.0f));
   auto floor = meshes->add(Mesh::plane(8.0f, 8.0f));
-  auto toon =
-    toon_materials->add(ToonMaterial{.base_color = ecs::Color::ORANGE});
+  auto toon = toon_materials->add(ToonMaterial{.base_color = ecs::Color::ORANGE});
   auto floor_mat =
     standard_materials->add(StandardMaterial::from_color({220, 220, 220, 255}));
 
   cmd.spawn(
-    Mesh3d{sphere},
-    MeshMaterial3d<ToonMaterial>{toon},
-    Transform::from_xyz(0, 1, 0)
+    Mesh3d{sphere}, MeshMaterial3d<ToonMaterial>{toon}, Transform::from_xyz(0, 1, 0)
   );
-  cmd.spawn(
-    Mesh3d{floor}, MeshMaterial3d<StandardMaterial>{floor_mat}, Transform{}
-  );
+  cmd.spawn(Mesh3d{floor}, MeshMaterial3d<StandardMaterial>{floor_mat}, Transform{});
 }
 } // namespace
 
@@ -96,17 +87,16 @@ auto main() -> int {
   App app;
   app
     .add_plugin(
-      rydz_platform::RayPlugin::install({
+      rydz_platform::RayPlugin{
         .window =
-          {.width = 800,
-           .height = 600,
-           .title = "10 - Custom Material",
-           .target_fps = 60},
-      })
+          {
+            .width = 800, .height = 600, .title = "10 - Custom Material", .target_fps = 60
+          },
+      }
     )
     .add_plugin(time_plugin)
-    .add_plugin(RenderPlugin::install)
-    .add_plugin([](App& app) -> void { RenderPlugin::register_material<ToonMaterial>(app); })
+    .add_plugin(RenderPlugin{})
+    .add_plugin(MaterialPlugin<ToonMaterial>{})
     .add_systems(Startup, setup)
     .add_systems(Update, change_toon)
     .run();

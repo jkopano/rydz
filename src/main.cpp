@@ -7,13 +7,14 @@ auto main() -> int {
   App app;
   app
     .add_plugin(
-      rydz_platform::RayPlugin::install({
-        .window = {1280, 720, "rydz_ecs 3D Demo", 800},
+      rydz_platform::RayPlugin{
+        .window =
+          {.width = 1280, .height = 720, .title = "rydz_ecs 3D Demo", .target_fps = 800},
         .trace_log_level = LOG_DEBUG,
-      })
+      }
     )
     .add_plugin(time_plugin)
-    .add_plugin(RenderPlugin::install)
+    .add_plugin(RenderPlugin{})
     .add_plugin(Input::install)
     .add_plugin(scene_plugin)
     .run();

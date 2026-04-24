@@ -59,9 +59,7 @@ auto error(fmt::runtime_format_string<Args...> fmt, Args&&... args) -> void {
 
 template <typename... Args>
 auto log(
-  spdlog::level::level_enum level,
-  fmt::runtime_format_string<Args...> fmt,
-  Args&&... args
+  spdlog::level::level_enum level, fmt::runtime_format_string<Args...> fmt, Args&&... args
 ) -> void {
   spdlog::log(level, fmt, std::forward<Args>(args)...);
 }
@@ -96,12 +94,10 @@ inline auto init_logging() -> void {
 
   spdlog::set_level(level);
 
-  spdlog::info(
-    "Logging level set to: {}", spdlog::level::to_string_view(level)
-  );
+  spdlog::info("Logging level set to: {}", spdlog::level::to_string_view(level));
 }
 } // namespace detail
 
 struct LogPlugin : public ecs::IPlugin {
-  auto build(ecs::App&) -> void override { detail::init_logging(); }
+  auto build(ecs::App&) -> void { detail::init_logging(); }
 };
