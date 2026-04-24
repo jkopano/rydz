@@ -19,7 +19,7 @@
 namespace ecs {
 
 inline constexpr i32 MAX_DIRECTIONAL_CASCADES = 4;
-inline constexpr i32 MAX_POINT_SHADOWS = 4;
+inline constexpr i32 MAX_POINT_SHADOWS = 12;
 inline constexpr i32 POINT_SHADOW_FACE_COUNT = 6;
 inline constexpr unsigned int SHADOW_UNIFORM_BINDING = 1;
 inline constexpr std::string_view SHADOW_UNIFORM_BLOCK_NAME = "ShadowUniforms";
@@ -148,12 +148,10 @@ inline auto compute_cascade_splits(
   f32 const ratio = clamped_far / clamped_near;
 
   for (i32 cascade_index = 0; cascade_index < cascade_count; ++cascade_index) {
-    f32 const p =
-      static_cast<f32>(cascade_index + 1) / static_cast<f32>(cascade_count);
+    f32 const p = static_cast<f32>(cascade_index + 1) / static_cast<f32>(cascade_count);
     f32 const log_split = clamped_near * std::pow(ratio, p);
     f32 const uniform_split = clamped_near + ((clamped_far - clamped_near) * p);
-    splits[cascade_index] =
-      (lambda * log_split) + ((1.0F - lambda) * uniform_split);
+    splits[cascade_index] = (lambda * log_split) + ((1.0F - lambda) * uniform_split);
   }
 
   return splits;
@@ -218,9 +216,7 @@ inline auto compute_frustum_slice_corners_world(
 }
 
 inline auto build_directional_shadow_view(
-  std::array<Vec3, 8> const& frustum_corners,
-  Vec3 light_direction,
-  u32 resolution
+  std::array<Vec3, 8> const& frustum_corners, Vec3 light_direction, u32 resolution
 ) -> ShadowView {
   light_direction = light_direction.normalized();
   if (light_direction.length_sq() <= 1e-8F) {
@@ -296,9 +292,8 @@ inline auto build_directional_shadow_view(
   return result;
 }
 
-inline auto build_point_shadow_views(
-  Vec3 light_position, f32 near_plane, f32 far_plane
-) -> std::array<ShadowView, POINT_SHADOW_FACE_COUNT> {
+inline auto build_point_shadow_views(Vec3 light_position, f32 near_plane, f32 far_plane)
+  -> std::array<ShadowView, POINT_SHADOW_FACE_COUNT> {
   std::array<ShadowView, POINT_SHADOW_FACE_COUNT> faces{};
   auto const targets = shadow_face_targets();
   auto const ups = shadow_face_ups();
@@ -310,7 +305,9 @@ inline auto build_point_shadow_views(
     face.orthographic = false;
     face.near_plane = near_plane;
     face.far_plane = far_plane;
-    face.view = Mat4::look_at_rh(light_position, light_position + targets[face_index], ups[face_index]);
+    face.view = Mat4::look_at_rh(
+      light_position, light_position + targets[face_index], ups[face_index]
+    );
     face.projection = projection;
     face.update_view_projection();
   }
@@ -335,7 +332,8 @@ struct ShadowUniformState {
   ShadowUniformData data{};
 
   auto update(ExtractedShadows const& shadows, ShadowSettings const& settings) -> void {
-    for (i32 cascade_index = 0; cascade_index < MAX_DIRECTIONAL_CASCADES; ++cascade_index) {
+    for (i32 cascade_index = 0; cascade_index < MAX_DIRECTIONAL_CASCADES;
+         ++cascade_index) {
       i32 const tile_x = cascade_index % 2;
       i32 const tile_y = cascade_index / 2;
       data.cascade_uv_rects[cascade_index] = Vec4{
@@ -406,8 +404,8 @@ public:
   DepthAtlas(DepthAtlas&& other) noexcept
       : framebuffer_(std::exchange(other.framebuffer_, 0)),
         depth_texture_(std::exchange(other.depth_texture_, {})),
-        width_(std::exchange(other.width_, 0)),
-        height_(std::exchange(other.height_, 0)) {}
+        width_(std::exchange(other.width_, 0)), height_(std::exchange(other.height_, 0)) {
+  }
 
   auto operator=(DepthAtlas&& other) noexcept -> DepthAtlas& {
     if (this == &other) {
@@ -531,7 +529,8 @@ public:
   DepthTarget2D(DepthTarget2D&& other) noexcept
       : framebuffer_(std::exchange(other.framebuffer_, 0)),
         depth_texture_(std::exchange(other.depth_texture_, {})),
-        width_(std::exchange(other.width_, 0)), height_(std::exchange(other.height_, 0)) {}
+        width_(std::exchange(other.width_, 0)), height_(std::exchange(other.height_, 0)) {
+  }
 
   auto operator=(DepthTarget2D&& other) noexcept -> DepthTarget2D& {
     if (this == &other) {
@@ -647,7 +646,8 @@ public:
   DepthCubemapTarget(DepthCubemapTarget&& other) noexcept
       : framebuffer_(std::exchange(other.framebuffer_, 0)),
         cubemap_id_(std::exchange(other.cubemap_id_, 0)),
-        width_(std::exchange(other.width_, 0)), height_(std::exchange(other.height_, 0)) {}
+        width_(std::exchange(other.width_, 0)), height_(std::exchange(other.height_, 0)) {
+  }
 
   auto operator=(DepthCubemapTarget&& other) noexcept -> DepthCubemapTarget& {
     if (this == &other) {
