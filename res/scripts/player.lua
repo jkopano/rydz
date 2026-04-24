@@ -1,4 +1,4 @@
-﻿-- Logika gracza — odpowiednik spawn_player + player_movement_system z C++
+-- Logika gracza — odpowiednik spawn_player + player_movement_system z C++
 -- Gracz jest kostką poruszającą się w rzucie izometrycznym
  
 print("[player.lua] Zaladowany!")
@@ -18,7 +18,7 @@ Rydz.on_startup(function(world)
  
     player_entity = world:spawn()
  
-    -- Dane skryptowe — odpowiednik komponentu Player{} z C++
+    -- Dane skryptowe
     world:set_lua_component(player_entity, {
         is_player  = true,
         speed      = PLAYER_SPEED,
@@ -27,8 +27,21 @@ Rydz.on_startup(function(world)
     })
  
     print("[player.lua] Gracz stworzony, entity ID: " .. tostring(player_entity))
-    print("[player.lua] UWAGA: Transform musi byc dodany przez C++ (insert_component)")
-    print("[player.lua] Na razie testujemy LuaComponent i Input")
+    
+    -- Dodanie reprezentacji 3D
+    print("[player.lua] Tworzenie grafiki...")
+    local tex_handle = world:load_texture("res/textures/stone.jpg")
+    local mat_handle = world:add_material_from_texture(tex_handle)
+    local mesh_handle = world:add_mesh_cube(1.0, 1.0, 1.0)
+    
+    world:add_mesh3d(player_entity, mesh_handle)
+    world:add_mesh_material3d(player_entity, mat_handle)
+    world:add_transform(player_entity, 0.0, 0.5, 0.0)
+
+    -- Przypisz znacznik kamery do gracza
+    world:insert_component(player_entity, Components.CameraTarget)
+
+    print("[player.lua] Komponenty dodane!")
 end)
  
 -- ── System ruchu ─────────────────────────────────────────────────────────────

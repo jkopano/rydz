@@ -1,4 +1,4 @@
-//Definiuje funkcjê rejestruj¹c¹ gobalne API silnika w VM Lua oraz strukturê LuaResource ktora jest zasobem ECS opakowuj¹cym VM Lua
+ï»¿//Definiuje funkcjÄ™ rejestrujÄ…cÄ… gobalne API silnika w VM Lua oraz strukturÄ™ LuaResource ktora jest zasobem ECS opakowujÄ…cym VM Lua
 
 #pragma once
 
@@ -13,6 +13,7 @@ extern "C" {
 #include "rydz_scripting/bindings/bind_transform.hpp"
 #include "rydz_scripting/bindings/bind_input.hpp"
 #include "rydz_scripting/bindings/bind_time.hpp"
+#include "rydz_scripting/bindings/bind_assets.hpp"
 #include "rydz_scripting/component_registry.hpp"
 #include "rydz_scripting/lua_system_registry.hpp"
 #include <string>
@@ -21,17 +22,18 @@ extern "C" {
 
 namespace scripting {
 
-	//Rejestracja metatabeli w globalnym rejestrze Lua, tworzenie globalnej tabeli Rydz oraz globalnej tablicy z polami etykiet harmonogramów
+	//Rejestracja metatabeli w globalnym rejestrze Lua, tworzenie globalnej tabeli Rydz oraz globalnej tablicy z polami etykiet harmonogramÃ³w
 	inline void register_rydz_api(lua_State* L) {
 		//Metatabele
 		register_world_metatable(L);
 		register_transform_metatable(L);
 
-		//Rejestracja komponentów
+		//Rejestracja komponentÃ³w
 		register_transform_in_registry();
 
 		register_input_table(L);
 		register_time_table(L);
+		register_asset_bindings(L);
 
 		//globalna tabela Components
 		lua_newtable(L);
@@ -50,7 +52,7 @@ namespace scripting {
 			lua_pushvalue(L, 2);
 			int func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
-			// Pobierz wskaŸnik do registry — ustawiany przez startup system w scene_new.hpp
+			// Pobierz wskaÅºnik do registry â€” ustawiany przez startup system w scene_new.hpp
 			lua_getfield(L, LUA_REGISTRYINDEX, "_sys_registry");
 			auto* reg = (scripting::LuaSystemRegistry*)lua_touserdata(L, -1);
 			lua_pop(L, 1);
@@ -65,7 +67,7 @@ namespace scripting {
 			});
 		lua_setfield(L, -2, "register_system");
 
-		// Rydz.on_startup(function) — skrót
+		// Rydz.on_startup(function) â€” skrÃ³t
 		lua_pushcfunction(L, [](lua_State* L) -> int {
 			luaL_checktype(L, 1, LUA_TFUNCTION);
 			lua_pushvalue(L, 1);
@@ -82,14 +84,14 @@ namespace scripting {
 
 		lua_setglobal(L, "Rydz");
 
-		//Sta³e schedule
+		//StaÅ‚e schedule
 		lua_newtable(L);
 		lua_pushstring(L, "Startup"); lua_setfield(L, -2, "Startup");
 		lua_pushstring(L, "Update");  lua_setfield(L, -2, "Update");
 		lua_setglobal(L, "Schedule");
 	}
 
-	//Zasób przechowuj¹cy maszynê wirtualn¹ Lua
+	//ZasÃ³b przechowujÄ…cy maszynÄ™ wirtualnÄ… Lua
 	struct LuaResource {
 
 		using T = ecs::Resource;

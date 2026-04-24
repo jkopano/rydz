@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "math.hpp"
 #include "rl.hpp"
 #include "rydz_camera/mod.hpp"
@@ -13,6 +13,7 @@
 #include "rydz_scripting/lua_resource.hpp"
 #include "rydz_scripting/lua_system_registry.hpp"
 #include "rydz_scripting/script_scheduler.hpp"
+#include "rydz_scripting/component_registry.hpp"
 #include <filesystem>
 #include <print>
 
@@ -23,6 +24,28 @@ using namespace math;
 
 inline bool is_gameplay_active(Res<engine::ConsoleState> console) {
     return !console->is_open;
+}
+
+// ── Components & Systems ──
+
+struct CameraTarget {
+    using Storage = ecs::SparseSetStorage<CameraTarget>;
+};
+
+inline void update_lua_camera_target_system(Query<Mut<IsometricCamera>> cam_query,
+                                            Query<Transform, CameraTarget> target_query) {
+    Vec3 target_pos = Vec3::sZero();
+    bool found = false;
+    for (auto [pt, _] : target_query.iter()) {
+        target_pos = pt->translation;
+        found = true;
+        break;
+    }
+    if (!found) return;
+
+    for (auto [cam] : cam_query.iter()) {
+        cam->target = target_pos;
+    }
 }
 
 // ── Startup: środowisko 3D (minimalne — oświetlenie + podłoga) ───────────────
@@ -68,6 +91,11 @@ inline void init_lua_scripting(ecs::World& world) {
         fprintf(stderr, "[Scripting] Brak LuaResource!\n");
         return;
     }
+
+    // Rejestracja znacznika kamery
+    scripting::ComponentRegistry::get().register_component<CameraTarget>("CameraTarget",
+        [](lua_State* L, ecs::World* w, ecs::Entity e) { return 0; }
+    );
 
     // 1. Zarejestruj całe API silnika (metatabelki, Components, Input, Time, Rydz, Schedule)
     scripting::register_rydz_api(lua->vm);
@@ -126,17 +154,19 @@ inline void scene_lua_plugin(App& app) {
     app.add_systems(Startup, spawn_ground);
     // Nie ma spawn_player — gracz tworzony jest przez Lua (Rydz.on_startup)
 
-    // Inicjalizacja Lua — MUSI być przed lua_startup_runner
-    app.add_systems(ecs::ScheduleLabel::Startup, init_lua_scripting);
-
-    // Uruchomienie systemów startowych zarejestrowanych przez skrypty
-    app.add_systems(ecs::ScheduleLabel::Startup, scripting::lua_startup_runner);
+    // Inicjalizacja Lua MUSI być wykonana przed lua_startup_runner!
+    app.add_systems(ecs::ScheduleLabel::Startup, 
+        group(init_lua_scripting, scripting::lua_startup_runner).chain());
 
     // ── Update ───────────────────────────────────────────────────────────────
 
     // Uruchomienie systemów update zarejestrowanych przez skrypty
     // (run_if nie jest tu potrzebne — skrypt sam może sprawdzić stan konsoli)
     app.add_systems(ecs::ScheduleLabel::Update, scripting::lua_update_runner);
+
+    // Aktualizacja kamery
+    app.add_systems(ecs::ScheduleLabel::Update, 
+        group(update_lua_camera_target_system).run_if(is_gameplay_active));
 
     // Konsola — renderowanie na końcu
     app.add_systems(RenderPassSet::Cleanup,

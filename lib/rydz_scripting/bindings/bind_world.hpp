@@ -183,14 +183,6 @@ namespace scripting {
 			});
 		lua_setfield(L, -2, "insert_component");
 
-		lua_setfield(L, -2, "__index");
-
-		lua_pushcfunction(L, [](lua_State* L) -> int {
-			lua_pushstring(L, "World");
-			return 1;
-		});
-		lua_setfield(L, -2, "__tostring");
-
 		// world:add_transform(entity, x, y, z)
 		lua_pushcfunction(L, [](lua_State* L) -> int {
 			ecs::World* world = check_world(L, 1);
@@ -202,6 +194,14 @@ namespace scripting {
 			return 0;
 			});
 		lua_setfield(L, -2, "add_transform");
+
+		lua_setfield(L, -2, "__index");
+
+		lua_pushcfunction(L, [](lua_State* L) -> int {
+			lua_pushstring(L, "World");
+			return 1;
+		});
+		lua_setfield(L, -2, "__tostring");
 
 		lua_pop(L, 1);
 	}
