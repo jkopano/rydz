@@ -104,6 +104,19 @@ struct ShadowAtlasTile {
   Vec4 uv_rect = {0.0F, 0.0F, 1.0F, 1.0F};
 };
 
+inline auto aabb_corners(AABox const& box) -> std::array<Vec3, 8> {
+  return {
+    Vec3{box.mMin.x, box.mMin.y, box.mMin.z},
+    Vec3{box.mMax.x, box.mMin.y, box.mMin.z},
+    Vec3{box.mMax.x, box.mMax.y, box.mMin.z},
+    Vec3{box.mMin.x, box.mMax.y, box.mMin.z},
+    Vec3{box.mMin.x, box.mMin.y, box.mMax.z},
+    Vec3{box.mMax.x, box.mMin.y, box.mMax.z},
+    Vec3{box.mMax.x, box.mMax.y, box.mMax.z},
+    Vec3{box.mMin.x, box.mMax.y, box.mMax.z},
+  };
+}
+
 inline auto shadow_face_targets() -> std::array<Vec3, POINT_SHADOW_FACE_COUNT> {
   return {
     Vec3{1.0F, 0.0F, 0.0F},
@@ -224,8 +237,15 @@ inline auto build_directional_shadow_view(
               ? Vec3{0.0F, 0.0F, 1.0F}
               : Vec3{0.0F, 1.0F, 0.0F};
 
+  f32 radius = 0.0F;
+  for (auto const& corner : frustum_corners) {
+    radius = std::max(radius, (corner - frustum_center).length());
+  }
+  radius = std::max(radius, 0.001F);
+  radius = std::ceil(radius * 16.0F) / 16.0F;
+
   ShadowView result{};
-  result.position = frustum_center - (light_direction * 100.0F);
+  result.position = frustum_center - (light_direction * (radius * 2.0F + 100.0F));
   result.orthographic = true;
   result.view = Mat4::look_at_rh(result.position, frustum_center, up);
 
@@ -247,23 +267,19 @@ inline auto build_directional_shadow_view(
     );
   }
 
-  Vec3 center = (min_bounds + max_bounds) * 0.5F;
-  f32 const width = std::max(max_bounds.x - min_bounds.x, 0.001F);
-  f32 const height = std::max(max_bounds.y - min_bounds.y, 0.001F);
-  f32 const texel_size_x = width / static_cast<f32>(std::max<u32>(resolution, 1U));
-  f32 const texel_size_y = height / static_cast<f32>(std::max<u32>(resolution, 1U));
+  Vec3 center = result.view * frustum_center;
+  f32 const diameter = radius * 2.0F;
+  f32 const texel_size = diameter / static_cast<f32>(std::max<u32>(resolution, 1U));
 
-  if (texel_size_x > 0.0F) {
-    center.x = std::floor(center.x / texel_size_x) * texel_size_x;
-  }
-  if (texel_size_y > 0.0F) {
-    center.y = std::floor(center.y / texel_size_y) * texel_size_y;
+  if (texel_size > 0.0F) {
+    center.x = std::floor(center.x / texel_size) * texel_size;
+    center.y = std::floor(center.y / texel_size) * texel_size;
   }
 
-  min_bounds.x = center.x - (width * 0.5F);
-  max_bounds.x = center.x + (width * 0.5F);
-  min_bounds.y = center.y - (height * 0.5F);
-  max_bounds.y = center.y + (height * 0.5F);
+  min_bounds.x = center.x - radius;
+  max_bounds.x = center.x + radius;
+  min_bounds.y = center.y - radius;
+  max_bounds.y = center.y + radius;
 
   f32 const depth_padding = std::max((max_bounds.z - min_bounds.z) * 0.25F, 25.0F);
   result.near_plane = -max_bounds.z - depth_padding;

@@ -78,6 +78,7 @@ struct ExtractedMeshes {
     usize material_index{};
     Mat4 world_transform{Mat4::IDENTITY};
     float distance_sq_to_camera{0.0F};
+    bool visible_in_view{true};
   };
 
   std::vector<MaterialItem> materials;

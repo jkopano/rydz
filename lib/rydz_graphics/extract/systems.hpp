@@ -101,6 +101,7 @@ struct Extract {
 
   static auto shadows(
     Res<ExtractedView> view,
+    Query<MeshBounds, GlobalTransform, Opt<ComputedVisibility>> shadow_caster_query,
     ResMut<ExtractedLights> lights,
     Res<ShadowSettings> settings,
     ResMut<ExtractedShadows> shadows
@@ -118,28 +119,40 @@ struct Extract {
     if (settings->directional_enabled && lights->has_directional &&
         lights->dir_light.casts_shadows) {
       shadows->has_directional = true;
-      shadows->cascade_count = settings->cascade_count_clamped();
+      shadows->cascade_count = 1;
 
-      auto const splits = compute_cascade_splits(
-        view->near_plane,
-        max_shadow_distance,
-        shadows->cascade_count,
-        std::clamp(settings->cascade_split_lambda, 0.0F, 1.0F)
-      );
+      AABox world_bounds;
+      bool has_world_bounds = false;
+      for (auto [bounds, global, computed_visibility] : shadow_caster_query.iter()) {
+        if (computed_visibility != nullptr && !computed_visibility->visible) {
+          continue;
+        }
 
-      f32 previous_split = view->near_plane;
-      for (i32 cascade_index = 0; cascade_index < shadows->cascade_count; ++cascade_index) {
-        f32 const split_distance = splits[cascade_index];
-        auto const corners = compute_frustum_slice_corners_world(
-          *view, previous_split, split_distance
+        AABox const transformed = transform_bbox(bounds->bbox, global->matrix);
+        if (!has_world_bounds) {
+          world_bounds = transformed;
+          has_world_bounds = true;
+          continue;
+        }
+
+        world_bounds.encapsulate(transformed.mMin);
+        world_bounds.encapsulate(transformed.mMax);
+      }
+
+      auto& cascade = shadows->directional_cascades[0];
+      if (has_world_bounds) {
+        cascade.shadow_view = build_directional_shadow_view(
+          aabb_corners(world_bounds), lights->dir_light.direction, settings->cascade_resolution
         );
-
-        auto& cascade = shadows->directional_cascades[cascade_index];
+        cascade.split_distance = max_shadow_distance;
+      } else {
+        auto const corners = compute_frustum_slice_corners_world(
+          *view, view->near_plane, max_shadow_distance
+        );
         cascade.shadow_view = build_directional_shadow_view(
           corners, lights->dir_light.direction, settings->cascade_resolution
         );
-        cascade.split_distance = split_distance;
-        previous_split = split_distance;
+        cascade.split_distance = max_shadow_distance;
       }
     }
 
@@ -193,17 +206,23 @@ struct Extract {
 
   template <RenderMaterialAsset M>
   static auto meshes(
-    Query<Mesh3d, GlobalTransform, MeshMaterial3d<M>, Opt<ViewVisibility>> query,
+    Query<
+      Mesh3d,
+      GlobalTransform,
+      MeshMaterial3d<M>,
+      Opt<ComputedVisibility>,
+      Opt<ViewVisibility>> query,
     Res<ExtractedView> view,
     Res<Assets<M>> material_assets,
     ResMut<MaterialCache> material_cache,
     ResMut<ExtractedMeshes> meshes
   ) -> void {
-    for (auto [mesh3d, global, material, visibility] : query.iter()) {
+    for (auto [mesh3d, global, material, computed_visibility, visibility] :
+         query.iter()) {
       if (!mesh3d->mesh.is_valid() || !material->material.is_valid()) {
         continue;
       }
-      if (visibility == nullptr || !visibility->visible) {
+      if (computed_visibility != nullptr && !computed_visibility->visible) {
         continue;
       }
 
@@ -240,6 +259,7 @@ struct Extract {
           .material_index = it->second,
           .world_transform = global->matrix,
           .distance_sq_to_camera = camera_offset.length_sq(),
+          .visible_in_view = visibility != nullptr ? visibility->visible : true,
         }
       );
     }
@@ -313,6 +333,9 @@ struct Queue {
     std::unordered_map<RenderBatchKey, usize> batch_index;
 
     for (auto const& item : meshes->items) {
+      if (!item.visible_in_view) {
+        continue;
+      }
       auto const& material = meshes->materials[item.material_index];
       if (material.transparent) {
         continue;
@@ -350,6 +373,9 @@ struct Queue {
     phase->clear();
 
     for (auto const& item : meshes->items) {
+      if (!item.visible_in_view) {
+        continue;
+      }
       auto const& material = meshes->materials[item.material_index];
       if (!material.transparent) {
         continue;

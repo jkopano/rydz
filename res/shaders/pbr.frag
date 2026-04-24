@@ -230,7 +230,11 @@ float computeDirectionalShadow(vec3 fragPos, vec3 normal, vec3 lightDir, vec3 vi
 }
 
 float computePointShadow(vec3 fragPos, GpuPointLight pointLight) {
-  int shadowSlot = int(pointLight.shadow_data.x + 0.5);
+  if (pointLight.shadow_data.x < 0.0) {
+    return 1.0;
+  }
+
+  int shadowSlot = int(pointLight.shadow_data.x);
   if (shadowSlot < 0 || shadowSlot >= u_shadow_flags.z) {
     return 1.0;
   }
