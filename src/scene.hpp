@@ -182,7 +182,7 @@ inline auto spawn_lights_on_input(
   cmd.spawn(
     DirectionalLight{
       .color = {255, 242, 230, 255},
-      .direction = Vec3(-0.3f, -1.0f, -0.5f),
+      .direction = Vec3(-0.0f, -1.0f, -0.0f),
       .intensity = 0.8f,
     }
   );
