@@ -93,6 +93,7 @@ struct Extract {
           .color = point_light->color,
           .intensity = point_light->intensity,
           .range = point_light->range,
+          .casts_shadows = point_light->casts_shadows,
           .shadow_slot = -1,
         }
       );
@@ -149,7 +150,7 @@ struct Extract {
     candidates.reserve(lights->point_lights.size());
     for (usize light_index = 0; light_index < lights->point_lights.size(); ++light_index) {
       auto const& point_light = lights->point_lights[light_index];
-      if (point_light.range <= 0.001F) {
+      if (!point_light.casts_shadows || point_light.range <= 0.001F) {
         continue;
       }
       candidates.push_back(light_index);

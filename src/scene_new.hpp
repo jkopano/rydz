@@ -106,7 +106,12 @@ inline void setup_lighting(Cmd cmd, NonSendMarker,
   });
 
   cmd.spawn(
-      PointLight{.color = {0, 255, 0, 255}, .intensity = 90.f, .range = 600.0f},
+      PointLight{
+          .color = {0, 255, 0, 255},
+          .intensity = 90.f,
+          .range = 600.0f,
+          .casts_shadows = true,
+      },
       Transform::from_xyz(0.0f, 3.0f, 0.0f)
 
       // Mesh3d{meshes->add(mesh::cube(0.5f, 0.5f,

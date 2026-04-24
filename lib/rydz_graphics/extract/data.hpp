@@ -48,6 +48,7 @@ struct ExtractedLights {
     Color color{Color::WHITE};
     float intensity{0.0F};
     float range{0.0F};
+    bool casts_shadows{false};
     i32 shadow_slot{-1};
   };
 

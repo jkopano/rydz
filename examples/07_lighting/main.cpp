@@ -61,7 +61,12 @@ void setup(
       cmd.spawn(
         Mesh3d{h},
         MeshMaterial3d{mat},
-        PointLight{.color = color, .intensity = intensity, .range = 30.0f},
+        PointLight{
+          .color = color,
+          .intensity = intensity,
+          .range = 30.0f,
+          .casts_shadows = true,
+        },
         Transform::from_xyz(0, y, 0),
         OrbitLight{.radius = radius, .speed = speed, .phase = phase}
       );

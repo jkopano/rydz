@@ -193,7 +193,12 @@ inline auto spawn_lights_on_input(
     Color color = Color::from_hsv(static_cast<f32>(i * 12), 0.8f, 1.0f);
 
     cmd.spawn(
-      PointLight{.color = color, .intensity = 500.0f, .range = 40.0f},
+      PointLight{
+        .color = color,
+        .intensity = 500.0f,
+        .range = 40.0f,
+        .casts_shadows = true,
+      },
       Transform::from_xyz(0, 10, 0),
       MovingLight{
         .base_pos = Vec3(0, 20.0f + ((i % 5) * 5.0f), 0),
