@@ -67,6 +67,11 @@ private:
       static_cast<int>(config.height),
       config.title.c_str()
     );
+
+    if (config.fullscreen) {
+      rl::ToggleFullscreen();
+    }
+
     rl::SetTargetFPS(static_cast<int>(config.target_fps));
     if (!rl::IsWindowReady()) {
       std::println(stderr, "InitWindow failed; aborting run loop.");

@@ -12,8 +12,7 @@ auto main() -> int {
   app
     .add_plugin(
       rydz_platform::RayPlugin{
-        .window =
-          {.width = 1280, .height = 720, .title = "rydz_ecs 3D Demo", .target_fps = 800},
+        .window = {.fullscreen = true, .title = "rydz_ecs 3D Demo", .target_fps = 800},
         .trace_log_level = LOG_DEBUG,
       }
     )

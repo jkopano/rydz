@@ -27,6 +27,7 @@ struct Window {
 
   u32 width{};
   u32 height{};
+  bool fullscreen{false};
   std::string title = "ECS App";
   u32 target_fps{60};
 
