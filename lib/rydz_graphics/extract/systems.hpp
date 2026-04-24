@@ -101,10 +101,10 @@ struct Extract {
 
   static auto shadows(
     Res<ExtractedView> view,
-    Query<MeshBounds, GlobalTransform, Opt<ComputedVisibility>> shadow_caster_query,
     ResMut<ExtractedLights> lights,
     Res<ShadowSettings> settings,
-    ResMut<ExtractedShadows> shadows
+    ResMut<ExtractedShadows> shadows,
+    Query<MeshBounds, GlobalTransform, Opt<ComputedVisibility>> shadow_caster_query
   ) -> void {
     shadows->clear();
 
@@ -112,47 +112,32 @@ struct Extract {
       return;
     }
 
-    f32 const max_shadow_distance = std::min(
-      view->far_plane, std::max(settings->cascade_max_distance, view->near_plane + 0.001F)
-    );
-
     if (settings->directional_enabled && lights->has_directional &&
         lights->dir_light.casts_shadows) {
-      shadows->has_directional = true;
-      shadows->cascade_count = 1;
+      AABox caster_bounds{};
+      bool has_caster_bounds = false;
 
-      AABox world_bounds;
-      bool has_world_bounds = false;
       for (auto [bounds, global, computed_visibility] : shadow_caster_query.iter()) {
-        if (computed_visibility != nullptr && !computed_visibility->visible) {
+        if ((computed_visibility != nullptr) && !computed_visibility->visible) {
           continue;
         }
 
-        AABox const transformed = transform_bbox(bounds->bbox, global->matrix);
-        if (!has_world_bounds) {
-          world_bounds = transformed;
-          has_world_bounds = true;
-          continue;
+        AABox const world_bounds = transform_bbox(bounds->bbox, global->matrix);
+        for (Vec3 const& corner : aabb_corners(world_bounds)) {
+          caster_bounds.encapsulate(corner);
         }
-
-        world_bounds.encapsulate(transformed.mMin);
-        world_bounds.encapsulate(transformed.mMax);
+        has_caster_bounds = true;
       }
 
-      auto& cascade = shadows->directional_cascades[0];
-      if (has_world_bounds) {
+      if (has_caster_bounds) {
+        shadows->has_directional = true;
+        shadows->cascade_count = 1;
+
+        auto& cascade = shadows->directional_cascades[0];
         cascade.shadow_view = build_directional_shadow_view(
-          aabb_corners(world_bounds), lights->dir_light.direction, settings->cascade_resolution
+          aabb_corners(caster_bounds), lights->dir_light.direction, settings->cascade_resolution
         );
-        cascade.split_distance = max_shadow_distance;
-      } else {
-        auto const corners = compute_frustum_slice_corners_world(
-          *view, view->near_plane, max_shadow_distance
-        );
-        cascade.shadow_view = build_directional_shadow_view(
-          corners, lights->dir_light.direction, settings->cascade_resolution
-        );
-        cascade.split_distance = max_shadow_distance;
+        cascade.split_distance = view->far_plane;
       }
     }
 
