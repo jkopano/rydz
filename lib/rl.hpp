@@ -22,6 +22,7 @@ using Rectangle = ::rlRectangle;
 using ::RenderTexture;
 using ::RenderTexture2D;
 using ::Shader;
+using ::AudioStream;
 using ::Sound;
 using ::Texture2D;
 using ::Vector2;
@@ -49,6 +50,8 @@ using ::SetTraceLogLevel;
 using ::TraceLog;
 using ::UnloadFileText;
 using ::WindowShouldClose;
+
+using ::ColorFromHSV;
 
 // ---- Input ----
 using ::DisableCursor;
@@ -94,9 +97,7 @@ using ::ImageFormat;
 using ::ImageText;
 using ::ImageTextEx;
 using ::rlLoadImage;
-inline auto LoadImage(char const* fileName) -> Image {
-  return ::rlLoadImage(fileName);
-}
+inline auto LoadImage(char const* fileName) -> Image { return ::rlLoadImage(fileName); }
 using ::LoadRenderTexture;
 using ::LoadTexture;
 using ::LoadTextureFromImage;
@@ -107,7 +108,19 @@ using ::UnloadRenderTexture;
 using ::UnloadTexture;
 
 // ---- Audio ----
+using ::CloseAudioDevice;
+using ::InitAudioDevice;
+using ::IsAudioDeviceReady;
+using ::IsSoundPlaying;
 using ::LoadSound;
+using ::PauseSound;
+using ::PlaySound;
+using ::ResumeSound;
+using ::SetSoundPan;
+using ::SetSoundPitch;
+using ::SetSoundVolume;
+using ::StopSound;
+using ::UnloadSound;
 
 // ---- GLTF ----
 using ::LoadGltfScene;

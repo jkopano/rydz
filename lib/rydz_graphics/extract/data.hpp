@@ -32,7 +32,12 @@ struct ExtractedView {
   float near_plane{0.1F};
   float far_plane{1000.0F};
 
-  auto clear() -> void { *this = ExtractedView{}; }
+  auto clear() -> void {
+    active_environment = nullptr;
+    postprocess = {};
+    active = false;
+    has_postprocess = false;
+  }
 };
 
 struct ExtractedLights {
@@ -49,7 +54,11 @@ struct ExtractedLights {
   DirectionalLight dir_light{};
   bool has_directional{};
 
-  auto clear() -> void { *this = ExtractedLights{}; }
+  auto clear() -> void {
+    point_lights.clear();
+    dir_light = {};
+    has_directional = false;
+  }
 };
 
 struct ExtractedMeshes {
@@ -72,7 +81,13 @@ struct ExtractedMeshes {
 
   std::vector<MaterialItem> materials;
   std::vector<Item> items;
-  auto clear() -> void { *this = ExtractedMeshes{}; }
+  std::unordered_map<u32, usize> material_lookup;
+
+  auto clear() -> void {
+    materials.clear();
+    items.clear();
+    material_lookup.clear();
+  }
 };
 
 struct ExtractedUi {
@@ -86,7 +101,7 @@ struct ExtractedUi {
   };
 
   std::vector<Item> items{};
-  auto clear() -> void { *this = ExtractedUi{}; }
+  auto clear() -> void { items.clear(); }
 };
 
 } // namespace ecs

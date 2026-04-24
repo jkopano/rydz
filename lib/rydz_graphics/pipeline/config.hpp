@@ -67,8 +67,8 @@ inline auto RenderState::apply(ecs::RenderConfig const& config) -> void {
   bool const cull_changed = cull_ != config.cull;
   bool const polygon_changed = polygon_ != config.polygon;
 
-  if (!color_mask_changed && !depth_changed && !blend_changed &&
-      !cull_changed && !polygon_changed) {
+  if (!color_mask_changed && !depth_changed && !blend_changed && !cull_changed &&
+      !polygon_changed) {
     return;
   }
 

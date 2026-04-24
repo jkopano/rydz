@@ -23,6 +23,10 @@ struct Color {
     return {r / 255.f, g / 255.f, b / 255.f};
   }
 
+  static auto from_hsv(float hue, float saturation, float value) -> Color {
+    return rl::ColorFromHSV(hue, saturation, value);
+  }
+
   auto operator==(Color const&) const -> bool = default;
 
   static Color const LIGHTGRAY;

@@ -23,21 +23,19 @@ uniform sampler2D u_occlusion_texture;
 uniform sampler2D u_emissive_texture;
 
 uniform vec4 u_color;
-uniform vec3 u_camera_pos;
-uniform mat4 u_mat_view;
-
-uniform vec3 u_dir_light_direction;
-uniform float u_dir_light_intensity;
-uniform vec3 u_dir_light_color;
-uniform int u_has_directional;
-
-uniform ivec4 u_cluster_dimensions;
-uniform vec2 u_cluster_screen_size;
-uniform vec2 u_cluster_near_far;
-uniform int u_cluster_max_lights;
-uniform int u_is_orthographic;
 uniform float u_alpha_cutoff;
 uniform int u_render_method;
+
+layout(std140, binding = 0) uniform ViewUniforms {
+  vec4 u_camera_pos;
+  mat4 u_mat_view;
+  mat4 u_mat_projection;
+  vec4 u_dir_light_direction;
+  vec4 u_dir_light_color_intensity;
+  ivec4 u_cluster_dimensions;
+  vec4 u_cluster_screen_size_near_far;
+  ivec4 u_view_flags;
+};
 
 const int RENDER_METHOD_OPAQUE = 0;
 const int RENDER_METHOD_TRANSPARENT = 1;
@@ -147,11 +145,11 @@ vec3 sampleNormal(vec3 N, vec3 T, vec3 B, vec2 uv) {
 }
 
 int computeDepthSlice(float depth, ivec3 dims) {
-  float nearPlane = max(u_cluster_near_far.x, 0.001);
-  float farPlane = max(u_cluster_near_far.y, nearPlane + 0.001);
+  float nearPlane = max(u_cluster_screen_size_near_far.z, 0.001);
+  float farPlane = max(u_cluster_screen_size_near_far.w, nearPlane + 0.001);
   float normalizedDepth = 0.0;
 
-  if (u_is_orthographic > 0) {
+  if (u_view_flags.z > 0) {
     normalizedDepth = (depth - nearPlane) / max(farPlane - nearPlane, 0.001);
   } else {
     normalizedDepth = log(depth / nearPlane) / log(farPlane / nearPlane);
@@ -163,20 +161,21 @@ int computeDepthSlice(float depth, ivec3 dims) {
 
 int computeClusterIndex(vec3 viewPos) {
   ivec3 dims = max(u_cluster_dimensions.xyz, ivec3(1));
-  vec2 tileSize = u_cluster_screen_size / vec2(float(dims.x), float(dims.y));
+  vec2 tileSize =
+      u_cluster_screen_size_near_far.xy / vec2(float(dims.x), float(dims.y));
   tileSize = max(tileSize, vec2(1.0));
 
   ivec2 tile = ivec2(gl_FragCoord.xy / tileSize);
   tile = clamp(tile, ivec2(0), dims.xy - ivec2(1));
 
-  float depth = max(-viewPos.z, max(u_cluster_near_far.x, 0.001));
+  float depth = max(-viewPos.z, max(u_cluster_screen_size_near_far.z, 0.001));
   int slice = computeDepthSlice(depth, dims);
   return (slice * dims.y + tile.y) * dims.x + tile.x;
 }
 
 void main() {
   vec3 normal = normalize(Normal);
-  vec3 viewDir = normalize(u_camera_pos - FragPos);
+  vec3 viewDir = normalize(u_camera_pos.xyz - FragPos);
 
   vec4 baseColor = colDiffuse;
   vec4 diffTex = texture(texture0, TexCoord);
@@ -209,9 +208,10 @@ void main() {
 
   vec3 lighting = vec3(0.0);
 
-  if (u_has_directional > 0 && u_dir_light_intensity > 0.0) {
-    vec3 lightDir = normalize(-u_dir_light_direction);
-    vec3 radiance = u_dir_light_color * u_dir_light_intensity;
+  if (u_view_flags.x > 0 && u_dir_light_color_intensity.w > 0.0) {
+    vec3 lightDir = normalize(-u_dir_light_direction.xyz);
+    vec3 radiance =
+        u_dir_light_color_intensity.xyz * u_dir_light_color_intensity.w;
     lighting += evaluatePBR(
         normal, viewDir, lightDir, radiance, albedo, metallic, roughness);
   }
@@ -219,7 +219,7 @@ void main() {
   vec3 viewPos = (u_mat_view * vec4(FragPos, 1.0)).xyz;
   int clusterIndex = computeClusterIndex(viewPos);
   ClusterRecord cluster = u_clusters[clusterIndex];
-  uint pointLightCount = min(cluster.meta.y, uint(max(u_cluster_max_lights, 0)));
+  uint pointLightCount = min(cluster.meta.y, uint(max(u_view_flags.y, 0)));
 
   for (uint i = 0u; i < pointLightCount; ++i) {
     uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];

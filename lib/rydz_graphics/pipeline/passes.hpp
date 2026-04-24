@@ -68,8 +68,13 @@ public:
     if (mesh == nullptr) {
       return;
     }
+    if (cmd.material_index >= ctx_.extracted_meshes.materials.size()) {
+      return;
+    }
+    auto const& material_item = ctx_.extracted_meshes.materials[cmd.material_index];
+    auto const& material = material_item.material;
 
-    pass_config_.cull = cmd.material.cull_state();
+    pass_config_.cull = material.cull_state();
     ctx_.render_state.apply(pass_config_);
 
     ShaderProgram& shader = resolve_shader(ctx_.marker, ctx_.shader_cache, shader_spec);
@@ -77,19 +82,17 @@ public:
 
     if (shader_changed) {
       last_shader_ = &shader;
-      apply_slot_uniforms_per_view(material_ctx_, cmd.material, shader);
+      apply_slot_uniforms_per_view(material_ctx_, material, shader);
     }
 
     bool const material_changed =
-      shader_changed || last_material_ == nullptr || (*last_material_ != cmd.material);
+      shader_changed || last_material_ == nullptr || (*last_material_ != material);
     if (material_changed) {
-      last_material_ = &cmd.material;
+      last_material_ = &material;
 
-      prepare_material(material_ctx_, cmd.material, shader_spec, last_prepared_);
-      cmd.material.apply(shader);
-      apply_slot_uniforms_per_material(
-        material_ctx_, cmd.material, last_prepared_, shader
-      );
+      prepare_material(material_ctx_, material, shader_spec, last_prepared_);
+      material.apply(shader);
+      apply_slot_uniforms_per_material(material_ctx_, material, last_prepared_, shader);
     }
 
     mesh->draw_instanced(
@@ -99,7 +102,12 @@ public:
     );
   }
 
-  auto draw(RenderCommand const& cmd) -> void { draw(cmd, cmd.material.shader); }
+  auto draw(RenderCommand const& cmd) -> void {
+    if (cmd.material_index >= ctx_.extracted_meshes.materials.size()) {
+      return;
+    }
+    draw(cmd, ctx_.extracted_meshes.materials[cmd.material_index].material.shader);
+  }
 
 private:
   PassContext& ctx_;
@@ -196,6 +204,7 @@ inline auto MeshPass<OpaqueTag>::execute(PassContext& ctx, RenderGraphRuntime&) 
     return;
   }
   ctx.render_state.begin_view(ctx.render_state.view());
+  ctx.view_uniforms.bind();
   PassRenderer renderer{ctx, MeshPass<OpaqueTag>::render_config()};
   for (auto const& cmd : ctx.opaque_phase.commands) {
     renderer.draw(cmd);
@@ -225,6 +234,7 @@ inline auto MeshPass<TransparentTag>::execute(PassContext& ctx, RenderGraphRunti
     return;
   }
   ctx.render_state.begin_view(ctx.render_state.view());
+  ctx.view_uniforms.bind();
   PassRenderer renderer{ctx, MeshPass<TransparentTag>::render_config()};
   for (auto const& cmd : ctx.transparent_phase.commands) {
     renderer.draw(cmd);
@@ -255,6 +265,7 @@ public:
 
     ctx.render_state.begin_view(ctx.render_state.view());
 
+    ctx.view_uniforms.bind();
     PassRenderer renderer{ctx};
     for (auto const& cmd : ctx.opaque_phase.commands) {
       renderer.draw(cmd, depth_prepass_shader_spec());
@@ -365,9 +376,11 @@ struct FramePass {
     Res<OpaquePhase> opaque_phase,
     Res<TransparentPhase> transparent_phase,
     Res<UiPhase> ui_phase,
+    Res<ExtractedMeshes> extracted_meshes,
     Res<Assets<Mesh>> mesh_assets,
     Res<Assets<Texture>> texture_assets,
     ResMut<ShaderCache> shader_cache,
+    ResMut<ViewUniformState> view_uniforms,
     Res<SlotProviderRegistry> slot_registry,
     Res<ExtractedView> view,
     Res<ExtractedLights> lights,
@@ -376,6 +389,8 @@ struct FramePass {
     Res<Time> time,
     NonSendMarker marker
   ) -> void {
+    view_uniforms->update(*view, *lights, *cluster_config);
+
     PassContext ctx{
       .marker = marker,
       .render_state = *render_state,
@@ -386,9 +401,11 @@ struct FramePass {
       .view = *view,
       .lights = *lights,
       .time = *time,
+      .extracted_meshes = *extracted_meshes,
       .mesh_assets = *mesh_assets,
       .texture_assets = *texture_assets,
       .shader_cache = *shader_cache,
+      .view_uniforms = *view_uniforms,
       .slot_registry = *slot_registry,
       .opaque_phase = *opaque_phase,
       .transparent_phase = *transparent_phase,

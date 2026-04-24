@@ -1,18 +1,111 @@
 #pragma once
 
 #include "rydz_graphics/extract/data.hpp"
+#include "rydz_graphics/gl/buffers.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/gl/state.hpp"
 #include "rydz_graphics/lighting/clustered_lighting.hpp"
 #include "rydz_graphics/material/slot_provider.hpp"
+#include "rydz_graphics/pipeline/batches.hpp"
 #include "rydz_graphics/pipeline/graph.hpp"
 #include "rydz_graphics/pipeline/pass_context.hpp"
-#include "rydz_graphics/pipeline/batches.hpp"
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
 
 namespace ecs {
+
+inline constexpr unsigned int VIEW_UNIFORM_BINDING = 0;
+inline constexpr std::string_view VIEW_UNIFORM_BLOCK_NAME = "ViewUniforms";
+
+struct alignas(16) ViewUniformData {
+  Vec4 camera_position = Vec4::ZERO;
+  Mat4 view = Mat4::IDENTITY;
+  Mat4 projection = Mat4::IDENTITY;
+  Vec4 directional_direction = Vec4::ZERO;
+  Vec4 directional_color_intensity = Vec4::ZERO;
+  std::array<int, 4> cluster_dimensions = {0, 0, 0, 0};
+  Vec4 cluster_screen_size_near_far = Vec4::ZERO;
+  std::array<int, 4> view_flags = {0, 0, 0, 0};
+};
+
+static_assert(sizeof(ViewUniformData) % 16 == 0);
+
+struct ViewUniformState {
+  using T = Resource;
+
+  gl::UBO buffer{};
+  ViewUniformData data{};
+
+  auto update(
+    ExtractedView const& view,
+    ExtractedLights const& lights,
+    ClusterConfig const& cluster_config
+  ) -> void {
+    data.camera_position = Vec4{
+      view.camera_view.position.x,
+      view.camera_view.position.y,
+      view.camera_view.position.z,
+      0.0F,
+    };
+    data.view = view.camera_view.view;
+    data.projection = view.camera_view.proj;
+
+    Vec3 const light_direction = lights.dir_light.direction.normalized();
+    data.directional_direction = Vec4{
+      light_direction.x,
+      light_direction.y,
+      light_direction.z,
+      0.0F,
+    };
+    data.directional_color_intensity = Vec4{
+      lights.dir_light.color.r / 255.0F,
+      lights.dir_light.color.g / 255.0F,
+      lights.dir_light.color.b / 255.0F,
+      lights.dir_light.intensity,
+    };
+    data.cluster_dimensions = {
+      cluster_config.tile_count_x_clamped(),
+      cluster_config.tile_count_y_clamped(),
+      cluster_config.slice_count_z_clamped(),
+      0,
+    };
+    data.cluster_screen_size_near_far = Vec4{
+      std::max(view.viewport.width, 1.0F),
+      std::max(view.viewport.height, 1.0F),
+      std::max(view.near_plane, 0.001F),
+      std::max(view.far_plane, view.near_plane + 0.001F),
+    };
+    data.view_flags = {
+      lights.has_directional ? 1 : 0,
+      static_cast<int>(cluster_config.max_lights_per_cluster_clamped()),
+      view.orthographic ? 1 : 0,
+      0,
+    };
+
+    if (!buffer.ready()) {
+      buffer = gl::UBO(
+        static_cast<unsigned int>(sizeof(ViewUniformData)), &data, RL_DYNAMIC_DRAW
+      );
+    } else {
+      buffer.update(&data, static_cast<unsigned int>(sizeof(ViewUniformData)), 0);
+    }
+  }
+
+  auto bind() const -> void {
+    if (buffer.ready()) {
+      buffer.bind(VIEW_UNIFORM_BINDING);
+    }
+  }
+
+  auto bind_shader(ShaderProgram& shader) const -> bool {
+    if (!buffer.ready()) {
+      return false;
+    }
+    bind();
+    return shader.bind_uniform_block(VIEW_UNIFORM_BLOCK_NAME, VIEW_UNIFORM_BINDING);
+  }
+};
 
 struct PbrFallbackTextures {
   gl::Texture metallic_black;
@@ -27,17 +120,13 @@ struct ShaderCache {
   std::unordered_map<ShaderSpec, ShaderProgram> shaders;
 };
 
-inline auto MaterialContext::frame() const -> PassContext const& {
-  return *frame_data;
-}
+inline auto MaterialContext::frame() const -> PassContext const& { return *frame_data; }
 
 inline auto MaterialContext::textures() const -> Assets<Texture> const& {
   return frame().texture_assets;
 }
 
-inline auto MaterialContext::view() const -> ExtractedView const& {
-  return frame().view;
-}
+inline auto MaterialContext::view() const -> ExtractedView const& { return frame().view; }
 
 inline auto MaterialContext::lights() const -> ExtractedLights const& {
   return frame().lights;
@@ -47,13 +136,14 @@ inline auto MaterialContext::cluster_config() const -> ClusterConfig const& {
   return frame().cluster_config;
 }
 
-inline auto MaterialContext::clustered_lighting() const
-  -> ClusteredLightingState const& {
+inline auto MaterialContext::clustered_lighting() const -> ClusteredLightingState const& {
   return frame().cluster_state;
 }
 
-inline auto MaterialContext::time() const -> Time const& {
-  return frame().time;
+inline auto MaterialContext::time() const -> Time const& { return frame().time; }
+
+inline auto MaterialContext::view_uniforms() const -> ViewUniformState const& {
+  return frame().view_uniforms;
 }
 
 inline auto MaterialContext::slots() const -> SlotProviderRegistry const& {
@@ -246,12 +336,9 @@ inline auto apply_slot_uniforms_per_material(
 
 inline auto HasCamera::slot_provider() -> SlotProvider {
   SlotProvider provider;
-  provider.apply_per_view =
-    [](MaterialContext const& ctx, ShaderProgram& shader) -> void {
-    shader.set(CameraUniform::Position, ctx.view().camera_view.position);
-    shader.set(CameraUniform::ViewMatrix, ctx.view().camera_view.view);
-    shader.set(CameraUniform::ProjectionMatrix, ctx.view().camera_view.proj);
-  };
+  provider.apply_per_view = [](
+                              MaterialContext const& ctx, ShaderProgram& shader
+                            ) -> void { ctx.view_uniforms().bind_shader(shader); };
   return provider;
 }
 
@@ -268,42 +355,8 @@ inline auto HasPBR::slot_provider() -> SlotProvider {
   SlotProvider provider;
   provider.apply_per_view =
     [](MaterialContext const& ctx, ShaderProgram& shader) -> void {
-    auto const& view = ctx.view();
-    auto const& lights = ctx.lights();
-    auto const& cluster_config = ctx.cluster_config();
-
-    int has_directional = lights.has_directional ? 1 : 0;
-    Vec3 dir_color = lights.dir_light.color;
-    Vec3 dir_dir = lights.dir_light.direction.normalized();
-    float dir_intensity = lights.dir_light.intensity;
-    Vec2 cluster_screen_size = {
-      std::max(view.viewport.width, 1.0F),
-      std::max(view.viewport.height, 1.0F),
-    };
-    Vec2 cluster_near_far = {
-      std::max(view.near_plane, 0.001f),
-      std::max(view.far_plane, view.near_plane + 0.001f),
-    };
-    std::array<int, 4> cluster_dimensions = {
-      cluster_config.tile_count_x_clamped(),
-      cluster_config.tile_count_y_clamped(),
-      cluster_config.slice_count_z_clamped(),
-      0
-    };
-    int cluster_max_lights =
-      static_cast<int>(cluster_config.max_lights_per_cluster_clamped());
-    int is_orthographic = view.orthographic ? 1 : 0;
-
+    (void) shader;
     ctx.clustered_lighting().bind();
-    shader.set(PbrLightingUniform::HasDirectional, has_directional);
-    shader.set(PbrLightingUniform::DirectionalDirection, dir_dir);
-    shader.set(PbrLightingUniform::DirectionalIntensity, dir_intensity);
-    shader.set(PbrLightingUniform::DirectionalColor, dir_color);
-    shader.set(PbrLightingUniform::ClusterDimensions, cluster_dimensions);
-    shader.set(PbrLightingUniform::ClusterScreenSize, cluster_screen_size);
-    shader.set(PbrLightingUniform::ClusterNearFar, cluster_near_far);
-    shader.set(PbrLightingUniform::ClusterMaxLights, cluster_max_lights);
-    shader.set(PbrLightingUniform::IsOrthographic, is_orthographic);
   };
   return provider;
 }

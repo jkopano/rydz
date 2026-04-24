@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <concepts>
+#include <external/glad.h>
 #include <functional>
 #include <span>
 #include <string>
@@ -134,6 +135,8 @@ public:
   ShaderProgram(ShaderProgram&& other) noexcept
       : shader_(other.shader_), uniform_locations_(std::move(other.uniform_locations_)),
         attribute_locations_(std::move(other.attribute_locations_)),
+        uniform_block_indices_(std::move(other.uniform_block_indices_)),
+        uniform_block_bindings_(std::move(other.uniform_block_bindings_)),
         owns_resource_(other.owns_resource_) {
     other.shader_ = Shader{};
     other.owns_resource_ = false;
@@ -148,6 +151,8 @@ public:
     shader_ = other.shader_;
     uniform_locations_ = std::move(other.uniform_locations_);
     attribute_locations_ = std::move(other.attribute_locations_);
+    uniform_block_indices_ = std::move(other.uniform_block_indices_);
+    uniform_block_bindings_ = std::move(other.uniform_block_bindings_);
     owns_resource_ = other.owns_resource_;
     other.shader_ = Shader{};
     other.owns_resource_ = false;
@@ -197,6 +202,34 @@ public:
     int const location = rl::GetShaderLocationAttrib(shader_, name);
     attribute_locations_.emplace(name, location);
     return location;
+  }
+
+  auto uniform_block_index(std::string_view const name) -> unsigned int {
+    std::string owned_name{name};
+    auto iter = uniform_block_indices_.find(owned_name);
+    if (iter != uniform_block_indices_.end()) {
+      return iter->second;
+    }
+
+    unsigned int const index = glGetUniformBlockIndex(shader_.id, owned_name.c_str());
+    uniform_block_indices_.emplace(std::move(owned_name), index);
+    return index;
+  }
+
+  auto bind_uniform_block(std::string_view const name, unsigned int binding) -> bool {
+    unsigned int const index = uniform_block_index(name);
+    if (index == GL_INVALID_INDEX) {
+      return false;
+    }
+
+    auto iter = uniform_block_bindings_.find(index);
+    if (iter != uniform_block_bindings_.end() && iter->second == binding) {
+      return true;
+    }
+
+    glUniformBlockBinding(shader_.id, index, binding);
+    uniform_block_bindings_.insert_or_assign(index, binding);
+    return true;
   }
 
   auto set(std::string_view const name, float value) -> void {
@@ -399,6 +432,8 @@ private:
   Shader shader_;
   std::unordered_map<std::string, int> uniform_locations_;
   std::unordered_map<std::string, int> attribute_locations_;
+  std::unordered_map<std::string, unsigned int> uniform_block_indices_;
+  std::unordered_map<unsigned int, unsigned int> uniform_block_bindings_;
   bool owns_resource_ = false;
 
   auto unload() -> void {

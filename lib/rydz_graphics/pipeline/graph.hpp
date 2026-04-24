@@ -6,6 +6,7 @@
 #include "rydz_graphics/pipeline/phase.hpp"
 #include "rydz_log/mod.hpp"
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -19,6 +20,7 @@ struct TextureDesc {
   i32 format = gl::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
   bool use_depth = true;
   bool hdr = false;
+  bool transient = false;
 };
 
 struct RenderGraphTexture {};
@@ -38,6 +40,7 @@ class RenderGraphRuntime;
 class RenderPass {
 public:
   virtual ~RenderPass() = default;
+  [[nodiscard]] virtual auto name() const -> std::string { return {}; }
 
   virtual auto setup(RenderGraphBuilder& builder) -> void = 0;
   virtual auto execute(PassContext& ctx, RenderGraphRuntime& runtime) -> void = 0;
@@ -141,22 +144,50 @@ public:
 
   [[nodiscard]] auto runtime() const -> RenderGraphRuntime const& { return runtime_; }
 
+  [[nodiscard]] auto debug_physical_slot(
+    RenderTextureHandle handle, u32 default_w = 1, u32 default_h = 1
+  ) const -> std::optional<usize> {
+    auto const [logical_to_physical, _] = build_physical_plan(default_w, default_h);
+    if (!handle.is_valid() || handle.id >= logical_to_physical.size()) {
+      return std::nullopt;
+    }
+
+    usize const slot = logical_to_physical[handle.id];
+    if (slot == INVALID_PHYSICAL_SLOT) {
+      return std::nullopt;
+    }
+    return slot;
+  }
+
   auto clear() -> void {
     passes_.clear();
     nodes_.clear();
-    for (auto& target : runtime_.targets) {
+    for (auto& target : runtime_.physical_targets) {
       target.unload();
     }
-    runtime_.targets.clear();
+    runtime_.physical_targets.clear();
+    runtime_.logical_to_physical.clear();
     resources_.clear();
     compiled_ = false;
   }
 
 private:
+  struct ResolvedTextureDesc {
+    u32 width = 0;
+    u32 height = 0;
+    i32 format = gl::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+    bool use_depth = true;
+    bool hdr = false;
+
+    auto operator==(ResolvedTextureDesc const&) const -> bool = default;
+  };
+
   struct ResourceInfo {
     std::string debug_name;
     TextureDesc desc{};
     bool backbuffer = false;
+    usize first_use = USIZE_MAX;
+    usize last_use = 0;
   };
 
   struct PassNode {
@@ -185,8 +216,9 @@ private:
   public:
     [[nodiscard]] auto get_texture(RenderTextureHandle handle) const
       -> gl::Texture const& override {
-      if (handle.is_valid() && handle.id < targets.size()) {
-        return targets[handle.id].texture;
+      auto const slot = physical_slot(handle);
+      if (slot != INVALID_PHYSICAL_SLOT && slot < physical_targets.size()) {
+        return physical_targets[slot].texture;
       }
       static gl::Texture empty{};
       return empty;
@@ -194,16 +226,27 @@ private:
 
     [[nodiscard]] auto get_target(RenderTextureHandle handle) const
       -> gl::RenderTarget const& override {
-      if (handle.is_valid() && handle.id < targets.size()) {
-        return targets[handle.id];
+      auto const slot = physical_slot(handle);
+      if (slot != INVALID_PHYSICAL_SLOT && slot < physical_targets.size()) {
+        return physical_targets[slot];
       }
       static gl::RenderTarget empty{};
       return empty;
     }
 
-    std::vector<gl::RenderTarget> targets;
+    std::vector<gl::RenderTarget> physical_targets;
+    std::vector<usize> logical_to_physical;
+
+  private:
+    [[nodiscard]] auto physical_slot(RenderTextureHandle handle) const -> usize {
+      if (!handle.is_valid() || handle.id >= logical_to_physical.size()) {
+        return INVALID_PHYSICAL_SLOT;
+      }
+      return logical_to_physical[handle.id];
+    }
   };
 
+  static constexpr usize INVALID_PHYSICAL_SLOT = USIZE_MAX;
   std::vector<ResourceInfo> resources_;
   std::vector<std::unique_ptr<RenderPass>> passes_;
   std::vector<PassNode> nodes_;
@@ -245,37 +288,119 @@ private:
   }
 
   auto ensure_resources(u32 default_w, u32 default_h) -> void {
-    if (runtime_.targets.size() < resources_.size()) {
-      runtime_.targets.resize(resources_.size());
+    auto const [logical_to_physical, physical_descs] =
+      build_physical_plan(default_w, default_h);
+    runtime_.logical_to_physical = logical_to_physical;
+
+    for (usize index = physical_descs.size(); index < runtime_.physical_targets.size();
+         ++index) {
+      runtime_.physical_targets[index].unload();
     }
+    runtime_.physical_targets.resize(physical_descs.size());
 
-    for (u32 index = 0; index < resources_.size(); ++index) {
-      auto const& resource = resources_[index];
-      if (resource.backbuffer) {
-        continue;
-      }
+    for (usize index = 0; index < physical_descs.size(); ++index) {
+      auto const& desc = physical_descs[index];
+      auto& target = runtime_.physical_targets[index];
 
-      auto const& desc = resource.desc;
-      auto& target = runtime_.targets[index];
-      u32 const w = desc.width > 0 ? desc.width : default_w;
-      u32 const h = desc.height > 0 ? desc.height : default_h;
-
-      if (target.ready() && target.texture.width == static_cast<i32>(w) &&
-          target.texture.height == static_cast<i32>(h)) {
+      if (target.ready() && target.texture.width == static_cast<i32>(desc.width) &&
+          target.texture.height == static_cast<i32>(desc.height)) {
         continue;
       }
 
       target.unload();
-      target = gl::RenderTarget(w, h);
+      target = gl::RenderTarget(desc.width, desc.height);
       if (target.ready()) {
         info(
-          "RenderGraph: allocated target '{}' ({}x{}) [ID {}]",
-          resource.debug_name.empty() ? "<unnamed>" : resource.debug_name,
-          w,
-          h,
+          "RenderGraph: allocated physical target slot {} ({}x{}) [ID {}]",
+          static_cast<int>(index),
+          static_cast<int>(desc.width),
+          static_cast<int>(desc.height),
           target.id
         );
         target.texture.set_filter(gl::TEXTURE_FILTER_BILINEAR);
+      }
+    }
+  }
+
+  [[nodiscard]] auto resolve_desc(
+    ResourceInfo const& resource, u32 default_w, u32 default_h
+  ) const -> ResolvedTextureDesc {
+    return ResolvedTextureDesc{
+      .width = resource.desc.width > 0 ? resource.desc.width : default_w,
+      .height = resource.desc.height > 0 ? resource.desc.height : default_h,
+      .format = resource.desc.format,
+      .use_depth = resource.desc.use_depth,
+      .hdr = resource.desc.hdr,
+    };
+  }
+
+  [[nodiscard]] auto build_physical_plan(u32 default_w, u32 default_h) const
+    -> std::pair<std::vector<usize>, std::vector<ResolvedTextureDesc>> {
+    struct PhysicalSlot {
+      ResolvedTextureDesc desc{};
+      usize last_use = 0;
+    };
+
+    std::vector<usize> logical_to_physical(resources_.size(), INVALID_PHYSICAL_SLOT);
+    std::vector<ResolvedTextureDesc> physical_descs;
+    std::vector<PhysicalSlot> slots;
+
+    for (usize resource_index = 0; resource_index < resources_.size(); ++resource_index) {
+      auto const& resource = resources_[resource_index];
+      if (resource.backbuffer) {
+        continue;
+      }
+
+      ResolvedTextureDesc const desc = resolve_desc(resource, default_w, default_h);
+      usize slot_index = INVALID_PHYSICAL_SLOT;
+      bool const has_usage = resource.first_use != USIZE_MAX;
+
+      if (resource.desc.transient && has_usage) {
+        for (usize candidate = 0; candidate < slots.size(); ++candidate) {
+          auto const& slot = slots[candidate];
+          if (slot.desc == desc && slot.last_use < resource.first_use) {
+            slot_index = candidate;
+            break;
+          }
+        }
+      }
+
+      if (slot_index == INVALID_PHYSICAL_SLOT) {
+        slot_index = slots.size();
+        slots.push_back(PhysicalSlot{.desc = desc, .last_use = resource.last_use});
+        physical_descs.push_back(desc);
+      } else {
+        slots[slot_index].last_use = resource.last_use;
+      }
+
+      logical_to_physical[resource_index] = slot_index;
+    }
+
+    return {std::move(logical_to_physical), std::move(physical_descs)};
+  }
+
+  auto compute_resource_lifetimes() -> void {
+    for (auto& resource : resources_) {
+      resource.first_use = USIZE_MAX;
+      resource.last_use = 0;
+    }
+
+    auto record_use = [&](RenderTextureHandle handle, usize pass_index) -> void {
+      if (!has_resource(handle)) {
+        return;
+      }
+
+      auto& resource = resources_[handle.id];
+      resource.first_use = std::min(resource.first_use, pass_index);
+      resource.last_use = std::max(resource.last_use, pass_index);
+    };
+
+    for (usize index = 0; index < nodes_.size(); ++index) {
+      for (auto const& input : nodes_[index].inputs) {
+        record_use(input, index);
+      }
+      for (auto const& output : nodes_[index].outputs) {
+        record_use(output, index);
       }
     }
   }
@@ -395,6 +520,7 @@ private:
       sorted_nodes.push_back(std::move(nodes_[index]));
     }
     nodes_ = std::move(sorted_nodes);
+    compute_resource_lifetimes();
   }
 };
 

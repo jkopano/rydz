@@ -7,20 +7,20 @@
 
 using namespace ecs;
 
-// Helper: run ExtractUi::system against the world and return the result.
+// Helper: run Extract::ui against the world and return the result.
 static auto run_extract_ui(World& world) -> ExtractedUi {
   world.insert_resource(ExtractedUi{});
 
   Query<Sprite, Transform> query(world, Tick{0}, world.read_change_tick());
   ResMut<ExtractedUi> ui{world.get_resource<ExtractedUi>()};
 
-  ExtractUi::system(query, ui);
+  Extract::ui(query, ui);
 
   return *world.get_resource<ExtractedUi>();
 }
 
 // Validates: Requirements 3.4
-// ExtractUi::system produces the same items as the old Extract::ui +
+// Extract::ui produces the same items as the old Extract::ui +
 // Extract::overlay combined (which were identical — overlay was a duplicate).
 TEST(ExtractUiTest, SystemCollectsAllValidSprites) {
   World world;
@@ -59,7 +59,7 @@ TEST(ExtractUiTest, SystemCollectsAllValidSprites) {
 }
 
 // Validates: Requirements 3.4
-// ExtractUi::system skips sprites with invalid (null) texture handles.
+// Extract::ui skips sprites with invalid (null) texture handles.
 TEST(ExtractUiTest, SystemSkipsInvalidHandles) {
   World world;
 
@@ -78,7 +78,7 @@ TEST(ExtractUiTest, SystemSkipsInvalidHandles) {
 }
 
 // Validates: Requirements 3.4
-// Calling ExtractUi::system twice clears and re-populates (no duplication).
+// Calling Extract::ui twice clears and re-populates (no duplication).
 TEST(ExtractUiTest, SystemClearsBeforeRepopulating) {
   World world;
 
@@ -90,8 +90,8 @@ TEST(ExtractUiTest, SystemClearsBeforeRepopulating) {
   Query<Sprite, Transform> query(world, Tick{0}, world.read_change_tick());
   ResMut<ExtractedUi> ui{world.get_resource<ExtractedUi>()};
 
-  ExtractUi::system(query, ui);
-  ExtractUi::system(query, ui);
+  Extract::ui(query, ui);
+  Extract::ui(query, ui);
 
   EXPECT_EQ(world.get_resource<ExtractedUi>()->items.size(), 1u);
 }

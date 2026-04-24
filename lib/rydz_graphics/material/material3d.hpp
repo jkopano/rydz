@@ -291,6 +291,35 @@ struct Material {
   Material(M const& material) : compiled(detail::compile_trait_material(material)) {}
 };
 
+struct MaterialCache {
+  using T = Resource;
+  std::unordered_map<u32, CompiledMaterial> items;
+
+  auto get_or_compile(Handle<Material> handle) -> CompiledMaterial const& {
+    return items[handle.id];
+  }
+
+  auto get_or_compile(Handle<Material> handle, Material const& asset)
+    -> CompiledMaterial const& {
+    auto [it, inserted] = items.try_emplace(handle.id);
+    if (inserted) {
+      it->second = asset.compiled;
+    }
+    return it->second;
+  }
+
+  template <TraitMaterialValue M>
+  auto get_or_compile(Handle<M> handle, M const& asset) -> CompiledMaterial const& {
+    auto [it, inserted] = items.try_emplace(handle.id);
+    if (inserted) {
+      it->second = detail::compile_trait_material(asset);
+    }
+    return it->second;
+  }
+
+  auto clear() -> void { items.clear(); }
+};
+
 template <typename M>
 concept RenderMaterialAsset =
   std::same_as<bare_t<M>, Material> || MaterialValue<bare_t<M>>;

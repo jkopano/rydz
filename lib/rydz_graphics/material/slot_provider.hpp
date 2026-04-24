@@ -27,6 +27,7 @@ struct ExtractedLights;
 struct ExtractedView;
 struct PassContext;
 struct SlotProviderRegistry;
+struct ViewUniformState;
 
 struct PreparedMaterial {
   std::array<gl::MaterialMap, K_MATERIAL_MAP_COUNT> local_maps{};
@@ -44,6 +45,7 @@ struct MaterialContext {
   [[nodiscard]] auto cluster_config() const -> ClusterConfig const&;
   [[nodiscard]] auto clustered_lighting() const -> ClusteredLightingState const&;
   [[nodiscard]] auto time() const -> Time const&;
+  [[nodiscard]] auto view_uniforms() const -> ViewUniformState const&;
   [[nodiscard]] auto slots() const -> SlotProviderRegistry const&;
 };
 

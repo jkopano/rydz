@@ -19,8 +19,7 @@ struct RenderMaterialKey {
   auto operator==(RenderMaterialKey const&) const -> bool = default;
 };
 
-template <typename M>
-auto render_material_key(Handle<M> material) -> RenderMaterialKey {
+template <typename M> auto render_material_key(Handle<M> material) -> RenderMaterialKey {
   return RenderMaterialKey{
     .asset_type = std::type_index(typeid(bare_t<M>)),
     .id = material.id,

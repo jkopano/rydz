@@ -1,6 +1,5 @@
 #pragma once
 
-#include "rydz_audio/plugin.hpp"
 #include "rydz_ecs/app.hpp"
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/mod.hpp"
@@ -64,6 +63,8 @@ struct RenderPlugin : IPlugin {
       .init_resource<ClusteredLightingState>()
       .init_resource<EnvironmentRenderer>()
       .init_resource<ShaderCache>()
+      .init_resource<ViewUniformState>()
+      .init_resource<MaterialCache>()
       .init_resource<SlotProviderRegistry>()
       .init_resource<DebugOverlaySettings>()
       .init_resource<gl::RenderState>()
@@ -75,7 +76,8 @@ struct RenderPlugin : IPlugin {
 
     app.init_resource<RenderGraph>();
     if (auto* graph = app.world().get_resource<RenderGraph>()) {
-      auto const main_target = graph->create_texture({}, "MainTarget");
+      auto const main_target =
+        graph->create_texture(TextureDesc{.transient = true}, "MainTarget");
       auto const screen = graph->import_backbuffer("Screen");
 
       graph->add_pass<ClearPass>(main_target);
@@ -92,7 +94,6 @@ struct RenderPlugin : IPlugin {
     if (auto* server = app.world().get_resource<AssetServer>()) {
       register_graphics_loaders(*server);
     }
-    rydz_audio::AudioPlugin::install(app);
     register_slot<HasCamera>(app, HasCamera::slot_provider());
     register_slot<HasPBR>(app, HasPBR::slot_provider());
 

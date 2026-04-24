@@ -16,19 +16,10 @@ struct MouseState {
 };
 
 struct Input {
-  static auto install(App &app) -> void {
-    app.insert_resource(Input{});
-    app.add_systems(First, input_polling_system);
-  }
-
   using T = Resource;
   auto key_down(KeyCode key) const -> bool { return keys_down_.contains(key); }
-  auto key_pressed(KeyCode key) const -> bool {
-    return keys_pressed_.contains(key);
-  }
-  auto key_released(KeyCode key) const -> bool {
-    return keys_released_.contains(key);
-  }
+  auto key_pressed(KeyCode key) const -> bool { return keys_pressed_.contains(key); }
+  auto key_released(KeyCode key) const -> bool { return keys_released_.contains(key); }
 
   auto mouse_delta() const -> math::Vec2 {
     return math::Vec2{mouse_.delta_x, mouse_.delta_y};
@@ -63,7 +54,7 @@ public:
     mouse_.delta_y = dy;
   }
 
-  auto keys_down() -> std::unordered_set<KeyCode> & { return keys_down_; }
+  auto keys_down() -> std::unordered_set<KeyCode>& { return keys_down_; }
 
   static auto input_polling_system(ResMut<Input> input, NonSendMarker) -> void {
     input->clear_frame();
@@ -73,7 +64,7 @@ public:
       input->set_key_down(key);
     }
 
-    auto &down = input->keys_down();
+    auto& down = input->keys_down();
     std::vector<KeyCode> released;
     for (KeyCode k : down) {
       if (rl::IsKeyUp(k)) {
@@ -93,6 +84,13 @@ private:
   std::unordered_set<KeyCode> keys_pressed_;
   std::unordered_set<KeyCode> keys_released_;
   MouseState mouse_;
+};
+
+struct InputPlugin : ecs::IPlugin {
+  auto build(App& app) const -> void {
+    app.insert_resource(Input{});
+    app.add_systems(First, Input::input_polling_system);
+  }
 };
 
 } // namespace ecs

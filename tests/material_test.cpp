@@ -121,6 +121,7 @@ TEST(MaterialTest, PrepareMaterialAppliesFallbackTexturesForDefaultedMaps) {
   ecs::ExtractedView view{};
   ecs::ExtractedLights lights{};
   ecs::Time time{};
+  ecs::ExtractedMeshes extracted_meshes{};
   ecs::Assets<ecs::Mesh> mesh_assets;
   ecs::OpaquePhase opaque_phase{};
   ecs::TransparentPhase transparent_phase{};
@@ -128,6 +129,7 @@ TEST(MaterialTest, PrepareMaterialAppliesFallbackTexturesForDefaultedMaps) {
   ecs::UiPhase ui_phase{};
   gl::ClusterConfig cluster_config{};
   gl::ClusteredLightingState cluster_state{};
+  ecs::ViewUniformState view_uniforms{};
   ecs::PassContext ctx{
     .marker = ecs::NonSendMarker{},
     .render_state = render_state,
@@ -135,9 +137,11 @@ TEST(MaterialTest, PrepareMaterialAppliesFallbackTexturesForDefaultedMaps) {
     .view = view,
     .lights = lights,
     .time = time,
+    .extracted_meshes = extracted_meshes,
     .mesh_assets = mesh_assets,
     .texture_assets = textures,
     .shader_cache = shader_cache,
+    .view_uniforms = view_uniforms,
     .slot_registry = registry,
     .opaque_phase = opaque_phase,
     .transparent_phase = transparent_phase,
@@ -218,6 +222,7 @@ TEST(MaterialTest, PrepareMaterialPreservesAuthoredTextureOverFallback) {
   ecs::ExtractedView view{};
   ecs::ExtractedLights lights{};
   ecs::Time time{};
+  ecs::ExtractedMeshes extracted_meshes{};
   ecs::Assets<ecs::Mesh> mesh_assets;
   ecs::OpaquePhase opaque_phase{};
   ecs::TransparentPhase transparent_phase{};
@@ -225,6 +230,7 @@ TEST(MaterialTest, PrepareMaterialPreservesAuthoredTextureOverFallback) {
   ecs::UiPhase ui_phase{};
   gl::ClusterConfig cluster_config{};
   gl::ClusteredLightingState cluster_state{};
+  ecs::ViewUniformState view_uniforms{};
   ecs::PassContext ctx{
     .marker = ecs::NonSendMarker{},
     .render_state = render_state,
@@ -232,9 +238,11 @@ TEST(MaterialTest, PrepareMaterialPreservesAuthoredTextureOverFallback) {
     .view = view,
     .lights = lights,
     .time = time,
+    .extracted_meshes = extracted_meshes,
     .mesh_assets = mesh_assets,
     .texture_assets = textures,
     .shader_cache = shader_cache,
+    .view_uniforms = view_uniforms,
     .slot_registry = registry,
     .opaque_phase = opaque_phase,
     .transparent_phase = transparent_phase,

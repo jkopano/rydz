@@ -104,10 +104,9 @@ struct Extract {
     Query<Mesh3d, GlobalTransform, MeshMaterial3d<M>, Opt<ViewVisibility>> query,
     Res<ExtractedView> view,
     Res<Assets<M>> material_assets,
+    ResMut<MaterialCache> material_cache,
     ResMut<ExtractedMeshes> meshes
   ) -> void {
-    std::unordered_map<u32, usize> material_cache;
-
     for (auto [mesh3d, global, material, visibility] : query.iter()) {
       if (!mesh3d->mesh.is_valid() || !material->material.is_valid()) {
         continue;
@@ -121,30 +120,32 @@ struct Extract {
         continue;
       }
 
-      auto [compiled_iter, inserted] = material_cache.try_emplace(material->material.id);
+      CompiledMaterial const& compiled =
+        material_cache->get_or_compile(material->material, *material_asset);
+
+      auto [it, inserted] = meshes->material_lookup.try_emplace(material->material.id);
       if (inserted) {
-        CompiledMaterial compiled = compile_render_material_asset(*material_asset);
         bool const transparent = compiled.render_method == RenderMethod::Transparent;
         bool const casts_shadows = compiled.casts_shadows;
-        compiled_iter->second = meshes->materials.size();
+        it->second = meshes->materials.size();
         meshes->materials.push_back(
           ExtractedMeshes::MaterialItem{
             .key = render_material_key(material->material),
-            .material = std::move(compiled),
+            .material = compiled,
             .transparent = transparent,
             .casts_shadows = casts_shadows,
           }
         );
       }
 
-      auto const& material_item = meshes->materials[compiled_iter->second];
+      auto const& material_item = meshes->materials[it->second];
       Vec3 camera_offset = global->translation() - view->camera_view.position;
 
       meshes->items.push_back(
         ExtractedMeshes::Item{
           .mesh = mesh3d->mesh,
           .material = material_item.key,
-          .material_index = compiled_iter->second,
+          .material_index = it->second,
           .world_transform = global->matrix,
           .distance_sq_to_camera = camera_offset.length_sq(),
         }
@@ -187,6 +188,31 @@ inline auto prepare_mesh(Handle<Mesh> const& handle, Assets<Mesh>& mesh_assets) 
   }
   return true;
 }
+
+inline auto opaque_command_less(
+  ExtractedMeshes const& meshes, RenderCommand const& lhs, RenderCommand const& rhs
+) -> bool {
+  auto const& lhs_material = meshes.materials[lhs.material_index];
+  auto const& rhs_material = meshes.materials[rhs.material_index];
+  if (lhs_material.material.shader.vertex_path !=
+      rhs_material.material.shader.vertex_path) {
+    return lhs_material.material.shader.vertex_path <
+           rhs_material.material.shader.vertex_path;
+  }
+  if (lhs_material.material.shader.fragment_path !=
+      rhs_material.material.shader.fragment_path) {
+    return lhs_material.material.shader.fragment_path <
+           rhs_material.material.shader.fragment_path;
+  }
+  if (lhs_material.key.asset_type != rhs_material.key.asset_type) {
+    return lhs_material.key.asset_type.hash_code() <
+           rhs_material.key.asset_type.hash_code();
+  }
+  if (lhs_material.key.id != rhs_material.key.id) {
+    return lhs_material.key.id < rhs_material.key.id;
+  }
+  return lhs.mesh.id < rhs.mesh.id;
+}
 } // namespace detail
 
 struct Queue {
@@ -207,7 +233,7 @@ struct Queue {
         usize const idx = phase->commands.size();
         RenderCommand cmd{
           .mesh = item.mesh,
-          .material = material.material,
+          .material_index = item.material_index,
           .instances = {math::to_rl(item.world_transform)},
           .sort_key = item.distance_sq_to_camera,
         };
@@ -219,6 +245,12 @@ struct Queue {
         );
       }
     }
+
+    std::ranges::sort(
+      phase->commands, [&](RenderCommand const& lhs, RenderCommand const& rhs) -> bool {
+        return detail::opaque_command_less(*meshes, lhs, rhs);
+      }
+    );
   }
 
   static auto transparent(Res<ExtractedMeshes> meshes, ResMut<TransparentPhase> phase)
@@ -233,7 +265,7 @@ struct Queue {
 
       RenderCommand cmd{
         .mesh = item.mesh,
-        .material = material.material,
+        .material_index = item.material_index,
         .instances = {math::to_rl(item.world_transform)},
         .sort_key = item.distance_sq_to_camera,
       };
@@ -256,7 +288,7 @@ struct Queue {
       }
       RenderCommand cmd{
         .mesh = item.mesh,
-        .material = material.material,
+        .material_index = item.material_index,
         .instances = {math::to_rl(item.world_transform)},
         .sort_key = item.distance_sq_to_camera,
       };
@@ -278,7 +310,7 @@ struct Queue {
     }
 
     std::ranges::stable_sort(
-      phase->items, [](UiPhase::Item const& lhs, UiPhase::Item const& rhs) {
+      phase->items, [](UiPhase::Item const& lhs, UiPhase::Item const& rhs) -> bool {
         return lhs.layer < rhs.layer;
       }
     );

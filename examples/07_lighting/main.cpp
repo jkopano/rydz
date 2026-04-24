@@ -31,14 +31,12 @@ void setup(
 
   // podłoga
   auto floor_h = meshes->add(Mesh::plane(30, 30));
-  auto floor_mat =
-    materials->add(StandardMaterial::from_color({200, 200, 200, 255}));
+  auto floor_mat = materials->add(StandardMaterial::from_color({200, 200, 200, 255}));
   cmd.spawn(Mesh3d{floor_h}, MeshMaterial3d{floor_mat}, Transform{});
 
   // kilka obiektów na scenie
   auto sphere_h = meshes->add(Mesh::sphere(1.0f));
-  auto sphere_mat =
-    materials->add(StandardMaterial::from_color(ecs::Color::WHITE));
+  auto sphere_mat = materials->add(StandardMaterial::from_color(ecs::Color::WHITE));
   for (int i = -2; i <= 2; ++i) {
     cmd.spawn(
       Mesh3d{sphere_h},
@@ -57,9 +55,7 @@ void setup(
   );
 
   auto make_orbit_light =
-    [&](
-      ecs::Color color, f32 radius, f32 speed, f32 phase, f32 y, f32 intensity
-    ) {
+    [&](ecs::Color color, f32 radius, f32 speed, f32 phase, f32 y, f32 intensity) {
       auto h = meshes->add(Mesh::cube(0.3f, 0.3f, 0.3f));
       auto mat = materials->add(StandardMaterial::from_color(color));
       cmd.spawn(
@@ -67,7 +63,7 @@ void setup(
         MeshMaterial3d{mat},
         PointLight{.color = color, .intensity = intensity, .range = 30.0f},
         Transform::from_xyz(0, y, 0),
-        OrbitLight{radius, speed, phase}
+        OrbitLight{.radius = radius, .speed = speed, .phase = phase}
       );
     };
 
@@ -97,24 +93,22 @@ void orbit_system(Query<Mut<Transform>, OrbitLight> query, Res<Time> time) {
   f32 t = time->elapsed_seconds;
   for (auto [tx, orbit] : query.iter()) {
     f32 angle = t * orbit->speed + orbit->phase;
-    tx->translation = Vec3(
-      cosf(angle) * orbit->radius,
-      tx->translation.y,
-      sinf(angle) * orbit->radius
-    );
+    tx->translation =
+      Vec3(cosf(angle) * orbit->radius, tx->translation.y, sinf(angle) * orbit->radius);
   }
 }
 
-int main() {
+auto main() -> int {
   App app;
   app
     .add_plugin(
-      rydz_platform::RayPlugin::install({
-        .window = {1024, 768, "07 - Lighting", 60},
-      })
+      rydz_platform::RayPlugin{
+        .window =
+          {.width = 1024, .height = 768, .title = "07 - Lighting", .target_fps = 60},
+      }
     )
     .add_plugin(time_plugin)
-    .add_plugin(RenderPlugin::install)
+    .add_plugin(RenderPlugin{})
     .add_systems(Startup, setup)
     .add_systems(Update, orbit_system)
     .run();

@@ -1,11 +1,11 @@
 #pragma once
 #include "math.hpp"
 #include "rl.hpp"
+#include "rydz_audio/mod.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_graphics/plugin.hpp"
 #include <algorithm>
 #include <print>
 
@@ -147,6 +147,26 @@ inline auto spawn_some_texture(Cmd cmd, Res<AssetServer> server, NonSendMarker) 
   );
 }
 
+struct MovingLight {
+  Vec3 base_pos;
+  f32 radius;
+  f32 speed;
+  f32 offset;
+};
+
+inline auto moving_lights_system(Query<Mut<Transform>, MovingLight> query, Res<Time> time)
+  -> void {
+  f32 t = time->elapsed_seconds;
+  for (auto [transform, light] : query.iter()) {
+    transform->translation.x =
+      light->base_pos.x + (std::cos((t * light->speed) + light->offset) * light->radius);
+    transform->translation.z =
+      light->base_pos.z + (std::sin((t * light->speed) + light->offset) * light->radius);
+    transform->translation.y =
+      light->base_pos.y + (std::sin(t * light->speed * 0.5f) * (light->radius * 0.5f));
+  }
+}
+
 struct LightsSpawned {
   using T = Resource;
   bool done = false;
@@ -154,7 +174,6 @@ struct LightsSpawned {
 
 inline auto spawn_lights_on_input(
   Cmd cmd,
-  Res<AssetServer> server,
   ResMut<Assets<Mesh>> meshes,
   ResMut<Assets<Material>> materials,
   ResMut<LightsSpawned> lights,
@@ -169,30 +188,31 @@ inline auto spawn_lights_on_input(
     DirectionalLight{
       .color = {255, 242, 230, 255},
       .direction = Vec3(-0.3f, -1.0f, -0.5f),
-      .intensity = 0.5f,
+      .intensity = 0.8f,
     }
   );
-  auto tex = server->load<Texture>("res/textures/stone.jpg");
-  auto stone_mat = materials->add(StandardMaterial::from_texture(tex));
 
   auto cube_h = meshes->add(Mesh::cube());
+  auto material = materials->add(StandardMaterial{});
 
-  cmd.spawn(
-    Mesh3d{cube_h},
-    PointLight{.color = {255, 0, 0, 255}, .intensity = 8800.0f, .range = 2000.0f},
-    Transform::from_xyz(-50.0f, 50.0f, 0.0f)
-  );
+  for (int i = 0; i < 30; ++i) {
+    f32 const angle = (static_cast<f32>(i) / 30.0f) * 2.0f * PI;
+    f32 const radius = 50.0f + ((i % 3) * 20.0f);
+    Color color = Color::from_hsv(static_cast<f32>(i * 12), 0.8f, 1.0f);
 
-  auto cube_h2 = meshes->add(Mesh::cube());
-
-  cmd.spawn(
-    Mesh3d{cube_h2}, MeshMaterial3d{stone_mat}, Transform::from_xyz(50.0f, 50.0f, 0.0f)
-  );
-
-  cmd.spawn(
-    PointLight{.color = {75, 75, 255, 255}, .intensity = 800.0f, .range = 200.0f},
-    Transform::from_xyz(100.0f, 100.0f, 0.0f)
-  );
+    cmd.spawn(
+      Mesh3d{cube_h},
+      MeshMaterial3d{material},
+      PointLight{.color = color, .intensity = 500.0f, .range = 40.0f},
+      Transform::from_xyz(0, 10, 0),
+      MovingLight{
+        .base_pos = Vec3(0, 20.0f + ((i % 5) * 5.0f), 0),
+        .radius = radius,
+        .speed = 0.2f + ((i % 3) * 0.1f),
+        .offset = angle,
+      }
+    );
+  }
 
   lights->done = true;
 }
@@ -219,7 +239,7 @@ inline void scene_plugin(App& app) {
 
   app.add_systems(Update, camera_controller_system);
   app.add_systems(Update, camera_mouse_system);
-  // app.add_systems(Update, some_shit);
+  app.add_systems(Update, moving_lights_system);
 
   app.add_systems(Update, spawn_lights_on_input);
 }

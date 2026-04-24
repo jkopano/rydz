@@ -1,14 +1,18 @@
 #pragma once
 
+#include "rydz_ecs/asset.hpp"
 #include "rydz_graphics/gl/resources.hpp"
-#include "rydz_graphics/material/material3d.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
 #include <vector>
 
 namespace ecs {
 
+using gl::Mesh;
+using gl::Texture;
+
 struct RenderCommand {
   Handle<Mesh> mesh{};
-  CompiledMaterial material{};
+  usize material_index{};
   std::vector<rl::Matrix> instances;
   f32 sort_key = 0.0F;
 
