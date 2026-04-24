@@ -17,7 +17,7 @@ using namespace rydz_math;
 void setup_scene(
   Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes, ResMut<Assets<ecs::Material>> materials
 ) {
-  auto ground_mesh = meshes->add(Mesh::plane(100.0f, 100.0f));
+  auto ground_mesh = meshes->add(Mesh::cube(100.0f, 2.0f, 100.0f));
   auto ground_mat = materials->add(StandardMaterial::from_color(Color{80, 120, 80}));
 
   cmd.spawn(
@@ -30,11 +30,6 @@ void setup_scene(
       .shape = Collider::Box{Vec3(50.0f, 1.0f, 50.0f)},
       .friction = 0.8f,
     },
-    Visibility::Hidden
-  );
-
-  cmd.spawn(
-    Transform::from_xyz(0.0f, 0.0f, 0.0f),
     Mesh3d{ground_mesh},
     MeshMaterial3d{ground_mat}
   );
@@ -43,14 +38,13 @@ void setup_scene(
     Camera3d::perspective(),
     ActiveCamera{},
     Transform::from_xyz(-55.0f, 48.0f, -55.0f).look_at(Vec3(0.0f, 0.0f, 0.0f)),
-    PostProcessMaterial{DefaultPostProcessMaterial{}},
     ecs::Environment::from_directory("textures/skybox")
   );
 
   cmd.spawn(
     DirectionalLight{
       .color = {255, 242, 230, 255},
-      .direction = Vec3(0.3f, -1.0f, 0.5f),
+      .direction = Vec3(-0.3f, -1.0f, -0.5f),
       .intensity = 0.8f,
     }
   );

@@ -187,7 +187,7 @@ struct Material {
       static std::vector<gl::MaterialMap> maps(ecs::K_MATERIAL_MAP_COUNT);
       fallback.maps = maps.data();
       constexpr int albedo = ecs::material_map_index(ecs::MaterialMap::Albedo);
-      fallback.maps[albedo].texture = Texture();
+      fallback.maps[albedo].texture.id = rl::rlGetTextureIdDefault();
       fallback.maps[albedo].texture.width = 1;
       fallback.maps[albedo].texture.height = 1;
       fallback.maps[albedo].texture.mipmaps = 1;

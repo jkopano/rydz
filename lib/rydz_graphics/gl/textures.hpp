@@ -60,7 +60,7 @@ struct Texture {
   i32 mipmaps = 0;
   i32 format = 0;
 
-  constexpr Texture() : id{rl::rlGetTextureIdDefault()} {};
+  constexpr Texture() = default;
 
   constexpr Texture(::rlTexture const& raw) noexcept
       : Texture(detail::raylib_cast<Texture>(raw)) {}
