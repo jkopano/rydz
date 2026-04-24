@@ -68,6 +68,83 @@ struct ShadowView {
   f32 far_plane = 1000.0F;
 
   auto update_view_projection() -> void { view_projection = projection * view; }
+
+  static auto from(
+    std::array<Vec3, 8> const& frustum_corners, Vec3 light_direction, u32 resolution
+  ) -> ShadowView {
+    light_direction = light_direction.normalized();
+    if (light_direction.length_sq() <= 1e-8F) {
+      light_direction = Vec3{-0.3F, -1.0F, -0.5F}.normalized();
+    }
+
+    Vec3 frustum_center = Vec3::ZERO;
+    for (auto const& corner : frustum_corners) {
+      frustum_center = frustum_center + corner;
+    }
+    frustum_center = frustum_center / static_cast<f32>(frustum_corners.size());
+
+    Vec3 up = std::abs(light_direction.dot(Vec3{0.0F, 1.0F, 0.0F})) > 0.99F
+                ? Vec3{0.0F, 0.0F, 1.0F}
+                : Vec3{0.0F, 1.0F, 0.0F};
+
+    f32 radius = 0.0F;
+    for (auto const& corner : frustum_corners) {
+      radius = std::max(radius, (corner - frustum_center).length());
+    }
+    radius = std::max(radius, 0.001F);
+    radius = std::ceil(radius * 16.0F) / 16.0F;
+
+    ShadowView result{};
+    result.position = frustum_center - (light_direction * (radius * 2.0F + 100.0F));
+    result.orthographic = true;
+    result.view = Mat4::look_at_rh(result.position, frustum_center, up);
+
+    Vec3 min_bounds = Vec3::splat(std::numeric_limits<f32>::max());
+    Vec3 max_bounds = Vec3::splat(-std::numeric_limits<f32>::max());
+    for (auto const& corner : frustum_corners) {
+      Vec3 const light_space = result.view * corner;
+      min_bounds = Vec3(
+        glm::min(
+          static_cast<Vec3::Base const&>(min_bounds),
+          static_cast<Vec3::Base const&>(light_space)
+        )
+      );
+      max_bounds = Vec3(
+        glm::max(
+          static_cast<Vec3::Base const&>(max_bounds),
+          static_cast<Vec3::Base const&>(light_space)
+        )
+      );
+    }
+
+    Vec3 center = result.view * frustum_center;
+    f32 const diameter = radius * 2.0F;
+    f32 const texel_size = diameter / static_cast<f32>(std::max<u32>(resolution, 1U));
+
+    if (texel_size > 0.0F) {
+      center.x = std::floor(center.x / texel_size) * texel_size;
+      center.y = std::floor(center.y / texel_size) * texel_size;
+    }
+
+    min_bounds.x = center.x - radius;
+    max_bounds.x = center.x + radius;
+    min_bounds.y = center.y - radius;
+    max_bounds.y = center.y + radius;
+
+    f32 const depth_padding = std::max((max_bounds.z - min_bounds.z) * 0.25F, 25.0F);
+    result.near_plane = -max_bounds.z - depth_padding;
+    result.far_plane = -min_bounds.z + depth_padding;
+    result.projection = Mat4::orthographic_rh(
+      min_bounds.x,
+      max_bounds.x,
+      min_bounds.y,
+      max_bounds.y,
+      result.near_plane,
+      result.far_plane
+    );
+    result.update_view_projection();
+    return result;
+  }
 };
 
 struct ExtractedShadows {
@@ -109,19 +186,6 @@ struct ShadowAtlasTile {
   Vec4 uv_rect = {0.0F, 0.0F, 1.0F, 1.0F};
 };
 
-inline auto aabb_corners(AABox const& box) -> std::array<Vec3, 8> {
-  return {
-    Vec3{box.mMin.x, box.mMin.y, box.mMin.z},
-    Vec3{box.mMax.x, box.mMin.y, box.mMin.z},
-    Vec3{box.mMax.x, box.mMax.y, box.mMin.z},
-    Vec3{box.mMin.x, box.mMax.y, box.mMin.z},
-    Vec3{box.mMin.x, box.mMin.y, box.mMax.z},
-    Vec3{box.mMax.x, box.mMin.y, box.mMax.z},
-    Vec3{box.mMax.x, box.mMax.y, box.mMax.z},
-    Vec3{box.mMin.x, box.mMax.y, box.mMax.z},
-  };
-}
-
 inline auto shadow_face_targets() -> std::array<Vec3, POINT_SHADOW_FACE_COUNT> {
   return {
     Vec3{1.0F, 0.0F, 0.0F},
@@ -142,24 +206,6 @@ inline auto shadow_face_ups() -> std::array<Vec3, POINT_SHADOW_FACE_COUNT> {
     Vec3{0.0F, -1.0F, 0.0F},
     Vec3{0.0F, -1.0F, 0.0F},
   };
-}
-
-inline auto compute_cascade_splits(
-  f32 near_plane, f32 far_plane, i32 cascade_count, f32 lambda
-) -> std::array<f32, MAX_DIRECTIONAL_CASCADES> {
-  std::array<f32, MAX_DIRECTIONAL_CASCADES> splits{};
-  f32 const clamped_near = std::max(near_plane, 0.001F);
-  f32 const clamped_far = std::max(far_plane, clamped_near + 0.001F);
-  f32 const ratio = clamped_far / clamped_near;
-
-  for (i32 cascade_index = 0; cascade_index < cascade_count; ++cascade_index) {
-    f32 const p = static_cast<f32>(cascade_index + 1) / static_cast<f32>(cascade_count);
-    f32 const log_split = clamped_near * std::pow(ratio, p);
-    f32 const uniform_split = clamped_near + ((clamped_far - clamped_near) * p);
-    splits[cascade_index] = (lambda * log_split) + ((1.0F - lambda) * uniform_split);
-  }
-
-  return splits;
 }
 
 inline auto projected_sphere_radius_pixels(
@@ -183,141 +229,6 @@ inline auto projected_sphere_radius_pixels(
   }
 
   return projection_y_scale * sphere_radius / view_depth * (viewport_height * 0.5F);
-}
-
-inline auto compute_frustum_slice_corners_world(
-  ExtractedView const& view, f32 slice_near, f32 slice_far
-) -> std::array<Vec3, 8> {
-  f32 const aspect =
-    compute_camera_aspect_ratio(view.viewport.width, view.viewport.height);
-  Mat4 const inverse_view = view.camera_view.view.inverse();
-
-  if (view.orthographic) {
-    f32 const full_half_width =
-      1.0F / std::max(std::abs(view.camera_view.proj(0, 0)), 0.0001F);
-    f32 const full_half_height =
-      1.0F / std::max(std::abs(view.camera_view.proj(1, 1)), 0.0001F);
-
-    std::array<Vec3, 8> view_space = {
-      Vec3{-full_half_width, -full_half_height, -slice_near},
-      Vec3{full_half_width, -full_half_height, -slice_near},
-      Vec3{full_half_width, full_half_height, -slice_near},
-      Vec3{-full_half_width, full_half_height, -slice_near},
-      Vec3{-full_half_width, -full_half_height, -slice_far},
-      Vec3{full_half_width, -full_half_height, -slice_far},
-      Vec3{full_half_width, full_half_height, -slice_far},
-      Vec3{-full_half_width, full_half_height, -slice_far},
-    };
-
-    std::array<Vec3, 8> world{};
-    for (usize i = 0; i < view_space.size(); ++i) {
-      world[i] = inverse_view * view_space[i];
-    }
-    return world;
-  }
-
-  f32 const projection_y_scale = std::max(std::abs(view.camera_view.proj(1, 1)), 0.0001F);
-  f32 const tan_fov_y = 1.0F / projection_y_scale;
-  f32 const tan_fov_x = tan_fov_y * aspect;
-
-  f32 const near_height = slice_near * tan_fov_y;
-  f32 const near_width = slice_near * tan_fov_x;
-  f32 const far_height = slice_far * tan_fov_y;
-  f32 const far_width = slice_far * tan_fov_x;
-
-  std::array<Vec3, 8> view_space = {
-    Vec3{-near_width, -near_height, -slice_near},
-    Vec3{near_width, -near_height, -slice_near},
-    Vec3{near_width, near_height, -slice_near},
-    Vec3{-near_width, near_height, -slice_near},
-    Vec3{-far_width, -far_height, -slice_far},
-    Vec3{far_width, -far_height, -slice_far},
-    Vec3{far_width, far_height, -slice_far},
-    Vec3{-far_width, far_height, -slice_far},
-  };
-
-  std::array<Vec3, 8> world{};
-  for (usize i = 0; i < view_space.size(); ++i) {
-    world[i] = inverse_view * view_space[i];
-  }
-  return world;
-}
-
-inline auto build_directional_shadow_view(
-  std::array<Vec3, 8> const& frustum_corners, Vec3 light_direction, u32 resolution
-) -> ShadowView {
-  light_direction = light_direction.normalized();
-  if (light_direction.length_sq() <= 1e-8F) {
-    light_direction = Vec3{-0.3F, -1.0F, -0.5F}.normalized();
-  }
-
-  Vec3 frustum_center = Vec3::ZERO;
-  for (auto const& corner : frustum_corners) {
-    frustum_center = frustum_center + corner;
-  }
-  frustum_center = frustum_center / static_cast<f32>(frustum_corners.size());
-
-  Vec3 up = std::abs(light_direction.dot(Vec3{0.0F, 1.0F, 0.0F})) > 0.99F
-              ? Vec3{0.0F, 0.0F, 1.0F}
-              : Vec3{0.0F, 1.0F, 0.0F};
-
-  f32 radius = 0.0F;
-  for (auto const& corner : frustum_corners) {
-    radius = std::max(radius, (corner - frustum_center).length());
-  }
-  radius = std::max(radius, 0.001F);
-  radius = std::ceil(radius * 16.0F) / 16.0F;
-
-  ShadowView result{};
-  result.position = frustum_center - (light_direction * (radius * 2.0F + 100.0F));
-  result.orthographic = true;
-  result.view = Mat4::look_at_rh(result.position, frustum_center, up);
-
-  Vec3 min_bounds = Vec3::splat(std::numeric_limits<f32>::max());
-  Vec3 max_bounds = Vec3::splat(-std::numeric_limits<f32>::max());
-  for (auto const& corner : frustum_corners) {
-    Vec3 const light_space = result.view * corner;
-    min_bounds = Vec3(
-      glm::min(
-        static_cast<Vec3::Base const&>(min_bounds),
-        static_cast<Vec3::Base const&>(light_space)
-      )
-    );
-    max_bounds = Vec3(
-      glm::max(
-        static_cast<Vec3::Base const&>(max_bounds),
-        static_cast<Vec3::Base const&>(light_space)
-      )
-    );
-  }
-
-  Vec3 center = result.view * frustum_center;
-  f32 const diameter = radius * 2.0F;
-  f32 const texel_size = diameter / static_cast<f32>(std::max<u32>(resolution, 1U));
-
-  if (texel_size > 0.0F) {
-    center.x = std::floor(center.x / texel_size) * texel_size;
-    center.y = std::floor(center.y / texel_size) * texel_size;
-  }
-
-  min_bounds.x = center.x - radius;
-  max_bounds.x = center.x + radius;
-  min_bounds.y = center.y - radius;
-  max_bounds.y = center.y + radius;
-
-  f32 const depth_padding = std::max((max_bounds.z - min_bounds.z) * 0.25F, 25.0F);
-  result.near_plane = -max_bounds.z - depth_padding;
-  result.far_plane = -min_bounds.z + depth_padding;
-  result.projection = Mat4::orthographic_rh(
-    min_bounds.x,
-    max_bounds.x,
-    min_bounds.y,
-    max_bounds.y,
-    result.near_plane,
-    result.far_plane
-  );
-  result.update_view_projection();
-  return result;
 }
 
 inline auto build_point_shadow_views(Vec3 light_position, f32 near_plane, f32 far_plane)

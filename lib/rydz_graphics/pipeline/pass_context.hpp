@@ -5,10 +5,10 @@
 #include "rydz_graphics/extract/data.hpp"
 #include "rydz_graphics/gl/state.hpp"
 #include "rydz_graphics/lighting/clustered_lighting.hpp"
+#include "rydz_graphics/lighting/shadow.hpp"
 #include "rydz_graphics/material/material_slot.hpp"
 #include "rydz_graphics/pipeline/config.hpp"
 #include "rydz_graphics/pipeline/phase.hpp"
-#include "rydz_graphics/shadow.hpp"
 
 namespace ecs {
 

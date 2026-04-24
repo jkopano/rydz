@@ -9,12 +9,12 @@
 #include "rydz_graphics/components/mesh3d.hpp"
 #include "rydz_graphics/components/sprite.hpp"
 #include "rydz_graphics/extract/data.hpp"
+#include "rydz_graphics/lighting/shadow.hpp"
 #include "rydz_graphics/material/material3d.hpp"
 #include "rydz_graphics/material/postprocess_material.hpp"
 #include "rydz_graphics/material/standard_material.hpp"
 #include "rydz_graphics/pipeline/batches.hpp"
 #include "rydz_graphics/pipeline/phase.hpp"
-#include "rydz_graphics/shadow.hpp"
 #include "rydz_graphics/spatial/frustum.hpp"
 #include "rydz_graphics/spatial/transform.hpp"
 #include "rydz_graphics/spatial/visibility.hpp"
@@ -125,7 +125,7 @@ struct Extract {
         }
 
         AABox const world_bounds = transform_bbox(bounds->bbox, global->matrix);
-        for (Vec3 const& corner : aabb_corners(world_bounds)) {
+        for (Vec3 const& corner : world_bounds.corners()) {
           caster_bounds.encapsulate(corner);
         }
         has_caster_bounds = true;
@@ -136,8 +136,10 @@ struct Extract {
         shadows->cascade_count = 1;
 
         auto& cascade = shadows->directional_cascades[0];
-        cascade.shadow_view = build_directional_shadow_view(
-          aabb_corners(caster_bounds), lights->dir_light.direction, settings->cascade_resolution
+        cascade.shadow_view = ShadowView::from(
+          caster_bounds.corners(),
+          lights->dir_light.direction,
+          settings->cascade_resolution
         );
         cascade.split_distance = view->far_plane;
       }
@@ -149,16 +151,16 @@ struct Extract {
 
     std::vector<usize> candidates;
     candidates.reserve(lights->point_lights.size());
-    for (usize light_index = 0; light_index < lights->point_lights.size(); ++light_index) {
+    for (usize light_index = 0; light_index < lights->point_lights.size();
+         ++light_index) {
       auto& point_light = lights->point_lights[light_index];
       if (!point_light.casts_shadows || point_light.range <= 0.001F) {
         continue;
       }
 
       if (settings->point_screen_space_shadows_enabled) {
-        f32 const projected_radius = projected_sphere_radius_pixels(
-          *view, point_light.position, point_light.range
-        );
+        f32 const projected_radius =
+          projected_sphere_radius_pixels(*view, point_light.position, point_light.range);
         if (std::isfinite(projected_radius) &&
             projected_radius <= settings->point_screen_space_threshold_px) {
           point_light.screen_space_shadows = true;

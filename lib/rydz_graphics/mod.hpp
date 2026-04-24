@@ -7,5 +7,4 @@
 #include "rydz_graphics/material/mod.hpp"
 #include "rydz_graphics/pipeline/mod.hpp"
 #include "rydz_graphics/plugin.hpp"
-#include "rydz_graphics/shadow.hpp"
 #include "rydz_graphics/spatial/mod.hpp"

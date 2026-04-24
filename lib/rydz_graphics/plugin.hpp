@@ -7,11 +7,11 @@
 #include "rydz_graphics/assets/scene_runtime.hpp"
 #include "rydz_graphics/extract/systems.hpp"
 #include "rydz_graphics/lighting/clustered_lighting.hpp"
+#include "rydz_graphics/lighting/shadow.hpp"
 #include "rydz_graphics/pipeline/config.hpp"
 #include "rydz_graphics/pipeline/graph.hpp"
 #include "rydz_graphics/pipeline/passes.hpp"
 #include "rydz_graphics/pipeline/phase.hpp"
-#include "rydz_graphics/shadow.hpp"
 #include "rydz_graphics/spatial/frustum.hpp"
 
 namespace ecs {
@@ -125,9 +125,8 @@ struct RenderPlugin : IPlugin {
           .chain()
       );
 
-    app.add_systems(First, SceneRuntimeSystems::cleanup_orphan_scene_entities_system)
-      .add_systems(Startup, initialize_environment_renderer)
-
+    app.add_systems(First, SceneRuntimeSystems::cleanup_orphan_scene_ent_system)
+      .add_systems(Startup, EnvironmentRenderer::initialize_environment_renderer)
       .add_systems(PreUpdate, SceneRuntimeSystems::sync_scene_roots_system)
 
       .add_systems(

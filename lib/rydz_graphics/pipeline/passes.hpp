@@ -31,21 +31,21 @@ struct RenderExecutionState {
 struct EnvironmentRenderer {
   using T = Resource;
   gl::Skybox skybox{};
-};
 
-inline auto initialize_environment_renderer(
-  ResMut<EnvironmentRenderer> renderer, NonSendMarker
-) -> void {
-  if (renderer->skybox.ready()) {
-    return;
+  static auto initialize_environment_renderer(
+    ResMut<EnvironmentRenderer> renderer, NonSendMarker
+  ) -> void {
+    if (renderer->skybox.ready()) {
+      return;
+    }
+
+    renderer->skybox = gl::Skybox::create(
+      gl::ShaderProgram::load(
+        gl::ShaderSpec::from("res/shaders/skybox.vert", "res/shaders/skybox.frag")
+      )
+    );
   }
-
-  renderer->skybox = gl::Skybox::create(
-    gl::ShaderProgram::load(
-      gl::ShaderSpec::from("res/shaders/skybox.vert", "res/shaders/skybox.frag")
-    )
-  );
-}
+};
 
 inline auto main_render_view(ExtractedView const& view) -> gl::RenderViewState {
   return gl::RenderViewState{
@@ -228,9 +228,8 @@ private:
   }
 
   static auto point_shadow_shader_spec() -> ShaderSpec const& {
-    static ShaderSpec const SPEC = ShaderSpec::from(
-      "res/shaders/point_shadow.vert", "res/shaders/point_shadow.frag"
-    );
+    static ShaderSpec const SPEC =
+      ShaderSpec::from("res/shaders/point_shadow.vert", "res/shaders/point_shadow.frag");
     return SPEC;
   }
 
@@ -509,9 +508,7 @@ struct WorldPass {
   ) -> void {
     (void) marker;
 
-    render_state.begin_view(
-      main_render_view(view)
-    );
+    render_state.begin_view(main_render_view(view));
 
     render_state.apply(RenderConfig::get_default());
   }

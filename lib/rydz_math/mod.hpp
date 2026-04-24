@@ -468,6 +468,19 @@ struct AABox {
       )
     );
   }
+
+  auto corners() const -> std::array<Vec3, 8> {
+    return {
+      Vec3{mMin.x, mMin.y, mMin.z},
+      Vec3{mMax.x, mMin.y, mMin.z},
+      Vec3{mMax.x, mMax.y, mMin.z},
+      Vec3{mMin.x, mMax.y, mMin.z},
+      Vec3{mMin.x, mMin.y, mMax.z},
+      Vec3{mMax.x, mMin.y, mMax.z},
+      Vec3{mMax.x, mMax.y, mMax.z},
+      Vec3{mMin.x, mMax.y, mMax.z},
+    };
+  }
 };
 
 inline auto to_rl(Vec2 value) -> ::Vector2 { return {value.x, value.y}; }

@@ -10,7 +10,7 @@
 namespace ecs {
 
 struct SceneRuntimeSystems {
-  static auto cleanup_orphan_scene_entities_system(World& world) -> void {
+  static auto cleanup_orphan_scene_ent_system(World& world) -> void {
     auto* owned_storage = world.get_storage<SceneOwned>();
     if (owned_storage == nullptr) {
       return;
