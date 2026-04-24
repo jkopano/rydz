@@ -15,13 +15,10 @@ using namespace physics;
 using namespace rydz_math;
 
 void setup_scene(
-  Cmd cmd,
-  ResMut<Assets<ecs::Mesh>> meshes,
-  ResMut<Assets<ecs::Material>> materials
+  Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes, ResMut<Assets<ecs::Material>> materials
 ) {
-  auto ground_mesh = meshes->add(Mesh::cube(100.0f, 2.0f, 100.0f));
-  auto ground_mat =
-    materials->add(StandardMaterial::from_color(Color{80, 120, 80}));
+  auto ground_mesh = meshes->add(Mesh::plane(100.0f, 100.0f));
+  auto ground_mat = materials->add(StandardMaterial::from_color(Color{80, 120, 80}));
 
   cmd.spawn(
     Transform::from_xyz(0.0f, -1.0f, 0.0f),
@@ -33,6 +30,11 @@ void setup_scene(
       .shape = Collider::Box{Vec3(50.0f, 1.0f, 50.0f)},
       .friction = 0.8f,
     },
+    Visibility::Hidden
+  );
+
+  cmd.spawn(
+    Transform::from_xyz(0.0f, 0.0f, 0.0f),
     Mesh3d{ground_mesh},
     MeshMaterial3d{ground_mat}
   );
@@ -41,13 +43,14 @@ void setup_scene(
     Camera3d::perspective(),
     ActiveCamera{},
     Transform::from_xyz(-55.0f, 48.0f, -55.0f).look_at(Vec3(0.0f, 0.0f, 0.0f)),
+    PostProcessMaterial{DefaultPostProcessMaterial{}},
     ecs::Environment::from_directory("textures/skybox")
   );
 
   cmd.spawn(
     DirectionalLight{
       .color = {255, 242, 230, 255},
-      .direction = Vec3(-0.3f, -1.0f, -0.5f),
+      .direction = Vec3(0.3f, -1.0f, 0.5f),
       .intensity = 0.8f,
     }
   );
@@ -63,8 +66,7 @@ void spawn_cubes(
     return;
   }
   auto cube_mesh = meshes->add(Mesh::cube());
-  auto cube_mat =
-    materials->add(StandardMaterial::from_color(Color{200, 60, 60}));
+  auto cube_mat = materials->add(StandardMaterial::from_color(Color{200, 60, 60}));
 
   for (auto x : range(-10, 10)) {
     for (auto y : range(-10, 10)) {
@@ -86,17 +88,14 @@ auto main() -> int {
   App app;
   app
     .add_plugin(
-      rydz_platform::RayPlugin::install({
+      rydz_platform::RayPlugin{
         .window =
-          {.width = 1280,
-           .height = 720,
-           .title = "13 - Physics",
-           .target_fps = 120},
+          {.width = 1280, .height = 720, .title = "13 - Physics", .target_fps = 120},
         .trace_log_level = LOG_DEBUG,
-      })
+      }
     )
     .add_plugin(time_plugin)
-    .add_plugin(RenderPlugin::install)
+    .add_plugin(RenderPlugin{})
     .add_plugin(Input::install)
     .add_plugin(physics::PhysicsPlugin{})
     .add_systems(Startup, setup_scene)

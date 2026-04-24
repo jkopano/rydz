@@ -135,6 +135,9 @@ struct RenderPlugin : IPlugin {
       .add_systems(
         RenderExtractSet::Extract,
         group(
+          propagate_transforms,
+          compute_mesh_bounds_system,
+          frustum_cull_system,
           Extract::clear_meshes,
           Extract::view,
           Extract::lighting,

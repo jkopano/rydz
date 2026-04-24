@@ -239,7 +239,7 @@ private:
           }
         }
       }
-    } guard{runtime_, node.outputs, resources_};
+    } guard{.runtime = runtime_, .outputs = node.outputs, .resources = resources_};
 
     node.pass->execute(ctx, runtime_);
   }

@@ -18,12 +18,11 @@ enum class PhysicsSet : u8 {
 struct PhysicsPlugin : public ecs::IPlugin {
   PhysicsSettings cfg{};
 
-  auto build(ecs::App& app) -> void override {
+  auto build(ecs::App& app) const -> void {
     app.init_resource<ecs::FixedTime>();
 
     auto const* existing = app.world().get_resource<PhysicsSettings>();
-    PhysicsSettings settings =
-      existing != nullptr ? *existing : PhysicsSettings{};
+    PhysicsSettings settings = existing != nullptr ? *existing : PhysicsSettings{};
 
     if (existing == nullptr) {
       app.insert_resource(cfg);
@@ -45,10 +44,7 @@ struct PhysicsPlugin : public ecs::IPlugin {
 
     app.configure_set(
       ecs::FixedUpdate,
-      ecs::configure(
-        PhysicsSet::PreStep, PhysicsSet::Step, PhysicsSet::PostStep
-      )
-        .chain()
+      ecs::configure(PhysicsSet::PreStep, PhysicsSet::Step, PhysicsSet::PostStep).chain()
     );
 
     app.add_systems(
@@ -67,8 +63,7 @@ struct PhysicsPlugin : public ecs::IPlugin {
 
     app.add_systems(
       PhysicsSet::PostStep,
-      ecs::group(sync_transforms, sync_velocities, process_contact_events)
-        .chain()
+      ecs::group(sync_transforms, sync_velocities, process_contact_events).chain()
     );
   }
 };

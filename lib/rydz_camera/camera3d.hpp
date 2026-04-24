@@ -68,19 +68,13 @@ inline auto compute_camera_aspect_ratio(float width, float height) -> float {
   return std::max(aspect, 0.0001f);
 }
 
-inline auto compute_camera_projection(Camera3d const& comp, float aspect)
-  -> Mat4 {
+inline auto compute_camera_projection(Camera3d const& comp, float aspect) -> Mat4 {
   if (comp.is_orthographic()) {
     float height = std::max(comp.orthographic_height, 0.0001f);
     float half_height = height * 0.5f;
     float half_width = half_height * aspect;
     return Mat4::orthographic_rh(
-      -half_width,
-      half_width,
-      -half_height,
-      half_height,
-      comp.near_plane,
-      comp.far_plane
+      -half_width, half_width, -half_height, half_height, comp.near_plane, comp.far_plane
     );
   }
 
@@ -96,18 +90,15 @@ inline auto compute_camera_view(
   return {.view = view, .proj = proj, .position = position};
 }
 
-inline auto compute_camera_view(
-  Transform const& t, Camera3d const& comp, float aspect
-) -> CameraView {
+inline auto compute_camera_view(Transform const& t, Camera3d const& comp, float aspect)
+  -> CameraView {
   return compute_camera_view(t.translation, t.forward(), t.up(), comp, aspect);
 }
 
 inline auto compute_camera_view(
   GlobalTransform const& t, Camera3d const& comp, float aspect
 ) -> CameraView {
-  return compute_camera_view(
-    t.translation(), t.forward(), t.up(), comp, aspect
-  );
+  return compute_camera_view(t.translation(), t.forward(), t.up(), comp, aspect);
 }
 
 } // namespace ecs

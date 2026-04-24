@@ -28,8 +28,7 @@ void setup(
 
   // podłoga
   auto floor_h = meshes->add(Mesh::plane(20, 20));
-  auto floor_mat =
-    materials->add(StandardMaterial::from_color(ecs::Color::DARKGRAY));
+  auto floor_mat = materials->add(StandardMaterial::from_color(ecs::Color::DARKGRAY));
   cmd.spawn(Mesh3d{floor_h}, MeshMaterial3d{floor_mat}, Transform{});
 
   // światło
@@ -43,13 +42,9 @@ void setup(
 
   // parent
   auto cube_h = meshes->add(Mesh::cube(1, 1, 1));
-  auto yellow_mat =
-    materials->add(StandardMaterial::from_color(ecs::Color::YELLOW));
+  auto yellow_mat = materials->add(StandardMaterial::from_color(ecs::Color::YELLOW));
   auto pivot = cmd.spawn(
-    Mesh3d{cube_h},
-    MeshMaterial3d{yellow_mat},
-    Transform::from_xyz(0, 2, 0),
-    PivotTag{}
+    Mesh3d{cube_h}, MeshMaterial3d{yellow_mat}, Transform::from_xyz(0, 2, 0), PivotTag{}
   );
 
   // child
@@ -65,8 +60,7 @@ void setup(
 
   // child of child
   auto tip_h = meshes->add(Mesh::sphere(0.4f));
-  auto blue_mat =
-    materials->add(StandardMaterial::from_color(ecs::Color::BLUE));
+  auto blue_mat = materials->add(StandardMaterial::from_color(ecs::Color::BLUE));
   cmd.spawn(
     Mesh3d{tip_h},
     MeshMaterial3d{blue_mat},
@@ -75,9 +69,7 @@ void setup(
   );
 
   std::println(
-    "hierarchy: pivot({}) -> arm({}) -> tip",
-    pivot.id().index(),
-    arm.id().index()
+    "hierarchy: pivot({}) -> arm({}) -> tip", pivot.id().index(), arm.id().index()
   );
 }
 
@@ -112,16 +104,17 @@ void rotate_pivot(Query<Mut<Transform>, PivotTag> query, Res<Time> time) {
   }
 }
 
-int main() {
+auto main() -> int {
   App app;
   app
     .add_plugin(
-      rydz_platform::RayPlugin::install({
-        .window = {1024, 768, "08 - Hierarchy", 60},
-      })
+      rydz_platform::RayPlugin{
+        .window =
+          {.width = 1024, .height = 768, .title = "08 - Hierarchy", .target_fps = 60},
+      }
     )
     .add_plugin(time_plugin)
-    .add_plugin(RenderPlugin::install)
+    .add_plugin(RenderPlugin{})
     .add_systems(Startup, setup)
     .add_systems(Update, rotate_pivot)
     .run();
