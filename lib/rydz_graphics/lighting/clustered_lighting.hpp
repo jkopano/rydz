@@ -55,6 +55,7 @@ struct ClusterConfig {
 struct alignas(16) GpuPointLight {
   Vec4 position_range = {0, 0, 0, 0};
   Vec4 color_intensity = {0, 0, 0, 0};
+  Vec4 shadow_data = {-1, 0, 0, 0};
 };
 
 struct alignas(16) ClusterGpuRecord {
@@ -66,7 +67,7 @@ struct alignas(16) ClusterGpuRecord {
   u32 _pad1 = 0;
 };
 
-static constexpr auto POINT_LIGHT_SIZE = 32;
+static constexpr auto POINT_LIGHT_SIZE = 48;
 static constexpr auto CLUSTER_RECORD_SIZE = 48;
 
 static_assert(sizeof(GpuPointLight) == POINT_LIGHT_SIZE);
@@ -323,6 +324,12 @@ public:
             light.color.g / 255.0f,
             light.color.b / 255.0f,
             light.intensity
+          },
+          .shadow_data = {
+            static_cast<f32>(light.shadow_slot),
+            light.range,
+            0.0F,
+            0.0F,
           },
         }
       );

@@ -11,6 +11,7 @@
 #include "rydz_graphics/pipeline/graph.hpp"
 #include "rydz_graphics/pipeline/passes.hpp"
 #include "rydz_graphics/pipeline/phase.hpp"
+#include "rydz_graphics/shadow.hpp"
 #include "rydz_graphics/spatial/frustum.hpp"
 
 namespace ecs {
@@ -64,10 +65,14 @@ struct RenderPlugin : IPlugin {
       .init_resource<EnvironmentRenderer>()
       .init_resource<ShaderCache>()
       .init_resource<ViewUniformState>()
+      .init_resource<ShadowUniformState>()
       .init_resource<MaterialCache>()
       .init_resource<SlotProviderRegistry>()
       .init_resource<DebugOverlaySettings>()
       .init_resource<gl::RenderState>()
+      .init_resource<ShadowSettings>()
+      .init_resource<ExtractedShadows>()
+      .init_resource<ShadowResources>()
       .init_resource<ShadowPhase>()
       .init_resource<OpaquePhase>()
       .init_resource<TransparentPhase>()
@@ -142,6 +147,7 @@ struct RenderPlugin : IPlugin {
           Extract::clear_meshes,
           Extract::view,
           Extract::lighting,
+          Extract::shadows,
           Extract::ui,
           Extract::meshes<Material>
         )

@@ -47,6 +47,30 @@ inline auto initialize_environment_renderer(
   );
 }
 
+inline auto main_render_view(ExtractedView const& view) -> gl::RenderViewState {
+  return gl::RenderViewState{
+    .viewport = view.viewport,
+    .view = view.camera_view.view,
+    .projection = view.camera_view.proj,
+    .camera_position = view.camera_view.position,
+    .orthographic = view.orthographic,
+    .near_plane = view.near_plane,
+    .far_plane = view.far_plane,
+  };
+}
+
+inline auto shadow_render_view(ShadowView const& view) -> gl::RenderViewState {
+  return gl::RenderViewState{
+    .viewport = {0.0F, 0.0F, 1.0F, 1.0F},
+    .view = view.view,
+    .projection = view.projection,
+    .camera_position = view.position,
+    .orthographic = view.orthographic,
+    .near_plane = view.near_plane,
+    .far_plane = view.far_plane,
+  };
+}
+
 class PassRenderer {
 public:
   explicit PassRenderer(
@@ -82,6 +106,8 @@ public:
 
     if (shader_changed) {
       last_shader_ = &shader;
+      ctx_.shadow_uniforms.bind_shader(shader);
+      ctx_.shadow_resources.bind_shader(shader);
       apply_slot_uniforms_per_view(material_ctx_, material, shader);
     }
 
@@ -137,9 +163,108 @@ class ShadowPass : public RenderPass {
 public:
   auto setup(RenderGraphBuilder&) -> void override {}
   auto execute(PassContext& ctx, RenderGraphRuntime&) -> void override {
+    auto* state = ctx.execution_state;
+    if ((state == nullptr) || !state->world_pass_active) {
+      return;
+    }
     if (ctx.shadow_phase.commands.empty()) {
       return;
     }
+
+    ctx.shadow_resources.ensure(ctx.shadow_settings);
+
+    if (ctx.shadows.cascade_count > 0 && ctx.shadow_resources.directional_atlas.ready()) {
+      ctx.shadow_resources.directional_atlas.begin();
+      for (i32 cascade_index = 0; cascade_index < ctx.shadows.cascade_count;
+           ++cascade_index) {
+        auto const tile = ctx.shadow_resources.directional_tile(cascade_index);
+        ctx.shadow_resources.directional_atlas.begin_tile(tile);
+        render_shadow_commands(
+          ctx,
+          ctx.shadows.directional_cascades[cascade_index].shadow_view,
+          directional_shadow_shader_spec()
+        );
+      }
+      ctx.shadow_resources.directional_atlas.end();
+    }
+
+    for (usize point_index = 0; point_index < ctx.shadows.point_shadows.size();
+         ++point_index) {
+      if (point_index >= ctx.shadow_resources.point_maps.size()) {
+        break;
+      }
+
+      auto& target = ctx.shadow_resources.point_maps[point_index];
+      if (!target.ready()) {
+        continue;
+      }
+
+      for (i32 face_index = 0; face_index < POINT_SHADOW_FACE_COUNT; ++face_index) {
+        target.begin_face(face_index);
+        render_point_shadow_commands(
+          ctx,
+          ctx.shadows.point_shadows[point_index],
+          face_index,
+          point_shadow_shader_spec()
+        );
+        target.end();
+      }
+    }
+
+    ctx.render_state.reset();
+    ctx.render_state.begin_view(main_render_view(ctx.view));
+    ctx.render_state.apply(RenderConfig::get_default());
+  }
+
+private:
+  static auto directional_shadow_shader_spec() -> ShaderSpec const& {
+    static ShaderSpec const SPEC =
+      ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth.frag");
+    return SPEC;
+  }
+
+  static auto point_shadow_shader_spec() -> ShaderSpec const& {
+    static ShaderSpec const SPEC = ShaderSpec::from(
+      "res/shaders/point_shadow.vert", "res/shaders/point_shadow.frag"
+    );
+    return SPEC;
+  }
+
+  static auto render_shadow_commands(
+    PassContext& ctx, ShadowView const& shadow_view, ShaderSpec const& shader_spec
+  ) -> void {
+    ctx.render_state.reset();
+    ctx.render_state.begin_view(shadow_render_view(shadow_view));
+
+    PassRenderer renderer{ctx, RenderConfig::depth_prepass()};
+    for (auto const& cmd : ctx.shadow_phase.commands) {
+      renderer.draw(cmd, shader_spec);
+    }
+    renderer.end(RenderConfig::post_depth_prepass());
+    ctx.render_state.end_view();
+    ctx.render_state.reset();
+  }
+
+  static auto render_point_shadow_commands(
+    PassContext& ctx,
+    ExtractedShadows::PointShadow const& point_shadow,
+    i32 face_index,
+    ShaderSpec const& shader_spec
+  ) -> void {
+    auto const& shadow_view = point_shadow.faces[static_cast<usize>(face_index)];
+    ctx.render_state.reset();
+    ctx.render_state.begin_view(shadow_render_view(shadow_view));
+
+    PassRenderer renderer{ctx, RenderConfig::depth_prepass()};
+    for (auto const& cmd : ctx.shadow_phase.commands) {
+      ShaderProgram& shader = resolve_shader(ctx.marker, ctx.shader_cache, shader_spec);
+      shader.set("u_light_pos", point_shadow.position);
+      shader.set("u_far_plane", point_shadow.far_plane);
+      renderer.draw(cmd, shader_spec);
+    }
+    renderer.end(RenderConfig::post_depth_prepass());
+    ctx.render_state.end_view();
+    ctx.render_state.reset();
   }
 };
 
@@ -321,15 +446,7 @@ struct WorldPass {
     (void) marker;
 
     render_state.begin_view(
-      gl::RenderViewState{
-        .viewport = view.viewport,
-        .view = view.camera_view.view,
-        .projection = view.camera_view.proj,
-        .camera_position = view.camera_view.position,
-        .orthographic = view.orthographic,
-        .near_plane = view.near_plane,
-        .far_plane = view.far_plane,
-      }
+      main_render_view(view)
     );
 
     render_state.apply(RenderConfig::get_default());
@@ -381,15 +498,21 @@ struct FramePass {
     Res<Assets<Texture>> texture_assets,
     ResMut<ShaderCache> shader_cache,
     ResMut<ViewUniformState> view_uniforms,
+    ResMut<ShadowUniformState> shadow_uniforms,
     Res<SlotProviderRegistry> slot_registry,
     Res<ExtractedView> view,
     Res<ExtractedLights> lights,
+    Res<ExtractedShadows> shadows,
     Res<ClusterConfig> cluster_config,
+    Res<ShadowSettings> shadow_settings,
+    ResMut<ShadowResources> shadow_resources,
     ResMut<ClusteredLightingState> cluster_state,
     Res<Time> time,
     NonSendMarker marker
   ) -> void {
     view_uniforms->update(*view, *lights, *cluster_config);
+    shadow_resources->ensure(*shadow_settings);
+    shadow_uniforms->update(*shadows, *shadow_settings);
 
     PassContext ctx{
       .marker = marker,
@@ -400,19 +523,23 @@ struct FramePass {
         },
       .view = *view,
       .lights = *lights,
+      .shadows = *shadows,
       .time = *time,
       .extracted_meshes = *extracted_meshes,
       .mesh_assets = *mesh_assets,
       .texture_assets = *texture_assets,
       .shader_cache = *shader_cache,
       .view_uniforms = *view_uniforms,
+      .shadow_uniforms = *shadow_uniforms,
       .slot_registry = *slot_registry,
       .opaque_phase = *opaque_phase,
       .transparent_phase = *transparent_phase,
       .shadow_phase = *shadow_phase,
       .ui_phase = *ui_phase,
       .cluster_config = *cluster_config,
+      .shadow_settings = *shadow_settings,
       .cluster_state = *cluster_state,
+      .shadow_resources = *shadow_resources,
       .execution_state = state.ptr,
       .environment_renderer = environment_renderer.ptr,
     };

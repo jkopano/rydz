@@ -48,6 +48,7 @@ struct ExtractedLights {
     Color color{Color::WHITE};
     float intensity{0.0F};
     float range{0.0F};
+    i32 shadow_slot{-1};
   };
 
   std::vector<PointLight> point_lights{};

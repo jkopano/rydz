@@ -295,6 +295,14 @@ public:
     }
   }
 
+  auto set_sampler(std::string_view const name, int unit) -> void {
+    int const location = uniform_location(name);
+    if (location >= 0) {
+      glUseProgram(shader_.id);
+      glUniform1i(location, unit);
+    }
+  }
+
   template <ecs::ShaderUniformBinding Binding, typename T>
   auto set(Binding binding, T&& value) -> void {
     set(map_uniform_binding(binding), std::forward<T>(value));

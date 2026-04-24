@@ -14,6 +14,7 @@
 #include "rydz_graphics/material/standard_material.hpp"
 #include "rydz_graphics/pipeline/batches.hpp"
 #include "rydz_graphics/pipeline/phase.hpp"
+#include "rydz_graphics/shadow.hpp"
 #include "rydz_graphics/spatial/frustum.hpp"
 #include "rydz_graphics/spatial/transform.hpp"
 #include "rydz_graphics/spatial/visibility.hpp"
@@ -92,6 +93,97 @@ struct Extract {
           .color = point_light->color,
           .intensity = point_light->intensity,
           .range = point_light->range,
+          .shadow_slot = -1,
+        }
+      );
+    }
+  }
+
+  static auto shadows(
+    Res<ExtractedView> view,
+    ResMut<ExtractedLights> lights,
+    Res<ShadowSettings> settings,
+    ResMut<ExtractedShadows> shadows
+  ) -> void {
+    shadows->clear();
+
+    if (!view->active) {
+      return;
+    }
+
+    f32 const max_shadow_distance = std::min(
+      view->far_plane, std::max(settings->cascade_max_distance, view->near_plane + 0.001F)
+    );
+
+    if (settings->directional_enabled && lights->has_directional &&
+        lights->dir_light.casts_shadows) {
+      shadows->has_directional = true;
+      shadows->cascade_count = settings->cascade_count_clamped();
+
+      auto const splits = compute_cascade_splits(
+        view->near_plane,
+        max_shadow_distance,
+        shadows->cascade_count,
+        std::clamp(settings->cascade_split_lambda, 0.0F, 1.0F)
+      );
+
+      f32 previous_split = view->near_plane;
+      for (i32 cascade_index = 0; cascade_index < shadows->cascade_count; ++cascade_index) {
+        f32 const split_distance = splits[cascade_index];
+        auto const corners = compute_frustum_slice_corners_world(
+          *view, previous_split, split_distance
+        );
+
+        auto& cascade = shadows->directional_cascades[cascade_index];
+        cascade.shadow_view = build_directional_shadow_view(
+          corners, lights->dir_light.direction, settings->cascade_resolution
+        );
+        cascade.split_distance = split_distance;
+        previous_split = split_distance;
+      }
+    }
+
+    if (!settings->point_shadows_enabled || lights->point_lights.empty()) {
+      return;
+    }
+
+    std::vector<usize> candidates;
+    candidates.reserve(lights->point_lights.size());
+    for (usize light_index = 0; light_index < lights->point_lights.size(); ++light_index) {
+      auto const& point_light = lights->point_lights[light_index];
+      if (point_light.range <= 0.001F) {
+        continue;
+      }
+      candidates.push_back(light_index);
+    }
+
+    std::ranges::sort(candidates, [&](usize lhs, usize rhs) -> bool {
+      Vec3 const lhs_offset =
+        lights->point_lights[lhs].position - view->camera_view.position;
+      Vec3 const rhs_offset =
+        lights->point_lights[rhs].position - view->camera_view.position;
+      return lhs_offset.length_sq() < rhs_offset.length_sq();
+    });
+
+    usize const selected_count = std::min<usize>(
+      candidates.size(), static_cast<usize>(settings->max_shadowed_point_lights_clamped())
+    );
+    shadows->point_shadows.reserve(selected_count);
+
+    for (usize point_slot = 0; point_slot < selected_count; ++point_slot) {
+      usize const light_index = candidates[point_slot];
+      auto& light = lights->point_lights[light_index];
+      light.shadow_slot = static_cast<i32>(point_slot);
+
+      f32 const near_plane = 0.1F;
+      f32 const far_plane = std::max(light.range, near_plane + 0.001F);
+      shadows->point_shadows.push_back(
+        ExtractedShadows::PointShadow{
+          .light_index = light_index,
+          .position = light.position,
+          .near_plane = near_plane,
+          .far_plane = far_plane,
+          .faces = build_point_shadow_views(light.position, near_plane, far_plane),
         }
       );
     }

@@ -37,6 +37,20 @@ layout(std140, binding = 0) uniform ViewUniforms {
   ivec4 u_view_flags;
 };
 
+layout(std140, binding = 1) uniform ShadowUniforms {
+  mat4 u_dir_light_matrices[4];
+  vec4 u_cascade_splits;
+  vec4 u_cascade_uv_rects[4];
+  ivec4 u_shadow_flags;
+  vec4 u_shadow_params;
+};
+
+uniform sampler2D u_shadow_atlas;
+uniform samplerCube u_point_shadow_map0;
+uniform samplerCube u_point_shadow_map1;
+uniform samplerCube u_point_shadow_map2;
+uniform samplerCube u_point_shadow_map3;
+
 const int RENDER_METHOD_OPAQUE = 0;
 const int RENDER_METHOD_TRANSPARENT = 1;
 const int RENDER_METHOD_ALPHA_CUTOUT = 2;
@@ -44,6 +58,7 @@ const int RENDER_METHOD_ALPHA_CUTOUT = 2;
 struct GpuPointLight {
   vec4 position_range;
   vec4 color_intensity;
+  vec4 shadow_data;
 };
 
 struct ClusterRecord {
@@ -99,6 +114,32 @@ float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
   return ggx1 * ggx2;
 }
 
+float sampleDirectionalDepth(int cascadeIndex, vec2 uv) {
+  vec4 rect = u_cascade_uv_rects[cascadeIndex];
+  vec2 atlasUv = rect.xy + uv * rect.zw;
+  return texture(u_shadow_atlas, atlasUv).r;
+}
+
+vec2 directionalTexelSize(int cascadeIndex) {
+  vec2 atlasSize = vec2(textureSize(u_shadow_atlas, 0));
+  return u_cascade_uv_rects[cascadeIndex].zw / atlasSize;
+}
+
+float samplePointShadow(int slot, vec3 dir) {
+  switch (slot) {
+  case 0:
+    return texture(u_point_shadow_map0, dir).r;
+  case 1:
+    return texture(u_point_shadow_map1, dir).r;
+  case 2:
+    return texture(u_point_shadow_map2, dir).r;
+  case 3:
+    return texture(u_point_shadow_map3, dir).r;
+  default:
+    return 1.0;
+  }
+}
+
 vec3 evaluatePBR(
   vec3 N,
   vec3 V,
@@ -142,6 +183,64 @@ vec3 sampleNormal(vec3 N, vec3 T, vec3 B, vec2 uv) {
   tangentNormal.xy *= u_normal_factor;
   mat3 TBN = mat3(T, B, N);
   return normalize(TBN * tangentNormal);
+}
+
+float computeDirectionalShadow(vec3 fragPos, vec3 normal, vec3 lightDir, vec3 viewPos) {
+  if (u_shadow_flags.x <= 0 || u_shadow_flags.y <= 0) {
+    return 1.0;
+  }
+
+  float depth = max(-viewPos.z, max(u_cluster_screen_size_near_far.z, 0.001));
+  int cascadeIndex = 0;
+  int cascadeCount = clamp(u_shadow_flags.y, 1, 4);
+  for (int i = 0; i < cascadeCount - 1; ++i) {
+    if (depth > u_cascade_splits[i]) {
+      cascadeIndex = i + 1;
+    }
+  }
+
+  vec4 shadowClip = u_dir_light_matrices[cascadeIndex] * vec4(fragPos, 1.0);
+  vec3 shadowCoord = shadowClip.xyz / max(shadowClip.w, 0.0001);
+  shadowCoord = shadowCoord * 0.5 + 0.5;
+
+  if (shadowCoord.z > 1.0 || shadowCoord.x < 0.0 || shadowCoord.x > 1.0 ||
+      shadowCoord.y < 0.0 || shadowCoord.y > 1.0) {
+    return 1.0;
+  }
+
+  float bias = max(
+    u_shadow_params.x,
+    u_shadow_params.y * (1.0 - max(dot(normal, lightDir), 0.0))
+  );
+  vec2 texelSize = directionalTexelSize(cascadeIndex);
+  int pcfRadius = max(u_shadow_flags.w, 0);
+  float visibility = 0.0;
+  float sampleCount = 0.0;
+
+  for (int x = -pcfRadius; x <= pcfRadius; ++x) {
+    for (int y = -pcfRadius; y <= pcfRadius; ++y) {
+      vec2 offset = vec2(float(x), float(y)) * texelSize;
+      float closestDepth = sampleDirectionalDepth(cascadeIndex, shadowCoord.xy + offset);
+      visibility += shadowCoord.z - bias > closestDepth ? 0.0 : 1.0;
+      sampleCount += 1.0;
+    }
+  }
+
+  return visibility / max(sampleCount, 1.0);
+}
+
+float computePointShadow(vec3 fragPos, GpuPointLight pointLight) {
+  int shadowSlot = int(pointLight.shadow_data.x + 0.5);
+  if (shadowSlot < 0 || shadowSlot >= u_shadow_flags.z) {
+    return 1.0;
+  }
+
+  vec3 lightToFrag = fragPos - pointLight.position_range.xyz;
+  float currentDepth = length(lightToFrag);
+  float farPlane = max(pointLight.shadow_data.y, 0.001);
+  float closestDepth = samplePointShadow(shadowSlot, lightToFrag);
+  closestDepth *= farPlane;
+  return currentDepth - u_shadow_params.z > closestDepth ? 0.0 : 1.0;
 }
 
 int computeDepthSlice(float depth, ivec3 dims) {
@@ -207,16 +306,17 @@ void main() {
   emissive *= pow(texture(u_emissive_texture, TexCoord).rgb, vec3(2.2));
 
   vec3 lighting = vec3(0.0);
+  vec3 viewPos = (u_mat_view * vec4(FragPos, 1.0)).xyz;
 
   if (u_view_flags.x > 0 && u_dir_light_color_intensity.w > 0.0) {
     vec3 lightDir = normalize(-u_dir_light_direction.xyz);
     vec3 radiance =
         u_dir_light_color_intensity.xyz * u_dir_light_color_intensity.w;
+    float shadow = computeDirectionalShadow(FragPos, normal, lightDir, viewPos);
     lighting += evaluatePBR(
-        normal, viewDir, lightDir, radiance, albedo, metallic, roughness);
+        normal, viewDir, lightDir, radiance * shadow, albedo, metallic, roughness);
   }
 
-  vec3 viewPos = (u_mat_view * vec4(FragPos, 1.0)).xyz;
   int clusterIndex = computeClusterIndex(viewPos);
   ClusterRecord cluster = u_clusters[clusterIndex];
   uint pointLightCount = min(cluster.meta.y, uint(max(u_view_flags.y, 0)));
@@ -242,8 +342,9 @@ void main() {
     attenuation *= smoothFactor * smoothFactor;
 
     vec3 radiance = pointLight.color_intensity.rgb * attenuation;
+    float shadow = computePointShadow(FragPos, pointLight);
     lighting += evaluatePBR(
-        normal, viewDir, lightDir, radiance, albedo, metallic, roughness);
+        normal, viewDir, lightDir, radiance * shadow, albedo, metallic, roughness);
   }
 
   vec3 F0 = mix(vec3(0.04), albedo, metallic);

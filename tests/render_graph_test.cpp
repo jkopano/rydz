@@ -61,18 +61,22 @@ auto execute(RenderGraph& graph) -> void {
   gl::RenderState render_state;
   ExtractedView view{};
   ExtractedLights lights{};
+  ExtractedShadows shadows{};
   Time time{};
   ExtractedMeshes extracted_meshes{};
   Assets<Mesh> mesh_assets;
   Assets<Texture> texture_assets;
   ShaderCache shader_cache;
   ViewUniformState view_uniforms;
+  ShadowUniformState shadow_uniforms;
   SlotProviderRegistry slot_registry;
   OpaquePhase opaque_phase{};
   TransparentPhase transparent_phase{};
   ShadowPhase shadow_phase{};
   UiPhase ui_phase{};
   gl::ClusterConfig cluster_config{};
+  ShadowSettings shadow_settings{};
+  ShadowResources shadow_resources{};
   gl::ClusteredLightingState cluster_state{};
   PassContext ctx{
     .marker = NonSendMarker{},
@@ -80,19 +84,23 @@ auto execute(RenderGraph& graph) -> void {
     .framebuffer = {},
     .view = view,
     .lights = lights,
+    .shadows = shadows,
     .time = time,
     .extracted_meshes = extracted_meshes,
     .mesh_assets = mesh_assets,
     .texture_assets = texture_assets,
     .shader_cache = shader_cache,
     .view_uniforms = view_uniforms,
+    .shadow_uniforms = shadow_uniforms,
     .slot_registry = slot_registry,
     .opaque_phase = opaque_phase,
     .transparent_phase = transparent_phase,
     .shadow_phase = shadow_phase,
     .ui_phase = ui_phase,
     .cluster_config = cluster_config,
+    .shadow_settings = shadow_settings,
     .cluster_state = cluster_state,
+    .shadow_resources = shadow_resources,
   };
   graph.execute(ctx);
 }

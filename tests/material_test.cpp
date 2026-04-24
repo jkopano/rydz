@@ -120,6 +120,7 @@ TEST(MaterialTest, PrepareMaterialAppliesFallbackTexturesForDefaultedMaps) {
   gl::RenderState render_state;
   ecs::ExtractedView view{};
   ecs::ExtractedLights lights{};
+  ecs::ExtractedShadows shadows{};
   ecs::Time time{};
   ecs::ExtractedMeshes extracted_meshes{};
   ecs::Assets<ecs::Mesh> mesh_assets;
@@ -128,27 +129,34 @@ TEST(MaterialTest, PrepareMaterialAppliesFallbackTexturesForDefaultedMaps) {
   ecs::ShadowPhase shadow_phase{};
   ecs::UiPhase ui_phase{};
   gl::ClusterConfig cluster_config{};
+  ecs::ShadowSettings shadow_settings{};
+  ecs::ShadowResources shadow_resources{};
   gl::ClusteredLightingState cluster_state{};
   ecs::ViewUniformState view_uniforms{};
+  ecs::ShadowUniformState shadow_uniforms{};
   ecs::PassContext ctx{
     .marker = ecs::NonSendMarker{},
     .render_state = render_state,
     .framebuffer = {},
     .view = view,
     .lights = lights,
+    .shadows = shadows,
     .time = time,
     .extracted_meshes = extracted_meshes,
     .mesh_assets = mesh_assets,
     .texture_assets = textures,
     .shader_cache = shader_cache,
     .view_uniforms = view_uniforms,
+    .shadow_uniforms = shadow_uniforms,
     .slot_registry = registry,
     .opaque_phase = opaque_phase,
     .transparent_phase = transparent_phase,
     .shadow_phase = shadow_phase,
     .ui_phase = ui_phase,
     .cluster_config = cluster_config,
+    .shadow_settings = shadow_settings,
     .cluster_state = cluster_state,
+    .shadow_resources = shadow_resources,
   };
   ecs::MaterialContext material_ctx{.frame_data = &ctx};
 
@@ -221,6 +229,7 @@ TEST(MaterialTest, PrepareMaterialPreservesAuthoredTextureOverFallback) {
   gl::RenderState render_state;
   ecs::ExtractedView view{};
   ecs::ExtractedLights lights{};
+  ecs::ExtractedShadows shadows{};
   ecs::Time time{};
   ecs::ExtractedMeshes extracted_meshes{};
   ecs::Assets<ecs::Mesh> mesh_assets;
@@ -229,27 +238,34 @@ TEST(MaterialTest, PrepareMaterialPreservesAuthoredTextureOverFallback) {
   ecs::ShadowPhase shadow_phase{};
   ecs::UiPhase ui_phase{};
   gl::ClusterConfig cluster_config{};
+  ecs::ShadowSettings shadow_settings{};
+  ecs::ShadowResources shadow_resources{};
   gl::ClusteredLightingState cluster_state{};
   ecs::ViewUniformState view_uniforms{};
+  ecs::ShadowUniformState shadow_uniforms{};
   ecs::PassContext ctx{
     .marker = ecs::NonSendMarker{},
     .render_state = render_state,
     .framebuffer = {},
     .view = view,
     .lights = lights,
+    .shadows = shadows,
     .time = time,
     .extracted_meshes = extracted_meshes,
     .mesh_assets = mesh_assets,
     .texture_assets = textures,
     .shader_cache = shader_cache,
     .view_uniforms = view_uniforms,
+    .shadow_uniforms = shadow_uniforms,
     .slot_registry = registry,
     .opaque_phase = opaque_phase,
     .transparent_phase = transparent_phase,
     .shadow_phase = shadow_phase,
     .ui_phase = ui_phase,
     .cluster_config = cluster_config,
+    .shadow_settings = shadow_settings,
     .cluster_state = cluster_state,
+    .shadow_resources = shadow_resources,
   };
   ecs::MaterialContext material_ctx{.frame_data = &ctx};
 

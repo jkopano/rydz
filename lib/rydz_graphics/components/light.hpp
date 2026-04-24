@@ -11,12 +11,14 @@ struct PointLight {
   Color color = Color::WHITE;
   float intensity = 1.0f;
   float range = 10.0f;
+  bool casts_shadows = false;
 };
 
 struct DirectionalLight {
   Color color = Color::WHITE;
   Vec3 direction = Vec3(-1, -1, -1);
   float intensity = 1.0f;
+  bool casts_shadows = true;
 };
 
 struct AmbientLight {
