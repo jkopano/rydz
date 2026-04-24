@@ -117,7 +117,7 @@ inline auto spawn_map(Cmd cmd, Res<AssetServer> asset_server) -> void {
 inline auto spawn_model(Cmd cmd, Res<AssetServer> asset_server) -> void {
   cmd.spawn(
     SceneRoot{asset_server->load<Scene>("res/models/hot_sun.glb")},
-    Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}}
+    Transform{.scale = Vec3{10.1f, 150.1f, 10.1f}}
   );
 }
 
