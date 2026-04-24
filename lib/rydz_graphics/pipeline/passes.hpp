@@ -108,6 +108,10 @@ public:
       last_shader_ = &shader;
       ctx_.shadow_uniforms.bind_shader(shader);
       ctx_.shadow_resources.bind_shader(shader);
+      if (ctx_.scene_depth_texture != nullptr && ctx_.scene_depth_texture->ready()) {
+        ctx_.scene_depth_texture->bind(SCENE_DEPTH_TEXTURE_SLOT);
+        shader.set_sampler("u_scene_depth", SCENE_DEPTH_TEXTURE_SLOT);
+      }
       apply_slot_uniforms_per_view(material_ctx_, material, shader);
     }
 
@@ -300,18 +304,21 @@ private:
 
 template <typename Tag> class MeshPass : public RenderPass {
 public:
-  explicit MeshPass(RenderTextureHandle main_target) : main_target_(main_target) {}
+  MeshPass(RenderTextureHandle main_target, RenderTextureHandle scene_depth)
+      : main_target_(main_target), scene_depth_(scene_depth) {}
 
   auto setup(RenderGraphBuilder& builder) -> void override;
   auto execute(PassContext& ctx, RenderGraphRuntime& runtime) -> void override;
 
 private:
   RenderTextureHandle main_target_;
+  RenderTextureHandle scene_depth_;
 
   static auto render_config() -> RenderConfig;
 };
 
 template <> inline auto MeshPass<OpaqueTag>::setup(RenderGraphBuilder& builder) -> void {
+  builder.read(scene_depth_);
   builder.write(main_target_);
 }
 
@@ -320,7 +327,8 @@ template <> inline auto MeshPass<OpaqueTag>::render_config() -> RenderConfig {
 }
 
 template <>
-inline auto MeshPass<OpaqueTag>::execute(PassContext& ctx, RenderGraphRuntime&) -> void {
+inline auto MeshPass<OpaqueTag>::execute(PassContext& ctx, RenderGraphRuntime& runtime)
+  -> void {
   auto* state = ctx.execution_state;
   if ((state == nullptr) || !state->world_pass_active) {
     return;
@@ -328,6 +336,9 @@ inline auto MeshPass<OpaqueTag>::execute(PassContext& ctx, RenderGraphRuntime&) 
   if (ctx.opaque_phase.commands.empty()) {
     return;
   }
+  auto const& scene_depth_target = runtime.get_target(scene_depth_);
+  ctx.scene_depth_texture =
+    scene_depth_target.depth.ready() ? &scene_depth_target.depth : nullptr;
   ctx.render_state.begin_view(ctx.render_state.view());
   ctx.view_uniforms.bind();
   PassRenderer renderer{ctx, MeshPass<OpaqueTag>::render_config()};
@@ -336,10 +347,12 @@ inline auto MeshPass<OpaqueTag>::execute(PassContext& ctx, RenderGraphRuntime&) 
   }
   renderer.end();
   ctx.render_state.end_view();
+  ctx.scene_depth_texture = nullptr;
 }
 
 template <>
 inline auto MeshPass<TransparentTag>::setup(RenderGraphBuilder& builder) -> void {
+  builder.read(scene_depth_);
   builder.read(main_target_);
   builder.write(main_target_);
 }
@@ -349,8 +362,9 @@ template <> inline auto MeshPass<TransparentTag>::render_config() -> RenderConfi
 }
 
 template <>
-inline auto MeshPass<TransparentTag>::execute(PassContext& ctx, RenderGraphRuntime&)
-  -> void {
+inline auto MeshPass<TransparentTag>::execute(
+  PassContext& ctx, RenderGraphRuntime& runtime
+) -> void {
   auto* state = ctx.execution_state;
   if ((state == nullptr) || !state->world_pass_active) {
     return;
@@ -358,6 +372,9 @@ inline auto MeshPass<TransparentTag>::execute(PassContext& ctx, RenderGraphRunti
   if (ctx.transparent_phase.commands.empty()) {
     return;
   }
+  auto const& scene_depth_target = runtime.get_target(scene_depth_);
+  ctx.scene_depth_texture =
+    scene_depth_target.depth.ready() ? &scene_depth_target.depth : nullptr;
   ctx.render_state.begin_view(ctx.render_state.view());
   ctx.view_uniforms.bind();
   PassRenderer renderer{ctx, MeshPass<TransparentTag>::render_config()};
@@ -366,6 +383,7 @@ inline auto MeshPass<TransparentTag>::execute(PassContext& ctx, RenderGraphRunti
   }
   renderer.end();
   ctx.render_state.end_view();
+  ctx.scene_depth_texture = nullptr;
 }
 
 using OpaquePass = MeshPass<OpaqueTag>;
@@ -407,6 +425,52 @@ private:
   }
 
   RenderTextureHandle main_target_;
+};
+
+class DepthCopyPass : public RenderPass {
+public:
+  DepthCopyPass(RenderTextureHandle source, RenderTextureHandle destination)
+      : source_(source), destination_(destination) {}
+
+  auto setup(RenderGraphBuilder& builder) -> void override {
+    builder.read(source_);
+    builder.write(destination_);
+  }
+
+  auto execute(PassContext& ctx, RenderGraphRuntime& runtime) -> void override {
+    auto* state = ctx.execution_state;
+    if (!state || !state->world_pass_active) {
+      return;
+    }
+
+    auto const& source = runtime.get_target(source_);
+    auto const& destination = runtime.get_target(destination_);
+    if (!source.ready() || !destination.ready() || source.depth.id == 0 ||
+        destination.depth.id == 0) {
+      return;
+    }
+
+    rl::rlDrawRenderBatchActive();
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, source.id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.id);
+    glBlitFramebuffer(
+      0,
+      0,
+      source.texture.width,
+      source.texture.height,
+      0,
+      0,
+      destination.texture.width,
+      destination.texture.height,
+      GL_DEPTH_BUFFER_BIT,
+      GL_NEAREST
+    );
+    glBindFramebuffer(GL_FRAMEBUFFER, destination.id);
+  }
+
+private:
+  RenderTextureHandle source_;
+  RenderTextureHandle destination_;
 };
 
 class ClusterBuildPass : public RenderPass {
@@ -540,6 +604,7 @@ struct FramePass {
       .shadow_settings = *shadow_settings,
       .cluster_state = *cluster_state,
       .shadow_resources = *shadow_resources,
+      .scene_depth_texture = nullptr,
       .execution_state = state.ptr,
       .environment_renderer = environment_renderer.ptr,
     };

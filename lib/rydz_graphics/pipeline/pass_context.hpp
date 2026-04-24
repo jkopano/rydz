@@ -40,6 +40,7 @@ struct PassContext {
   ShadowSettings const& shadow_settings;
   ClusteredLightingState& cluster_state;
   ShadowResources& shadow_resources;
+  gl::Texture const* scene_depth_texture{};
   RenderExecutionState* execution_state{};
   EnvironmentRenderer const* environment_renderer{};
 };

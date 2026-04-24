@@ -101,6 +101,7 @@ auto execute(RenderGraph& graph) -> void {
     .shadow_settings = shadow_settings,
     .cluster_state = cluster_state,
     .shadow_resources = shadow_resources,
+    .scene_depth_texture = nullptr,
   };
   graph.execute(ctx);
 }

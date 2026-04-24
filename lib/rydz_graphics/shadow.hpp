@@ -19,12 +19,13 @@
 namespace ecs {
 
 inline constexpr i32 MAX_DIRECTIONAL_CASCADES = 4;
-inline constexpr i32 MAX_POINT_SHADOWS = 12;
+inline constexpr i32 MAX_POINT_SHADOWS = 4;
 inline constexpr i32 POINT_SHADOW_FACE_COUNT = 6;
 inline constexpr unsigned int SHADOW_UNIFORM_BINDING = 1;
 inline constexpr std::string_view SHADOW_UNIFORM_BLOCK_NAME = "ShadowUniforms";
 inline constexpr i32 SHADOW_ATLAS_TEXTURE_SLOT = 11;
 inline constexpr i32 POINT_SHADOW_TEXTURE_SLOT_BASE = 12;
+inline constexpr i32 SCENE_DEPTH_TEXTURE_SLOT = 16;
 
 struct ShadowSettings {
   using T = Resource;
@@ -37,6 +38,10 @@ struct ShadowSettings {
   bool point_shadows_enabled = true;
   u32 max_shadowed_point_lights = MAX_POINT_SHADOWS;
   u32 point_shadow_resolution = 1024;
+  bool point_screen_space_shadows_enabled = true;
+  f32 point_screen_space_threshold_px = 96.0F;
+  i32 point_screen_space_steps = 12;
+  f32 point_screen_space_thickness = 0.12F;
   f32 directional_constant_bias = 0.0015F;
   f32 directional_normal_bias = 0.01F;
   f32 point_constant_bias = 0.01F;
@@ -155,6 +160,29 @@ inline auto compute_cascade_splits(
   }
 
   return splits;
+}
+
+inline auto projected_sphere_radius_pixels(
+  ExtractedView const& view, Vec3 world_position, f32 sphere_radius
+) -> f32 {
+  if (sphere_radius <= 0.0F) {
+    return 0.0F;
+  }
+
+  Vec3 const view_position = view.camera_view.view * world_position;
+  f32 const viewport_height = std::max(view.viewport.height, 1.0F);
+  f32 const projection_y_scale = std::max(std::abs(view.camera_view.proj(1, 1)), 0.0001F);
+
+  if (view.orthographic) {
+    return projection_y_scale * sphere_radius * (viewport_height * 0.5F);
+  }
+
+  f32 const view_depth = -view_position.z;
+  if (view_depth <= std::max(view.near_plane, 0.001F)) {
+    return std::numeric_limits<f32>::infinity();
+  }
+
+  return projection_y_scale * sphere_radius / view_depth * (viewport_height * 0.5F);
 }
 
 inline auto compute_frustum_slice_corners_world(
@@ -321,6 +349,8 @@ struct alignas(16) ShadowUniformData {
   std::array<Vec4, MAX_DIRECTIONAL_CASCADES> cascade_uv_rects{};
   std::array<int, 4> flags = {0, 0, 0, 0};
   Vec4 params = Vec4::ZERO;
+  std::array<int, 4> point_screen_flags = {0, 0, 0, 0};
+  Vec4 point_screen_params = Vec4::ZERO;
 };
 
 static_assert(sizeof(ShadowUniformData) % 16 == 0);
@@ -364,6 +394,18 @@ struct ShadowUniformState {
       settings.directional_constant_bias,
       settings.directional_normal_bias,
       settings.point_constant_bias,
+      0.0F,
+    };
+    data.point_screen_flags = {
+      settings.point_screen_space_shadows_enabled ? 1 : 0,
+      std::max(settings.point_screen_space_steps, 1),
+      0,
+      0,
+    };
+    data.point_screen_params = Vec4{
+      settings.point_screen_space_thickness,
+      0.0F,
+      0.0F,
       0.0F,
     };
 

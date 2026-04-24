@@ -157,6 +157,7 @@ TEST(MaterialTest, PrepareMaterialAppliesFallbackTexturesForDefaultedMaps) {
     .shadow_settings = shadow_settings,
     .cluster_state = cluster_state,
     .shadow_resources = shadow_resources,
+    .scene_depth_texture = nullptr,
   };
   ecs::MaterialContext material_ctx{.frame_data = &ctx};
 
@@ -266,6 +267,7 @@ TEST(MaterialTest, PrepareMaterialPreservesAuthoredTextureOverFallback) {
     .shadow_settings = shadow_settings,
     .cluster_state = cluster_state,
     .shadow_resources = shadow_resources,
+    .scene_depth_texture = nullptr,
   };
   ecs::MaterialContext material_ctx{.frame_data = &ctx};
 

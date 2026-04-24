@@ -43,9 +43,12 @@ layout(std140, binding = 1) uniform ShadowUniforms {
   vec4 u_cascade_uv_rects[4];
   ivec4 u_shadow_flags;
   vec4 u_shadow_params;
+  ivec4 u_point_screen_shadow_flags;
+  vec4 u_point_screen_shadow_params;
 };
 
 uniform sampler2D u_shadow_atlas;
+uniform sampler2D u_scene_depth;
 uniform samplerCube u_point_shadow_map0;
 uniform samplerCube u_point_shadow_map1;
 uniform samplerCube u_point_shadow_map2;
@@ -140,6 +143,31 @@ float samplePointShadow(int slot, vec3 dir) {
   }
 }
 
+float sceneDepthToViewDepth(float depthSample) {
+  float nearPlane = max(u_cluster_screen_size_near_far.z, 0.001);
+  float farPlane = max(u_cluster_screen_size_near_far.w, nearPlane + 0.001);
+
+  if (u_view_flags.z > 0) {
+    return mix(nearPlane, farPlane, clamp(depthSample, 0.0, 1.0));
+  }
+
+  float z = depthSample * 2.0 - 1.0;
+  float denom = farPlane + nearPlane - z * (farPlane - nearPlane);
+  return (2.0 * nearPlane * farPlane) / max(denom, 0.0001);
+}
+
+vec2 projectViewToUv(vec3 viewPos, out float ndcDepth) {
+  vec4 clip = u_mat_projection * vec4(viewPos, 1.0);
+  if (clip.w <= 0.0001) {
+    ndcDepth = 2.0;
+    return vec2(-1.0);
+  }
+
+  vec3 ndc = clip.xyz / clip.w;
+  ndcDepth = ndc.z;
+  return ndc.xy * 0.5 + 0.5;
+}
+
 vec3 evaluatePBR(
   vec3 N,
   vec3 V,
@@ -229,7 +257,58 @@ float computeDirectionalShadow(vec3 fragPos, vec3 normal, vec3 lightDir, vec3 vi
   return visibility / max(sampleCount, 1.0);
 }
 
-float computePointShadow(vec3 fragPos, GpuPointLight pointLight) {
+float computePointScreenSpaceShadow(vec3 viewPos, GpuPointLight pointLight) {
+  if (u_point_screen_shadow_flags.x <= 0) {
+    return 1.0;
+  }
+
+  vec3 lightViewPos = (u_mat_view * vec4(pointLight.position_range.xyz, 1.0)).xyz;
+  vec3 ray = lightViewPos - viewPos;
+  float rayLength = length(ray);
+  if (rayLength <= 0.001) {
+    return 1.0;
+  }
+
+  int steps = max(u_point_screen_shadow_flags.y, 1);
+  vec3 rayDir = ray / rayLength;
+  float thickness = max(u_point_screen_shadow_params.x, 0.001);
+  float startDistance = max(rayLength / float(steps), 0.05);
+  float stepLength = max((rayLength - startDistance) / float(steps), 0.01);
+
+  for (int step = 0; step < steps; ++step) {
+    float travel = startDistance + stepLength * float(step);
+    if (travel >= rayLength) {
+      break;
+    }
+
+    vec3 samplePos = viewPos + rayDir * travel;
+    float ndcDepth = 0.0;
+    vec2 uv = projectViewToUv(samplePos, ndcDepth);
+    if (ndcDepth < -1.0 || ndcDepth > 1.0 || uv.x <= 0.0 || uv.x >= 1.0 ||
+        uv.y <= 0.0 || uv.y >= 1.0) {
+      continue;
+    }
+
+    float sceneDepthSample = texture(u_scene_depth, uv).r;
+    if (sceneDepthSample >= 0.999999) {
+      continue;
+    }
+
+    float sceneDepth = sceneDepthToViewDepth(sceneDepthSample);
+    float rayDepth = -samplePos.z;
+    if (sceneDepth + thickness < rayDepth) {
+      return 0.0;
+    }
+  }
+
+  return 1.0;
+}
+
+float computePointShadow(vec3 fragPos, vec3 viewPos, GpuPointLight pointLight) {
+  if (pointLight.shadow_data.z > 0.5) {
+    return computePointScreenSpaceShadow(viewPos, pointLight);
+  }
+
   if (pointLight.shadow_data.x < 0.0) {
     return 1.0;
   }
@@ -346,7 +425,7 @@ void main() {
     attenuation *= smoothFactor * smoothFactor;
 
     vec3 radiance = pointLight.color_intensity.rgb * attenuation;
-    float shadow = computePointShadow(FragPos, pointLight);
+    float shadow = computePointShadow(FragPos, viewPos, pointLight);
     lighting += evaluatePBR(
         normal, viewDir, lightDir, radiance * shadow, albedo, metallic, roughness);
   }

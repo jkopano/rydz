@@ -328,7 +328,7 @@ public:
           .shadow_data = {
             static_cast<f32>(light.shadow_slot),
             light.range,
-            0.0F,
+            light.screen_space_shadows ? 1.0F : 0.0F,
             0.0F,
           },
         }

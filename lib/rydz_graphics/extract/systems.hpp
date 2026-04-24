@@ -94,6 +94,7 @@ struct Extract {
           .intensity = point_light->intensity,
           .range = point_light->range,
           .casts_shadows = point_light->casts_shadows,
+          .screen_space_shadows = false,
           .shadow_slot = -1,
         }
       );
@@ -149,10 +150,22 @@ struct Extract {
     std::vector<usize> candidates;
     candidates.reserve(lights->point_lights.size());
     for (usize light_index = 0; light_index < lights->point_lights.size(); ++light_index) {
-      auto const& point_light = lights->point_lights[light_index];
+      auto& point_light = lights->point_lights[light_index];
       if (!point_light.casts_shadows || point_light.range <= 0.001F) {
         continue;
       }
+
+      if (settings->point_screen_space_shadows_enabled) {
+        f32 const projected_radius = projected_sphere_radius_pixels(
+          *view, point_light.position, point_light.range
+        );
+        if (std::isfinite(projected_radius) &&
+            projected_radius <= settings->point_screen_space_threshold_px) {
+          point_light.screen_space_shadows = true;
+          continue;
+        }
+      }
+
       candidates.push_back(light_index);
     }
 

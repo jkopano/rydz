@@ -49,6 +49,7 @@ struct ExtractedLights {
     float intensity{0.0F};
     float range{0.0F};
     bool casts_shadows{false};
+    bool screen_space_shadows{false};
     i32 shadow_slot{-1};
   };
 

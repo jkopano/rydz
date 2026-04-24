@@ -83,15 +83,18 @@ struct RenderPlugin : IPlugin {
     if (auto* graph = app.world().get_resource<RenderGraph>()) {
       auto const main_target =
         graph->create_texture(TextureDesc{.transient = true}, "MainTarget");
+      auto const scene_depth =
+        graph->create_texture(TextureDesc{.transient = true}, "SceneDepthCopy");
       auto const screen = graph->import_backbuffer("Screen");
 
       graph->add_pass<ClearPass>(main_target);
       graph->add_pass<ShadowPass>();
       graph->add_pass<DepthPrepass>(main_target);
+      graph->add_pass<DepthCopyPass>(main_target, scene_depth);
       graph->add_pass<ClusterBuildPass>();
       graph->add_pass<EnvironmentPass>(main_target);
-      graph->add_pass<OpaquePass>(main_target);
-      graph->add_pass<TransparentPass>(main_target);
+      graph->add_pass<OpaquePass>(main_target, scene_depth);
+      graph->add_pass<TransparentPass>(main_target, scene_depth);
       graph->add_pass<PostProcessPassNode>(main_target, screen);
       graph->add_pass<UiPass>(main_target, screen);
     }
