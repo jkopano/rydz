@@ -65,14 +65,14 @@ struct ExtractedLights {
 
   std::vector<PointLight> point_lights{};
   std::vector<SpotLight> spot_lights{};
-  AmbientLight ambient_light{.color = Color::WHITE, .intensity = 0.0F};
+  AmbientLight ambient_light{};
   DirectionalLight dir_light{};
   bool has_directional{};
 
   auto clear() -> void {
     point_lights.clear();
     spot_lights.clear();
-    ambient_light = AmbientLight{.color = Color::WHITE, .intensity = 0.0F};
+    ambient_light = {};
     dir_light = {};
     has_directional = false;
   }

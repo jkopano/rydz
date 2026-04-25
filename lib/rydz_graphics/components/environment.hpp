@@ -49,13 +49,17 @@ struct Environment {
     return std::move(*this);
   }
 
-  auto with_lighting(AmbientLight ambient, DirectionalLight directional) & -> Environment& {
+  auto with_lighting(
+    AmbientLight ambient, DirectionalLight directional
+  ) & -> Environment& {
     ambient_light = ambient;
     directional_light = directional;
     return *this;
   }
 
-  auto with_lighting(AmbientLight ambient, DirectionalLight directional) && -> Environment&& {
+  auto with_lighting(
+    AmbientLight ambient, DirectionalLight directional
+  ) && -> Environment&& {
     ambient_light = ambient;
     directional_light = directional;
     return std::move(*this);

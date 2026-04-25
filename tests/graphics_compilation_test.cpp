@@ -67,3 +67,9 @@ TEST(GraphicsCompilation, EnvironmentLightingBuilderWorksOnTemporaries) {
   EXPECT_FLOAT_EQ(env.ambient_light.intensity, 0.5f);
   EXPECT_FLOAT_EQ(env.directional_light.intensity, 1.0f);
 }
+
+TEST(GraphicsCompilation, EnvironmentDefaultsToNoAmbientContribution) {
+  auto env = Environment::from_color(Color::BLACK);
+
+  EXPECT_FLOAT_EQ(env.ambient_light.intensity, 0.0f);
+}

@@ -32,7 +32,7 @@ struct DirectionalLight {
 
 struct AmbientLight {
   Color color = Color::RAYWHITE;
-  float intensity = 0.9f;
+  float intensity = 0.1f;
 };
 
 } // namespace ecs

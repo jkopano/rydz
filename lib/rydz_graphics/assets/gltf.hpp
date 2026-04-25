@@ -166,8 +166,40 @@ inline auto material_from_backend_material(
     material_value.metallic = maps[material_map_index(MaterialMap::Metalness)].value;
     material_value.roughness = maps[material_map_index(MaterialMap::Roughness)].value;
     material_value.normal_scale = maps[material_map_index(MaterialMap::Normal)].value;
-    material_value.occlusion_strength =
-      maps[material_map_index(MaterialMap::Occlusion)].value;
+  }
+
+  if (gltf_material != nullptr) {
+    if (gltf_material->has_pbr_metallic_roughness) {
+      material_value.metallic =
+        gltf_material->pbr_metallic_roughness.metallic_factor;
+      material_value.roughness =
+        gltf_material->pbr_metallic_roughness.roughness_factor;
+    }
+
+    if (gltf_material->normal_texture.texture != nullptr) {
+      material_value.normal_scale = gltf_material->normal_texture.scale;
+    } else {
+      material_value.normal_scale = -1.0F;
+    }
+
+    if (gltf_material->occlusion_texture.texture != nullptr) {
+      material_value.occlusion_strength = gltf_material->occlusion_texture.scale;
+    } else {
+      material_value.occlusion_strength = -1.0F;
+    }
+
+    material_value.emissive_color = Color{
+      static_cast<unsigned char>(
+        std::clamp(gltf_material->emissive_factor[0], 0.0F, 1.0F) * 255.0F
+      ),
+      static_cast<unsigned char>(
+        std::clamp(gltf_material->emissive_factor[1], 0.0F, 1.0F) * 255.0F
+      ),
+      static_cast<unsigned char>(
+        std::clamp(gltf_material->emissive_factor[2], 0.0F, 1.0F) * 255.0F
+      ),
+      255,
+    };
   }
 
   CompiledMaterial compiled = Material{material_value}.compiled;

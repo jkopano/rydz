@@ -208,12 +208,6 @@ inline auto setup_camera(Cmd cmd, NonSendMarker) -> void {
     CameraController{},
     PostProcessMaterial{DefaultPostProcessMaterial{}},
     Environment::from_directory("res/hdri/skybox")
-      .with_ambient_light(
-        AmbientLight{
-          .color = Color::RAYWHITE,
-          .intensity = 0.4f,
-        }
-      )
       .with_directional_light(
         DirectionalLight{
           .color = Color::WHITE,
