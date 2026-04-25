@@ -133,7 +133,11 @@ auto main() -> int {
     .add_plugin(
       rydz_platform::RayPlugin{
         .window =
-          {.width = 1280, .height = 720, .title = "13 - Physics", .target_fps = 120},
+          {.width = 1280,
+           .height = 720,
+           .title = "13 - Physics",
+           .target_fps = 120,
+           .is_fullscreen = true},
         .trace_log_level = LOG_DEBUG,
       }
     )
