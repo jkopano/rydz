@@ -148,7 +148,6 @@ inline auto spawn_some_texture(Cmd cmd, Res<AssetServer> server, NonSendMarker) 
 }
 
 struct MovingLight {
-  Vec3 base_pos;
   f32 radius;
   f32 speed;
   f32 offset;
@@ -159,9 +158,8 @@ inline auto moving_lights_system(Query<Mut<Transform>, MovingLight> query, Res<T
   f32 t = time->elapsed_seconds;
   for (auto [transform, light] : query.iter()) {
     transform->translation.x =
-      light->base_pos.x + (std::cos((t * light->speed) + light->offset) * light->radius);
+      (std::cos((t * light->speed) + light->offset) * light->radius);
     transform->translation.z =
-      light->base_pos.z +
       (std::sin((t * light->speed) + light->offset) * light->radius / 4.0f);
   }
 }
@@ -198,9 +196,8 @@ inline auto spawn_lights_on_input(
         .range = 40.0f,
         .casts_shadows = true,
       },
-      Transform::from_xyz(0, ((i % 2 == 0 ? 10.f : 50.f)), 0),
+      Transform::from_xyz(0, ((i % 2 == 0 ? 2.f : 40.f)), 0),
       MovingLight{
-        .base_pos = Vec3(0, 20.0f + ((i % 5) * 5.0f), 0),
         .radius = radius,
         .speed = 0.2f,
         .offset = angle,
