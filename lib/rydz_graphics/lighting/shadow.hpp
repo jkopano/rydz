@@ -7,6 +7,7 @@
 #include "rydz_graphics/gl/buffers.hpp"
 #include "rydz_graphics/gl/shader.hpp"
 #include "rydz_graphics/gl/textures.hpp"
+#include "rydz_graphics/lighting/shadow_atlas_allocator.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -27,12 +28,17 @@ inline constexpr i32 SHADOW_ATLAS_TEXTURE_SLOT = 11;
 inline constexpr i32 POINT_SHADOW_TEXTURE_SLOT_BASE = 12;
 inline constexpr i32 SCENE_DEPTH_TEXTURE_SLOT = 16;
 
+struct ShadowResources;
+struct ExtractedView;
+
 struct ShadowSettings {
   using T = Resource;
 
   bool directional_enabled = true;
   i32 cascade_count = MAX_DIRECTIONAL_CASCADES;
+
   u32 cascade_resolution = 2048;
+
   f32 cascade_split_lambda = 0.7F;
   f32 cascade_max_distance = 150.0F;
   bool point_shadows_enabled = true;
@@ -46,6 +52,11 @@ struct ShadowSettings {
   f32 directional_normal_bias = 0.01F;
   f32 point_constant_bias = 0.01F;
   i32 directional_pcf_radius = 1;
+
+  bool use_dynamic_atlas = true;
+  u32 atlas_size = 8192 * 2;
+  u32 cascade_min_resolution = 128;
+  u32 cascade_max_resolution = 2048;
 
   [[nodiscard]] auto cascade_count_clamped() const -> i32 {
     return std::clamp(cascade_count, 1, MAX_DIRECTIONAL_CASCADES);
@@ -153,6 +164,7 @@ struct ExtractedShadows {
   struct DirectionalCascade {
     ShadowView shadow_view{};
     f32 split_distance = 0.0F;
+    u32 allocated_resolution = 0;
   };
 
   struct PointShadow {
@@ -272,62 +284,11 @@ struct ShadowUniformState {
   gl::UBO buffer{};
   ShadowUniformData data{};
 
-  auto update(ExtractedShadows const& shadows, ShadowSettings const& settings) -> void {
-    for (i32 cascade_index = 0; cascade_index < MAX_DIRECTIONAL_CASCADES;
-         ++cascade_index) {
-      i32 const tile_x = cascade_index % 2;
-      i32 const tile_y = cascade_index / 2;
-      data.cascade_uv_rects[cascade_index] = Vec4{
-        static_cast<f32>(tile_x) * 0.5F,
-        static_cast<f32>(tile_y) * 0.5F,
-        0.5F,
-        0.5F,
-      };
-
-      if (cascade_index < shadows.cascade_count) {
-        data.directional_matrices[cascade_index] =
-          shadows.directional_cascades[cascade_index].shadow_view.view_projection;
-        data.cascade_splits[cascade_index] =
-          shadows.directional_cascades[cascade_index].split_distance;
-      } else {
-        data.directional_matrices[cascade_index] = Mat4::IDENTITY;
-        data.cascade_splits[cascade_index] = 0.0F;
-      }
-    }
-
-    data.flags = {
-      shadows.has_directional ? 1 : 0,
-      shadows.cascade_count,
-      static_cast<int>(shadows.point_shadows.size()),
-      std::max(settings.directional_pcf_radius, 0),
-    };
-    data.params = Vec4{
-      settings.directional_constant_bias,
-      settings.directional_normal_bias,
-      settings.point_constant_bias,
-      0.0F,
-    };
-    data.point_screen_flags = {
-      settings.point_screen_space_shadows_enabled ? 1 : 0,
-      std::max(settings.point_screen_space_steps, 1),
-      0,
-      0,
-    };
-    data.point_screen_params = Vec4{
-      settings.point_screen_space_thickness,
-      0.0F,
-      0.0F,
-      0.0F,
-    };
-
-    if (!buffer.ready()) {
-      buffer = gl::UBO(
-        static_cast<unsigned int>(sizeof(ShadowUniformData)), &data, RL_DYNAMIC_DRAW
-      );
-    } else {
-      buffer.update(&data, static_cast<unsigned int>(sizeof(ShadowUniformData)), 0);
-    }
-  }
+  auto update(
+    ExtractedShadows const& shadows,
+    ShadowSettings const& settings,
+    ShadowResources const& resources
+  ) -> void;
 
   auto bind() const -> void {
     if (buffer.ready()) {
@@ -714,10 +675,18 @@ struct ShadowResources {
 
   gl::DepthAtlas directional_atlas{};
   std::array<gl::DepthCubemapTarget, MAX_POINT_SHADOWS> point_maps{};
+  ShadowAtlasAllocator allocator{};
+  std::array<ShadowAtlasTile, MAX_DIRECTIONAL_CASCADES> cascade_tiles{};
 
   auto ensure(ShadowSettings const& settings) -> void {
-    u32 const atlas_extent = settings.cascade_resolution * 2U;
-    directional_atlas.ensure(atlas_extent, atlas_extent);
+    if (settings.use_dynamic_atlas) {
+      allocator.atlas_size = settings.atlas_size;
+      directional_atlas.ensure(settings.atlas_size, settings.atlas_size);
+    } else {
+
+      u32 const atlas_extent = settings.cascade_resolution * 2U;
+      directional_atlas.ensure(atlas_extent, atlas_extent);
+    }
 
     for (i32 point_index = 0; point_index < settings.max_shadowed_point_lights_clamped();
          ++point_index) {
@@ -727,7 +696,85 @@ struct ShadowResources {
     }
   }
 
+  auto allocate_cascades(
+    ExtractedShadows& shadows, ShadowSettings const& settings, ExtractedView const& view
+  ) -> void {
+    if (!settings.use_dynamic_atlas || !shadows.has_directional) {
+
+      for (i32 i = 0; i < shadows.cascade_count; ++i) {
+        cascade_tiles[i] = directional_tile_legacy(i);
+        shadows.directional_cascades[i].allocated_resolution =
+          settings.cascade_resolution;
+      }
+      return;
+    }
+
+    std::vector<ShadowAtlasAllocator::AllocationRequest> requests;
+    requests.reserve(shadows.cascade_count);
+
+    for (i32 i = 0; i < shadows.cascade_count; ++i) {
+      auto const& cascade = shadows.directional_cascades[i];
+      f32 const distance = cascade.split_distance;
+
+      f32 const max_dist = std::max(view.far_plane, 1.0F);
+      f32 const normalized_dist = std::clamp(distance / max_dist, 0.0F, 1.0F);
+      u32 const priority = static_cast<u32>((1.0F - normalized_dist) * 1000000.0F);
+
+      u32 const preferred = static_cast<u32>(
+        settings.cascade_min_resolution +
+        (settings.cascade_max_resolution - settings.cascade_min_resolution) *
+          (1.0F - normalized_dist)
+      );
+
+      requests.push_back(
+        ShadowAtlasAllocator::AllocationRequest{
+          .priority = priority,
+          .min_size = settings.cascade_min_resolution,
+          .preferred_size = std::max(preferred, settings.cascade_min_resolution),
+        }
+      );
+    }
+
+    auto allocations = allocator.allocate_batch(requests);
+
+    for (i32 i = 0; i < shadows.cascade_count; ++i) {
+      auto const& alloc = allocations[i];
+      if (alloc.valid) {
+        cascade_tiles[i] = ShadowAtlasTile{
+          .x = alloc.x,
+          .y = alloc.y,
+          .width = static_cast<i32>(alloc.size),
+          .height = static_cast<i32>(alloc.size),
+          .uv_rect = {
+            static_cast<f32>(alloc.x) / static_cast<f32>(settings.atlas_size),
+            static_cast<f32>(alloc.y) / static_cast<f32>(settings.atlas_size),
+            static_cast<f32>(alloc.size) / static_cast<f32>(settings.atlas_size),
+            static_cast<f32>(alloc.size) / static_cast<f32>(settings.atlas_size),
+          },
+        };
+        shadows.directional_cascades[i].allocated_resolution = alloc.size;
+      } else {
+
+        cascade_tiles[i] = ShadowAtlasTile{
+          .x = 0,
+          .y = 0,
+          .width = 1,
+          .height = 1,
+          .uv_rect = {0.0F, 0.0F, 0.0F, 0.0F},
+        };
+        shadows.directional_cascades[i].allocated_resolution = 0;
+      }
+    }
+  }
+
   [[nodiscard]] auto directional_tile(i32 cascade_index) const -> ShadowAtlasTile {
+    if (cascade_index >= 0 && cascade_index < MAX_DIRECTIONAL_CASCADES) {
+      return cascade_tiles[cascade_index];
+    }
+    return ShadowAtlasTile{};
+  }
+
+  [[nodiscard]] auto directional_tile_legacy(i32 cascade_index) const -> ShadowAtlasTile {
     i32 const tile_x = cascade_index % 2;
     i32 const tile_y = cascade_index / 2;
     i32 const tile_width = static_cast<i32>(directional_atlas.width() / 2U);
@@ -759,5 +806,61 @@ struct ShadowResources {
     }
   }
 };
+
+inline auto ShadowUniformState::update(
+  ExtractedShadows const& shadows,
+  ShadowSettings const& settings,
+  ShadowResources const& resources
+) -> void {
+  for (i32 cascade_index = 0; cascade_index < MAX_DIRECTIONAL_CASCADES; ++cascade_index) {
+    if (cascade_index < shadows.cascade_count) {
+      auto const& tile = resources.cascade_tiles[static_cast<usize>(cascade_index)];
+      data.cascade_uv_rects[static_cast<usize>(cascade_index)] = tile.uv_rect;
+      data.directional_matrices[static_cast<usize>(cascade_index)] =
+        shadows.directional_cascades[static_cast<usize>(cascade_index)]
+          .shadow_view.view_projection;
+      data.cascade_splits[static_cast<usize>(cascade_index)] =
+        shadows.directional_cascades[static_cast<usize>(cascade_index)].split_distance;
+    } else {
+      data.cascade_uv_rects[static_cast<usize>(cascade_index)] =
+        Vec4{0.0F, 0.0F, 0.0F, 0.0F};
+      data.directional_matrices[static_cast<usize>(cascade_index)] = Mat4::IDENTITY;
+      data.cascade_splits[static_cast<usize>(cascade_index)] = 0.0F;
+    }
+  }
+
+  data.flags = {
+    shadows.has_directional ? 1 : 0,
+    shadows.cascade_count,
+    static_cast<int>(shadows.point_shadows.size()),
+    std::max(settings.directional_pcf_radius, 0),
+  };
+  data.params = Vec4{
+    settings.directional_constant_bias,
+    settings.directional_normal_bias,
+    settings.point_constant_bias,
+    0.0F,
+  };
+  data.point_screen_flags = {
+    settings.point_screen_space_shadows_enabled ? 1 : 0,
+    std::max(settings.point_screen_space_steps, 1),
+    0,
+    0,
+  };
+  data.point_screen_params = Vec4{
+    settings.point_screen_space_thickness,
+    0.0F,
+    0.0F,
+    0.0F,
+  };
+
+  if (!buffer.ready()) {
+    buffer = gl::UBO(
+      static_cast<unsigned int>(sizeof(ShadowUniformData)), &data, RL_DYNAMIC_DRAW
+    );
+  } else {
+    buffer.update(&data, static_cast<unsigned int>(sizeof(ShadowUniformData)), 0);
+  }
+}
 
 } // namespace ecs

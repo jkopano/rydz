@@ -177,6 +177,12 @@ public:
 
     ctx.shadow_resources.ensure(ctx.shadow_settings);
 
+    if (ctx.shadows.has_directional) {
+      ctx.shadow_resources.allocate_cascades(
+        const_cast<ExtractedShadows&>(ctx.shadows), ctx.shadow_settings, ctx.view
+      );
+    }
+
     if (ctx.shadows.cascade_count > 0 && ctx.shadow_resources.directional_atlas.ready()) {
       ctx.shadow_resources.directional_atlas.begin();
       for (i32 cascade_index = 0; cascade_index < ctx.shadows.cascade_count;
@@ -592,7 +598,14 @@ struct FramePass {
   ) -> void {
     view_uniforms->update(*view, *lights, *cluster_config);
     shadow_resources->ensure(*shadow_settings);
-    shadow_uniforms->update(*shadows, *shadow_settings);
+
+    if (shadows->has_directional) {
+      shadow_resources->allocate_cascades(
+        const_cast<ExtractedShadows&>(*shadows), *shadow_settings, *view
+      );
+    }
+
+    shadow_uniforms->update(*shadows, *shadow_settings, *shadow_resources);
 
     PassContext ctx{
       .marker = marker,
