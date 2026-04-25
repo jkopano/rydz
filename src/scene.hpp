@@ -186,7 +186,7 @@ inline auto spawn_lights_on_input(
 
   for (int i = 0; i < 30; ++i) {
     f32 const angle = (static_cast<f32>(i) / 30.0f) * 2.0f * PI;
-    f32 const radius = 30.0f + ((i % 2) * 40.0f);
+    f32 const radius = 30.0f + ((i % 2 + 1) * 40.0f);
     Color color = Color::from_hsv(static_cast<f32>(i * 12), 0.8f, 1.0f);
 
     cmd.spawn(
