@@ -160,7 +160,7 @@ inline auto moving_lights_system(Query<Mut<Transform>, MovingLight> query, Res<T
     transform->translation.x =
       (std::cos((t * light->speed) + light->offset) * light->radius);
     transform->translation.z =
-      (std::sin((t * light->speed) + light->offset) * light->radius / 4.0f);
+      (std::sin((t * light->speed) + light->offset) * light->radius / 3.5f);
   }
 }
 
