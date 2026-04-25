@@ -210,40 +210,22 @@ public:
     for (usize point_index = 0; point_index < ctx.shadows.point_shadows.size();
          ++point_index) {
       auto const& point_shadow = ctx.shadows.point_shadows[point_index];
-      
-      if (point_shadow.use_atlas && ctx.shadow_resources.point_atlas.ready()) {
-        auto const& tile = ctx.shadow_resources.point_atlas_tiles[point_index];
-        for (i32 face_index = 0; face_index < POINT_SHADOW_FACE_COUNT; ++face_index) {
-          ctx.shadow_resources.point_atlas.begin();
-          ctx.shadow_resources.point_atlas.begin_tile(tile);
-          render_point_shadow_commands(
-            ctx,
-            point_shadow,
-            face_index,
-            point_shadow_shader_spec()
-          );
-          ctx.shadow_resources.point_atlas.end();
-        }
-      } else {
-        if (point_index >= ctx.shadow_resources.point_maps.size()) {
-          break;
-        }
 
-        auto& target = ctx.shadow_resources.point_maps[point_index];
-        if (!target.ready()) {
-          continue;
-        }
+      if (!ctx.shadow_resources.point_maps.ready()) {
+        break;
+      }
 
-        for (i32 face_index = 0; face_index < POINT_SHADOW_FACE_COUNT; ++face_index) {
-          target.begin_face(face_index);
-          render_point_shadow_commands(
-            ctx,
-            point_shadow,
-            face_index,
-            point_shadow_shader_spec()
-          );
-          target.end();
-        }
+      for (i32 face_index = 0; face_index < POINT_SHADOW_FACE_COUNT; ++face_index) {
+        ctx.shadow_resources.point_maps.begin_face(
+          static_cast<i32>(point_index), face_index
+        );
+        render_point_shadow_commands(
+          ctx,
+          point_shadow,
+          face_index,
+          point_shadow_shader_spec()
+        );
+        ctx.shadow_resources.point_maps.end();
       }
     }
 
@@ -533,7 +515,7 @@ public:
     }
 
     ctx.cluster_state.build_cluster_buffers(
-      ctx.marker, ctx.view, ctx.lights, ctx.cluster_config
+      ctx.marker, ctx.view, ctx.lights, ctx.shadows, ctx.cluster_config
     );
   }
 };
@@ -543,6 +525,7 @@ struct WorldPass {
     Res<RenderExecutionState> state,
     Res<ExtractedView> view,
     Res<ExtractedLights> lights,
+    Res<ExtractedShadows> shadows,
     Res<ClusterConfig> cluster_config,
     ResMut<ClusteredLightingState> cluster_state,
     NonSendMarker marker
@@ -551,7 +534,9 @@ struct WorldPass {
       return;
     }
 
-    cluster_state->build_cluster_buffers(marker, *view, *lights, *cluster_config);
+    cluster_state->build_cluster_buffers(
+      marker, *view, *lights, *shadows, *cluster_config
+    );
   }
 
   static auto begin(

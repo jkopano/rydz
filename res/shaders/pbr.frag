@@ -49,10 +49,7 @@ layout(std140, binding = 1) uniform ShadowUniforms {
 
 uniform sampler2D u_shadow_atlas;
 uniform sampler2D u_scene_depth;
-uniform samplerCube u_point_shadow_map0;
-uniform samplerCube u_point_shadow_map1;
-uniform samplerCube u_point_shadow_map2;
-uniform samplerCube u_point_shadow_map3;
+uniform samplerCubeArray u_point_shadow_maps;
 
 const int RENDER_METHOD_OPAQUE = 0;
 const int RENDER_METHOD_TRANSPARENT = 1;
@@ -129,18 +126,7 @@ vec2 directionalTexelSize(int cascadeIndex) {
 }
 
 float samplePointShadow(int slot, vec3 dir) {
-  switch (slot) {
-  case 0:
-    return texture(u_point_shadow_map0, dir).r;
-  case 1:
-    return texture(u_point_shadow_map1, dir).r;
-  case 2:
-    return texture(u_point_shadow_map2, dir).r;
-  case 3:
-    return texture(u_point_shadow_map3, dir).r;
-  default:
-    return 1.0;
-  }
+  return texture(u_point_shadow_maps, vec4(dir, float(slot))).r;
 }
 
 float sceneDepthToViewDepth(float depthSample) {

@@ -152,7 +152,7 @@ inline auto build_cluster_record(
   f32 const ndc_y1 = -1.0F + (2.0F * static_cast<f32>(tile_y + 1) / tile_count_y);
 
   f32 const slice_near =
-    cluster_slice_distance(config, near_plane, far_plane, orthographic, tile_z);
+    tile_z == 0 ? 0.0F : cluster_slice_distance(config, near_plane, far_plane, orthographic, tile_z);
   f32 const slice_far =
     cluster_slice_distance(config, near_plane, far_plane, orthographic, tile_z + 1);
 
@@ -187,8 +187,14 @@ inline auto build_cluster_record(
     for (auto const& [corner_x, corner_y] : corners) {
       math::Vec3 const near_corner =
         unproject_to_view(inverse_projection, corner_x, corner_y, -1.0F);
-      bbox.encapsulate(near_corner * (slice_near / camera_near));
-      bbox.encapsulate(near_corner * (slice_far / camera_near));
+      math::Vec3 const ray_dir = near_corner.normalized();
+
+      if (std::abs(ray_dir.z) > 1e-6F) {
+        f32 const t_near = -slice_near / ray_dir.z;
+        f32 const t_far = -slice_far / ray_dir.z;
+        bbox.encapsulate(ray_dir * t_near);
+        bbox.encapsulate(ray_dir * t_far);
+      }
     }
   }
 
@@ -270,6 +276,7 @@ public:
     ecs::NonSendMarker marker,
     ecs::ExtractedView const& view,
     ecs::ExtractedLights const& lights,
+    ecs::ExtractedShadows const& shadows,
     ClusterConfig const& config
   ) -> void {
     (void) marker;
@@ -315,6 +322,18 @@ public:
 
     for (usize i = 0; i < point_light_count; ++i) {
       auto const& light = lights.point_lights[i];
+      bool shadow_valid = false;
+      bool shadow_use_atlas = false;
+
+      if (light.shadow_slot >= 0) {
+        usize const shadow_slot = static_cast<usize>(light.shadow_slot);
+        if (shadow_slot < shadows.point_shadows.size()) {
+          auto const& point_shadow = shadows.point_shadows[shadow_slot];
+          shadow_valid = point_shadow.allocated_resolution > 0;
+          shadow_use_atlas = point_shadow.use_atlas && shadow_valid;
+        }
+      }
+
       point_lights_cpu.push_back(
         GpuPointLight{
           .position_range =
@@ -326,10 +345,10 @@ public:
             light.intensity
           },
           .shadow_data = {
-            static_cast<f32>(light.shadow_slot),
+            shadow_valid ? static_cast<f32>(light.shadow_slot) : -1.0F,
             light.range,
             light.screen_space_shadows ? 1.0F : 0.0F,
-            0.0F,
+            shadow_use_atlas ? 1.0F : 0.0F,
           },
         }
       );

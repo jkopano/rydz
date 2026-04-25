@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "rydz_graphics/lighting/clustered_lighting.hpp"
+#include "rydz_graphics/lighting/shadow.hpp"
 
 TEST(ClusteredLightingTest, ConfigClampsInvalidDimensions) {
   gl::ClusterConfig config{
@@ -48,4 +49,10 @@ TEST(ClusteredLightingTest, ClusterRecordUsesClampedStrideAndClearsCount) {
   EXPECT_LT(record.min_bounds.x, record.max_bounds.x);
   EXPECT_LT(record.min_bounds.y, record.max_bounds.y);
   EXPECT_LT(record.min_bounds.z, record.max_bounds.z);
+}
+
+TEST(ClusteredLightingTest, PointShadowAtlasIsDisabledByDefault) {
+  ecs::ShadowSettings settings{};
+
+  EXPECT_FALSE(settings.use_dynamic_point_atlas);
 }

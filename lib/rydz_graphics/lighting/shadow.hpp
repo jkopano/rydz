@@ -53,7 +53,8 @@ struct ShadowSettings {
   f32 point_constant_bias = 0.01F;
   i32 directional_pcf_radius = 1;
 
-  bool use_dynamic_point_atlas = true;
+  // Deprecated by the cubemap-array backend; kept for config compatibility.
+  bool use_dynamic_point_atlas = false;
   u32 point_atlas_size = 4096;
   u32 point_min_resolution = 64;
   u32 point_max_resolution = 512;
@@ -669,6 +670,121 @@ private:
   u32 height_ = 0;
 };
 
+class DepthCubemapArrayTarget {
+public:
+  DepthCubemapArrayTarget() = default;
+  DepthCubemapArrayTarget(DepthCubemapArrayTarget const&) = delete;
+  auto operator=(DepthCubemapArrayTarget const&) -> DepthCubemapArrayTarget& = delete;
+
+  DepthCubemapArrayTarget(DepthCubemapArrayTarget&& other) noexcept
+      : framebuffer_(std::exchange(other.framebuffer_, 0)),
+        texture_id_(std::exchange(other.texture_id_, 0)),
+        width_(std::exchange(other.width_, 0)),
+        height_(std::exchange(other.height_, 0)),
+        cubemap_count_(std::exchange(other.cubemap_count_, 0)) {}
+
+  auto operator=(DepthCubemapArrayTarget&& other) noexcept -> DepthCubemapArrayTarget& {
+    if (this == &other) {
+      return *this;
+    }
+    unload();
+    framebuffer_ = std::exchange(other.framebuffer_, 0);
+    texture_id_ = std::exchange(other.texture_id_, 0);
+    width_ = std::exchange(other.width_, 0);
+    height_ = std::exchange(other.height_, 0);
+    cubemap_count_ = std::exchange(other.cubemap_count_, 0);
+    return *this;
+  }
+
+  ~DepthCubemapArrayTarget() { unload(); }
+
+  [[nodiscard]] auto ready() const -> bool {
+    return framebuffer_ != 0 && texture_id_ != 0;
+  }
+
+  auto ensure(u32 width, u32 height, u32 cubemap_count) -> void {
+    cubemap_count = std::max(cubemap_count, 1U);
+    if (ready() && width_ == width && height_ == height &&
+        cubemap_count_ == cubemap_count) {
+      return;
+    }
+
+    unload();
+    width_ = width;
+    height_ = height;
+    cubemap_count_ = cubemap_count;
+
+    glGenFramebuffers(1, &framebuffer_);
+    glGenTextures(1, &texture_id_);
+    glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, texture_id_);
+    glTexImage3D(
+      GL_TEXTURE_CUBE_MAP_ARRAY,
+      0,
+      GL_DEPTH_COMPONENT32F,
+      static_cast<GLsizei>(width),
+      static_cast<GLsizei>(height),
+      static_cast<GLsizei>(cubemap_count * static_cast<u32>(ecs::POINT_SHADOW_FACE_COUNT)),
+      0,
+      GL_DEPTH_COMPONENT,
+      GL_FLOAT,
+      nullptr
+    );
+    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  }
+
+  auto begin_face(i32 cubemap_index, i32 face_index) const -> void {
+    rl::rlDrawRenderBatchActive();
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
+    i32 const layer = cubemap_index * ecs::POINT_SHADOW_FACE_COUNT + face_index;
+    glFramebufferTextureLayer(
+      GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_id_, 0, layer
+    );
+    glViewport(0, 0, static_cast<GLsizei>(width_), static_cast<GLsizei>(height_));
+    glClear(GL_DEPTH_BUFFER_BIT);
+  }
+
+  auto end() const -> void {
+    rl::rlDrawRenderBatchActive();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  }
+
+  auto bind(i32 slot) const -> void {
+    glActiveTexture(static_cast<GLenum>(GL_TEXTURE0 + slot));
+    glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, texture_id_);
+  }
+
+  auto unload() -> void {
+    if (texture_id_ != 0) {
+      glDeleteTextures(1, &texture_id_);
+      texture_id_ = 0;
+    }
+    if (framebuffer_ != 0) {
+      glDeleteFramebuffers(1, &framebuffer_);
+      framebuffer_ = 0;
+    }
+    width_ = 0;
+    height_ = 0;
+    cubemap_count_ = 0;
+  }
+
+private:
+  u32 framebuffer_ = 0;
+  u32 texture_id_ = 0;
+  u32 width_ = 0;
+  u32 height_ = 0;
+  u32 cubemap_count_ = 0;
+};
+
 } // namespace gl
 
 namespace ecs {
@@ -677,35 +793,24 @@ struct ShadowResources {
   using T = Resource;
 
   gl::DepthAtlas directional_atlas{};
-  gl::DepthAtlas point_atlas{};
-  std::array<gl::DepthCubemapTarget, MAX_POINT_SHADOWS> point_maps{};
-  ShadowAtlasAllocator point_allocator{};
+  gl::DepthCubemapArrayTarget point_maps{};
   std::array<ShadowAtlasTile, MAX_DIRECTIONAL_CASCADES> cascade_tiles{};
-  std::array<ShadowAtlasTile, MAX_POINT_SHADOWS> point_atlas_tiles{};
 
   auto ensure(ShadowSettings const& settings) -> void {
     u32 const dir_atlas_extent = settings.cascade_resolution * 2U;
     directional_atlas.ensure(dir_atlas_extent, dir_atlas_extent);
-
-    if (settings.use_dynamic_point_atlas) {
-      point_allocator.atlas_size = settings.point_atlas_size;
-      point_atlas.ensure(settings.point_atlas_size, settings.point_atlas_size);
-    } else {
-      for (i32 point_index = 0;
-           point_index < settings.max_shadowed_point_lights_clamped();
-           ++point_index) {
-        point_maps[point_index].ensure(
-          settings.point_shadow_resolution, settings.point_shadow_resolution
-        );
-      }
-    }
+    point_maps.ensure(
+      settings.point_shadow_resolution,
+      settings.point_shadow_resolution,
+      static_cast<u32>(settings.max_shadowed_point_lights_clamped())
+    );
   }
 
   auto allocate_cascades(
     ExtractedShadows& shadows, ShadowSettings const& settings, ExtractedView const& view
   ) -> void {
     for (i32 i = 0; i < shadows.cascade_count; ++i) {
-      cascade_tiles[i] = directional_tile_legacy(i);
+      cascade_tiles[static_cast<usize>(i)] = directional_tile_legacy(i);
       shadows.directional_cascades[i].allocated_resolution = settings.cascade_resolution;
     }
   }
@@ -716,68 +821,12 @@ struct ShadowResources {
     ExtractedView const& view,
     ExtractedLights const& lights
   ) -> void {
-    if (!settings.use_dynamic_point_atlas || shadows.point_shadows.empty()) {
-      for (auto& point_shadow : shadows.point_shadows) {
-        point_shadow.use_atlas = false;
-        point_shadow.allocated_resolution = settings.point_shadow_resolution;
-      }
-      return;
-    }
+    (void) view;
+    (void) lights;
 
-    std::vector<ShadowAtlasAllocator::AllocationRequest> requests;
-    requests.reserve(shadows.point_shadows.size());
-
-    for (auto const& point_shadow : shadows.point_shadows) {
-      auto const& light = lights.point_lights[point_shadow.light_index];
-      Vec3 const camera_offset = light.position - view.camera_view.position;
-      f32 const distance = camera_offset.length();
-
-      f32 const max_dist = std::max(view.far_plane, 1.0F);
-      f32 const normalized_dist = std::clamp(distance / max_dist, 0.0F, 1.0F);
-      u32 const priority = static_cast<u32>((1.0F - normalized_dist) * 1000000.0F);
-
-      u32 const preferred = static_cast<u32>(
-        settings.point_min_resolution +
-        (settings.point_max_resolution - settings.point_min_resolution) *
-          (1.0F - normalized_dist)
-      );
-
-      requests.push_back(
-        ShadowAtlasAllocator::AllocationRequest{
-          .priority = priority,
-          .min_size = settings.point_min_resolution,
-          .preferred_size = std::max(preferred, settings.point_min_resolution),
-        }
-      );
-    }
-
-    auto allocations = point_allocator.allocate_batch(requests);
-
-    for (usize i = 0; i < shadows.point_shadows.size(); ++i) {
-      auto& point_shadow = shadows.point_shadows[i];
-      auto const& alloc = allocations[i];
-
-      if (alloc.valid) {
-        point_shadow.use_atlas = true;
-        point_shadow.atlas_slot = static_cast<i32>(i);
-        point_shadow.allocated_resolution = alloc.size;
-
-        point_atlas_tiles[i] = ShadowAtlasTile{
-          .x = alloc.x,
-          .y = alloc.y,
-          .width = static_cast<i32>(alloc.size),
-          .height = static_cast<i32>(alloc.size),
-          .uv_rect = {
-            static_cast<f32>(alloc.x) / static_cast<f32>(settings.point_atlas_size),
-            static_cast<f32>(alloc.y) / static_cast<f32>(settings.point_atlas_size),
-            static_cast<f32>(alloc.size) / static_cast<f32>(settings.point_atlas_size),
-            static_cast<f32>(alloc.size) / static_cast<f32>(settings.point_atlas_size),
-          },
-        };
-      } else {
-        point_shadow.use_atlas = false;
-        point_shadow.allocated_resolution = 0;
-      }
+    for (auto& point_shadow : shadows.point_shadows) {
+      point_shadow.use_atlas = false;
+      point_shadow.allocated_resolution = settings.point_shadow_resolution;
     }
   }
 
@@ -810,18 +859,9 @@ struct ShadowResources {
   auto bind_shader(gl::ShaderProgram& shader) const -> void {
     directional_atlas.bind(SHADOW_ATLAS_TEXTURE_SLOT);
     shader.set_sampler("u_shadow_atlas", SHADOW_ATLAS_TEXTURE_SLOT);
-
-    if (point_atlas.ready()) {
-      point_atlas.bind(SHADOW_ATLAS_TEXTURE_SLOT + 1);
-      shader.set_sampler("u_point_shadow_atlas", SHADOW_ATLAS_TEXTURE_SLOT + 1);
-    }
-
-    for (i32 point_index = 0; point_index < MAX_POINT_SHADOWS; ++point_index) {
-      i32 const slot = POINT_SHADOW_TEXTURE_SLOT_BASE + point_index;
-      point_maps[point_index].bind(slot);
-      shader.set_sampler(
-        std::string{"u_point_shadow_map"} + std::to_string(point_index), slot
-      );
+    if (point_maps.ready()) {
+      point_maps.bind(POINT_SHADOW_TEXTURE_SLOT_BASE);
+      shader.set_sampler("u_point_shadow_maps", POINT_SHADOW_TEXTURE_SLOT_BASE);
     }
   }
 };
