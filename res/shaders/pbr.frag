@@ -553,19 +553,43 @@ void main() {
 
   // Debug: visualize shadows
   // Uncomment to see shadow values (red = shadow, green = no shadow)
-  // float avgShadow = 0.0;
-  // for (uint i = 0u; i < localLightCount; ++i) {
-  //   uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
-  //   GpuLocalLight localLight = u_local_lights[lightIndex];
-  //   if (isPointLight(localLight)) {
-  //     float shadow = computePointShadow(FragPos, viewPos, localLight);
-  //     avgShadow += shadow;
-  //   }
-  // }
-  // if (localLightCount > 0u) {
-  //   avgShadow /= float(localLightCount);
-  //   color = mix(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), avgShadow);
-  // }
+  vec3 shadowDebug = vec3(0.0);
+  bool hasLights = false;
+
+  for (uint i = 0u; i < localLightCount; ++i) {
+    uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
+    GpuLocalLight localLight = u_local_lights[lightIndex];
+
+    if (localLight.color_intensity.w > 0.0) {
+      float s = computePointShadow(FragPos, viewPos, localLight);
+      hasLights = true;
+
+      if (localLight.shadow_cone_data.y > 0.5) {
+        // KANAŁ CZERWONY: Screen Space Shadows (SSS)
+        // Jeśli widoczne są czerwone obwódki na krawędziach, winny jest Raymarcher SSS
+        shadowDebug.r += (1.0 - s);
+      } else {
+        // KANAŁ ZIELONY: Klasyczne Shadow Mapy (CubeArray)
+        // Jeśli tu są błędy, problemem jest Bias lub PCF w CubeMapach
+        shadowDebug.g += (1.0 - s);
+      }
+    }
+  }
+
+  if (hasLights) {
+    // Legenda kolorów:
+    // CZARNY  = Pełne światło (brak cienia)
+    // CZERWONY = Cień generowany przez SSS
+    // ZIELONY  = Cień generowany przez Shadow Mapy
+    // ŻÓŁTY    = Miejsce, gdzie oba systemy nakładają cień (częsty powód "zbyt ciemnych" krawędzi)
+    color = shadowDebug;
+
+    // Opcjonalnie: wzmocnij kontrast dla lepszej widoczności artefaktów
+    color *= 1.0;
+  } else {
+    // NIEBIESKI = Obszar klastra bez świateł punktowych (debug zasięgu świateł)
+    color = vec3(0.0, 0.0, 0.2);
+  }
 
   FragColor = vec4(color, 1.0);
 }
