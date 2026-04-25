@@ -52,10 +52,14 @@ struct ClusterConfig {
   }
 };
 
-struct alignas(16) GpuPointLight {
+inline constexpr f32 LOCAL_LIGHT_TYPE_POINT = 0.0F;
+inline constexpr f32 LOCAL_LIGHT_TYPE_SPOT = 1.0F;
+
+struct alignas(16) GpuLocalLight {
   Vec4 position_range = {0, 0, 0, 0};
   Vec4 color_intensity = {0, 0, 0, 0};
-  Vec4 shadow_data = {-1, 0, 0, 0};
+  Vec4 direction_type = {0, 0, -1, LOCAL_LIGHT_TYPE_POINT};
+  Vec4 shadow_cone_data = {-1, 0, -1, -1};
 };
 
 struct alignas(16) ClusterGpuRecord {
@@ -67,10 +71,10 @@ struct alignas(16) ClusterGpuRecord {
   u32 _pad1 = 0;
 };
 
-static constexpr auto POINT_LIGHT_SIZE = 48;
+static constexpr auto LOCAL_LIGHT_SIZE = 64;
 static constexpr auto CLUSTER_RECORD_SIZE = 48;
 
-static_assert(sizeof(GpuPointLight) == POINT_LIGHT_SIZE);
+static_assert(sizeof(GpuLocalLight) == LOCAL_LIGHT_SIZE);
 static_assert(sizeof(ClusterGpuRecord) == CLUSTER_RECORD_SIZE);
 
 struct ClusterConfigSnapshot {
@@ -206,13 +210,13 @@ inline auto build_cluster_record(
 struct ClusteredLightingState {
   using T = ecs::Resource;
 
-  SSBO point_light_buffer{};
+  SSBO local_light_buffer{};
   SSBO cluster_buffer{};
   SSBO light_index_buffer{};
   SSBO overflow_buffer{};
   ComputeProgram cluster_build_program{};
 
-  std::vector<GpuPointLight> point_lights_cpu;
+  std::vector<GpuLocalLight> local_lights_cpu;
   std::vector<ClusterGpuRecord> clusters_cpu;
 
   math::Mat4 last_proj = math::Mat4::IDENTITY;
@@ -222,7 +226,7 @@ struct ClusteredLightingState {
   bool last_ortho = false;
   bool last_config_valid = false;
   bool clusters_dirty = true;
-  u32 point_light_buffer_bytes = 0;
+  u32 local_light_buffer_bytes = 0;
   u32 cluster_buffer_bytes = 0;
   u32 light_index_buffer_bytes = 0;
   bool cluster_build_program_failed = false;
@@ -236,15 +240,15 @@ public:
 
   auto ensure_buffers(ClusterConfig const& config) -> void {
     u32 const point_light_bytes =
-      static_cast<u32>(sizeof(GpuPointLight) * std::max(config.max_point_lights, 1U));
+      static_cast<u32>(sizeof(GpuLocalLight) * std::max(config.max_point_lights, 1U));
     u32 const cluster_bytes =
       static_cast<u32>(sizeof(ClusterGpuRecord) * config.cluster_count());
     u32 const light_index_bytes =
       static_cast<u32>(sizeof(u32) * config.max_light_indices());
 
-    if (!point_light_buffer.ready() || point_light_buffer_bytes != point_light_bytes) {
-      point_light_buffer = SSBO(point_light_bytes, nullptr, RL_DYNAMIC_DRAW);
-      point_light_buffer_bytes = point_light_bytes;
+    if (!local_light_buffer.ready() || local_light_buffer_bytes != point_light_bytes) {
+      local_light_buffer = SSBO(point_light_bytes, nullptr, RL_DYNAMIC_DRAW);
+      local_light_buffer_bytes = point_light_bytes;
     }
     if (!cluster_buffer.ready() || cluster_buffer_bytes != cluster_bytes) {
       cluster_buffer = SSBO(cluster_bytes, nullptr, RL_DYNAMIC_DRAW);
@@ -303,39 +307,40 @@ public:
       last_ortho = view.orthographic;
     }
 
-    point_lights_cpu.clear();
-    point_lights_cpu.reserve(config.max_point_lights);
+    local_lights_cpu.clear();
+    local_lights_cpu.reserve(config.max_point_lights);
 
     if (clusters_dirty) {
       clusters_cpu.clear();
       clusters_cpu.resize(config.cluster_count());
     }
 
-    usize const point_light_count =
-      std::min(lights.point_lights.size(), static_cast<usize>(config.max_point_lights));
-    if (lights.point_lights.size() > point_light_count) {
+    usize const requested_local_light_count = lights.point_lights.size() + lights.spot_lights.size();
+    usize const max_local_light_count = static_cast<usize>(config.max_point_lights);
+    if (requested_local_light_count > max_local_light_count) {
       warn(
-        "Forward+: dropping {} point lights beyonds configured cap",
-        static_cast<int>(lights.point_lights.size() - point_light_count)
+        "Forward+: dropping {} local lights beyond configured cap",
+        static_cast<int>(requested_local_light_count - max_local_light_count)
       );
     }
+
+    usize const point_light_count =
+      std::min(lights.point_lights.size(), max_local_light_count);
 
     for (usize i = 0; i < point_light_count; ++i) {
       auto const& light = lights.point_lights[i];
       bool shadow_valid = false;
-      bool shadow_use_atlas = false;
 
       if (light.shadow_slot >= 0) {
         usize const shadow_slot = static_cast<usize>(light.shadow_slot);
         if (shadow_slot < shadows.point_shadows.size()) {
           auto const& point_shadow = shadows.point_shadows[shadow_slot];
           shadow_valid = point_shadow.allocated_resolution > 0;
-          shadow_use_atlas = point_shadow.use_atlas && shadow_valid;
         }
       }
 
-      point_lights_cpu.push_back(
-        GpuPointLight{
+      local_lights_cpu.push_back(
+        GpuLocalLight{
           .position_range =
             {light.position.x, light.position.y, light.position.z, light.range},
           .color_intensity = {
@@ -344,11 +349,45 @@ public:
             light.color.b / 255.0f,
             light.intensity
           },
-          .shadow_data = {
+          .direction_type = {0.0F, 0.0F, -1.0F, LOCAL_LIGHT_TYPE_POINT},
+          .shadow_cone_data = {
             shadow_valid ? static_cast<f32>(light.shadow_slot) : -1.0F,
-            light.range,
             light.screen_space_shadows ? 1.0F : 0.0F,
-            shadow_use_atlas ? 1.0F : 0.0F,
+            -1.0F,
+            -1.0F,
+          },
+        }
+      );
+    }
+
+    usize const remaining_capacity = max_local_light_count - point_light_count;
+    usize const spot_light_count = std::min(lights.spot_lights.size(), remaining_capacity);
+    for (usize i = 0; i < spot_light_count; ++i) {
+      auto const& light = lights.spot_lights[i];
+      f32 const inner_angle = std::clamp(light.inner_angle, 0.0F, PI);
+      f32 const outer_angle = std::clamp(light.outer_angle, inner_angle, PI);
+
+      local_lights_cpu.push_back(
+        GpuLocalLight{
+          .position_range =
+            {light.position.x, light.position.y, light.position.z, light.range},
+          .color_intensity = {
+            light.color.r / 255.0f,
+            light.color.g / 255.0f,
+            light.color.b / 255.0f,
+            light.intensity
+          },
+          .direction_type = {
+            light.direction.x,
+            light.direction.y,
+            light.direction.z,
+            LOCAL_LIGHT_TYPE_SPOT,
+          },
+          .shadow_cone_data = {
+            -1.0F,
+            0.0F,
+            std::cos(inner_angle),
+            std::cos(outer_angle),
           },
         }
       );
@@ -389,10 +428,10 @@ public:
 
     u32 overflow_count = 0;
 
-    if (!point_lights_cpu.empty()) {
-      point_light_buffer.update(
-        point_lights_cpu.data(),
-        static_cast<u32>(point_lights_cpu.size() * sizeof(GpuPointLight)),
+    if (!local_lights_cpu.empty()) {
+      local_light_buffer.update(
+        local_lights_cpu.data(),
+        static_cast<u32>(local_lights_cpu.size() * sizeof(GpuLocalLight)),
         0
       );
     }
@@ -405,14 +444,14 @@ public:
 
     overflow_buffer.update(&overflow_count, sizeof(overflow_count), 0);
 
-    if (!point_lights_cpu.empty() && ensure_compute_program()) {
+    if (!local_lights_cpu.empty() && ensure_compute_program()) {
       dispatch_cluster_build(view, config);
     }
   }
 
   auto bind() const -> void {
-    if (point_light_buffer.ready()) {
-      point_light_buffer.bind(0);
+    if (local_light_buffer.ready()) {
+      local_light_buffer.bind(0);
     }
     if (cluster_buffer.ready()) {
       cluster_buffer.bind(1);
@@ -428,13 +467,13 @@ public:
 private:
   auto dispatch_cluster_build(ecs::ExtractedView const& view, ClusterConfig const& config)
     -> void {
-    u32 const point_light_count = static_cast<u32>(point_lights_cpu.size());
+    u32 const point_light_count = static_cast<u32>(local_lights_cpu.size());
     u32 const workgroups = (point_light_count + 63U) / 64U;
     if (workgroups == 0) {
       return;
     }
 
-    point_light_buffer.bind(0);
+    local_light_buffer.bind(0);
     cluster_buffer.bind(1);
     light_index_buffer.bind(2);
     overflow_buffer.bind(3);
@@ -472,6 +511,6 @@ namespace ecs {
 using gl::ClusterConfig;
 using gl::ClusteredLightingState;
 using gl::ClusterGpuRecord;
-using gl::GpuPointLight;
+using gl::GpuLocalLight;
 
 } // namespace ecs

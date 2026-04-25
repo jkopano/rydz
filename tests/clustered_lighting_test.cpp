@@ -56,3 +56,7 @@ TEST(ClusteredLightingTest, PointShadowAtlasIsDisabledByDefault) {
 
   EXPECT_FALSE(settings.use_dynamic_point_atlas);
 }
+
+TEST(ClusteredLightingTest, LocalLightGpuLayoutRemainsStd430Aligned) {
+  EXPECT_EQ(sizeof(gl::GpuLocalLight), 64U);
+}

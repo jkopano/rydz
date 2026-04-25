@@ -53,12 +53,26 @@ struct ExtractedLights {
     i32 shadow_slot{-1};
   };
 
+  struct SpotLight {
+    Vec3 position;
+    Vec3 direction{0.0F, 0.0F, -1.0F};
+    Color color{Color::WHITE};
+    float intensity{0.0F};
+    float range{0.0F};
+    float inner_angle{20.0F * DEG2RAD};
+    float outer_angle{30.0F * DEG2RAD};
+  };
+
   std::vector<PointLight> point_lights{};
+  std::vector<SpotLight> spot_lights{};
+  AmbientLight ambient_light{.color = Color::WHITE, .intensity = 0.0F};
   DirectionalLight dir_light{};
   bool has_directional{};
 
   auto clear() -> void {
     point_lights.clear();
+    spot_lights.clear();
+    ambient_light = AmbientLight{.color = Color::WHITE, .intensity = 0.0F};
     dir_light = {};
     has_directional = false;
   }

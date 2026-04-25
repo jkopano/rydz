@@ -74,28 +74,80 @@ struct Extract {
   }
 
   static auto lighting(
+    Res<ExtractedView> view,
+    Query<AmbientLight> ambient_query,
     Query<DirectionalLight> dir_query,
     Query<PointLight, GlobalTransform> point_query,
+    Query<SpotLight, GlobalTransform> spot_query,
     ResMut<ExtractedLights> lights
   ) -> void {
     lights->clear();
 
-    for (auto [dir] : dir_query.iter()) {
-      lights->dir_light = *dir;
-      lights->has_directional = true;
-      break;
+    if (view->active_environment != nullptr) {
+      lights->ambient_light = view->active_environment->ambient_light;
+      lights->dir_light = view->active_environment->directional_light;
+      lights->has_directional =
+        lights->dir_light.intensity > 0.0F && lights->dir_light.direction.length_sq() > 1e-8F;
     }
 
+    if (lights->ambient_light.intensity <= 0.0F) {
+      for (auto [ambient] : ambient_query.iter()) {
+        lights->ambient_light = *ambient;
+        break;
+      }
+    }
+
+    if (!lights->has_directional) {
+      for (auto [dir] : dir_query.iter()) {
+        lights->dir_light = *dir;
+        lights->has_directional = dir->intensity > 0.0F && dir->direction.length_sq() > 1e-8F;
+        break;
+      }
+    }
+
+    if (!view->active) {
+      return;
+    }
+
+    auto const frustum_planes =
+      extract_frustum_planes(view->camera_view.proj * view->camera_view.view);
+
     for (auto [point_light, global] : point_query.iter()) {
+      Vec3 const position = global->translation();
+      if (point_light->range <= 0.001F ||
+          !sphere_in_frustum(position, point_light->range, frustum_planes)) {
+        continue;
+      }
+
       lights->point_lights.push_back(
         ExtractedLights::PointLight{
-          .position = global->translation(),
+          .position = position,
           .color = point_light->color,
           .intensity = point_light->intensity,
           .range = point_light->range,
           .casts_shadows = point_light->casts_shadows,
           .screen_space_shadows = false,
           .shadow_slot = -1,
+        }
+      );
+    }
+
+    for (auto [spot_light, global] : spot_query.iter()) {
+      Vec3 const position = global->translation();
+      if (spot_light->range <= 0.001F ||
+          !sphere_in_frustum(position, spot_light->range, frustum_planes)) {
+        continue;
+      }
+
+      lights->spot_lights.push_back(
+        ExtractedLights::SpotLight{
+          .position = position,
+          .direction = global->forward(),
+          .color = spot_light->color,
+          .intensity = spot_light->intensity,
+          .range = spot_light->range,
+          .inner_angle = spot_light->inner_angle,
+          .outer_angle = spot_light->outer_angle,
         }
       );
     }

@@ -79,6 +79,15 @@ inline auto aabb_in_frustum(
   });
 }
 
+inline auto sphere_in_frustum(
+  Vec3 const& center, float radius, std::array<FrustumPlane, 6> const& planes
+) -> bool {
+  float const clamped_radius = std::max(radius, 0.0F);
+  return std::ranges::all_of(planes, [&](auto const& plane) -> bool {
+    return (plane.normal.dot(center) + plane.distance) >= -clamped_radius;
+  });
+}
+
 inline auto extract_frustum_planes(Mat4 vp) -> std::array<FrustumPlane, 6> {
   auto row = [&](int i) -> Vec4 {
     return {vp(i, 0), vp(i, 1), vp(i, 2), vp(i, 3)};

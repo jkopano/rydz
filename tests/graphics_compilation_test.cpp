@@ -13,6 +13,7 @@
 
 #include "rydz_graphics/gl/shader_bindings.hpp"
 #include "rydz_graphics/gl/mod.hpp"
+#include "rydz_graphics/components/environment.hpp"
 
 using namespace ecs;
 
@@ -24,6 +25,8 @@ TEST(GraphicsCompilation, NewOrganizedIncludes) {
   ClusteredLightingState cl;
   FrustumPlane fp;
   MaterialMap mm = MaterialMap::Albedo;
+  SpotLight sl;
+  Environment env;
 
   // If we got here, all types are accessible
   SUCCEED();
@@ -38,10 +41,29 @@ TEST(GraphicsCompilation, ModuleExports) {
 
   // lighting/mod.hpp should export all lighting utilities
   ClusteredLightingState cl;
+  SpotLight sl;
+  Environment env;
 
   // gl/mod.hpp should export shader bindings
   MaterialMap mm = MaterialMap::Albedo;
 
   // If we got here, all module exports are working
   SUCCEED();
+}
+
+TEST(GraphicsCompilation, EnvironmentLightingBuilderWorksOnTemporaries) {
+  auto env = Environment::from_color(Color::BLACK)
+               .with_ambient_light(AmbientLight{
+                 .color = Color::WHITE,
+                 .intensity = 0.5f,
+               })
+               .with_directional_light(DirectionalLight{
+                 .color = Color::WHITE,
+                 .direction = Vec3(-1.0f, -1.0f, -1.0f).normalized(),
+                 .intensity = 1.0f,
+                 .casts_shadows = true,
+               });
+
+  EXPECT_FLOAT_EQ(env.ambient_light.intensity, 0.5f);
+  EXPECT_FLOAT_EQ(env.directional_light.intensity, 1.0f);
 }

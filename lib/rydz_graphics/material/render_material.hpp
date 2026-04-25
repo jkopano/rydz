@@ -24,6 +24,7 @@ struct alignas(16) ViewUniformData {
   Mat4 projection = Mat4::IDENTITY;
   Vec4 directional_direction = Vec4::ZERO;
   Vec4 directional_color_intensity = Vec4::ZERO;
+  Vec4 ambient_color_intensity = Vec4::ZERO;
   std::array<int, 4> cluster_dimensions = {0, 0, 0, 0};
   Vec4 cluster_screen_size_near_far = Vec4::ZERO;
   std::array<int, 4> view_flags = {0, 0, 0, 0};
@@ -63,6 +64,12 @@ struct ViewUniformState {
       lights.dir_light.color.g / 255.0F,
       lights.dir_light.color.b / 255.0F,
       lights.dir_light.intensity,
+    };
+    data.ambient_color_intensity = Vec4{
+      lights.ambient_light.color.r / 255.0F,
+      lights.ambient_light.color.g / 255.0F,
+      lights.ambient_light.color.b / 255.0F,
+      lights.ambient_light.intensity,
     };
     data.cluster_dimensions = {
       cluster_config.tile_count_x_clamped(),

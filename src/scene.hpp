@@ -181,8 +181,7 @@ inline auto spawn_lights_on_input(
       .color = {255, 242, 230, 255},
       .direction = Vec3(-0.0f, -1.0f, -0.0f),
       .intensity = 0.8f,
-    },
-    AmbientLight{}
+    }
   );
 
   for (int i = 0; i < 30; ++i) {
@@ -216,7 +215,7 @@ inline auto setup_camera(Cmd cmd, NonSendMarker) -> void {
     Transform::from_xyz(8, 6, 8).look_at(Vec3::ZERO),
     CameraController{},
     PostProcessMaterial{DefaultPostProcessMaterial{}},
-    ecs::Environment::from_directory("res/hdri/skybox")
+    Environment::from_directory("res/hdri/skybox")
   );
   rl::DisableCursor();
 }

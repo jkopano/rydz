@@ -2,6 +2,7 @@
 
 #include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_ecs/world.hpp"
+#include "rydz_graphics/spatial/frustum.hpp"
 #include "rydz_graphics/spatial/visibility.hpp"
 
 using namespace ecs;
@@ -189,4 +190,24 @@ TEST(GraphicsVisibilityTest, VisibilityMonotonicity_HiddenMidChainImpliesInvisib
       }
     }
   }
+}
+
+TEST(GraphicsVisibilityTest, SphereFrustumCullKeepsVisibleLights) {
+  constexpr float HALF_PI = 1.57079632679F;
+  math::Mat4 const projection =
+    math::Mat4::perspective_rh(HALF_PI, 1.0F, 0.1F, 50.0F);
+  auto const planes = extract_frustum_planes(projection);
+
+  EXPECT_TRUE(sphere_in_frustum(math::Vec3{0.0F, 0.0F, -5.0F}, 1.0F, planes));
+  EXPECT_TRUE(sphere_in_frustum(math::Vec3{6.0F, 0.0F, -5.0F}, 2.5F, planes));
+}
+
+TEST(GraphicsVisibilityTest, SphereFrustumCullRejectsOffscreenLights) {
+  constexpr float HALF_PI = 1.57079632679F;
+  math::Mat4 const projection =
+    math::Mat4::perspective_rh(HALF_PI, 1.0F, 0.1F, 50.0F);
+  auto const planes = extract_frustum_planes(projection);
+
+  EXPECT_FALSE(sphere_in_frustum(math::Vec3{12.0F, 0.0F, -5.0F}, 1.0F, planes));
+  EXPECT_FALSE(sphere_in_frustum(math::Vec3{0.0F, 0.0F, 5.0F}, 1.0F, planes));
 }

@@ -32,6 +32,7 @@ layout(std140, binding = 0) uniform ViewUniforms {
   mat4 u_mat_projection;
   vec4 u_dir_light_direction;
   vec4 u_dir_light_color_intensity;
+  vec4 u_ambient_light_color_intensity;
   ivec4 u_cluster_dimensions;
   vec4 u_cluster_screen_size_near_far;
   ivec4 u_view_flags;
@@ -55,10 +56,11 @@ const int RENDER_METHOD_OPAQUE = 0;
 const int RENDER_METHOD_TRANSPARENT = 1;
 const int RENDER_METHOD_ALPHA_CUTOUT = 2;
 
-struct GpuPointLight {
+struct GpuLocalLight {
   vec4 position_range;
   vec4 color_intensity;
-  vec4 shadow_data;
+  vec4 direction_type;
+  vec4 shadow_cone_data;
 };
 
 struct ClusterRecord {
@@ -67,8 +69,8 @@ struct ClusterRecord {
   uvec4 meta;
 };
 
-layout(std430, binding = 0) readonly buffer PointLightBuffer {
-  GpuPointLight u_point_lights[];
+layout(std430, binding = 0) readonly buffer LocalLightBuffer {
+  GpuLocalLight u_local_lights[];
 };
 
 layout(std430, binding = 1) readonly buffer ClusterBuffer {
@@ -80,6 +82,8 @@ layout(std430, binding = 2) readonly buffer ClusterIndexBuffer {
 };
 
 const float PI = 3.14159265359;
+const float LOCAL_LIGHT_TYPE_POINT = 0.5;
+const float LOCAL_LIGHT_TYPE_SPOT = 1.5;
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
   return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
@@ -300,7 +304,29 @@ float computeDirectionalShadow(vec3 fragPos, vec3 normal, vec3 lightDir, vec3 vi
   return visibility / max(sampleCount, 1.0);
 }
 
-float computePointScreenSpaceShadow(vec3 viewPos, GpuPointLight pointLight) {
+bool isPointLight(GpuLocalLight light) {
+  return light.direction_type.w < LOCAL_LIGHT_TYPE_POINT;
+}
+
+bool isSpotLight(GpuLocalLight light) {
+  return light.direction_type.w >= LOCAL_LIGHT_TYPE_POINT &&
+         light.direction_type.w < LOCAL_LIGHT_TYPE_SPOT;
+}
+
+float computeSpotAttenuation(GpuLocalLight light, vec3 lightDir) {
+  vec3 spotDirection = normalize(light.direction_type.xyz);
+  float innerCos = light.shadow_cone_data.z;
+  float outerCos = light.shadow_cone_data.w;
+  float cosTheta = dot(-lightDir, spotDirection);
+  float cone = clamp(
+    (cosTheta - outerCos) / max(innerCos - outerCos, 0.0001),
+    0.0,
+    1.0
+  );
+  return cone * cone;
+}
+
+float computePointScreenSpaceShadow(vec3 viewPos, GpuLocalLight pointLight) {
   if (u_point_screen_shadow_flags.x <= 0) {
     return 1.0;
   }
@@ -347,23 +373,23 @@ float computePointScreenSpaceShadow(vec3 viewPos, GpuPointLight pointLight) {
   return 1.0;
 }
 
-float computePointShadow(vec3 fragPos, vec3 viewPos, GpuPointLight pointLight) {
-  if (pointLight.shadow_data.z > 0.5) {
+float computePointShadow(vec3 fragPos, vec3 viewPos, GpuLocalLight pointLight) {
+  if (pointLight.shadow_cone_data.y > 0.5) {
     return computePointScreenSpaceShadow(viewPos, pointLight);
   }
 
-  if (pointLight.shadow_data.x < 0.0) {
+  if (pointLight.shadow_cone_data.x < 0.0) {
     return 1.0;
   }
 
-  int shadowSlot = int(pointLight.shadow_data.x);
+  int shadowSlot = int(pointLight.shadow_cone_data.x);
   if (shadowSlot < 0 || shadowSlot >= u_shadow_flags.z) {
     return 1.0;
   }
 
   vec3 lightToFrag = fragPos - pointLight.position_range.xyz;
   float currentDepth = length(lightToFrag);
-  float farPlane = max(pointLight.shadow_data.y, 0.001);
+  float farPlane = max(pointLight.position_range.w, 0.001);
   return samplePointShadowPCF(shadowSlot, lightToFrag, currentDepth, farPlane);
 }
 
@@ -443,30 +469,40 @@ void main() {
 
   int clusterIndex = computeClusterIndex(viewPos);
   ClusterRecord cluster = u_clusters[clusterIndex];
-  uint pointLightCount = min(cluster.meta.y, uint(max(u_view_flags.y, 0)));
+  uint localLightCount = min(cluster.meta.y, uint(max(u_view_flags.y, 0)));
 
-  for (uint i = 0u; i < pointLightCount; ++i) {
+  for (uint i = 0u; i < localLightCount; ++i) {
     uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
-    GpuPointLight pointLight = u_point_lights[lightIndex];
+    GpuLocalLight localLight = u_local_lights[lightIndex];
 
-    if (pointLight.color_intensity.w <= 0.0) {
+    if (localLight.color_intensity.w <= 0.0) {
       continue;
     }
 
-    vec3 lightVec = pointLight.position_range.xyz - FragPos;
+    vec3 lightVec = localLight.position_range.xyz - FragPos;
     float distance = length(lightVec);
-    if (distance > pointLight.position_range.w) {
+    if (distance > localLight.position_range.w || distance <= 0.001) {
       continue;
     }
 
     vec3 lightDir = normalize(lightVec);
-    float attenuation = pointLight.color_intensity.w / (distance * distance + 0.01);
-    float factor = distance / pointLight.position_range.w;
+    float attenuation = localLight.color_intensity.w / (distance * distance + 0.01);
+    float factor = distance / localLight.position_range.w;
     float smoothFactor = clamp(1.0 - factor * factor * factor * factor, 0.0, 1.0);
     attenuation *= smoothFactor * smoothFactor;
 
-    vec3 radiance = pointLight.color_intensity.rgb * attenuation;
-    float shadow = computePointShadow(FragPos, viewPos, pointLight);
+    if (isSpotLight(localLight)) {
+      float coneAttenuation = computeSpotAttenuation(localLight, lightDir);
+      if (coneAttenuation <= 0.0) {
+        continue;
+      }
+      attenuation *= coneAttenuation;
+    }
+
+    vec3 radiance = localLight.color_intensity.rgb * attenuation;
+    float shadow = isPointLight(localLight)
+                     ? computePointShadow(FragPos, viewPos, localLight)
+                     : 1.0;
     lighting += evaluatePBR(
         normal, viewDir, lightDir, radiance * shadow, albedo, metallic, roughness);
   }
@@ -475,7 +511,9 @@ void main() {
   vec3 F = fresnelSchlickRoughness(max(dot(normal, viewDir), 0.0), F0, roughness);
   vec3 kS = F;
   vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
-  vec3 ambientColor = kD * albedo * 0.03 * ao;
+  vec3 ambientColor =
+    kD * albedo * u_ambient_light_color_intensity.rgb *
+    u_ambient_light_color_intensity.w * ao;
   vec3 color = ambientColor + lighting + emissive;
 
   float strength = u_color.a;
