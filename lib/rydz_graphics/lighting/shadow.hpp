@@ -37,7 +37,7 @@ struct ShadowSettings {
   bool directional_enabled = true;
   i32 cascade_count = MAX_DIRECTIONAL_CASCADES;
 
-  u32 cascade_resolution = 2048;
+  u32 cascade_resolution = 4096;
 
   f32 cascade_split_lambda = 0.7F;
   f32 cascade_max_distance = 150.0F;
@@ -54,11 +54,11 @@ struct ShadowSettings {
   i32 directional_pcf_radius = 1;
   i32 point_pcf_radius = 1;
 
-  // Deprecated by the cubemap-array backend; kept for config compatibility.
-  bool use_dynamic_point_atlas = false;
-  u32 point_atlas_size = 4096;
-  u32 point_min_resolution = 64;
-  u32 point_max_resolution = 512;
+  // FOR ATLAST - maybe in future
+  // bool use_dynamic_point_atlas = false;
+  // u32 point_atlas_size = 4096;
+  // u32 point_min_resolution = 64;
+  // u32 point_max_resolution = 512;
 
   [[nodiscard]] auto cascade_count_clamped() const -> i32 {
     return std::clamp(cascade_count, 1, MAX_DIRECTIONAL_CASCADES);
@@ -680,8 +680,7 @@ public:
   DepthCubemapArrayTarget(DepthCubemapArrayTarget&& other) noexcept
       : framebuffer_(std::exchange(other.framebuffer_, 0)),
         texture_id_(std::exchange(other.texture_id_, 0)),
-        width_(std::exchange(other.width_, 0)),
-        height_(std::exchange(other.height_, 0)),
+        width_(std::exchange(other.width_, 0)), height_(std::exchange(other.height_, 0)),
         cubemap_count_(std::exchange(other.cubemap_count_, 0)) {}
 
   auto operator=(DepthCubemapArrayTarget&& other) noexcept -> DepthCubemapArrayTarget& {
@@ -724,7 +723,9 @@ public:
       GL_DEPTH_COMPONENT32F,
       static_cast<GLsizei>(width),
       static_cast<GLsizei>(height),
-      static_cast<GLsizei>(cubemap_count * static_cast<u32>(ecs::POINT_SHADOW_FACE_COUNT)),
+      static_cast<GLsizei>(
+        cubemap_count * static_cast<u32>(ecs::POINT_SHADOW_FACE_COUNT)
+      ),
       0,
       GL_DEPTH_COMPONENT,
       GL_FLOAT,
@@ -747,9 +748,7 @@ public:
     rl::rlDrawRenderBatchActive();
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
     i32 const layer = cubemap_index * ecs::POINT_SHADOW_FACE_COUNT + face_index;
-    glFramebufferTextureLayer(
-      GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_id_, 0, layer
-    );
+    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_id_, 0, layer);
     glViewport(0, 0, static_cast<GLsizei>(width_), static_cast<GLsizei>(height_));
     glClear(GL_DEPTH_BUFFER_BIT);
   }
