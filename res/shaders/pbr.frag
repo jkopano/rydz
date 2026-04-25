@@ -143,38 +143,41 @@ void buildPointShadowBasis(vec3 dir, out vec3 tangent, out vec3 bitangent) {
   bitangent = cross(dir, tangent);
 }
 
-float computePointShadowBias(float currentDepth, float farPlane) {
-  float normalizedDepth = clamp(currentDepth / farPlane, 0.0, 1.0);
-  float distanceScale = mix(1.0, 2.0, normalizedDepth);
-  return (u_shadow_params.z * distanceScale) / farPlane;
+float computePointShadowBias(float currentDepth, float farPlane, vec3 normal, vec3 lightDir) {
+  float baseBias = u_shadow_params.z;
+  float cosTheta = clamp(dot(normal, lightDir), 0.0, 1.0);
+  float angleFactor = mix(2.0, 1.0, cosTheta);
+  float distanceScale = mix(1.0, 2.0, clamp(currentDepth / farPlane, 0.0, 1.0));
+
+  return (baseBias * angleFactor * distanceScale) / farPlane;
 }
 
 float samplePointShadowPCF(
   int slot,
   vec3 lightToFrag,
   float currentDepth,
-  float farPlane
+  float farPlane,
+  vec3 normal,
+  vec3 lightDir
 ) {
-  if (currentDepth <= 0.001) {
-    return 1.0;
-  }
+  if (currentDepth <= 0.001) return 1.0;
 
-  if (currentDepth > farPlane) {
-    return 1.0;
-  }
+  // Miękkie wygaszanie cienia przy granicy zasięgu światła (farPlane)
+  float shadowFade = smoothstep(farPlane, farPlane * 0.9, currentDepth);
+  if (shadowFade <= 0.0) return 1.0;
 
   int pcfRadius = max(u_point_screen_shadow_flags.z, 0);
   float currentDepthNormalized = currentDepth / farPlane;
-  float bias = computePointShadowBias(currentDepth, farPlane);
+  float bias = computePointShadowBias(currentDepth, farPlane, normal, lightDir);
 
   if (pcfRadius <= 0) {
     float closestDepth = samplePointShadow(slot, lightToFrag);
-    return currentDepthNormalized - bias > closestDepth ? 0.0 : 1.0;
+    float s = currentDepthNormalized - bias > closestDepth ? 0.0 : 1.0;
+    return mix(1.0, s, shadowFade);
   }
 
   vec3 dir = normalize(lightToFrag);
-  vec3 tangent;
-  vec3 bitangent;
+  vec3 tangent, bitangent;
   buildPointShadowBasis(dir, tangent, bitangent);
 
   float texelScale = pointShadowTexelScale();
@@ -191,7 +194,8 @@ float samplePointShadowPCF(
     }
   }
 
-  return visibility / max(sampleCount, 1.0);
+  float finalShadow = visibility / max(sampleCount, 1.0);
+  return mix(1.0, finalShadow, shadowFade);
 }
 
 float sceneDepthToViewDepth(float depthSample) {
@@ -341,22 +345,23 @@ float computePointScreenSpaceShadow(vec3 viewPos, GpuLocalLight pointLight) {
   int steps = max(u_point_screen_shadow_flags.y, 1);
   float thickness = max(u_point_screen_shadow_params.x, 0.2);
 
-  float startDistance = 0.15;
-  float stepLength = (rayLength - startDistance) / float(steps);
+  // DITHERING: Dodajemy małe losowe przesunięcie startu promienia.
+  // To zamienia "schodki" (banding) w drobne ziarno.
+  float dither = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+  float startDistance = 0.15 + (dither * 0.1);
 
-  float shadowVisibility = 1.0;
+  float stepLength = (rayLength - startDistance) / float(steps);
+  float maxOcclusion = 0.0;
+  vec2 finalUV = vec2(0.0);
 
   for (int step = 0; step < steps; ++step) {
-    float travel = startDistance + stepLength * float(step);
+    // Przesuwamy każdy krok o dither, żeby próbki nie układały się w linie
+    float travel = startDistance + stepLength * (float(step) + dither);
     vec3 samplePos = viewPos + rayDir * travel;
 
     float ndcDepth = 0.0;
     vec2 uv = projectViewToUv(samplePos, ndcDepth);
-
-    float edgeFade = 1.0 - max(
-          smoothstep(0.9, 1.0, abs(uv.x * 2.0 - 1.0)),
-          smoothstep(0.9, 1.0, abs(uv.y * 2.0 - 1.0))
-        );
+    finalUV = uv;
 
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
 
@@ -365,39 +370,53 @@ float computePointScreenSpaceShadow(vec3 viewPos, GpuLocalLight pointLight) {
 
     float sceneDepth = sceneDepthToViewDepth(sceneDepthSample);
     float rayDepth = -samplePos.z;
-
     float diff = rayDepth - sceneDepth;
 
+    // Kluczowe: Warunek kolizji z "miękkim marginesem"
     if (diff > 0.0 && diff < thickness) {
-      float occlusion = smoothstep(thickness, 0.0, diff);
+      // Im cieńszy obiekt (mały diff), tym mocniejszy cień.
+      // Im dalej od punktu startu, tym bardziej rozmywamy (travel / rayLength).
+      float softness = clamp(1.0 - (diff / thickness), 0.0, 1.0);
+      float distFade = clamp(1.0 - (travel / rayLength), 0.0, 1.0);
 
-      shadowVisibility = min(shadowVisibility, mix(1.0, 1.0 - occlusion, edgeFade));
+      // Rejestrujemy occlusion
+      maxOcclusion = max(maxOcclusion, softness * distFade);
 
-      if (shadowVisibility < 0.1) return 0.0;
+      // Jeśli mamy mocną kolizję, wychodzimy szybciej
+      if (maxOcclusion > 0.9) break;
     }
   }
 
-  return clamp(shadowVisibility, 0.0, 1.0);
+  // Płynne wygaszanie na krawędziach ekranu (żeby cienie nie migały przy krawędziach)
+  float edgeFade = 1.0 - max(
+        smoothstep(0.8, 1.0, abs(finalUV.x * 2.0 - 1.0)),
+        smoothstep(0.8, 1.0, abs(finalUV.y * 2.0 - 1.0))
+      );
+
+  // Mix finalny: 1.0 to brak cienia, 0.0 to pełny cień
+  float shadow = mix(1.0, 1.0 - maxOcclusion, edgeFade);
+
+  // Zapobiegamy całkowitej czerni SSS (często wygląda to nienaturalnie)
+  return clamp(shadow, 0.1, 1.0);
 }
 
-float computePointShadow(vec3 fragPos, vec3 viewPos, GpuLocalLight pointLight) {
+float computePointShadow(vec3 fragPos, vec3 viewPos, vec3 normal, GpuLocalLight pointLight) {
   if (pointLight.shadow_cone_data.y > 0.5) {
     return computePointScreenSpaceShadow(viewPos, pointLight);
   }
 
-  if (pointLight.shadow_cone_data.x < 0.0) {
-    return 1.0;
-  }
+  if (pointLight.shadow_cone_data.x < 0.0) return 1.0;
 
   int shadowSlot = int(pointLight.shadow_cone_data.x);
-  if (shadowSlot < 0 || shadowSlot >= u_shadow_flags.z) {
-    return 1.0;
-  }
+  if (shadowSlot < 0 || shadowSlot >= u_shadow_flags.z) return 1.0;
 
-  vec3 lightToFrag = fragPos - pointLight.position_range.xyz;
+  vec3 lightVec = pointLight.position_range.xyz - fragPos;
+  vec3 lightToFrag = -lightVec;
   float currentDepth = length(lightToFrag);
   float farPlane = max(pointLight.position_range.w, 0.001);
-  return samplePointShadowPCF(shadowSlot, lightToFrag, currentDepth, farPlane);
+
+  // Przekazujemy normalną i kierunek światła do PCF (dla biasu)
+  return samplePointShadowPCF(shadowSlot, lightToFrag, currentDepth, farPlane, normal, normalize(lightVec));
 }
 
 int computeDepthSlice(float depth, ivec3 dims) {
@@ -516,7 +535,7 @@ void main() {
 
     vec3 radiance = localLight.color_intensity.rgb * attenuation;
     float shadow = isPointLight(localLight)
-      ? computePointShadow(FragPos, viewPos, localLight) : 1.0;
+      ? computePointShadow(FragPos, viewPos, normal, localLight) : 1.0;
     lighting += evaluatePBR(
         normal, viewDir, lightDir, radiance * shadow, albedo, metallic, roughness);
   }
@@ -553,43 +572,31 @@ void main() {
 
   // Debug: visualize shadows
   // Uncomment to see shadow values (red = shadow, green = no shadow)
-  vec3 shadowDebug = vec3(0.0);
-  bool hasLights = false;
-
-  for (uint i = 0u; i < localLightCount; ++i) {
-    uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
-    GpuLocalLight localLight = u_local_lights[lightIndex];
-
-    if (localLight.color_intensity.w > 0.0) {
-      float s = computePointShadow(FragPos, viewPos, localLight);
-      hasLights = true;
-
-      if (localLight.shadow_cone_data.y > 0.5) {
-        // KANAŁ CZERWONY: Screen Space Shadows (SSS)
-        // Jeśli widoczne są czerwone obwódki na krawędziach, winny jest Raymarcher SSS
-        shadowDebug.r += (1.0 - s);
-      } else {
-        // KANAŁ ZIELONY: Klasyczne Shadow Mapy (CubeArray)
-        // Jeśli tu są błędy, problemem jest Bias lub PCF w CubeMapach
-        shadowDebug.g += (1.0 - s);
-      }
-    }
-  }
-
-  if (hasLights) {
-    // Legenda kolorów:
-    // CZARNY  = Pełne światło (brak cienia)
-    // CZERWONY = Cień generowany przez SSS
-    // ZIELONY  = Cień generowany przez Shadow Mapy
-    // ŻÓŁTY    = Miejsce, gdzie oba systemy nakładają cień (częsty powód "zbyt ciemnych" krawędzi)
-    color = shadowDebug;
-
-    // Opcjonalnie: wzmocnij kontrast dla lepszej widoczności artefaktów
-    color *= 1.0;
-  } else {
-    // NIEBIESKI = Obszar klastra bez świateł punktowych (debug zasięgu świateł)
-    color = vec3(0.0, 0.0, 0.2);
-  }
+  // vec3 shadowDebug = vec3(0.0);
+  // bool hasLights = false;
+  //
+  // for (uint i = 0u; i < localLightCount; ++i) {
+  //   uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
+  //   GpuLocalLight localLight = u_local_lights[lightIndex];
+  //
+  //   if (localLight.color_intensity.w > 0.0) {
+  //     float s = computePointShadow(FragPos, viewPos, normal, localLight);
+  //     hasLights = true;
+  //
+  //     if (localLight.shadow_cone_data.y > 0.5) {
+  //       shadowDebug.r += (1.0 - s);
+  //     } else {
+  //       shadowDebug.g += (1.0 - s);
+  //     }
+  //   }
+  // }
+  //
+  // if (hasLights) {
+  //   color = shadowDebug;
+  //   color *= 1.0;
+  // } else {
+  //   color = vec3(0.0, 0.0, 0.2);
+  // }
 
   FragColor = vec4(color, 1.0);
 }
