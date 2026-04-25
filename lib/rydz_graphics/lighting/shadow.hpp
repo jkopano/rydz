@@ -53,10 +53,10 @@ struct ShadowSettings {
   f32 point_constant_bias = 0.01F;
   i32 directional_pcf_radius = 1;
 
-  bool use_dynamic_atlas = true;
-  u32 atlas_size = 8192 * 2;
-  u32 cascade_min_resolution = 128;
-  u32 cascade_max_resolution = 2048;
+  bool use_dynamic_point_atlas = true;
+  u32 point_atlas_size = 4096;
+  u32 point_min_resolution = 64;
+  u32 point_max_resolution = 512;
 
   [[nodiscard]] auto cascade_count_clamped() const -> i32 {
     return std::clamp(cascade_count, 1, MAX_DIRECTIONAL_CASCADES);
@@ -173,6 +173,9 @@ struct ExtractedShadows {
     f32 near_plane = 0.1F;
     f32 far_plane = 1.0F;
     std::array<ShadowView, POINT_SHADOW_FACE_COUNT> faces{};
+    u32 allocated_resolution = 0;
+    bool use_atlas = false;
+    i32 atlas_slot = -1;
   };
 
   bool has_directional = false;
@@ -674,95 +677,106 @@ struct ShadowResources {
   using T = Resource;
 
   gl::DepthAtlas directional_atlas{};
+  gl::DepthAtlas point_atlas{};
   std::array<gl::DepthCubemapTarget, MAX_POINT_SHADOWS> point_maps{};
-  ShadowAtlasAllocator allocator{};
+  ShadowAtlasAllocator point_allocator{};
   std::array<ShadowAtlasTile, MAX_DIRECTIONAL_CASCADES> cascade_tiles{};
+  std::array<ShadowAtlasTile, MAX_POINT_SHADOWS> point_atlas_tiles{};
 
   auto ensure(ShadowSettings const& settings) -> void {
-    if (settings.use_dynamic_atlas) {
-      allocator.atlas_size = settings.atlas_size;
-      directional_atlas.ensure(settings.atlas_size, settings.atlas_size);
+    u32 const dir_atlas_extent = settings.cascade_resolution * 2U;
+    directional_atlas.ensure(dir_atlas_extent, dir_atlas_extent);
+
+    if (settings.use_dynamic_point_atlas) {
+      point_allocator.atlas_size = settings.point_atlas_size;
+      point_atlas.ensure(settings.point_atlas_size, settings.point_atlas_size);
     } else {
-
-      u32 const atlas_extent = settings.cascade_resolution * 2U;
-      directional_atlas.ensure(atlas_extent, atlas_extent);
-    }
-
-    for (i32 point_index = 0; point_index < settings.max_shadowed_point_lights_clamped();
-         ++point_index) {
-      point_maps[point_index].ensure(
-        settings.point_shadow_resolution, settings.point_shadow_resolution
-      );
+      for (i32 point_index = 0;
+           point_index < settings.max_shadowed_point_lights_clamped();
+           ++point_index) {
+        point_maps[point_index].ensure(
+          settings.point_shadow_resolution, settings.point_shadow_resolution
+        );
+      }
     }
   }
 
   auto allocate_cascades(
     ExtractedShadows& shadows, ShadowSettings const& settings, ExtractedView const& view
   ) -> void {
-    if (!settings.use_dynamic_atlas || !shadows.has_directional) {
+    for (i32 i = 0; i < shadows.cascade_count; ++i) {
+      cascade_tiles[i] = directional_tile_legacy(i);
+      shadows.directional_cascades[i].allocated_resolution = settings.cascade_resolution;
+    }
+  }
 
-      for (i32 i = 0; i < shadows.cascade_count; ++i) {
-        cascade_tiles[i] = directional_tile_legacy(i);
-        shadows.directional_cascades[i].allocated_resolution =
-          settings.cascade_resolution;
+  auto allocate_point_lights(
+    ExtractedShadows& shadows,
+    ShadowSettings const& settings,
+    ExtractedView const& view,
+    ExtractedLights const& lights
+  ) -> void {
+    if (!settings.use_dynamic_point_atlas || shadows.point_shadows.empty()) {
+      for (auto& point_shadow : shadows.point_shadows) {
+        point_shadow.use_atlas = false;
+        point_shadow.allocated_resolution = settings.point_shadow_resolution;
       }
       return;
     }
 
     std::vector<ShadowAtlasAllocator::AllocationRequest> requests;
-    requests.reserve(shadows.cascade_count);
+    requests.reserve(shadows.point_shadows.size());
 
-    for (i32 i = 0; i < shadows.cascade_count; ++i) {
-      auto const& cascade = shadows.directional_cascades[i];
-      f32 const distance = cascade.split_distance;
+    for (auto const& point_shadow : shadows.point_shadows) {
+      auto const& light = lights.point_lights[point_shadow.light_index];
+      Vec3 const camera_offset = light.position - view.camera_view.position;
+      f32 const distance = camera_offset.length();
 
       f32 const max_dist = std::max(view.far_plane, 1.0F);
       f32 const normalized_dist = std::clamp(distance / max_dist, 0.0F, 1.0F);
       u32 const priority = static_cast<u32>((1.0F - normalized_dist) * 1000000.0F);
 
       u32 const preferred = static_cast<u32>(
-        settings.cascade_min_resolution +
-        (settings.cascade_max_resolution - settings.cascade_min_resolution) *
+        settings.point_min_resolution +
+        (settings.point_max_resolution - settings.point_min_resolution) *
           (1.0F - normalized_dist)
       );
 
       requests.push_back(
         ShadowAtlasAllocator::AllocationRequest{
           .priority = priority,
-          .min_size = settings.cascade_min_resolution,
-          .preferred_size = std::max(preferred, settings.cascade_min_resolution),
+          .min_size = settings.point_min_resolution,
+          .preferred_size = std::max(preferred, settings.point_min_resolution),
         }
       );
     }
 
-    auto allocations = allocator.allocate_batch(requests);
+    auto allocations = point_allocator.allocate_batch(requests);
 
-    for (i32 i = 0; i < shadows.cascade_count; ++i) {
+    for (usize i = 0; i < shadows.point_shadows.size(); ++i) {
+      auto& point_shadow = shadows.point_shadows[i];
       auto const& alloc = allocations[i];
+
       if (alloc.valid) {
-        cascade_tiles[i] = ShadowAtlasTile{
+        point_shadow.use_atlas = true;
+        point_shadow.atlas_slot = static_cast<i32>(i);
+        point_shadow.allocated_resolution = alloc.size;
+
+        point_atlas_tiles[i] = ShadowAtlasTile{
           .x = alloc.x,
           .y = alloc.y,
           .width = static_cast<i32>(alloc.size),
           .height = static_cast<i32>(alloc.size),
           .uv_rect = {
-            static_cast<f32>(alloc.x) / static_cast<f32>(settings.atlas_size),
-            static_cast<f32>(alloc.y) / static_cast<f32>(settings.atlas_size),
-            static_cast<f32>(alloc.size) / static_cast<f32>(settings.atlas_size),
-            static_cast<f32>(alloc.size) / static_cast<f32>(settings.atlas_size),
+            static_cast<f32>(alloc.x) / static_cast<f32>(settings.point_atlas_size),
+            static_cast<f32>(alloc.y) / static_cast<f32>(settings.point_atlas_size),
+            static_cast<f32>(alloc.size) / static_cast<f32>(settings.point_atlas_size),
+            static_cast<f32>(alloc.size) / static_cast<f32>(settings.point_atlas_size),
           },
         };
-        shadows.directional_cascades[i].allocated_resolution = alloc.size;
       } else {
-
-        cascade_tiles[i] = ShadowAtlasTile{
-          .x = 0,
-          .y = 0,
-          .width = 1,
-          .height = 1,
-          .uv_rect = {0.0F, 0.0F, 0.0F, 0.0F},
-        };
-        shadows.directional_cascades[i].allocated_resolution = 0;
+        point_shadow.use_atlas = false;
+        point_shadow.allocated_resolution = 0;
       }
     }
   }
@@ -796,6 +810,11 @@ struct ShadowResources {
   auto bind_shader(gl::ShaderProgram& shader) const -> void {
     directional_atlas.bind(SHADOW_ATLAS_TEXTURE_SLOT);
     shader.set_sampler("u_shadow_atlas", SHADOW_ATLAS_TEXTURE_SLOT);
+
+    if (point_atlas.ready()) {
+      point_atlas.bind(SHADOW_ATLAS_TEXTURE_SLOT + 1);
+      shader.set_sampler("u_point_shadow_atlas", SHADOW_ATLAS_TEXTURE_SLOT + 1);
+    }
 
     for (i32 point_index = 0; point_index < MAX_POINT_SHADOWS; ++point_index) {
       i32 const slot = POINT_SHADOW_TEXTURE_SLOT_BASE + point_index;

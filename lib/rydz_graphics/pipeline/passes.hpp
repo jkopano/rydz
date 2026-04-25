@@ -182,6 +182,15 @@ public:
         const_cast<ExtractedShadows&>(ctx.shadows), ctx.shadow_settings, ctx.view
       );
     }
+    
+    if (!ctx.shadows.point_shadows.empty()) {
+      ctx.shadow_resources.allocate_point_lights(
+        const_cast<ExtractedShadows&>(ctx.shadows),
+        ctx.shadow_settings,
+        ctx.view,
+        ctx.lights
+      );
+    }
 
     if (ctx.shadows.cascade_count > 0 && ctx.shadow_resources.directional_atlas.ready()) {
       ctx.shadow_resources.directional_atlas.begin();
@@ -200,24 +209,41 @@ public:
 
     for (usize point_index = 0; point_index < ctx.shadows.point_shadows.size();
          ++point_index) {
-      if (point_index >= ctx.shadow_resources.point_maps.size()) {
-        break;
-      }
+      auto const& point_shadow = ctx.shadows.point_shadows[point_index];
+      
+      if (point_shadow.use_atlas && ctx.shadow_resources.point_atlas.ready()) {
+        auto const& tile = ctx.shadow_resources.point_atlas_tiles[point_index];
+        for (i32 face_index = 0; face_index < POINT_SHADOW_FACE_COUNT; ++face_index) {
+          ctx.shadow_resources.point_atlas.begin();
+          ctx.shadow_resources.point_atlas.begin_tile(tile);
+          render_point_shadow_commands(
+            ctx,
+            point_shadow,
+            face_index,
+            point_shadow_shader_spec()
+          );
+          ctx.shadow_resources.point_atlas.end();
+        }
+      } else {
+        if (point_index >= ctx.shadow_resources.point_maps.size()) {
+          break;
+        }
 
-      auto& target = ctx.shadow_resources.point_maps[point_index];
-      if (!target.ready()) {
-        continue;
-      }
+        auto& target = ctx.shadow_resources.point_maps[point_index];
+        if (!target.ready()) {
+          continue;
+        }
 
-      for (i32 face_index = 0; face_index < POINT_SHADOW_FACE_COUNT; ++face_index) {
-        target.begin_face(face_index);
-        render_point_shadow_commands(
-          ctx,
-          ctx.shadows.point_shadows[point_index],
-          face_index,
-          point_shadow_shader_spec()
-        );
-        target.end();
+        for (i32 face_index = 0; face_index < POINT_SHADOW_FACE_COUNT; ++face_index) {
+          target.begin_face(face_index);
+          render_point_shadow_commands(
+            ctx,
+            point_shadow,
+            face_index,
+            point_shadow_shader_spec()
+          );
+          target.end();
+        }
       }
     }
 
@@ -602,6 +628,15 @@ struct FramePass {
     if (shadows->has_directional) {
       shadow_resources->allocate_cascades(
         const_cast<ExtractedShadows&>(*shadows), *shadow_settings, *view
+      );
+    }
+    
+    if (!shadows->point_shadows.empty()) {
+      shadow_resources->allocate_point_lights(
+        const_cast<ExtractedShadows&>(*shadows),
+        *shadow_settings,
+        *view,
+        *lights
       );
     }
 
