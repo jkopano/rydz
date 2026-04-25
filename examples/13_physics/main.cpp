@@ -90,7 +90,7 @@ auto main() -> int {
     )
     .add_plugin(time_plugin)
     .add_plugin(RenderPlugin{})
-    .add_plugin(Input::install)
+    .add_plugin(InputPlugin{})
     .add_plugin(physics::PhysicsPlugin{})
     .add_systems(Startup, setup_scene)
     .add_systems(Update, spawn_cubes)

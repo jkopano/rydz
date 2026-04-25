@@ -196,7 +196,7 @@ inline auto spawn_lights_on_input(
         .range = 40.0f,
         .casts_shadows = true,
       },
-      Transform::from_xyz(0, ((i % 2 == 0 ? 2.f : 40.f)), 0),
+      Transform::from_xyz(0, ((i % 2 == 0 ? 5.f : 40.f)), 0),
       MovingLight{
         .radius = radius,
         .speed = 0.2f,
