@@ -159,6 +159,10 @@ float samplePointShadowPCF(
     return 1.0;
   }
 
+  if (currentDepth > farPlane) {
+    return 1.0;
+  }
+
   int pcfRadius = max(u_point_screen_shadow_flags.z, 0);
   float currentDepthNormalized = currentDepth / farPlane;
   float bias = computePointShadowBias(currentDepth, farPlane);
@@ -327,50 +331,41 @@ float computeSpotAttenuation(GpuLocalLight light, vec3 lightDir) {
 }
 
 float computePointScreenSpaceShadow(vec3 viewPos, GpuLocalLight pointLight) {
-  if (u_point_screen_shadow_flags.x <= 0) {
-    return 1.0;
-  }
+  if (u_point_screen_shadow_flags.x <= 0) return 1.0;
 
   vec3 lightViewPos = (u_mat_view * vec4(pointLight.position_range.xyz, 1.0)).xyz;
-  vec3 ray = lightViewPos - viewPos;
-  float rayLength = length(ray);
-  if (rayLength <= 0.001) {
-    return 1.0;
-  }
+
+  vec3 rayDirFull = lightViewPos - viewPos;
+  float rayLength = length(rayDirFull);
+  vec3 rayDir = rayDirFull / rayLength;
 
   int steps = max(u_point_screen_shadow_flags.y, 1);
-  vec3 rayDir = ray / rayLength;
-  float thickness = max(u_point_screen_shadow_params.x, 0.001);
-  float startDistance = max(rayLength / float(steps), 0.05);
-  float stepLength = max((rayLength - startDistance) / float(steps), 0.01);
+  float thickness = max(u_point_screen_shadow_params.x, 0.2); // Zwiększ lekko grubość domyślną
+
+  float startDistance = 0.1;
+  float stepLength = (rayLength - startDistance) / float(steps);
 
   for (int step = 0; step < steps; ++step) {
     float travel = startDistance + stepLength * float(step);
-    if (travel >= rayLength) {
-      break;
-    }
-
     vec3 samplePos = viewPos + rayDir * travel;
+
     float ndcDepth = 0.0;
     vec2 uv = projectViewToUv(samplePos, ndcDepth);
-    if (ndcDepth < -1.0 || ndcDepth > 1.0 || uv.x <= 0.0 || uv.x >= 1.0 ||
-        uv.y <= 0.0 || uv.y >= 1.0) {
-      continue;
-    }
+
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
 
     float sceneDepthSample = texture(u_scene_depth, uv).r;
-    if (sceneDepthSample >= 0.999999) {
-      continue;
-    }
+    if (sceneDepthSample >= 0.999) continue;
 
     float sceneDepth = sceneDepthToViewDepth(sceneDepthSample);
     float rayDepth = -samplePos.z;
-    if (sceneDepth + thickness < rayDepth) {
+
+    if (rayDepth > sceneDepth && rayDepth < sceneDepth + thickness) {
       return 0.0;
     }
   }
 
-  return 1.0;
+  return 1.0; // Ścieżka czysta
 }
 
 float computePointShadow(vec3 fragPos, vec3 viewPos, GpuLocalLight pointLight) {
@@ -481,15 +476,23 @@ void main() {
 
     vec3 lightVec = localLight.position_range.xyz - FragPos;
     float distance = length(lightVec);
-    if (distance > localLight.position_range.w || distance <= 0.001) {
+    if (distance <= 0.001) {
       continue;
     }
 
     vec3 lightDir = normalize(lightVec);
     float attenuation = localLight.color_intensity.w / (distance * distance + 0.01);
     float factor = distance / localLight.position_range.w;
-    float smoothFactor = clamp(1.0 - factor * factor * factor * factor, 0.0, 1.0);
-    attenuation *= smoothFactor * smoothFactor;
+
+    // Debug: visualize distance factor
+    // if (factor > 0.9 && factor < 1.1) {
+    //   lighting += vec3(10.0, 0.0, 0.0);
+    // }
+
+    // Smooth falloff without hard cutoff at range boundary
+    // Use a function that approaches 0 asymptotically instead of hitting 0 at factor=1
+    float smoothFactor = 1.0 / (1.0 + factor * factor * factor * factor);
+    attenuation *= smoothFactor;
 
     if (isSpotLight(localLight)) {
       float coneAttenuation = computeSpotAttenuation(localLight, lightDir);
@@ -527,6 +530,30 @@ void main() {
   // float far = u_cluster_screen_size_near_far.w;
   // float visualDepth = (linearDepth - near) / (far - near);
   // color = vec3(clamp(visualDepth, 0.0, 1.0));
+
+  // Debug: visualize light count per cluster
+  // float lightCountVis = float(localLightCount) / 8.0;
+  // color = mix(color, vec3(0.0, 1.0, 0.0), lightCountVis);
+
+  // Debug: visualize total lighting contribution
+  // float lightingVis = length(lighting) / 10.0;
+  // color = vec3(lightingVis);
+
+  // Debug: visualize shadows
+  // Uncomment to see shadow values (red = shadow, green = no shadow)
+  // float avgShadow = 0.0;
+  // for (uint i = 0u; i < localLightCount; ++i) {
+  //   uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
+  //   GpuLocalLight localLight = u_local_lights[lightIndex];
+  //   if (isPointLight(localLight)) {
+  //     float shadow = computePointShadow(FragPos, viewPos, localLight);
+  //     avgShadow += shadow;
+  //   }
+  // }
+  // if (localLightCount > 0u) {
+  //   avgShadow /= float(localLightCount);
+  //   color = mix(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), avgShadow);
+  // }
 
   FragColor = vec4(color, 1.0);
 }

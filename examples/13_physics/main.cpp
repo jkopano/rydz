@@ -36,7 +36,7 @@ void setup_scene(
   Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes, ResMut<Assets<ecs::Material>> materials
 ) {
   auto ground_mesh = meshes->add(Mesh::cube(100.0f, 2.0f, 100.0f));
-  auto ground_mat = materials->add(StandardMaterial::from_color(Color{80, 120, 80}));
+  auto ground_mat = materials->add(StandardMaterial::from_color(Color::DARKGRAY));
 
   cmd.spawn(
     Transform::from_xyz(0.0f, -1.0f, 0.0f),
@@ -55,7 +55,7 @@ void setup_scene(
   cmd.spawn(
     Camera3d::perspective(),
     ActiveCamera{},
-    Transform::from_xyz(-55.0f, 48.0f, -55.0f).look_at(Vec3(0.0f, 0.0f, 0.0f)),
+    Transform::from_xyz(-50.0f, 42.0f, -50.0f).look_at(Vec3(0.0f, 0.0f, 0.0f)),
     ecs::Environment::from_directory("textures/skybox")
   );
 
@@ -80,8 +80,8 @@ void setup_scene(
         Transform::from_xyz(2.f * i, 12.f, 2.f * j),
         PointLight{
           .color = color,
-          .intensity = 400,
-          .range = 20,
+          .intensity = 40,
+          .range = 30,
           .casts_shadows = true,
         },
         MovingLight{
