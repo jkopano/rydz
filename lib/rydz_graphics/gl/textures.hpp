@@ -141,7 +141,6 @@ struct RenderTarget {
     target.texture.mipmaps = 1;
     target.texture.format = color_format;
 
-    // Attach color texture
     rl::rlFramebufferAttach(
       target.id,
       target.texture.id,
@@ -157,7 +156,6 @@ struct RenderTarget {
     target.depth.mipmaps = 1;
     target.depth.format = 19;
 
-    // Attach depth texture
     rl::rlFramebufferAttach(
       target.id, target.depth.id, RL_ATTACHMENT_DEPTH, RL_ATTACHMENT_TEXTURE2D, 0
     );

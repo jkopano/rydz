@@ -46,7 +46,7 @@ struct ShadowSettings {
   u32 point_shadow_resolution = 1024;
   bool point_screen_space_shadows_enabled = true;
   f32 point_screen_space_threshold_px = 96.0F;
-  i32 point_screen_space_steps = 12;
+  i32 point_screen_space_steps = 36;
   f32 point_screen_space_thickness = 0.12F;
   f32 directional_constant_bias = 0.0015F;
   f32 directional_normal_bias = 0.01F;

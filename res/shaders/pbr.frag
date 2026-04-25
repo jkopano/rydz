@@ -162,7 +162,6 @@ float samplePointShadowPCF(
 ) {
   if (currentDepth <= 0.001) return 1.0;
 
-  // Miękkie wygaszanie cienia przy granicy zasięgu światła (farPlane)
   float shadowFade = smoothstep(farPlane, farPlane * 0.9, currentDepth);
   if (shadowFade <= 0.0) return 1.0;
 
@@ -334,75 +333,58 @@ float computeSpotAttenuation(GpuLocalLight light, vec3 lightDir) {
   return cone * cone;
 }
 
-float computePointScreenSpaceShadow(vec3 viewPos, GpuLocalLight pointLight) {
+float computePointScreenSpaceShadow(vec3 viewPos, vec3 normal, GpuLocalLight pointLight) {
   if (u_point_screen_shadow_flags.x <= 0) return 1.0;
 
   vec3 lightViewPos = (u_mat_view * vec4(pointLight.position_range.xyz, 1.0)).xyz;
-  vec3 rayDirFull = lightViewPos - viewPos;
+
+  vec3 normalView = normalize(mat3(u_mat_view) * normal);
+  vec3 rayStart = viewPos + normalView * 0.05;
+
+  vec3 rayDirFull = lightViewPos - rayStart;
   float rayLength = length(rayDirFull);
   vec3 rayDir = rayDirFull / rayLength;
 
   int steps = max(u_point_screen_shadow_flags.y, 1);
   float thickness = max(u_point_screen_shadow_params.x, 0.2);
 
-  // DITHERING: Dodajemy małe losowe przesunięcie startu promienia.
-  // To zamienia "schodki" (banding) w drobne ziarno.
-  float dither = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
-  float startDistance = 0.15 + (dither * 0.1);
+  float jitter = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
 
-  float stepLength = (rayLength - startDistance) / float(steps);
   float maxOcclusion = 0.0;
-  vec2 finalUV = vec2(0.0);
+  float accumulatedDistance = 0.02; // Minimalny offset startowy
 
   for (int step = 0; step < steps; ++step) {
-    // Przesuwamy każdy krok o dither, żeby próbki nie układały się w linie
-    float travel = startDistance + stepLength * (float(step) + dither);
-    vec3 samplePos = viewPos + rayDir * travel;
+    float scale = float(step) + jitter;
+    float travel = accumulatedDistance + (rayLength / float(steps)) * scale * 0.5;
 
+    if (travel >= rayLength) break;
+
+    vec3 samplePos = rayStart + rayDir * travel;
     float ndcDepth = 0.0;
     vec2 uv = projectViewToUv(samplePos, ndcDepth);
-    finalUV = uv;
 
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
 
     float sceneDepthSample = texture(u_scene_depth, uv).r;
-    if (sceneDepthSample >= 0.9999) continue;
-
     float sceneDepth = sceneDepthToViewDepth(sceneDepthSample);
     float rayDepth = -samplePos.z;
     float diff = rayDepth - sceneDepth;
 
-    // Kluczowe: Warunek kolizji z "miękkim marginesem"
     if (diff > 0.0 && diff < thickness) {
-      // Im cieńszy obiekt (mały diff), tym mocniejszy cień.
-      // Im dalej od punktu startu, tym bardziej rozmywamy (travel / rayLength).
-      float softness = clamp(1.0 - (diff / thickness), 0.0, 1.0);
-      float distFade = clamp(1.0 - (travel / rayLength), 0.0, 1.0);
+      float weight = 1.0 - (diff / thickness);
+      float distWeight = clamp(1.0 - (travel / rayLength), 0.0, 1.0);
 
-      // Rejestrujemy occlusion
-      maxOcclusion = max(maxOcclusion, softness * distFade);
-
-      // Jeśli mamy mocną kolizję, wychodzimy szybciej
-      if (maxOcclusion > 0.9) break;
+      maxOcclusion = max(maxOcclusion, weight * distWeight);
+      if (maxOcclusion >= 0.98) break;
     }
   }
 
-  // Płynne wygaszanie na krawędziach ekranu (żeby cienie nie migały przy krawędziach)
-  float edgeFade = 1.0 - max(
-        smoothstep(0.8, 1.0, abs(finalUV.x * 2.0 - 1.0)),
-        smoothstep(0.8, 1.0, abs(finalUV.y * 2.0 - 1.0))
-      );
-
-  // Mix finalny: 1.0 to brak cienia, 0.0 to pełny cień
-  float shadow = mix(1.0, 1.0 - maxOcclusion, edgeFade);
-
-  // Zapobiegamy całkowitej czerni SSS (często wygląda to nienaturalnie)
-  return clamp(shadow, 0.1, 1.0);
+  return clamp(1.0 - maxOcclusion, 0.0, 1.0);
 }
 
 float computePointShadow(vec3 fragPos, vec3 viewPos, vec3 normal, GpuLocalLight pointLight) {
   if (pointLight.shadow_cone_data.y > 0.5) {
-    return computePointScreenSpaceShadow(viewPos, pointLight);
+    return computePointScreenSpaceShadow(viewPos, normal, pointLight);
   }
 
   if (pointLight.shadow_cone_data.x < 0.0) return 1.0;
@@ -415,7 +397,6 @@ float computePointShadow(vec3 fragPos, vec3 viewPos, vec3 normal, GpuLocalLight 
   float currentDepth = length(lightToFrag);
   float farPlane = max(pointLight.position_range.w, 0.001);
 
-  // Przekazujemy normalną i kierunek światła do PCF (dla biasu)
   return samplePointShadowPCF(shadowSlot, lightToFrag, currentDepth, farPlane, normal, normalize(lightVec));
 }
 
@@ -520,8 +501,6 @@ void main() {
     //   lighting += vec3(10.0, 0.0, 0.0);
     // }
 
-    // Smooth falloff without hard cutoff at range boundary
-    // Use a function that approaches 0 asymptotically instead of hitting 0 at factor=1
     float smoothFactor = 1.0 / (1.0 + factor * factor * factor * factor);
     attenuation *= smoothFactor;
 
@@ -572,31 +551,31 @@ void main() {
 
   // Debug: visualize shadows
   // Uncomment to see shadow values (red = shadow, green = no shadow)
-  vec3 shadowDebug = vec3(0.0);
-  bool hasLights = false;
-
-  for (uint i = 0u; i < localLightCount; ++i) {
-    uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
-    GpuLocalLight localLight = u_local_lights[lightIndex];
-
-    if (localLight.color_intensity.w > 0.0) {
-      float s = computePointShadow(FragPos, viewPos, normal, localLight);
-      hasLights = true;
-
-      if (localLight.shadow_cone_data.y > 0.5) {
-        shadowDebug.r += (1.0 - s);
-      } else {
-        shadowDebug.g += (1.0 - s);
-      }
-    }
-  }
-
-  if (hasLights) {
-    color = shadowDebug;
-    color *= 1.0;
-  } else {
-    color = vec3(0.0, 0.0, 0.2);
-  }
+  // vec3 shadowDebug = vec3(0.0);
+  // bool hasLights = false;
+  //
+  // for (uint i = 0u; i < localLightCount; ++i) {
+  //   uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
+  //   GpuLocalLight localLight = u_local_lights[lightIndex];
+  //
+  //   if (localLight.color_intensity.w > 0.0) {
+  //     float s = computePointShadow(FragPos, viewPos, normal, localLight);
+  //     hasLights = true;
+  //
+  //     if (localLight.shadow_cone_data.y > 0.5) {
+  //       shadowDebug.r += (1.0 - s);
+  //     } else {
+  //       shadowDebug.g += (1.0 - s);
+  //     }
+  //   }
+  // }
+  //
+  // if (hasLights) {
+  //   color = shadowDebug;
+  //   color *= 1.0;
+  // } else {
+  //   color = vec3(0.0, 0.0, 0.2);
+  // }
 
   FragColor = vec4(color, 1.0);
 }
