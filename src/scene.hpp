@@ -160,7 +160,7 @@ inline auto moving_lights_system(Query<Mut<Transform>, MovingLight> query, Res<T
     transform->translation.x =
       (std::cos((t * light->speed) + light->offset) * light->radius);
     transform->translation.z =
-      (std::sin((t * light->speed) + light->offset) * light->radius / 3.0f);
+      (std::sin((t * light->speed) + light->offset) * light->radius / 2.0f);
   }
 }
 
@@ -186,7 +186,7 @@ inline auto spawn_lights_on_input(
 
   for (int i = 0; i < 30; ++i) {
     f32 const angle = (static_cast<f32>(i) / 30.0f) * 2.0f * PI;
-    f32 const radius = 50.0f + ((i % 3) * 20.0f);
+    f32 const radius = 30.0f + ((i % 2) * 40.0f);
     Color color = Color::from_hsv(static_cast<f32>(i * 12), 0.8f, 1.0f);
 
     cmd.spawn(
