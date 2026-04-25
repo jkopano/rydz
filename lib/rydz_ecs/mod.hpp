@@ -36,5 +36,6 @@
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/core/input.hpp"
 #include "rydz_ecs/core/name.hpp"
+#include "rydz_ecs/core/player.hpp"
 
 #include "rydz_ecs/tracy_plugin.hpp"
