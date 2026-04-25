@@ -572,31 +572,31 @@ void main() {
 
   // Debug: visualize shadows
   // Uncomment to see shadow values (red = shadow, green = no shadow)
-  // vec3 shadowDebug = vec3(0.0);
-  // bool hasLights = false;
-  //
-  // for (uint i = 0u; i < localLightCount; ++i) {
-  //   uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
-  //   GpuLocalLight localLight = u_local_lights[lightIndex];
-  //
-  //   if (localLight.color_intensity.w > 0.0) {
-  //     float s = computePointShadow(FragPos, viewPos, normal, localLight);
-  //     hasLights = true;
-  //
-  //     if (localLight.shadow_cone_data.y > 0.5) {
-  //       shadowDebug.r += (1.0 - s);
-  //     } else {
-  //       shadowDebug.g += (1.0 - s);
-  //     }
-  //   }
-  // }
-  //
-  // if (hasLights) {
-  //   color = shadowDebug;
-  //   color *= 1.0;
-  // } else {
-  //   color = vec3(0.0, 0.0, 0.2);
-  // }
+  vec3 shadowDebug = vec3(0.0);
+  bool hasLights = false;
+
+  for (uint i = 0u; i < localLightCount; ++i) {
+    uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
+    GpuLocalLight localLight = u_local_lights[lightIndex];
+
+    if (localLight.color_intensity.w > 0.0) {
+      float s = computePointShadow(FragPos, viewPos, normal, localLight);
+      hasLights = true;
+
+      if (localLight.shadow_cone_data.y > 0.5) {
+        shadowDebug.r += (1.0 - s);
+      } else {
+        shadowDebug.g += (1.0 - s);
+      }
+    }
+  }
+
+  if (hasLights) {
+    color = shadowDebug;
+    color *= 1.0;
+  } else {
+    color = vec3(0.0, 0.0, 0.2);
+  }
 
   FragColor = vec4(color, 1.0);
 }
