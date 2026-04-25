@@ -308,7 +308,7 @@ private:
       }
 
       target.unload();
-      target = gl::RenderTarget(desc.width, desc.height);
+      target = gl::RenderTarget::with_depth_texture(desc.width, desc.height, desc.format);
       if (target.ready()) {
         info(
           "RenderGraph: allocated physical target slot {} ({}x{}) [ID {}]",

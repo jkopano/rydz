@@ -284,9 +284,9 @@ float computeDirectionalShadow(vec3 fragPos, vec3 normal, vec3 lightDir, vec3 vi
   }
 
   float bias = max(
-    u_shadow_params.x,
-    u_shadow_params.y * (1.0 - max(dot(normal, lightDir), 0.0))
-  );
+      u_shadow_params.x,
+      u_shadow_params.y * (1.0 - max(dot(normal, lightDir), 0.0))
+    );
   vec2 texelSize = directionalTexelSize(cascadeIndex);
   int pcfRadius = max(u_shadow_flags.w, 0);
   float visibility = 0.0;
@@ -310,7 +310,7 @@ bool isPointLight(GpuLocalLight light) {
 
 bool isSpotLight(GpuLocalLight light) {
   return light.direction_type.w >= LOCAL_LIGHT_TYPE_POINT &&
-         light.direction_type.w < LOCAL_LIGHT_TYPE_SPOT;
+    light.direction_type.w < LOCAL_LIGHT_TYPE_SPOT;
 }
 
 float computeSpotAttenuation(GpuLocalLight light, vec3 lightDir) {
@@ -319,10 +319,10 @@ float computeSpotAttenuation(GpuLocalLight light, vec3 lightDir) {
   float outerCos = light.shadow_cone_data.w;
   float cosTheta = dot(-lightDir, spotDirection);
   float cone = clamp(
-    (cosTheta - outerCos) / max(innerCos - outerCos, 0.0001),
-    0.0,
-    1.0
-  );
+      (cosTheta - outerCos) / max(innerCos - outerCos, 0.0001),
+      0.0,
+      1.0
+    );
   return cone * cone;
 }
 
@@ -411,7 +411,7 @@ int computeDepthSlice(float depth, ivec3 dims) {
 int computeClusterIndex(vec3 viewPos) {
   ivec3 dims = max(u_cluster_dimensions.xyz, ivec3(1));
   vec2 tileSize =
-      u_cluster_screen_size_near_far.xy / vec2(float(dims.x), float(dims.y));
+    u_cluster_screen_size_near_far.xy / vec2(float(dims.x), float(dims.y));
   tileSize = max(tileSize, vec2(1.0));
 
   ivec2 tile = ivec2(gl_FragCoord.xy / tileSize);
@@ -461,7 +461,7 @@ void main() {
   if (u_view_flags.x > 0 && u_dir_light_color_intensity.w > 0.0) {
     vec3 lightDir = normalize(-u_dir_light_direction.xyz);
     vec3 radiance =
-        u_dir_light_color_intensity.xyz * u_dir_light_color_intensity.w;
+      u_dir_light_color_intensity.xyz * u_dir_light_color_intensity.w;
     float shadow = computeDirectionalShadow(FragPos, normal, lightDir, viewPos);
     lighting += evaluatePBR(
         normal, viewDir, lightDir, radiance * shadow, albedo, metallic, roughness);
@@ -501,8 +501,7 @@ void main() {
 
     vec3 radiance = localLight.color_intensity.rgb * attenuation;
     float shadow = isPointLight(localLight)
-                     ? computePointShadow(FragPos, viewPos, localLight)
-                     : 1.0;
+      ? computePointShadow(FragPos, viewPos, localLight) : 1.0;
     lighting += evaluatePBR(
         normal, viewDir, lightDir, radiance * shadow, albedo, metallic, roughness);
   }
@@ -513,7 +512,7 @@ void main() {
   vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
   vec3 ambientColor =
     kD * albedo * u_ambient_light_color_intensity.rgb *
-    u_ambient_light_color_intensity.w * ao;
+      u_ambient_light_color_intensity.w * ao;
   vec3 color = ambientColor + lighting + emissive;
 
   float strength = u_color.a;
@@ -521,5 +520,13 @@ void main() {
   color = color / (color + vec3(1.0));
   color = pow(color, vec3(1.0 / 2.2));
 
-  FragColor = vec4(color, outputAlpha);
+  // vec2 screenUV = gl_FragCoord.xy / u_cluster_screen_size_near_far.xy;
+  // float rawDepth = texture(u_scene_depth, screenUV).r;
+  // float linearDepth = sceneDepthToViewDepth(rawDepth);
+  // float near = u_cluster_screen_size_near_far.z;
+  // float far = u_cluster_screen_size_near_far.w;
+  // float visualDepth = (linearDepth - near) / (far - near);
+  // color = vec3(clamp(visualDepth, 0.0, 1.0));
+
+  FragColor = vec4(color, 1.0);
 }

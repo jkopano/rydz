@@ -15,7 +15,7 @@ namespace gl {
 inline auto set_blend_mode(int mode) -> void { rl::rlSetBlendMode(mode); }
 
 struct Depth {
-  enum class Func {
+  enum class Func : u8 {
     Always,
     Never,
     Less,
@@ -27,13 +27,42 @@ struct Depth {
   };
   bool test = true;
   bool write = true;
-  Func func = Func::Less;
+  Func func = Func::LessEqual;
 
   auto operator==(Depth const&) const -> bool = default;
 
   auto apply() const -> void {
     test ? rl::rlEnableDepthTest() : rl::rlDisableDepthTest();
     write ? rl::rlEnableDepthMask() : rl::rlDisableDepthMask();
+
+    GLenum gl_func = GL_LESS;
+    switch (func) {
+    case Func::Always:
+      gl_func = GL_ALWAYS;
+      break;
+    case Func::Never:
+      gl_func = GL_NEVER;
+      break;
+    case Func::Less:
+      gl_func = GL_LESS;
+      break;
+    case Func::LessEqual:
+      gl_func = GL_LEQUAL;
+      break;
+    case Func::Greater:
+      gl_func = GL_GREATER;
+      break;
+    case Func::GreaterEqual:
+      gl_func = GL_GEQUAL;
+      break;
+    case Func::Equal:
+      gl_func = GL_EQUAL;
+      break;
+    case Func::NotEqual:
+      gl_func = GL_NOTEQUAL;
+      break;
+    }
+    glDepthFunc(gl_func);
   }
 };
 

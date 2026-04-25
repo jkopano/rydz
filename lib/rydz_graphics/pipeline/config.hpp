@@ -35,9 +35,29 @@ struct RenderConfig {
 
   static auto post_depth_prepass() -> RenderConfig { return get_default(); }
 
+  static auto depth_to_color() -> RenderConfig {
+    return {
+      .depth = {.test = false, .write = false},
+      .blend = gl::Blend::disabled(),
+      .cull = gl::Cull::back(),
+      .polygon = gl::Polygon::fill(),
+      .color_mask = {},
+    };
+  }
+
   static auto opaque() -> RenderConfig {
     return {
       .depth = {.test = true, .write = true},
+      .blend = gl::Blend::disabled(),
+      .cull = gl::Cull::back(),
+      .polygon = gl::Polygon::fill(),
+      .color_mask = {},
+    };
+  }
+
+  static auto opaque_no_depth_write() -> RenderConfig {
+    return {
+      .depth = {.test = true, .write = false},
       .blend = gl::Blend::disabled(),
       .cull = gl::Cull::back(),
       .polygon = gl::Polygon::fill(),

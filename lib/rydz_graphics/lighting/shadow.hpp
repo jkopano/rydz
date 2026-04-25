@@ -20,7 +20,7 @@
 namespace ecs {
 
 inline constexpr i32 MAX_DIRECTIONAL_CASCADES = 4;
-inline constexpr i32 MAX_POINT_SHADOWS = 12;
+inline constexpr i32 MAX_POINT_SHADOWS = 1;
 inline constexpr i32 POINT_SHADOW_FACE_COUNT = 6;
 inline constexpr unsigned int SHADOW_UNIFORM_BINDING = 1;
 inline constexpr std::string_view SHADOW_UNIFORM_BLOCK_NAME = "ShadowUniforms";
@@ -65,9 +65,7 @@ struct ShadowSettings {
   }
 
   [[nodiscard]] auto max_shadowed_point_lights_clamped() const -> i32 {
-    return static_cast<i32>(
-      std::min<u32>(std::max<u32>(max_shadowed_point_lights, 1U), MAX_POINT_SHADOWS)
-    );
+    return static_cast<i32>(std::min<u32>(max_shadowed_point_lights, MAX_POINT_SHADOWS));
   }
 };
 
@@ -470,6 +468,8 @@ public:
   }
 
   [[nodiscard]] auto texture() const -> Texture const& { return depth_texture_; }
+  [[nodiscard]] auto width() const -> u32 { return width_; }
+  [[nodiscard]] auto height() const -> u32 { return height_; }
 
   auto ensure(u32 width, u32 height) -> void {
     if (ready() && width_ == width && height_ == height) {
@@ -489,20 +489,18 @@ public:
     glTexImage2D(
       GL_TEXTURE_2D,
       0,
-      GL_DEPTH_COMPONENT32F,
+      GL_DEPTH_COMPONENT,
       static_cast<GLsizei>(width),
       static_cast<GLsizei>(height),
       0,
       GL_DEPTH_COMPONENT,
-      GL_FLOAT,
+      GL_UNSIGNED_INT,
       nullptr
     );
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    float const border_color[4] = {1.0F, 1.0F, 1.0F, 1.0F};
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     glFramebufferTexture2D(
       GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_texture_.id, 0
@@ -516,7 +514,7 @@ public:
     depth_texture_.width = static_cast<i32>(width);
     depth_texture_.height = static_cast<i32>(height);
     depth_texture_.mipmaps = 1;
-    depth_texture_.format = GL_DEPTH_COMPONENT32F;
+    depth_texture_.format = GL_DEPTH_COMPONENT;
   }
 
   auto begin() const -> void {
@@ -529,6 +527,30 @@ public:
   auto end() const -> void {
     rl::rlDrawRenderBatchActive();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  }
+
+  auto copy_depth_from(RenderTarget const& source) const -> void {
+    if (!ready() || source.id == 0 || source.depth.id == 0) {
+      return;
+    }
+    if (depth_texture_.id == 0) {
+      return;
+    }
+
+    rl::rlDrawRenderBatchActive();
+    
+    glCopyImageSubData(
+      source.depth.id, GL_TEXTURE_2D, 0, 0, 0, 0,
+      depth_texture_.id, GL_TEXTURE_2D, 0, 0, 0, 0,
+      std::min(source.texture.width, static_cast<i32>(width_)),
+      std::min(source.texture.height, static_cast<i32>(height_)),
+      1
+    );
+    
+    GLenum err = glGetError();
+    if (err != GL_NO_ERROR) {
+      warn("DepthTarget2D::copy_depth_from: glCopyImageSubData error {:#x}", err);
+    }
   }
 
   auto bind(i32 slot) const -> void {
@@ -794,6 +816,7 @@ struct ShadowResources {
 
   gl::DepthAtlas directional_atlas{};
   gl::DepthCubemapArrayTarget point_maps{};
+  gl::DepthTarget2D scene_depth_copy{};
   std::array<ShadowAtlasTile, MAX_DIRECTIONAL_CASCADES> cascade_tiles{};
 
   auto ensure(ShadowSettings const& settings) -> void {

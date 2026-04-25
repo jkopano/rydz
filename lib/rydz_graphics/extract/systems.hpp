@@ -236,22 +236,27 @@ struct Extract {
     );
     shadows->point_shadows.reserve(selected_count);
 
-    for (usize point_slot = 0; point_slot < selected_count; ++point_slot) {
+    for (usize point_slot = 0; point_slot < candidates.size(); ++point_slot) {
       usize const light_index = candidates[point_slot];
       auto& light = lights->point_lights[light_index];
-      light.shadow_slot = static_cast<i32>(point_slot);
 
-      f32 const near_plane = 0.1F;
-      f32 const far_plane = std::max(light.range, near_plane + 0.001F);
-      shadows->point_shadows.push_back(
-        ExtractedShadows::PointShadow{
-          .light_index = light_index,
-          .position = light.position,
-          .near_plane = near_plane,
-          .far_plane = far_plane,
-          .faces = build_point_shadow_views(light.position, near_plane, far_plane),
-        }
-      );
+      if (point_slot < selected_count) {
+        light.shadow_slot = static_cast<i32>(point_slot);
+
+        f32 const near_plane = 0.1F;
+        f32 const far_plane = std::max(light.range, near_plane + 0.001F);
+        shadows->point_shadows.push_back(
+          ExtractedShadows::PointShadow{
+            .light_index = light_index,
+            .position = light.position,
+            .near_plane = near_plane,
+            .far_plane = far_plane,
+            .faces = build_point_shadow_views(light.position, near_plane, far_plane),
+          }
+        );
+      } else if (settings->point_screen_space_shadows_enabled) {
+        light.screen_space_shadows = true;
+      }
     }
   }
 

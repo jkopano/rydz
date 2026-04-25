@@ -51,10 +51,21 @@ TEST(ClusteredLightingTest, ClusterRecordUsesClampedStrideAndClearsCount) {
   EXPECT_LT(record.min_bounds.z, record.max_bounds.z);
 }
 
-TEST(ClusteredLightingTest, PointShadowAtlasIsDisabledByDefault) {
+TEST(ClusteredLightingTest, PointShadowedLightCountDefaultsWithinLimits) {
   ecs::ShadowSettings settings{};
 
-  EXPECT_FALSE(settings.use_dynamic_point_atlas);
+  EXPECT_GE(settings.max_shadowed_point_lights_clamped(), 0);
+  EXPECT_LE(
+    settings.max_shadowed_point_lights_clamped(),
+    ecs::MAX_POINT_SHADOWS
+  );
+}
+
+TEST(ClusteredLightingTest, PointShadowCountCanBeClampedToZero) {
+  ecs::ShadowSettings settings{};
+  settings.max_shadowed_point_lights = 0;
+
+  EXPECT_EQ(settings.max_shadowed_point_lights_clamped(), 0);
 }
 
 TEST(ClusteredLightingTest, LocalLightGpuLayoutRemainsStd430Aligned) {

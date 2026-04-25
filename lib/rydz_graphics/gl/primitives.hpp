@@ -112,6 +112,8 @@ inline constexpr int SHADER_UNIFORM_IVEC4 = RL_SHADER_UNIFORM_IVEC4;
 
 inline constexpr int PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 =
   ::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+inline constexpr int PIXELFORMAT_UNCOMPRESSED_R32 = ::PIXELFORMAT_UNCOMPRESSED_R32;
+inline constexpr int PIXELFORMAT_UNCOMPRESSED_R16 = ::PIXELFORMAT_UNCOMPRESSED_R16;
 inline constexpr int TEXTURE_FILTER_BILINEAR = ::TEXTURE_FILTER_BILINEAR;
 
 inline auto default_texture_id() -> unsigned int { return rl::rlGetTextureIdDefault(); }

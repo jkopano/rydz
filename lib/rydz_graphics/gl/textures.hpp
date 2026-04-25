@@ -1,8 +1,10 @@
 #pragma once
 
+#include "external/raylib/src/rlgl.h"
 #include "rydz_graphics/gl/primitives.hpp"
 #include <array>
 #include <cstring>
+#include <external/glad.h>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -122,6 +124,56 @@ struct RenderTarget {
 
   RenderTarget(u32 width, u32 height)
       : RenderTarget(rl::LoadRenderTexture(width, height)) {}
+
+  static auto with_depth_texture(
+    u32 width, u32 height, i32 color_format = RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
+  ) -> RenderTarget {
+    RenderTarget target{};
+
+    target.id = rl::rlLoadFramebuffer();
+    rl::rlBindFramebuffer(GL_FRAMEBUFFER, target.id);
+
+    target.texture.id = rl::rlLoadTexture(
+      nullptr, static_cast<int>(width), static_cast<int>(height), color_format, 1
+    );
+    target.texture.width = static_cast<i32>(width);
+    target.texture.height = static_cast<i32>(height);
+    target.texture.mipmaps = 1;
+    target.texture.format = color_format;
+
+    // Attach color texture
+    rl::rlFramebufferAttach(
+      target.id,
+      target.texture.id,
+      RL_ATTACHMENT_COLOR_CHANNEL0,
+      RL_ATTACHMENT_TEXTURE2D,
+      0
+    );
+
+    target.depth.id =
+      rl::rlLoadTextureDepth(static_cast<int>(width), static_cast<int>(height), false);
+    target.depth.width = static_cast<i32>(width);
+    target.depth.height = static_cast<i32>(height);
+    target.depth.mipmaps = 1;
+    target.depth.format = 19;
+
+    // Attach depth texture
+    rl::rlFramebufferAttach(
+      target.id, target.depth.id, RL_ATTACHMENT_DEPTH, RL_ATTACHMENT_TEXTURE2D, 0
+    );
+
+    rl::rlEnableTexture(target.depth.id);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+    rl::rlDisableTexture();
+
+    if (!rl::rlFramebufferComplete(target.id)) {
+      warn("RenderTarget::with_depth_texture: FBO incomplete");
+    }
+
+    rl::rlBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return target;
+  }
 
   constexpr operator ::RenderTexture() const noexcept {
     return detail::raylib_cast<::RenderTexture>(*this);

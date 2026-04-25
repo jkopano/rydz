@@ -182,7 +182,7 @@ public:
         const_cast<ExtractedShadows&>(ctx.shadows), ctx.shadow_settings, ctx.view
       );
     }
-    
+
     if (!ctx.shadows.point_shadows.empty()) {
       ctx.shadow_resources.allocate_point_lights(
         const_cast<ExtractedShadows&>(ctx.shadows),
@@ -220,10 +220,7 @@ public:
           static_cast<i32>(point_index), face_index
         );
         render_point_shadow_commands(
-          ctx,
-          point_shadow,
-          face_index,
-          point_shadow_shader_spec()
+          ctx, point_shadow, face_index, point_shadow_shader_spec()
         );
         ctx.shadow_resources.point_maps.end();
       }
@@ -323,9 +320,15 @@ public:
 
     ctx.render_state.begin_view(ctx.render_state.view());
     auto const& active_view = ctx.render_state.view();
+
+    glDepthMask(GL_FALSE);
+
     renderer->skybox.draw(
       ctx.view.active_environment->skybox, active_view.view, active_view.projection
     );
+
+    glDepthMask(GL_TRUE);
+
     ctx.render_state.end_view();
     ctx.render_state.reset();
   }
@@ -368,9 +371,15 @@ inline auto MeshPass<OpaqueTag>::execute(PassContext& ctx, RenderGraphRuntime& r
   if (ctx.opaque_phase.commands.empty()) {
     return;
   }
-  auto const& scene_depth_target = runtime.get_target(scene_depth_);
-  ctx.scene_depth_texture =
-    scene_depth_target.depth.ready() ? &scene_depth_target.depth : nullptr;
+  auto const& scene_depth_texture = runtime.get_texture(scene_depth_);
+  ctx.scene_depth_texture = scene_depth_texture.ready() ? &scene_depth_texture : nullptr;
+
+  if (ctx.scene_depth_texture) {
+    info("OpaquePass: Using scene_depth texture ID {}", ctx.scene_depth_texture->id);
+  } else {
+    info("OpaquePass: scene_depth texture NOT READY");
+  }
+
   ctx.render_state.begin_view(ctx.render_state.view());
   ctx.view_uniforms.bind();
   PassRenderer renderer{ctx, MeshPass<OpaqueTag>::render_config()};
@@ -404,9 +413,8 @@ inline auto MeshPass<TransparentTag>::execute(
   if (ctx.transparent_phase.commands.empty()) {
     return;
   }
-  auto const& scene_depth_target = runtime.get_target(scene_depth_);
-  ctx.scene_depth_texture =
-    scene_depth_target.depth.ready() ? &scene_depth_target.depth : nullptr;
+  auto const& scene_depth_texture = runtime.get_texture(scene_depth_);
+  ctx.scene_depth_texture = scene_depth_texture.ready() ? &scene_depth_texture : nullptr;
   ctx.render_state.begin_view(ctx.render_state.view());
   ctx.view_uniforms.bind();
   PassRenderer renderer{ctx, MeshPass<TransparentTag>::render_config()};
@@ -423,11 +431,14 @@ using TransparentPass = MeshPass<TransparentTag>;
 
 class DepthPrepass : public RenderPass {
 public:
-  explicit DepthPrepass(RenderTextureHandle main_target) : main_target_(main_target) {}
+  DepthPrepass(RenderTextureHandle main_target, RenderTextureHandle scene_depth)
+      : main_target_(main_target), scene_depth_(scene_depth) {}
 
   auto setup(RenderGraphBuilder& builder) -> void override {
     builder.write(main_target_);
+    builder.write(scene_depth_);
   }
+
   auto execute(PassContext& ctx, RenderGraphRuntime& runtime) -> void override {
     auto* state = ctx.execution_state;
     if (!state || !state->world_pass_active) {
@@ -438,15 +449,41 @@ public:
       return;
     }
 
-    ctx.render_state.begin_view(ctx.render_state.view());
+    auto const& main = runtime.get_target(main_target_);
+    auto const& depth_color = runtime.get_target(scene_depth_);
 
+    if (!main.ready() || !depth_color.ready()) {
+      return;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, main.id);
+    glViewport(0, 0, main.texture.width, main.texture.height);
+
+    ctx.render_state.begin_view(ctx.render_state.view());
     ctx.view_uniforms.bind();
-    PassRenderer renderer{ctx};
+    PassRenderer renderer{ctx, RenderConfig::depth_prepass()};
     for (auto const& cmd : ctx.opaque_phase.commands) {
       renderer.draw(cmd, depth_prepass_shader_spec());
     }
     renderer.end(RenderConfig::post_depth_prepass());
     ctx.render_state.end_view();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, depth_color.id);
+    glViewport(0, 0, depth_color.texture.width, depth_color.texture.height);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    ctx.render_state.begin_view(ctx.render_state.view());
+    ctx.view_uniforms.bind();
+    PassRenderer depth_color_renderer{ctx, RenderConfig::depth_to_color()};
+    for (auto const& cmd : ctx.opaque_phase.commands) {
+      depth_color_renderer.draw(cmd, depth_to_color_shader_spec());
+    }
+    depth_color_renderer.end();
+    ctx.render_state.end_view();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    ctx.render_state.reset();
   }
 
 private:
@@ -456,7 +493,14 @@ private:
     return SPEC;
   }
 
+  static auto depth_to_color_shader_spec() -> ShaderSpec const& {
+    static ShaderSpec const SPEC =
+      ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth_color.frag");
+    return SPEC;
+  }
+
   RenderTextureHandle main_target_;
+  RenderTextureHandle scene_depth_;
 };
 
 class DepthCopyPass : public RenderPass {
@@ -477,27 +521,57 @@ public:
 
     auto const& source = runtime.get_target(source_);
     auto const& destination = runtime.get_target(destination_);
-    if (!source.ready() || !destination.ready() || source.depth.id == 0 ||
-        destination.depth.id == 0) {
+    if (!source.ready() || !destination.ready() || source.depth.id == 0) {
+      info(
+        "DepthCopyPass: skipping - source ready: {}, dest ready: {}, depth id: {}",
+        source.ready(),
+        destination.ready(),
+        source.depth.id
+      );
       return;
     }
 
-    rl::rlDrawRenderBatchActive();
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, source.id);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.id);
-    glBlitFramebuffer(
-      0,
-      0,
-      source.texture.width,
-      source.texture.height,
-      0,
-      0,
-      destination.texture.width,
-      destination.texture.height,
-      GL_DEPTH_BUFFER_BIT,
-      GL_NEAREST
+    info(
+      "DepthCopyPass: executing - copying depth from {} to {}", source.id, destination.id
     );
+
+    ShaderProgram& shader = resolve_shader(
+      ctx.marker,
+      ctx.shader_cache,
+      ShaderSpec::from("res/shaders/depth_copy.vert", "res/shaders/depth_copy.frag")
+    );
+
+    rl::rlDrawRenderBatchActive();
+
     glBindFramebuffer(GL_FRAMEBUFFER, destination.id);
+    glViewport(0, 0, destination.texture.width, destination.texture.height);
+
+    glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, source.depth.id);
+
+    shader.with_bound([&]() {
+      shader.set_sampler("u_depth_texture", 0);
+
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+    });
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    info("DepthCopyPass: completed");
+
+    ctx.render_state.reset();
   }
 
 private:
@@ -615,13 +689,10 @@ struct FramePass {
         const_cast<ExtractedShadows&>(*shadows), *shadow_settings, *view
       );
     }
-    
+
     if (!shadows->point_shadows.empty()) {
       shadow_resources->allocate_point_lights(
-        const_cast<ExtractedShadows&>(*shadows),
-        *shadow_settings,
-        *view,
-        *lights
+        const_cast<ExtractedShadows&>(*shadows), *shadow_settings, *view, *lights
       );
     }
 
