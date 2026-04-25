@@ -20,7 +20,7 @@
 namespace ecs {
 
 inline constexpr i32 MAX_DIRECTIONAL_CASCADES = 4;
-inline constexpr i32 MAX_POINT_SHADOWS = 1;
+inline constexpr i32 MAX_POINT_SHADOWS = 8;
 inline constexpr i32 POINT_SHADOW_FACE_COUNT = 6;
 inline constexpr unsigned int SHADOW_UNIFORM_BINDING = 1;
 inline constexpr std::string_view SHADOW_UNIFORM_BLOCK_NAME = "ShadowUniforms";
@@ -538,15 +538,25 @@ public:
     }
 
     rl::rlDrawRenderBatchActive();
-    
+
     glCopyImageSubData(
-      source.depth.id, GL_TEXTURE_2D, 0, 0, 0, 0,
-      depth_texture_.id, GL_TEXTURE_2D, 0, 0, 0, 0,
+      source.depth.id,
+      GL_TEXTURE_2D,
+      0,
+      0,
+      0,
+      0,
+      depth_texture_.id,
+      GL_TEXTURE_2D,
+      0,
+      0,
+      0,
+      0,
       std::min(source.texture.width, static_cast<i32>(width_)),
       std::min(source.texture.height, static_cast<i32>(height_)),
       1
     );
-    
+
     GLenum err = glGetError();
     if (err != GL_NO_ERROR) {
       warn("DepthTarget2D::copy_depth_from: glCopyImageSubData error {:#x}", err);
