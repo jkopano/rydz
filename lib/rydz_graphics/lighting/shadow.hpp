@@ -20,7 +20,7 @@
 namespace ecs {
 
 inline constexpr i32 MAX_DIRECTIONAL_CASCADES = 4;
-inline constexpr i32 MAX_POINT_SHADOWS = 16;
+inline constexpr i32 MAX_POINT_SHADOWS = 32;
 inline constexpr i32 POINT_SHADOW_FACE_COUNT = 6;
 inline constexpr unsigned int SHADOW_UNIFORM_BINDING = 1;
 inline constexpr std::string_view SHADOW_UNIFORM_BLOCK_NAME = "ShadowUniforms";
