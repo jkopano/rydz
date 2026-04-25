@@ -167,7 +167,8 @@ inline void measure_node(ecs::World &world, ecs::Entity entity) {
   auto *l = world.get_component<Label>(entity);
   if (nullptr != l) {
     auto *text_cache = world.get_resource<UiTextCache>();
-    auto *textures = world.get_resource<ecs::Assets<rl::Texture2D>>();
+    auto *textures =
+        world.get_resource<ecs::Assets<ecs::Texture>>(); // ← nowy typ
 
     if (text_cache && textures) {
       const std::string key = make_label_cache_key(*l);
@@ -175,13 +176,13 @@ inline void measure_node(ecs::World &world, ecs::Entity entity) {
       if (it == text_cache->items.end()) {
         rl::Image img = rl::ImageText(l->text.c_str(),
                                       static_cast<int>(l->font_size), l->color);
-        rl::Texture2D tex = rl::LoadTextureFromImage(img);
+        gl::Texture tex = rl::LoadTextureFromImage(img); // ← gl::Texture
         rl::UnloadImage(img);
         auto handle = textures->add(tex);
         it = text_cache->items.emplace(key, handle).first;
       }
 
-      if (const rl::Texture2D *t = textures->get(it->second)) {
+      if (const ecs::Texture *t = textures->get(it->second)) { // ← nowy typ
         c->content_size = math::Vec2(static_cast<float>(t->width),
                                      static_cast<float>(t->height));
         return;

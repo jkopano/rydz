@@ -5,7 +5,7 @@
 #include "rydz_ecs/asset.hpp"
 #include "rydz_ecs/entity.hpp"
 #include "rydz_ecs/fwd.hpp"
-#include "rydz_graphics/components/color.hpp"
+#include "rydz_graphics/mod.hpp"
 #include <string>
 #include <unordered_map>
 
@@ -16,15 +16,24 @@ struct UiRoot {
   ecs::Entity root;
 };
 
-// for tests
 struct UiWhiteTexture {
   using T = ecs::Resource;
-  ecs::Handle<rl::Texture2D> handle;
+  ecs::Handle<ecs::Texture> handle;
 };
 
 struct UiTextCache {
   using T = ecs::Resource;
-  std::unordered_map<std::string, ecs::Handle<rl::Texture2D>> items;
+  std::unordered_map<std::string, ecs::Handle<ecs::Texture>> items;
+};
+
+struct UiFontCache {
+  using T = ecs::Resource;
+  std::unordered_map<std::string, rl::Font> items;
+};
+
+struct UiQuadMesh {
+  using T = ecs::Resource;
+  ecs::Handle<ecs::Mesh> mesh;
 };
 
 struct UiNode {
@@ -83,15 +92,17 @@ struct Panel {
 struct Label {
   std::string text = "";
   float font_size = 16.0;
-  ecs::Color color = ecs::Color::BLACK;
+  rlColor color = rlColor{rlColor{.r = 0, .g = 0, .b = 0, .a = 255}};
+  std::string font_path = "";
+  float spacing = 1.0f;
 };
 
-inline std::string make_label_cache_key(const Label &label) {
+inline std::string make_label_cache_key(Label const& label) {
   return label.text + "|" + std::to_string(label.font_size) + "|" +
-         std::to_string(label.color.r) + "," +
-         std::to_string(label.color.g) + "," +
-         std::to_string(label.color.b) + "," +
-         std::to_string(label.color.a);
+         std::to_string(label.color.r) + "," + std::to_string(label.color.g) +
+         "," + std::to_string(label.color.b) + "," +
+         std::to_string(label.color.a) + "|" + label.font_path + "|" +
+         std::to_string(label.spacing);
 }
 
 } // namespace rydz::ui

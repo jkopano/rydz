@@ -20,6 +20,7 @@ using ::rlMesh;
 using ::rlRectangle;
 using Rectangle = ::rlRectangle;
 using ::AudioStream;
+using ::Font;
 using ::RenderTexture;
 using ::RenderTexture2D;
 using ::Shader;
@@ -74,6 +75,7 @@ using ::IsKeyUp;
 // ---- Screen ----
 using ::GetScreenHeight;
 using ::GetScreenWidth;
+using ::SetConfigFlags;
 
 // ---- Models / Meshes ----
 using ::DrawMesh;
@@ -111,6 +113,12 @@ using ::SetTextureWrap;
 using ::UnloadImage;
 using ::UnloadRenderTexture;
 using ::UnloadTexture;
+
+// ---- Font ----
+using ::GetFontDefault;
+using ::ImageDrawTextEx;
+using ::LoadFont;
+using ::MeasureTextEx;
 
 // ---- Audio ----
 using ::CloseAudioDevice;

@@ -30,6 +30,7 @@ struct Window {
   bool fullscreen{false};
   std::string title = "ECS App";
   u32 target_fps{60};
+  bool is_fullscreen{};
 
 public:
   static auto install(Window config);
