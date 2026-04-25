@@ -3,6 +3,7 @@
 // ground
 
 #include "rydz_ecs/mod.hpp"
+#include "rydz_graphics/components/light.hpp"
 #include "rydz_graphics/mod.hpp"
 #include "rydz_graphics/plugin.hpp"
 #include "rydz_physics/mod.hpp"
@@ -13,6 +14,23 @@
 using namespace ecs;
 using namespace physics;
 using namespace rydz_math;
+
+struct MovingLight {
+  f32 radius;
+  f32 speed;
+  f32 offset;
+};
+
+inline auto moving_lights_system(Query<Mut<Transform>, MovingLight> query, Res<Time> time)
+  -> void {
+  f32 t = time->elapsed_seconds;
+  for (auto [transform, light] : query.iter()) {
+    transform->translation.x =
+      (std::cos((t * light->speed) + light->offset) * light->radius);
+    transform->translation.z =
+      (std::sin((t * light->speed) + light->offset) * light->radius / 2.0f);
+  }
+}
 
 void setup_scene(
   Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes, ResMut<Assets<ecs::Material>> materials
@@ -48,6 +66,32 @@ void setup_scene(
       .intensity = 0.8f,
     }
   );
+  for (auto i : range(-10, 10)) {
+    for (auto j : range(-10, 10)) {
+      if (i % 4 != 0 || j % 4 != 0) {
+        continue;
+      }
+
+      f32 const angle = (static_cast<f32>(i) / 30.0f) * 2.0f * PI;
+      f32 const radius = 30.0f;
+      Color color = Color::from_hsv(static_cast<f32>(i * 12), 0.8f, 1.0f);
+
+      cmd.spawn(
+        Transform::from_xyz(2.f * i, 12.f, 2.f * j),
+        PointLight{
+          .color = color,
+          .intensity = 400,
+          .range = 20,
+          .casts_shadows = true,
+        },
+        MovingLight{
+          .radius = radius,
+          .speed = 0.2f,
+          .offset = angle,
+        }
+      );
+    }
+  }
 }
 
 void spawn_cubes(
@@ -94,6 +138,7 @@ auto main() -> int {
     .add_plugin(physics::PhysicsPlugin{})
     .add_systems(Startup, setup_scene)
     .add_systems(Update, spawn_cubes)
+    .add_systems(Update, moving_lights_system)
     .run();
 
   return 0;
