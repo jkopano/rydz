@@ -52,6 +52,7 @@ struct ShadowSettings {
   f32 directional_normal_bias = 0.01F;
   f32 point_constant_bias = 0.01F;
   i32 directional_pcf_radius = 1;
+  i32 point_pcf_radius = 1;
 
   // Deprecated by the cubemap-array backend; kept for config compatibility.
   bool use_dynamic_point_atlas = false;
@@ -903,7 +904,7 @@ inline auto ShadowUniformState::update(
   data.point_screen_flags = {
     settings.point_screen_space_shadows_enabled ? 1 : 0,
     std::max(settings.point_screen_space_steps, 1),
-    0,
+    std::max(settings.point_pcf_radius, 0),
     0,
   };
   data.point_screen_params = Vec4{

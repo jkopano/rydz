@@ -129,6 +129,63 @@ float samplePointShadow(int slot, vec3 dir) {
   return texture(u_point_shadow_maps, vec4(dir, float(slot))).r;
 }
 
+float pointShadowTexelScale() {
+  return 2.0 / max(float(textureSize(u_point_shadow_maps, 0).x), 1.0);
+}
+
+void buildPointShadowBasis(vec3 dir, out vec3 tangent, out vec3 bitangent) {
+  vec3 up = abs(dir.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
+  tangent = normalize(cross(up, dir));
+  bitangent = cross(dir, tangent);
+}
+
+float computePointShadowBias(float currentDepth, float farPlane) {
+  float normalizedDepth = clamp(currentDepth / farPlane, 0.0, 1.0);
+  float distanceScale = mix(1.0, 2.0, normalizedDepth);
+  return (u_shadow_params.z * distanceScale) / farPlane;
+}
+
+float samplePointShadowPCF(
+  int slot,
+  vec3 lightToFrag,
+  float currentDepth,
+  float farPlane
+) {
+  if (currentDepth <= 0.001) {
+    return 1.0;
+  }
+
+  int pcfRadius = max(u_point_screen_shadow_flags.z, 0);
+  float currentDepthNormalized = currentDepth / farPlane;
+  float bias = computePointShadowBias(currentDepth, farPlane);
+
+  if (pcfRadius <= 0) {
+    float closestDepth = samplePointShadow(slot, lightToFrag);
+    return currentDepthNormalized - bias > closestDepth ? 0.0 : 1.0;
+  }
+
+  vec3 dir = normalize(lightToFrag);
+  vec3 tangent;
+  vec3 bitangent;
+  buildPointShadowBasis(dir, tangent, bitangent);
+
+  float texelScale = pointShadowTexelScale();
+  float visibility = 0.0;
+  float sampleCount = 0.0;
+
+  for (int x = -pcfRadius; x <= pcfRadius; ++x) {
+    for (int y = -pcfRadius; y <= pcfRadius; ++y) {
+      vec2 offset = vec2(float(x), float(y)) * texelScale;
+      vec3 sampleDir = normalize(dir + tangent * offset.x + bitangent * offset.y);
+      float closestDepth = samplePointShadow(slot, sampleDir);
+      visibility += currentDepthNormalized - bias > closestDepth ? 0.0 : 1.0;
+      sampleCount += 1.0;
+    }
+  }
+
+  return visibility / max(sampleCount, 1.0);
+}
+
 float sceneDepthToViewDepth(float depthSample) {
   float nearPlane = max(u_cluster_screen_size_near_far.z, 0.001);
   float farPlane = max(u_cluster_screen_size_near_far.w, nearPlane + 0.001);
@@ -307,9 +364,7 @@ float computePointShadow(vec3 fragPos, vec3 viewPos, GpuPointLight pointLight) {
   vec3 lightToFrag = fragPos - pointLight.position_range.xyz;
   float currentDepth = length(lightToFrag);
   float farPlane = max(pointLight.shadow_data.y, 0.001);
-  float closestDepth = samplePointShadow(shadowSlot, lightToFrag);
-  closestDepth *= farPlane;
-  return currentDepth - u_shadow_params.z > closestDepth ? 0.0 : 1.0;
+  return samplePointShadowPCF(shadowSlot, lightToFrag, currentDepth, farPlane);
 }
 
 int computeDepthSlice(float depth, ivec3 dims) {
