@@ -4,6 +4,7 @@
 
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/components/light.hpp"
+#include "rydz_graphics/material/material3d.hpp"
 #include "rydz_graphics/mod.hpp"
 #include "rydz_graphics/plugin.hpp"
 #include "rydz_physics/mod.hpp"
@@ -66,6 +67,8 @@ void setup_scene(
       .intensity = 0.8f,
     }
   );
+  auto cube_mesh = meshes->add(Mesh::cube());
+  auto cube_mat = materials->add(StandardMaterial::from_color(Color{200, 60, 60}));
   for (auto i : range(-10, 10)) {
     for (auto j : range(-10, 10)) {
       if (i % 4 != 0 || j % 4 != 0) {
@@ -78,6 +81,8 @@ void setup_scene(
 
       cmd.spawn(
         Transform::from_xyz(2.f * i, 12.f, 2.f * j),
+        Mesh3d(cube_mesh),
+        MeshMaterial3d(cube_mat),
         PointLight{
           .color = color,
           .intensity = 40,

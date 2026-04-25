@@ -334,16 +334,17 @@ float computePointScreenSpaceShadow(vec3 viewPos, GpuLocalLight pointLight) {
   if (u_point_screen_shadow_flags.x <= 0) return 1.0;
 
   vec3 lightViewPos = (u_mat_view * vec4(pointLight.position_range.xyz, 1.0)).xyz;
-
   vec3 rayDirFull = lightViewPos - viewPos;
   float rayLength = length(rayDirFull);
   vec3 rayDir = rayDirFull / rayLength;
 
   int steps = max(u_point_screen_shadow_flags.y, 1);
-  float thickness = max(u_point_screen_shadow_params.x, 0.2); // Zwiększ lekko grubość domyślną
+  float thickness = max(u_point_screen_shadow_params.x, 0.2);
 
-  float startDistance = 0.1;
+  float startDistance = 0.15;
   float stepLength = (rayLength - startDistance) / float(steps);
+
+  float shadowVisibility = 1.0;
 
   for (int step = 0; step < steps; ++step) {
     float travel = startDistance + stepLength * float(step);
@@ -352,20 +353,31 @@ float computePointScreenSpaceShadow(vec3 viewPos, GpuLocalLight pointLight) {
     float ndcDepth = 0.0;
     vec2 uv = projectViewToUv(samplePos, ndcDepth);
 
+    float edgeFade = 1.0 - max(
+          smoothstep(0.9, 1.0, abs(uv.x * 2.0 - 1.0)),
+          smoothstep(0.9, 1.0, abs(uv.y * 2.0 - 1.0))
+        );
+
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
 
     float sceneDepthSample = texture(u_scene_depth, uv).r;
-    if (sceneDepthSample >= 0.999) continue;
+    if (sceneDepthSample >= 0.9999) continue;
 
     float sceneDepth = sceneDepthToViewDepth(sceneDepthSample);
     float rayDepth = -samplePos.z;
 
-    if (rayDepth > sceneDepth && rayDepth < sceneDepth + thickness) {
-      return 0.0;
+    float diff = rayDepth - sceneDepth;
+
+    if (diff > 0.0 && diff < thickness) {
+      float occlusion = smoothstep(thickness, 0.0, diff);
+
+      shadowVisibility = min(shadowVisibility, mix(1.0, 1.0 - occlusion, edgeFade));
+
+      if (shadowVisibility < 0.1) return 0.0;
     }
   }
 
-  return 1.0; // Ścieżka czysta
+  return clamp(shadowVisibility, 0.0, 1.0);
 }
 
 float computePointShadow(vec3 fragPos, vec3 viewPos, GpuLocalLight pointLight) {
