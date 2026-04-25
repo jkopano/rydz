@@ -176,14 +176,6 @@ inline auto spawn_lights_on_input(
     return;
   }
 
-  cmd.spawn(
-    DirectionalLight{
-      .color = {255, 242, 230, 255},
-      .direction = Vec3(-0.0f, -1.0f, -0.0f),
-      .intensity = 0.8f,
-    }
-  );
-
   for (int i = 0; i < 30; ++i) {
     f32 const angle = (static_cast<f32>(i) / 30.0f) * 2.0f * PI;
     f32 const radius = 30.0f + ((i % 2 + 1) * 40.0f);
@@ -216,6 +208,20 @@ inline auto setup_camera(Cmd cmd, NonSendMarker) -> void {
     CameraController{},
     PostProcessMaterial{DefaultPostProcessMaterial{}},
     Environment::from_directory("res/hdri/skybox")
+      .with_ambient_light(
+        AmbientLight{
+          .color = Color::RAYWHITE,
+          .intensity = 0.4f,
+        }
+      )
+      .with_directional_light(
+        DirectionalLight{
+          .color = Color::WHITE,
+          .direction = Vec3(-0.2f, -1.0f, -0.1f).normalized(),
+          .intensity = 1.0f,
+          .casts_shadows = true,
+        }
+      )
   );
   rl::DisableCursor();
 }
