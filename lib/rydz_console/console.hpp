@@ -2,6 +2,7 @@
 #pragma once
 #include "rl.hpp"
 #include "rydz_ecs/mod.hpp"
+#include "rydz_graphics/color.hpp"
 #include "scripting.hpp"
 #include <sstream>
 #include <string>
@@ -21,7 +22,8 @@ struct ConsoleState {
   std::string current_input = "";
   int cursor_pos = 0;
   std::vector<std::string> history = {
-      "[System] Konsola gotowa. Wpisz komende..."};
+    "[System] Konsola gotowa. Wpisz komende..."
+  };
   std::vector<std::string> command_history;
   int history_index = 0;
   int scroll_offset = 0;
@@ -30,7 +32,7 @@ struct ConsoleState {
 
   // dodanie wpisu do logu konsoli, dzieli wielolinijkowe komunikaty na
   // pojedyncze linie i ogranicza historię do 200 wpisów
-  void log(const std::string &msg) {
+  void log(std::string const& msg) {
     std::stringstream ss(msg);
     std::string line;
     while (std::getline(ss, line, '\n')) {
@@ -45,7 +47,7 @@ struct ConsoleState {
 
   // dodanie komendy do historii, zapobiega duplikatom i aktualizuje indeks
   // historii
-  void add_command_to_history(const std::string &cmd) {
+  void add_command_to_history(std::string const& cmd) {
     if (cmd.empty())
       return;
     if (command_history.empty() || command_history.back() != cmd) {
@@ -55,10 +57,12 @@ struct ConsoleState {
   }
 };
 
-inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
-                                ecs::ResMut<LuaResource> lua,
-                                ecs::ResMut<ecs::Input> input,
-                                ecs::Res<ecs::Time> time) {
+inline void ConsoleUpdateSystem(
+  ecs::ResMut<ConsoleState> console,
+  ecs::ResMut<LuaResource> lua,
+  ecs::ResMut<ecs::Input> input,
+  ecs::Res<ecs::Time> time
+) {
   // klawisze otwarcia
   std::vector<i32> pressed_chars;
   for (i32 key = GetCharPressed(); key > 0; key = GetCharPressed()) {
@@ -66,7 +70,7 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
   }
 
   bool toggle_requested =
-      input->key_pressed(KEY_GRAVE) || input->key_pressed(KEY_F1);
+    input->key_pressed(KEY_GRAVE) || input->key_pressed(KEY_F1);
   for (i32 codepoint : pressed_chars) {
     if (is_console_toggle_char(codepoint)) {
       toggle_requested = true;
@@ -97,8 +101,8 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
     console->scroll_offset -= 10;
 
   int max_scroll = console->history.empty()
-                       ? 0
-                       : static_cast<int>(console->history.size()) - 1;
+                     ? 0
+                     : static_cast<int>(console->history.size()) - 1;
   if (console->scroll_offset < 0)
     console->scroll_offset = 0;
   if (console->scroll_offset > max_scroll)
@@ -107,17 +111,18 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
   // zbieranie znaków z ograniczeniami
   for (i32 key : pressed_chars) {
     if (key >= 32 && key <= 125 && !is_console_toggle_char(key)) {
-      console->current_input.insert(console->current_input.begin() +
-                                        console->cursor_pos,
-                                    static_cast<char>(key));
+      console->current_input.insert(
+        console->current_input.begin() + console->cursor_pos,
+        static_cast<char>(key)
+      );
       console->cursor_pos++;
     }
   }
 
-  const float REPEAT_DELAY =
-      0.4f; // czas przytrzymania przed rozpoczęciem powtarzania
-  const float REPEAT_RATE =
-      0.05f; // czas między kolejnymi usunięciami podczas powtarzania
+  float const REPEAT_DELAY =
+    0.4f; // czas przytrzymania przed rozpoczęciem powtarzania
+  float const REPEAT_RATE =
+    0.05f; // czas między kolejnymi usunięciami podczas powtarzania
 
   auto do_backspace = [&]() {
     if (console->cursor_pos > 0) {
@@ -176,7 +181,7 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
       console->cursor_pos = static_cast<int>(console->current_input.size());
     } else {
       console->history_index =
-          static_cast<int>(console->command_history.size());
+        static_cast<int>(console->command_history.size());
       console->current_input.clear();
       console->cursor_pos = 0;
     }
@@ -198,24 +203,26 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
 
     int result = luaL_dostring(lua->vm, cmd.c_str());
     if (result != LUA_OK) {
-      const char *error_msg = lua_tostring(lua->vm, -1);
-      console->log("[Blad] " +
-                   std::string(error_msg ? error_msg : "Nieznany błąd"));
+      char const* error_msg = lua_tostring(lua->vm, -1);
+      console->log(
+        "[Blad] " + std::string(error_msg ? error_msg : "Nieznany błąd")
+      );
       lua_pop(lua->vm, 1);
     }
   }
 }
 
 // system renderujący konsolę
-inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
-                                ecs::NonSendMarker) {
+inline void ConsoleRenderSystem(
+  ecs::Res<ConsoleState> console, ecs::NonSendMarker
+) {
   if (!console->is_open)
     return;
 
   i32 screen_w = rl::GetScreenWidth();
   i32 console_h = rl::GetScreenHeight() / 3;
 
-  rl::DrawRectangle(0, 0, screen_w, console_h, Fade(rl::BLACK, 0.85f));
+  rl::DrawRectangle(0, 0, screen_w, console_h, Fade(ecs::Color::BLACK, 0.85f));
 
   int y = console_h - 30;
   int current_line = 0;
@@ -227,7 +234,7 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
       continue;
     }
 
-    rlDrawText(it->c_str(), 10, y, 20, rl::RAYWHITE);
+    rlDrawText(it->c_str(), 10, y, 20, ecs::Color::RAYWHITE);
     y -= 25;
     current_line++;
 
@@ -235,16 +242,16 @@ inline void ConsoleRenderSystem(ecs::Res<ConsoleState> console,
       break;
   }
 
-  DrawRectangle(0, console_h, screen_w, 30, Fade(DARKGRAY, 0.9f));
+  DrawRectangle(0, console_h, screen_w, 30, Fade(ecs::Color::DARKGRAY, 0.9f));
   std::string display =
-      "] " + console->current_input.substr(0, console->cursor_pos) + "|" +
-      console->current_input.substr(console->cursor_pos);
-  rlDrawText(display.c_str(), 10, console_h + 5, 20, rl::GREEN);
+    "] " + console->current_input.substr(0, console->cursor_pos) + "|" +
+    console->current_input.substr(console->cursor_pos);
+  rlDrawText(display.c_str(), 10, console_h + 5, 20, ecs::Color::GREEN);
 }
 
 // funkcja pluginu, która inicjalizuje zasób stanu konsoli i dodaje system
 // aktualizacji do harmonogramu
-inline void console_plugin(ecs::App &app) {
+inline void console_plugin(ecs::App& app) {
   app.init_resource<ConsoleState>();
   app.add_systems(ecs::ScheduleLabel::Update, ConsoleUpdateSystem);
 }

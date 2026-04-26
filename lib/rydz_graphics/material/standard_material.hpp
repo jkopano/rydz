@@ -8,7 +8,7 @@
 namespace ecs {
 
 struct StandardMaterial : MaterialTrait<HasPBR> {
-  Color base_color = kWhite;
+  Color base_color = Color::WHITE;
   Handle<Texture> texture{};
   Handle<Texture> normal_map{};
   Handle<Texture> metallic_map{};
@@ -21,73 +21,71 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
   f32 normal_scale = -1.0f;
   f32 occlusion_strength = -1.0f;
 
-  static StandardMaterial from_color(Color c) { return {.base_color = c}; }
-  static StandardMaterial from_texture(Handle<Texture> tex,
-                                       Color tint = kWhite) {
+  static auto from_color(Color c) -> StandardMaterial {
+    return {.base_color = c};
+  }
+  static auto from_texture(Handle<Texture> tex, Color tint = Color::WHITE)
+    -> StandardMaterial {
     return {.base_color = tint, .texture = tex};
   }
 
-  static ShaderRef vertex_shader() { return "res/shaders/pbr.vert"; }
-  static ShaderRef fragment_shader() { return "res/shaders/pbr.frag"; }
+  static auto vertex_shader() -> ShaderRef { return "res/shaders/pbr.vert"; }
+  static auto fragment_shader() -> ShaderRef { return "res/shaders/pbr.frag"; }
 
-  RenderMethod render_method() const {
+  [[nodiscard]] auto render_method() const -> RenderMethod {
     return base_color.a < 255 ? RenderMethod::Transparent
                               : RenderMethod::Opaque;
   }
 
-  bool enable_shadows() const { return base_color.a == 255; }
-  bool double_sided() const { return false; }
-  float alpha_cutoff() const { return 0.1f; }
+  [[nodiscard]] auto enable_shadows() const -> bool {
+    return base_color.a == 255;
+  }
+  [[nodiscard]] auto double_sided() const -> bool { return false; }
+  [[nodiscard]] auto alpha_cutoff() const -> float { return 0.1F; }
 
-  void bind(MaterialBuilder &builder) const {
-    builder.color(gl::MATERIAL_MAP_DIFFUSE, base_color);
+  auto bind(MaterialBuilder& builder) const -> void {
+    builder.color(MaterialMap::Albedo, base_color);
     if (texture.is_valid()) {
-      builder.texture(gl::MATERIAL_MAP_DIFFUSE, texture);
+      builder.texture(MaterialMap::Albedo, texture);
     }
     if (normal_map.is_valid()) {
-      builder.texture(gl::MATERIAL_MAP_NORMAL, normal_map);
+      builder.texture(MaterialMap::Normal, normal_map);
     }
     if (metallic_map.is_valid()) {
-      builder.texture(gl::MATERIAL_MAP_METALNESS, metallic_map);
+      builder.texture(MaterialMap::Metalness, metallic_map);
     }
     if (roughness_map.is_valid()) {
-      builder.texture(gl::MATERIAL_MAP_ROUGHNESS, roughness_map);
+      builder.texture(MaterialMap::Roughness, roughness_map);
     }
     if (occlusion_map.is_valid()) {
-      builder.texture(gl::MATERIAL_MAP_OCCLUSION, occlusion_map);
+      builder.texture(MaterialMap::Occlusion, occlusion_map);
     }
     if (emissive_map.is_valid()) {
-      builder.texture(gl::MATERIAL_MAP_EMISSION, emissive_map);
+      builder.texture(MaterialMap::Emission, emissive_map);
     }
 
-    if (metallic >= 0.0f) {
-      builder.uniform("u_metallic_factor", gl::Uniform(metallic));
+    if (metallic >= 0.0F) {
+      builder.uniform(MaterialMap::Metalness, gl::Uniform(metallic));
     }
-    if (roughness >= 0.0f) {
-      builder.uniform("u_roughness_factor", gl::Uniform{roughness});
+    if (roughness >= 0.0F) {
+      builder.uniform(MaterialMap::Roughness, gl::Uniform{roughness});
     }
-    if (normal_scale >= 0.0f) {
-      builder.uniform("u_normal_factor", gl::Uniform{normal_scale});
+    if (normal_scale >= 0.0F) {
+      builder.uniform(MaterialMap::Normal, gl::Uniform{normal_scale});
     }
-    if (occlusion_strength >= 0.0f) {
-      builder.uniform("u_occlusion_factor", gl::Uniform{occlusion_strength});
+    if (occlusion_strength >= 0.0F) {
+      builder.uniform(MaterialMap::Occlusion, gl::Uniform{occlusion_strength});
     }
     if (emissive_color.a > 0) {
-      auto emissive = color_to_vec3(emissive_color);
-      builder.uniform("u_emissive_factor",
-                      math::Vec3(emissive.x, emissive.y, emissive.z));
+      math::Vec3 emissive = emissive_color;
+      builder.uniform(
+        MaterialMap::Emission, math::Vec3(emissive.x, emissive.y, emissive.z)
+      );
     }
-    builder.uniform("u_color", gl::Uniform{1.0f, 1.0f, 1.0f, 0.0f});
+    builder.uniform(MaterialMap::Albedo, gl::Uniform{1.0F, 1.0F, 1.0F, 0.0F});
   }
 };
 
 static_assert(MaterialValue<StandardMaterial>);
-
-struct MeshMaterial3d {
-  Handle<Material> material{};
-
-  MeshMaterial3d() = default;
-  explicit MeshMaterial3d(Handle<Material> material) : material(material) {}
-};
 
 } // namespace ecs

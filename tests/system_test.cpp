@@ -5,6 +5,8 @@
 #include "rydz_ecs/system.hpp"
 #include "rydz_ecs/world.hpp"
 
+#include <string>
+
 using namespace ecs;
 
 namespace {
@@ -27,7 +29,16 @@ struct LocalCounter {
   int value = 0;
 };
 
+[[maybe_unused]] void valid_free_system(Res<Counter> /*counter*/) {}
+
 } // namespace
+
+static_assert(SystemCallable<decltype(+valid_free_system)>);
+static_assert(SystemCallable<decltype([](Res<Counter> /*counter*/) {})>);
+static_assert(SystemCallable<decltype([](World & /*world*/) {})>);
+static_assert(!SystemCallable<decltype([](int /*not_a_param*/) {})>);
+static_assert(!SystemCallable<decltype([](std::string /*not_a_param*/) {})>);
+static_assert(!SystemCallable<decltype([](auto /*generic*/) {})>);
 
 // ============================================================
 // System tests (mirrors system_test.rs)

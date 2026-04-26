@@ -7,8 +7,6 @@ in vec4 vertexTangent;
 in mat4 instanceTransform;
 
 uniform mat4 mvp;
-uniform mat4 matModel;
-uniform int u_use_instancing;
 
 out vec3 FragPos;
 out vec3 Normal;
@@ -17,7 +15,7 @@ out vec3 Bitangent;
 out vec2 TexCoord;
 
 void main() {
-  mat4 model = (u_use_instancing != 0) ? instanceTransform : matModel;
+  mat4 model = instanceTransform;
 
   vec4 world_pos = model * vec4(vertexPosition, 1.0);
   FragPos = world_pos.xyz;

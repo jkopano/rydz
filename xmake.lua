@@ -13,8 +13,9 @@ if is_plat("windows") then
 	set_toolchains("clang-cl")
 elseif is_plat("linux") then
 	set_toolchains("clang")
-	-- add_cxflags("-stdlib=libc++")
-	--    add_ldflags("-stdlib=libc++")
+	if os.getenv("NIX_PATH") then
+		add_ldflags("-fuse-ld=mold", { force = true })
+	end
 end
 
 -- helpers
@@ -34,6 +35,11 @@ local tracy_enabled = false
 local function add_tracy()
 	if tracy_enabled then
 		add_packages("tracy")
+		if is_plat("linux") then
+			-- system_name_of() uses dladdr(); exported executable symbols are
+			-- needed so Tracy gets function names instead of raw addresses.
+			add_ldflags("-rdynamic", { force = true })
+		end
 	end
 end
 
@@ -42,9 +48,21 @@ set_languages("c++23")
 add_includedirs("lib")
 set_warnings("all", "extra")
 
+if is_plat("windows") then
+	-- Dla clang-cl / msvc (jeśli używasz clang-cl, to zrozumie te flagi)
+	add_cxflags("-Wfloat-conversion", "-Wconstant-conversion")
+else
+	-- Dla czystego Clanga na Linuxie
+	add_cxflags("-Wfloat-conversion", "-Wconversion")
+end
+
 -- common dependencies
 add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")
 add_requires("fmt", "spdlog", { configs = { external_fmt = true } })
+
+if is_plat("windows") then
+    add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", {force = true})
+end
 
 if tracy_enabled then
 	add_requires("tracy")
@@ -187,7 +205,7 @@ local examples = {
 	"10_custom_material",
 	"11_sets",
 	"12_observers",
-	"13_ui",
+	"13_physics",
 }
 
 for _, name in ipairs(examples) do

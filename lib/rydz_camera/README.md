@@ -28,7 +28,7 @@ bool smooth_follow = true; // Enable/disable smooth following
 ```cpp
 void setup_isometric_camera(
   Cmd cmd,
-  const Vec3& target = Vec3::sZero(),
+  const Vec3& target = Vec3::ZERO,
   const Vec3& offset = Vec3(10.0f, 10.0f, 10.0f),
   f32 ortho_height = 20.0f,
   f32 follow_speed = 5.0f);
@@ -48,7 +48,7 @@ inline void setup_scene(Cmd cmd, ResMut<Assets<rl::Mesh>> meshes, NonSendMarker)
             Transform::from_xyz(0, 0.5f, 0), Player{});
   
   // Spawn isometric camera following origin with offset
-  setup_isometric_camera(cmd, Vec3::sZero(), Vec3(10, 10, 10), 20.0f);
+  setup_isometric_camera(cmd, Vec3::ZERO, Vec3(10, 10, 10), 20.0f);
 }
 
 inline void update_camera(Query<Mut<IsometricCamera>> cam_query, 
