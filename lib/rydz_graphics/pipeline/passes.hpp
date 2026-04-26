@@ -455,6 +455,7 @@ public:
 
     ctx.render_state.begin_view(ctx.render_state.view());
     ctx.view_uniforms.bind();
+
     PassRenderer renderer{ctx, RenderConfig::depth_prepass()};
     for (auto const& cmd : ctx.opaque_phase.commands) {
       renderer.draw(cmd, depth_prepass_shader_spec());
@@ -469,6 +470,7 @@ public:
 
     ctx.render_state.begin_view(ctx.render_state.view());
     ctx.view_uniforms.bind();
+
     PassRenderer depth_color_renderer{ctx, RenderConfig::depth_to_color()};
     for (auto const& cmd : ctx.opaque_phase.commands) {
       depth_color_renderer.draw(cmd, depth_to_color_shader_spec());

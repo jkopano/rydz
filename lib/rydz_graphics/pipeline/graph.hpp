@@ -166,7 +166,7 @@ public:
       target.unload();
     }
     runtime_.physical_targets.clear();
-    runtime_.logical_to_physical.clear();
+    runtime_.ir_to_physical.clear();
     resources_.clear();
     compiled_ = false;
   }
@@ -235,14 +235,14 @@ private:
     }
 
     std::vector<gl::RenderTarget> physical_targets;
-    std::vector<usize> logical_to_physical;
+    std::vector<usize> ir_to_physical;
 
   private:
     [[nodiscard]] auto physical_slot(RenderTextureHandle handle) const -> usize {
-      if (!handle.is_valid() || handle.id >= logical_to_physical.size()) {
+      if (!handle.is_valid() || handle.id >= ir_to_physical.size()) {
         return INVALID_PHYSICAL_SLOT;
       }
-      return logical_to_physical[handle.id];
+      return ir_to_physical[handle.id];
     }
   };
 
@@ -290,7 +290,7 @@ private:
   auto ensure_resources(u32 default_w, u32 default_h) -> void {
     auto const [logical_to_physical, physical_descs] =
       build_physical_plan(default_w, default_h);
-    runtime_.logical_to_physical = logical_to_physical;
+    runtime_.ir_to_physical = logical_to_physical;
 
     for (usize index = physical_descs.size(); index < runtime_.physical_targets.size();
          ++index) {

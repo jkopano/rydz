@@ -40,9 +40,8 @@ public:
       id_ = 0;
     }
   }
-  auto update(
-    void const* data, unsigned int size, unsigned int offset = 0
-  ) const -> void {
+  auto update(void const* data, unsigned int size, unsigned int offset = 0) const
+    -> void {
     if (id_ != 0) {
       rl::rlUpdateShaderBuffer(id_, data, size, offset);
     }
@@ -92,9 +91,8 @@ public:
     }
   }
 
-  auto update(
-    void const* data, unsigned int size, unsigned int offset = 0
-  ) const -> void {
+  auto update(void const* data, unsigned int size, unsigned int offset = 0) const
+    -> void {
     if (id_ != 0) {
       glBindBuffer(GL_UNIFORM_BUFFER, id_);
       glBufferSubData(GL_UNIFORM_BUFFER, offset, size, data);
@@ -124,8 +122,7 @@ public:
 
   VertexArray(VertexArray const&) = delete;
   auto operator=(VertexArray const&) -> VertexArray& = delete;
-  VertexArray(VertexArray&& other) noexcept
-      : id_(std::exchange(other.id_, 0)) {}
+  VertexArray(VertexArray&& other) noexcept : id_(std::exchange(other.id_, 0)) {}
   auto operator=(VertexArray&& other) noexcept -> VertexArray& {
     if (this == &other) {
       return *this;
@@ -173,15 +170,13 @@ public:
   VertexBuffer(void const* data, i32 size, bool dynamic = false)
       : id_(rl::rlLoadVertexBuffer(data, size, dynamic)) {}
 
-  static auto create(void const* data, i32 size, bool dynamic = false)
-    -> VertexBuffer {
+  static auto create(void const* data, i32 size, bool dynamic = false) -> VertexBuffer {
     return {data, size, dynamic};
   }
 
   VertexBuffer(VertexBuffer const&) = delete;
   auto operator=(VertexBuffer const&) -> VertexBuffer& = delete;
-  VertexBuffer(VertexBuffer&& other) noexcept
-      : id_(std::exchange(other.id_, 0)) {}
+  VertexBuffer(VertexBuffer&& other) noexcept : id_(std::exchange(other.id_, 0)) {}
   auto operator=(VertexBuffer&& other) noexcept -> VertexBuffer& {
     if (this == &other) {
       return *this;
@@ -222,15 +217,13 @@ public:
   ElementBuffer(void const* data, i32 size, bool dynamic = false)
       : id_(rl::rlLoadVertexBufferElement(data, size, dynamic)) {}
 
-  static auto create(void const* data, i32 size, bool dynamic = false)
-    -> ElementBuffer {
+  static auto create(void const* data, i32 size, bool dynamic = false) -> ElementBuffer {
     return {data, size, dynamic};
   }
 
   ElementBuffer(ElementBuffer const&) = delete;
   auto operator=(ElementBuffer const&) -> ElementBuffer& = delete;
-  ElementBuffer(ElementBuffer&& other) noexcept
-      : id_(std::exchange(other.id_, 0)) {}
+  ElementBuffer(ElementBuffer&& other) noexcept : id_(std::exchange(other.id_, 0)) {}
   auto operator=(ElementBuffer&& other) noexcept -> ElementBuffer& {
     if (this == &other) {
       return *this;
@@ -260,8 +253,7 @@ public:
 
   static auto unbind() -> void { rl::rlDisableVertexBufferElement(); }
 
-  static auto draw(i32 offset, i32 count, void const* buffer = nullptr)
-    -> void {
+  static auto draw(i32 offset, i32 count, void const* buffer = nullptr) -> void {
     rl::rlDrawVertexArrayElements(offset, count, buffer);
   }
 
@@ -274,14 +266,13 @@ using VBO = VertexBuffer;
 using EBO = ElementBuffer;
 
 template <typename T>
-concept GpuBuffer =
-  requires(T const& b, T& m, void const* data, u32 sz, u32 idx) {
-    { b.ready() } -> std::convertible_to<bool>;
-    { b.id() } -> std::convertible_to<u32>;
-    { m.reset() } -> std::same_as<void>;
-    { b.update(data, sz, 0u) } -> std::same_as<void>;
-    { b.bind(idx) } -> std::same_as<void>;
-  };
+concept GpuBuffer = requires(T const& b, T& m, void const* data, u32 sz, u32 idx) {
+  { b.ready() } -> std::convertible_to<bool>;
+  { b.id() } -> std::convertible_to<u32>;
+  { m.reset() } -> std::same_as<void>;
+  { b.update(data, sz, 0u) } -> std::same_as<void>;
+  { b.bind(idx) } -> std::same_as<void>;
+};
 
 static_assert(GpuBuffer<SSBO>);
 static_assert(GpuBuffer<UBO>);

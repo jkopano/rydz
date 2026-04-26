@@ -156,7 +156,9 @@ inline auto build_cluster_record(
   f32 const ndc_y1 = -1.0F + (2.0F * static_cast<f32>(tile_y + 1) / tile_count_y);
 
   f32 const slice_near =
-    tile_z == 0 ? 0.0F : cluster_slice_distance(config, near_plane, far_plane, orthographic, tile_z);
+    tile_z == 0
+      ? 0.0F
+      : cluster_slice_distance(config, near_plane, far_plane, orthographic, tile_z);
   f32 const slice_far =
     cluster_slice_distance(config, near_plane, far_plane, orthographic, tile_z + 1);
 
@@ -315,8 +317,9 @@ public:
       clusters_cpu.resize(config.cluster_count());
     }
 
-    usize const requested_local_light_count = lights.point_lights.size() + lights.spot_lights.size();
-    usize const max_local_light_count = static_cast<usize>(config.max_point_lights);
+    usize const requested_local_light_count =
+      lights.point_lights.size() + lights.spot_lights.size();
+    auto const max_local_light_count = static_cast<usize>(config.max_point_lights);
     if (requested_local_light_count > max_local_light_count) {
       warn(
         "Forward+: dropping {} local lights beyond configured cap",
@@ -332,7 +335,7 @@ public:
       bool shadow_valid = false;
 
       if (light.shadow_slot >= 0) {
-        usize const shadow_slot = static_cast<usize>(light.shadow_slot);
+        auto const shadow_slot = static_cast<usize>(light.shadow_slot);
         if (shadow_slot < shadows.point_shadows.size()) {
           auto const& point_shadow = shadows.point_shadows[shadow_slot];
           shadow_valid = point_shadow.allocated_resolution > 0;
@@ -343,12 +346,11 @@ public:
         GpuLocalLight{
           .position_range =
             {light.position.x, light.position.y, light.position.z, light.range},
-          .color_intensity = {
-            light.color.r / 255.0f,
-            light.color.g / 255.0f,
-            light.color.b / 255.0f,
-            light.intensity
-          },
+          .color_intensity =
+            {light.color.r / 255.0f,
+             light.color.g / 255.0f,
+             light.color.b / 255.0f,
+             light.intensity},
           .direction_type = {0.0F, 0.0F, -1.0F, LOCAL_LIGHT_TYPE_POINT},
           .shadow_cone_data = {
             shadow_valid ? static_cast<f32>(light.shadow_slot) : -1.0F,
@@ -361,7 +363,8 @@ public:
     }
 
     usize const remaining_capacity = max_local_light_count - point_light_count;
-    usize const spot_light_count = std::min(lights.spot_lights.size(), remaining_capacity);
+    usize const spot_light_count =
+      std::min(lights.spot_lights.size(), remaining_capacity);
     for (usize i = 0; i < spot_light_count; ++i) {
       auto const& light = lights.spot_lights[i];
       f32 const inner_angle = std::clamp(light.inner_angle, 0.0F, PI);
@@ -371,18 +374,18 @@ public:
         GpuLocalLight{
           .position_range =
             {light.position.x, light.position.y, light.position.z, light.range},
-          .color_intensity = {
-            light.color.r / 255.0f,
-            light.color.g / 255.0f,
-            light.color.b / 255.0f,
-            light.intensity
-          },
-          .direction_type = {
-            light.direction.x,
-            light.direction.y,
-            light.direction.z,
-            LOCAL_LIGHT_TYPE_SPOT,
-          },
+          .color_intensity =
+            {light.color.r / 255.0f,
+             light.color.g / 255.0f,
+             light.color.b / 255.0f,
+             light.intensity},
+          .direction_type =
+            {
+              light.direction.x,
+              light.direction.y,
+              light.direction.z,
+              LOCAL_LIGHT_TYPE_SPOT,
+            },
           .shadow_cone_data = {
             -1.0F,
             0.0F,
