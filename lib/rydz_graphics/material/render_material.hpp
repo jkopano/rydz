@@ -199,7 +199,7 @@ inline auto apply_default_material_map_textures(gl::Material& material) -> void 
   auto* maps = material.maps;
   for (auto const map : DEFAULT_MATERIAL_MAPS) {
     auto& material_map = maps[material_map_index(map)];
-    if (material_map.texture.ready()) {
+    if (material_map.texture.id > 0) {
       continue;
     }
 

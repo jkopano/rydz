@@ -2,8 +2,8 @@
 #include "rydz_audio/mod.hpp"
 #include "rydz_graphics/mod.hpp"
 #include "rydz_platform/mod.hpp"
-#include "scene_new.hpp"
-// #include "scene.hpp"
+// #include "scene_new.hpp"
+#include "scene.hpp"
 
 using namespace ecs;
 

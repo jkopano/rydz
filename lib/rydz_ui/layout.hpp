@@ -178,7 +178,7 @@ inline void measure_node(ecs::World &world, ecs::Entity entity) {
                                       static_cast<int>(l->font_size), l->color);
         gl::Texture tex = rl::LoadTextureFromImage(img); // ← gl::Texture
         rl::UnloadImage(img);
-        auto handle = textures->add(tex);
+        auto handle = textures->add(std::move(tex));
         it = text_cache->items.emplace(key, handle).first;
       }
 

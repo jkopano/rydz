@@ -93,7 +93,7 @@ private:
     }
 
     app.world().resources.clear();
-    rl::CloseWindow();
+    rl::rlCloseWindow();
   }
 };
 

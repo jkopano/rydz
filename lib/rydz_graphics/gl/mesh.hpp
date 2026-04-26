@@ -13,16 +13,16 @@ namespace gl {
 struct Material;
 
 struct MaterialMap {
-  Texture texture{};
+  ::rlTexture texture{};
   ecs::Color color{};
   f32 value{};
 
   constexpr MaterialMap() = default;
   constexpr MaterialMap(::rlMaterialMap const& raw) noexcept
-      : MaterialMap(detail::raylib_cast<MaterialMap>(raw)) {}
+      : texture(raw.texture), color(raw.color), value(raw.value) {}
 
   constexpr operator ::rlMaterialMap() const noexcept {
-    return detail::raylib_cast<::rlMaterialMap>(*this);
+    return ::rlMaterialMap{texture, color, value};
   }
 
   auto operator=(::rlMaterialMap const& raw) noexcept -> MaterialMap& {
@@ -30,7 +30,7 @@ struct MaterialMap {
     return *this;
   }
 
-  [[nodiscard]] auto has_texture() const -> bool { return texture.ready(); }
+  [[nodiscard]] auto has_texture() const -> bool { return texture.id > 0; }
 };
 
 static_assert(sizeof(MaterialMap) == sizeof(::rlMaterialMap));
