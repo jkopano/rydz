@@ -264,19 +264,17 @@ inline void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
 void show_player_position_ui(
   Res<rydz::ui::UiRoot> root,
   Cmd cmd,
+  Local<Vec3> pos,
   Query<Transform, With<Player>, Changed<Transform>> player_query,
   Query<UiMarker, Mut<rydz::ui::Label>> panel_query
 ) {
-  Vec3 player_pos = Vec3::ZERO;
 
   for (auto [pt] : player_query.iter()) {
-    player_pos = pt->translation;
+    *pos = pt->translation;
     break;
   }
   std::string player_pos_string =
-    std::format("Pos: {:.2f}, {:.2f}, {:.2f}", player_pos.x, player_pos.y, player_pos.z);
-
-  info("{}", player_pos_string);
+    std::format("Pos: {:.2f}, {:.2f}, {:.2f}", pos->x, pos->y, pos->z);
 
   auto result = panel_query.single();
   if (!result) {
