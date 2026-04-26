@@ -423,7 +423,6 @@ public:
 
 } // namespace gl
 
-#include "rydz_graphics/gl/render_target_builder.hpp"
 #include "rydz_graphics/gl/texture_builder.hpp"
 
 namespace gl {
