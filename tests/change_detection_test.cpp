@@ -194,3 +194,114 @@ TEST(ChangeDetectionTest, AddedDetectsAcrossTickGap) {
   EXPECT_TRUE(
       (QueryFilterTraits<Added<Health>>::matches(world, entity, last_run, this_run)));
 }
+
+TEST(ChangeDetectionTest, ChangedDetectsAcrossMultipleRuns) {
+  // Symuluje scenariusz z UI: system uruchamia się wielokrotnie,
+  // komponent jest modyfikowany między uruchomieniami
+  World world;
+  auto entity = world.spawn();
+  world.insert_component(entity, Health{100});
+
+  // Pierwsze uruchomienie systemu (last_run = 0)
+  Tick last_run{0};
+  Tick this_run = world.read_change_tick();
+
+  // Komponent został dodany, więc Changed powinien wykryć
+  EXPECT_TRUE(
+      (QueryFilterTraits<Changed<Health>>::matches(world, entity, last_run, this_run)));
+
+  // Drugie uruchomienie - bez zmian
+  last_run = this_run;
+  world.increment_change_tick();
+  this_run = world.read_change_tick();
+
+  EXPECT_FALSE(
+      (QueryFilterTraits<Changed<Health>>::matches(world, entity, last_run, this_run)));
+
+  // Trzecie uruchomienie - z modyfikacją między uruchomieniami
+  last_run = this_run;
+  world.increment_change_tick();
+  this_run = world.read_change_tick();
+
+  auto &storage = world.ensure_storage_exist<Health>();
+  storage.mark_changed(entity, this_run);
+
+  EXPECT_TRUE(
+      (QueryFilterTraits<Changed<Health>>::matches(world, entity, last_run, this_run)));
+
+  // Czwarte uruchomienie - bez nowych zmian
+  last_run = this_run;
+  world.increment_change_tick();
+  this_run = world.read_change_tick();
+
+  EXPECT_FALSE(
+      (QueryFilterTraits<Changed<Health>>::matches(world, entity, last_run, this_run)));
+}
+
+TEST(ChangeDetectionTest, ChangedWithMutQuery) {
+  // Test integracyjny: Changed<T> z Query<Mut<T>>
+  World world;
+
+  auto e1 = world.spawn();
+  world.insert_component(e1, Health{100});
+  auto e2 = world.spawn();
+  world.insert_component(e2, Health{200});
+
+  Tick tick0 = world.read_change_tick();
+  world.increment_change_tick();
+  Tick tick1 = world.read_change_tick();
+
+  // Modyfikujemy e1 przez Mut<Health> w tick1
+  // Use Entity to identify which entity to mutate, because any non-const
+  // access through Mut<T>::operator->() triggers mark() (C++ can't
+  // distinguish reads from writes in operator->).
+  {
+    Query<Entity, Mut<Health>> mut_query(world, tick0, tick1);
+    mut_query.each([&](Entity entity, Mut<Health> h) {
+      if (entity == e1) {
+        h->value = 150; // To powinno oznaczyć jako changed w tick1
+      }
+    });
+  }
+
+  // Nowe uruchomienie w tick2 - Changed powinien wykryć e1 (zmieniony w tick1)
+  // last_run=tick0 (ostatnie uruchomienie systemu), this_run=tick2
+  world.increment_change_tick();
+  Tick tick2 = world.read_change_tick();
+
+  std::vector<int> changed_values;
+  Query<Health, Filters<Changed<Health>>> changed_query(world, tick0, tick2);
+  changed_query.each([&](const Health *h) { changed_values.push_back(h->value); });
+
+  ASSERT_EQ(changed_values.size(), 1u);
+  EXPECT_EQ(changed_values[0], 150);
+}
+
+TEST(ChangeDetectionTest, ChangedDoesNotDetectOldChanges) {
+  // Test że Changed nie wykrywa zmian sprzed last_run
+  World world;
+  auto entity = world.spawn();
+  world.insert_component(entity, Health{100});
+
+  Tick tick0 = world.read_change_tick();
+  world.increment_change_tick();
+  Tick tick1 = world.read_change_tick();
+
+  // Modyfikacja w tick1
+  auto &storage = world.ensure_storage_exist<Health>();
+  storage.mark_changed(entity, tick1);
+
+  world.increment_change_tick();
+  Tick tick2 = world.read_change_tick();
+  world.increment_change_tick();
+  Tick tick3 = world.read_change_tick();
+
+  // System uruchamia się w tick3, ale last_run = tick2
+  // Zmiana była w tick1, więc nie powinna być wykryta
+  EXPECT_FALSE(
+      (QueryFilterTraits<Changed<Health>>::matches(world, entity, tick2, tick3)));
+
+  // Ale jeśli last_run = tick0, to zmiana powinna być wykryta
+  EXPECT_TRUE(
+      (QueryFilterTraits<Changed<Health>>::matches(world, entity, tick0, tick3)));
+}

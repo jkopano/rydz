@@ -13,7 +13,6 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 #include <limits>
-#include <raylib.h>
 
 namespace rydz_math {
 

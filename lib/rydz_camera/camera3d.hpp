@@ -23,7 +23,7 @@ struct Camera3d {
   float far_plane = 1000.0f;
 
   static constexpr auto perspective(
-    float fov_y_deg = 45.0f, float near_plane = 0.1f, float far_plane = 1000.0f
+    float fov_y_deg = 25.0f, float near_plane = 0.1f, float far_plane = 1000.0f
   ) -> Camera3d {
     return {
       .projection = CameraProjection3D::Perspective,

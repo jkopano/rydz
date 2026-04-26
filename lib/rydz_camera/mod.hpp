@@ -69,7 +69,7 @@ struct IsometricCameraBundle {
     f32 follow_speed = 5.0f
   ) -> IsometricCameraBundle {
     return IsometricCameraBundle{
-      .camera_component = Camera3d::orthographic(ortho_height),
+      .camera_component = Camera3d::perspective(),
       .active_camera = ActiveCamera{},
       .transform =
         Transform::from_xyz(target.x + offset.x, target.y + offset.y, target.z + offset.z)

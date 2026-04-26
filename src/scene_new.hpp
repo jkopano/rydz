@@ -31,9 +31,9 @@ struct WasdKeyMarker {
 };
 
 // Isometric camera offset from the player
-static float const kCamOffX = 10.0f;
-static float const kCamOffY = 10.0f;
-static float const kCamOffZ = 10.0f;
+static float const kCamOffX = 50.0f;
+static float const kCamOffY = 85.0f;
+static float const kCamOffZ = 50.0f;
 
 // ── Systems ──────────────────────────────────────────────────────────────────
 
@@ -265,7 +265,7 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
 void show_player_position_ui(
   Res<rydz::ui::UiRoot> root,
   Cmd cmd,
-  Query<Transform, Player> player_query,
+  Query<Transform, Player, Changed<Transform>> player_query,
   Query<UiMarker, Mut<rydz::ui::Label>> panel_query
 ) {
 
@@ -276,10 +276,12 @@ void show_player_position_ui(
   }
   std::string player_pos_string =
     std::format("Pos: {:.2f}, {:.2f}, {:.2f}", player_pos.x, player_pos.y, player_pos.z);
+  info("{}", player_pos_string);
 
   auto result = panel_query.single();
-  if (!result)
+  if (!result) {
     return;
+  }
   auto [_, panel] = *result;
   panel->text = player_pos_string;
 }
@@ -288,9 +290,8 @@ void update_wasd_ui_system(
   Query<Mut<rydz::ui::Panel>, WasdKeyMarker> query, Res<Input> input
 ) {
   // Definiujemy kolory dla stanów przycisku
-  auto color_pressed = rlColor{.r = 255, .g = 255, .b = 255, .a = 255}; // Jasny biały
-  auto color_released =
-    rlColor{.r = 128, .g = 128, .b = 128, .a = 128}; // Półprzezroczysty szary
+  auto color_pressed = Color::WHITE;
+  auto color_released = Color::GRAY;
 
   for (auto [panel, marker] : query.iter()) {
     if (input->key_down(marker->keycode)) {
@@ -320,8 +321,11 @@ inline void scene_plugin(App& app) {
   app.add_systems(ScheduleLabel::Startup, spawn_entity_models);
 
   app.add_systems(ScheduleLabel::Startup, setup_ui);
-  app.add_systems(ScheduleLabel::Update, show_player_position_ui);
-  app.add_systems(ScheduleLabel::Update, update_wasd_ui_system);
+  app.add_systems(
+    ScheduleLabel::Update,
+    ecs::group(show_player_position_ui, update_wasd_ui_system)
+      .after(player_movement_system)
+  );
 
   app.add_systems(
     ScheduleLabel::Update,

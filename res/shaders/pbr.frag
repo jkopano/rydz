@@ -48,13 +48,23 @@ layout(std140, binding = 1) uniform ShadowUniforms {
   vec4 u_point_screen_shadow_params;
 };
 
-uniform sampler2D u_shadow_atlas;
+uniform sampler2DShadow u_shadow_atlas;
 uniform sampler2D u_scene_depth;
 uniform samplerCubeArray u_point_shadow_maps;
 
 const int RENDER_METHOD_OPAQUE = 0;
 const int RENDER_METHOD_TRANSPARENT = 1;
 const int RENDER_METHOD_ALPHA_CUTOUT = 2;
+const vec2 poissonDisk[16] = vec2[](
+    vec2(-0.94201624, -0.39906216), vec2(0.94558609, -0.76890725),
+    vec2(-0.094184101, -0.92938870), vec2(0.34495938, 0.29387760),
+    vec2(-0.91588581, 0.45771432), vec2(-0.81544232, -0.87912464),
+    vec2(-0.38277543, 0.27676845), vec2(0.97484398, 0.75648379),
+    vec2(0.44323325, -0.97511554), vec2(0.53742981, -0.47373420),
+    vec2(-0.65438281, -0.96679435), vec2(-0.16533552, 0.72837163),
+    vec2(-0.61339245, 0.61592413), vec2(-0.037227324, -0.49558356),
+    vec2(0.30243549, 0.79255139), vec2(0.22330755, -0.15443225)
+  );
 
 struct GpuLocalLight {
   vec4 position_range;
@@ -118,10 +128,10 @@ float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
   return ggx1 * ggx2;
 }
 
-float sampleDirectionalDepth(int cascadeIndex, vec2 uv) {
+float sampleDirectionalDepth(int cascadeIndex, vec2 uv, float compareDepth) {
   vec4 rect = u_cascade_uv_rects[cascadeIndex];
   vec2 atlasUv = rect.xy + uv * rect.zw;
-  return texture(u_shadow_atlas, atlasUv).r;
+  return texture(u_shadow_atlas, vec3(atlasUv, compareDepth));
 }
 
 vec2 directionalTexelSize(int cascadeIndex) {
@@ -290,20 +300,18 @@ float computeDirectionalShadow(vec3 fragPos, vec3 normal, vec3 lightDir, vec3 vi
     return 1.0;
   }
 
-  float bias = max(
-      u_shadow_params.x,
-      u_shadow_params.y * (1.0 - max(dot(normal, lightDir), 0.0))
-    );
+  float bias = max(u_shadow_params.y * (1.0 - max(dot(normal, lightDir), 0.0)), u_shadow_params.x);
+  float currentDepth = shadowCoord.z - bias;
+
   vec2 texelSize = directionalTexelSize(cascadeIndex);
-  int pcfRadius = max(u_shadow_flags.w, 0);
   float visibility = 0.0;
   float sampleCount = 0.0;
+  int pcfRadius = max(u_shadow_flags.w, 0);
 
   for (int x = -pcfRadius; x <= pcfRadius; ++x) {
     for (int y = -pcfRadius; y <= pcfRadius; ++y) {
       vec2 offset = vec2(float(x), float(y)) * texelSize;
-      float closestDepth = sampleDirectionalDepth(cascadeIndex, shadowCoord.xy + offset);
-      visibility += shadowCoord.z - bias > closestDepth ? 0.0 : 1.0;
+      visibility += sampleDirectionalDepth(cascadeIndex, shadowCoord.xy + offset, currentDepth);
       sampleCount += 1.0;
     }
   }

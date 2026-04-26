@@ -1,6 +1,7 @@
 #pragma once
 
 #include <raylib.h>
+#define RL_MATRIX_TYPE
 #include <rlgl.h>
 
 namespace rl {

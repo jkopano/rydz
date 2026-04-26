@@ -1,7 +1,8 @@
 #pragma once
 
-#include "external/raylib/src/rlgl.h"
+#include "rl.hpp"
 #include "rydz_graphics/gl/primitives.hpp"
+#include "rydz_log/mod.hpp"
 #include <array>
 #include <cstring>
 #include <external/glad.h>
