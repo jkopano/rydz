@@ -47,27 +47,27 @@ struct EnvironmentRenderer {
   }
 };
 
-inline auto main_render_view(ExtractedView const& view) -> gl::RenderViewState {
+inline auto main_render_view(ExtractedView const& ev) -> gl::RenderViewState {
   return gl::RenderViewState{
-    .viewport = view.viewport,
-    .view = view.camera_view.view,
-    .projection = view.camera_view.proj,
-    .camera_position = view.camera_view.position,
-    .orthographic = view.orthographic,
-    .near_plane = view.near_plane,
-    .far_plane = view.far_plane,
+    .viewport = ev.viewport,
+    .view = ev.camera_view.view,
+    .projection = ev.camera_view.proj,
+    .camera_position = ev.camera_view.position,
+    .orthographic = ev.orthographic,
+    .near_plane = ev.near_plane,
+    .far_plane = ev.far_plane,
   };
 }
 
-inline auto shadow_render_view(ShadowView const& view) -> gl::RenderViewState {
+inline auto shadow_render_view(ShadowView const& sv) -> gl::RenderViewState {
   return gl::RenderViewState{
     .viewport = {0.0F, 0.0F, 1.0F, 1.0F},
-    .view = view.view,
-    .projection = view.projection,
-    .camera_position = view.position,
-    .orthographic = view.orthographic,
-    .near_plane = view.near_plane,
-    .far_plane = view.far_plane,
+    .view = sv.view,
+    .projection = sv.projection,
+    .camera_position = sv.position,
+    .orthographic = sv.orthographic,
+    .near_plane = sv.near_plane,
+    .far_plane = sv.far_plane,
   };
 }
 
@@ -374,12 +374,6 @@ inline auto MeshPass<OpaqueTag>::execute(PassContext& ctx, RenderGraphRuntime& r
   auto const& scene_depth_texture = runtime.get_texture(scene_depth_);
   ctx.scene_depth_texture = scene_depth_texture.ready() ? &scene_depth_texture : nullptr;
 
-  if (ctx.scene_depth_texture) {
-    info("OpaquePass: Using scene_depth texture ID {}", ctx.scene_depth_texture->id);
-  } else {
-    info("OpaquePass: scene_depth texture NOT READY");
-  }
-
   ctx.render_state.begin_view(ctx.render_state.view());
   ctx.view_uniforms.bind();
   PassRenderer renderer{ctx, MeshPass<OpaqueTag>::render_config()};
@@ -495,88 +489,12 @@ private:
 
   static auto depth_to_color_shader_spec() -> ShaderSpec const& {
     static ShaderSpec const SPEC =
-      ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth_color.frag");
+      ShaderSpec::from("res/shaders/depth.vert", "res/shaders/depth.frag");
     return SPEC;
   }
 
   RenderTextureHandle main_target_;
   RenderTextureHandle scene_depth_;
-};
-
-class DepthCopyPass : public RenderPass {
-public:
-  DepthCopyPass(RenderTextureHandle source, RenderTextureHandle destination)
-      : source_(source), destination_(destination) {}
-
-  auto setup(RenderGraphBuilder& builder) -> void override {
-    builder.read(source_);
-    builder.write(destination_);
-  }
-
-  auto execute(PassContext& ctx, RenderGraphRuntime& runtime) -> void override {
-    auto* state = ctx.execution_state;
-    if (!state || !state->world_pass_active) {
-      return;
-    }
-
-    auto const& source = runtime.get_target(source_);
-    auto const& destination = runtime.get_target(destination_);
-    if (!source.ready() || !destination.ready() || source.depth.id == 0) {
-      info(
-        "DepthCopyPass: skipping - source ready: {}, dest ready: {}, depth id: {}",
-        source.ready(),
-        destination.ready(),
-        source.depth.id
-      );
-      return;
-    }
-
-    info(
-      "DepthCopyPass: executing - copying depth from {} to {}", source.id, destination.id
-    );
-
-    ShaderProgram& shader = resolve_shader(
-      ctx.marker,
-      ctx.shader_cache,
-      ShaderSpec::from("res/shaders/depth_copy.vert", "res/shaders/depth_copy.frag")
-    );
-
-    rl::rlDrawRenderBatchActive();
-
-    glBindFramebuffer(GL_FRAMEBUFFER, destination.id);
-    glViewport(0, 0, destination.texture.width, destination.texture.height);
-
-    glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_BLEND);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, source.depth.id);
-
-    shader.with_bound([&]() {
-      shader.set_sampler("u_depth_texture", 0);
-
-      glDrawArrays(GL_TRIANGLES, 0, 3);
-    });
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    glDepthMask(GL_TRUE);
-    glEnable(GL_DEPTH_TEST);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    info("DepthCopyPass: completed");
-
-    ctx.render_state.reset();
-  }
-
-private:
-  RenderTextureHandle source_;
-  RenderTextureHandle destination_;
 };
 
 class ClusterBuildPass : public RenderPass {

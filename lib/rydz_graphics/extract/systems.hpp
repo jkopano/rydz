@@ -86,8 +86,8 @@ struct Extract {
     if (view->active_environment != nullptr) {
       lights->ambient_light = view->active_environment->ambient_light;
       lights->dir_light = view->active_environment->directional_light;
-      lights->has_directional =
-        lights->dir_light.intensity > 0.0F && lights->dir_light.direction.length_sq() > 1e-8F;
+      lights->has_directional = lights->dir_light.intensity > 0.0F &&
+                                lights->dir_light.direction.length_sq() > 1e-8F;
     }
 
     if (lights->ambient_light.intensity <= 0.0F) {
@@ -100,7 +100,8 @@ struct Extract {
     if (!lights->has_directional) {
       for (auto [dir] : dir_query.iter()) {
         lights->dir_light = *dir;
-        lights->has_directional = dir->intensity > 0.0F && dir->direction.length_sq() > 1e-8F;
+        lights->has_directional =
+          dir->intensity > 0.0F && dir->direction.length_sq() > 1e-8F;
         break;
       }
     }
@@ -286,26 +287,25 @@ struct Extract {
       }
 
       auto const* material_asset = material_assets->get(material->material);
-      if (material_asset == nullptr) {
-        continue;
-      }
 
       CompiledMaterial const& compiled =
         material_cache->get_or_compile(material->material, *material_asset);
 
-      auto [it, inserted] = meshes->material_lookup.try_emplace(material->material.id);
+      auto material_key = render_material_key(material->material);
+      auto [it, inserted] = meshes->material_lookup.try_emplace(material_key);
       if (inserted) {
         bool const transparent = compiled.render_method == RenderMethod::Transparent;
         bool const casts_shadows = compiled.casts_shadows;
         it->second = meshes->materials.size();
         meshes->materials.push_back(
           ExtractedMeshes::MaterialItem{
-            .key = render_material_key(material->material),
+            .key = material_key,
             .material = compiled,
             .transparent = transparent,
             .casts_shadows = casts_shadows,
           }
         );
+      } else {
       }
 
       auto const& material_item = meshes->materials[it->second];
@@ -398,6 +398,7 @@ struct Queue {
         continue;
       }
       auto const& material = meshes->materials[item.material_index];
+
       if (material.transparent) {
         continue;
       }

@@ -87,7 +87,6 @@ void setup_scene(
           .color = color,
           .intensity = 40,
           .range = 30,
-          .casts_shadows = true,
         },
         MovingLight{
           .radius = radius,

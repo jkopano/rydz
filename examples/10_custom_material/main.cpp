@@ -36,24 +36,31 @@ struct ToonMaterial : MaterialTrait<HasCamera> {
   }
 
   [[nodiscard]] auto enable_shadows() const -> bool { return base_color.a == 255; }
+  [[nodiscard]] auto double_sided() const -> bool { return false; }
+  [[nodiscard]] auto alpha_cutoff() const -> float { return 0.1f; }
 
   void bind(MaterialBuilder& builder) const {
-    builder.color(MaterialMap::Albedo, base_color);
+    builder.uniform(MaterialMap::Albedo, Uniform{base_color});
     builder.uniform(ToonUniform::RimStrength, Uniform{rim_strength});
-    builder.uniform("lightDir", Uniform{lightDir});
+    builder.uniform(ToonUniform::LightDir, Uniform{lightDir});
   }
 };
 
 namespace {
+
 auto change_toon(
   Query<Entity, MeshMaterial3d<ToonMaterial>> query,
   ResMut<Assets<ToonMaterial>> materials,
+  ResMut<MaterialCache> cache,
   Res<Time> time
 ) -> void {
   for (auto [entity, material_handle] : query.iter()) {
     if (auto* mat = materials->get(material_handle->material)) {
       mat->lightDir.x = std::cos(time->elapsed_seconds);
       mat->lightDir.z = std::sin(time->elapsed_seconds);
+
+      auto key = render_material_key(material_handle->material);
+      cache->items.erase(key);
     }
   }
 }

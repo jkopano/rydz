@@ -83,15 +83,12 @@ struct RenderPlugin : IPlugin {
     if (auto* graph = app.world().get_resource<RenderGraph>()) {
       auto const main_target =
         graph->create_texture(TextureDesc{.transient = true}, "MainTarget");
-      auto const scene_depth =
-        graph->create_texture(
-          TextureDesc{
-            .format = gl::PIXELFORMAT_UNCOMPRESSED_R32,
-            .use_depth = true,
-            .transient = true
-          },
-          "SceneDepthCopy"
-        );
+      auto const scene_depth = graph->create_texture(
+        TextureDesc{
+          .format = gl::PIXELFORMAT_UNCOMPRESSED_R32, .use_depth = true, .transient = true
+        },
+        "SceneDepth"
+      );
       auto const screen = graph->import_backbuffer("Screen");
 
       graph->add_pass<ClearPass>(main_target);

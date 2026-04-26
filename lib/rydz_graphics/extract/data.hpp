@@ -100,7 +100,7 @@ struct ExtractedMeshes {
 
   std::vector<MaterialItem> materials;
   std::vector<Item> items;
-  std::unordered_map<u32, usize> material_lookup;
+  std::unordered_map<RenderMaterialKey, usize> material_lookup;
 
   auto clear() -> void {
     materials.clear();

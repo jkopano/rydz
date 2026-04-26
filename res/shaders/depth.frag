@@ -17,6 +17,5 @@ void main() {
     discard;
   }
 
-  // TEST: output magenta to verify THIS shader is running
-  FragColor = vec4(1.0, 0.0, 1.0, 1.0);
+  FragColor = vec4(gl_FragCoord.z, 0.0, 0.0, 1.0);
 }

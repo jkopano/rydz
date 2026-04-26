@@ -38,7 +38,7 @@ struct StandardMaterial : MaterialTrait<HasPBR> {
   [[nodiscard]] auto alpha_cutoff() const -> float { return 0.1F; }
 
   auto bind(MaterialBuilder& builder) const -> void {
-    builder.color(MaterialMap::Albedo, base_color);
+    builder.uniform(MaterialMap::Albedo, base_color);
     if (texture.is_valid()) {
       builder.texture(MaterialMap::Albedo, texture);
     }

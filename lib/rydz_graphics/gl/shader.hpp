@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hash.hpp"
+#include "rydz_graphics/components/color.hpp"
 #include "rydz_graphics/gl/primitives.hpp"
 #include "rydz_graphics/gl/shader_bindings.hpp"
 #include "rydz_graphics/gl/textures.hpp"
@@ -79,6 +80,13 @@ struct Uniform {
     float_data[1] = y;
     float_data[2] = z;
     float_data[3] = w;
+  }
+
+  Uniform(ecs::Color color) : type(UniformType::Vec4), float_data{} {
+    float_data[0] = color.r / 255;
+    float_data[1] = color.g / 255;
+    float_data[2] = color.b / 255;
+    float_data[3] = color.a / 255;
   }
 
   explicit Uniform(int v) : type(UniformType::Int), int_data{} { int_data[0] = v; }

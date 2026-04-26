@@ -826,7 +826,6 @@ struct ShadowResources {
 
   gl::DepthAtlas directional_atlas{};
   gl::DepthCubemapArrayTarget point_maps{};
-  gl::DepthTarget2D scene_depth_copy{};
   std::array<ShadowAtlasTile, MAX_DIRECTIONAL_CASCADES> cascade_tiles{};
 
   auto ensure(ShadowSettings const& settings) -> void {

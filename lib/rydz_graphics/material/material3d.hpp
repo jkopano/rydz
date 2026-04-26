@@ -8,6 +8,7 @@
 #include "rydz_graphics/components/color.hpp"
 #include "rydz_graphics/gl/shader.hpp"
 #include "rydz_graphics/gl/shader_bindings.hpp"
+#include "rydz_graphics/pipeline/batches.hpp"
 #include "rydz_graphics/pipeline/config.hpp"
 #include <algorithm>
 #include <concepts>
@@ -158,11 +159,6 @@ public:
     return *this;
   }
 
-  auto color(MaterialMap map_type, Color color_value) -> MaterialBuilder& {
-    maps_.push_back(MaterialMapBinding::color_binding(map_type, color_value));
-    return *this;
-  }
-
   auto maps() const -> std::vector<MaterialMapBinding> const& { return maps_; }
   auto uniforms() const -> std::unordered_map<UniformName, Uniform> const& {
     return uniforms_;
@@ -257,9 +253,11 @@ auto compile_trait_material(M const& material) -> CompiledMaterial {
   using T = bare_t<M>;
   static_assert(MaterialMeta<T>::is_trait_based);
 
+  auto vert = T::vertex_shader();
+  auto frag = T::fragment_shader();
+
   CompiledMaterial compiled;
-  compiled.shader =
-    ShaderSpec::from(std::string(T::vertex_shader()), std::string(T::fragment_shader()));
+  compiled.shader = ShaderSpec::from(std::string(vert), std::string(frag));
   MaterialBuilder builder;
   material.bind(builder);
   compiled.maps = builder.take_maps();
@@ -293,15 +291,16 @@ struct Material {
 
 struct MaterialCache {
   using T = Resource;
-  std::unordered_map<u32, CompiledMaterial> items;
+  std::unordered_map<RenderMaterialKey, CompiledMaterial> items;
 
   auto get_or_compile(Handle<Material> handle) -> CompiledMaterial const& {
-    return items[handle.id];
+    return items[render_material_key(handle)];
   }
 
   auto get_or_compile(Handle<Material> handle, Material const& asset)
     -> CompiledMaterial const& {
-    auto [it, inserted] = items.try_emplace(handle.id);
+    auto key = render_material_key(handle);
+    auto [it, inserted] = items.try_emplace(key);
     if (inserted) {
       it->second = asset.compiled;
     }
@@ -310,7 +309,8 @@ struct MaterialCache {
 
   template <TraitMaterialValue M>
   auto get_or_compile(Handle<M> handle, M const& asset) -> CompiledMaterial const& {
-    auto [it, inserted] = items.try_emplace(handle.id);
+    auto key = render_material_key(handle);
+    auto [it, inserted] = items.try_emplace(key);
     if (inserted) {
       it->second = detail::compile_trait_material(asset);
     }
