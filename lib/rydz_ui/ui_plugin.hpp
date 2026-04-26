@@ -3,7 +3,6 @@
 #include "rydz_ecs/app.hpp"
 #include "rydz_graphics/extract/systems.hpp"
 #include "rydz_graphics/spatial/transform.hpp"
-#include "rydz_ui.hpp"
 #include "rydz_ui/system_sets.hpp"
 
 struct UiPlugin {
@@ -117,9 +116,8 @@ public:
           font = fit->second;
         }
 
-        rl::Vector2 text_size = rl::MeasureTextEx(
-          font, label.text.c_str(), label.font_size, label.spacing
-        );
+        rl::Vector2 text_size =
+          rl::MeasureTextEx(font, label.text.c_str(), label.font_size, label.spacing);
 
         rl::Image img = rl::GenImageColor(
           static_cast<int>(text_size.x),

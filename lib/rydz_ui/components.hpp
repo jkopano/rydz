@@ -99,10 +99,9 @@ struct Label {
 
 inline std::string make_label_cache_key(Label const& label) {
   return label.text + "|" + std::to_string(label.font_size) + "|" +
-         std::to_string(label.color.r) + "," + std::to_string(label.color.g) +
-         "," + std::to_string(label.color.b) + "," +
-         std::to_string(label.color.a) + "|" + label.font_path + "|" +
-         std::to_string(label.spacing);
+         std::to_string(label.color.r) + "," + std::to_string(label.color.g) + "," +
+         std::to_string(label.color.b) + "," + std::to_string(label.color.a) + "|" +
+         label.font_path + "|" + std::to_string(label.spacing);
 }
 
 } // namespace rydz::ui

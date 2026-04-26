@@ -30,8 +30,8 @@ local function is_msvc_like()
 	return tc == "msvc" or tc == "clang-cl"
 end
 
--- local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
-local tracy_enabled = false
+local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
+-- local tracy_enabled = false
 local function add_tracy()
 	if tracy_enabled then
 		add_packages("tracy")

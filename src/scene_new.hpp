@@ -10,7 +10,6 @@
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/mod.hpp"
 #include "rydz_graphics/plugin.hpp"
-#include "rydz_graphics/render_plugin.hpp"
 #include "rydz_levelLoader/rydz_levelLoader.hpp"
 #include "rydz_ui/mod.hpp"
 #include <algorithm>
@@ -104,9 +103,7 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
   );
 }
 
-inline void setup_lighting(
-  Cmd cmd, NonSendMarker, ResMut<Assets<ecs::Mesh>> meshes
-) {
+inline void setup_lighting(Cmd cmd, NonSendMarker, ResMut<Assets<ecs::Mesh>> meshes) {
   cmd.spawn(
     AmbientLight{
       .color = {60, 60, 70, 255},
@@ -133,34 +130,28 @@ inline void setup_lighting(
 
 inline void spawn_ground(
   Cmd cmd,
+  Res<AssetServer> server,
   ResMut<Assets<ecs::Mesh>> meshes,
-  ResMut<Assets<ecs::Texture>> textures,
   ResMut<Assets<ecs::Material>> materials,
   NonSendMarker
 ) {
-  auto plane_h = meshes->add(mesh::plane(20.0f, 20.0f, 1, 1));
-  auto plane_mat = materials->add(
-    StandardMaterial::from_texture(
-      textures->add(gl::load_texture("res/textures/brick.png"))
-    )
-  );
+  auto tex = server->load<Texture>("res/texture/brick.jpg");
+  auto plane_h = meshes->add(Mesh::plane(20.0f, 20.0f, 1, 1));
+  auto plane_mat = materials->add(StandardMaterial::from_texture(tex));
 
   cmd.spawn(Mesh3d{plane_h}, MeshMaterial3d{plane_mat}, Transform{});
 }
 
 inline void spawn_player(
   Cmd cmd,
+  Res<AssetServer> server,
   ResMut<Assets<ecs::Mesh>> meshes,
-  ResMut<Assets<ecs::Texture>> textures,
   ResMut<Assets<ecs::Material>> materials,
   NonSendMarker
 ) {
-  auto cube_h = meshes->add(mesh::cube(1.0f, 1.0f, 1.0f));
-  auto cube_mat = materials->add(
-    StandardMaterial::from_texture(
-      textures->add(gl::load_texture("res/textures/stone.jpg"))
-    )
-  );
+  auto tex = server->load<Texture>("res/texture/stone.jpg");
+  auto cube_h = meshes->add(Mesh::cube(1.0f, 1.0f, 1.0f));
+  auto cube_mat = materials->add(StandardMaterial::from_texture(tex));
 
   cmd.spawn(
     Mesh3d{cube_h},
@@ -180,8 +171,7 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
         .direction = rydz::ui::Direction::Row,
         .align = rydz::ui::Align::Start,
         .justify = rydz::ui::Justify::End,
-        .padding =
-          rydz::ui::UiRect{.left = 10, .top = 10, .right = 10, .bottom = 10},
+        .padding = rydz::ui::UiRect{.left = 10, .top = 10, .right = 10, .bottom = 10},
       }
     );
 
@@ -192,10 +182,8 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
         rydz::ui::Panel{rlColor{.r = 200, .g = 60, .b = 60, .a = 128}},
         rydz::ui::Style{
           .direction = rydz::ui::Direction::Column,
-          .padding =
-            rydz::ui::UiRect{.left = 10, .top = 10, .right = 10, .bottom = 10},
-          .margin =
-            rydz::ui::UiRect{.left = 0, .top = 0, .right = 10, .bottom = 0},
+          .padding = rydz::ui::UiRect{.left = 10, .top = 10, .right = 10, .bottom = 10},
+          .margin = rydz::ui::UiRect{.left = 0, .top = 0, .right = 10, .bottom = 0},
           .size =
             {.width = rydz::ui::SizeValue::px(200.0f),
              .height = rydz::ui::SizeValue::px(80.0f)},
@@ -227,8 +215,7 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
           .direction = rydz::ui::Direction::Row,
           .align = rydz::ui::Align::Center,
           .justify = rydz::ui::Justify::Center,
-          .padding =
-            rydz::ui::UiRect{.left = 5, .top = 5, .right = 5, .bottom = 5},
+          .padding = rydz::ui::UiRect{.left = 5, .top = 5, .right = 5, .bottom = 5},
           .size =
             {.width = rydz::ui::SizeValue::px(210.0f),
              .height = rydz::ui::SizeValue::px(60.0F)},
@@ -247,8 +234,7 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
             .direction = rydz::ui::Direction::Row,
             .align = rydz::ui::Align::Center,
             .justify = rydz::ui::Justify::Center,
-            .margin =
-              rydz::ui::UiRect{.left = 4, .top = 4, .right = 4, .bottom = 4},
+            .margin = rydz::ui::UiRect{.left = 4, .top = 4, .right = 4, .bottom = 4},
             .size =
               {.width = rydz::ui::SizeValue::px(40.0f),
                .height = rydz::ui::SizeValue::px(40.0f)},
@@ -288,9 +274,8 @@ void show_player_position_ui(
     player_pos = pt->translation;
     break;
   }
-  std::string player_pos_string = std::format(
-    "Pos: {:.2f}, {:.2f}, {:.2f}", player_pos.x, player_pos.y, player_pos.z
-  );
+  std::string player_pos_string =
+    std::format("Pos: {:.2f}, {:.2f}, {:.2f}", player_pos.x, player_pos.y, player_pos.z);
 
   auto result = panel_query.single();
   if (!result)
@@ -303,8 +288,7 @@ void update_wasd_ui_system(
   Query<Mut<rydz::ui::Panel>, WasdKeyMarker> query, Res<Input> input
 ) {
   // Definiujemy kolory dla stanów przycisku
-  auto color_pressed =
-    rlColor{.r = 255, .g = 255, .b = 255, .a = 255}; // Jasny biały
+  auto color_pressed = rlColor{.r = 255, .g = 255, .b = 255, .a = 255}; // Jasny biały
   auto color_released =
     rlColor{.r = 128, .g = 128, .b = 128, .a = 128}; // Półprzezroczysty szary
 
@@ -320,7 +304,7 @@ void update_wasd_ui_system(
 // ── Plugin ───────────────────────────────────────────────────────────────────
 
 inline void scene_plugin(App& app) {
-  app.add_plugin(Input::install);
+  app.add_plugin(InputPlugin{});
   app.add_plugin(UiPlugin::install);
   app.add_plugin(system_multithreading({true}));
   app.add_plugin(engine::scripting_plugin);
@@ -346,7 +330,6 @@ inline void scene_plugin(App& app) {
   );
 
   app.add_systems(
-    RenderPassSet::Cleanup,
-    group(engine::ConsoleRenderSystem).before(FramePass::end)
+    RenderPassSet::Cleanup, group(engine::ConsoleRenderSystem).before(FramePass::end)
   );
 }
