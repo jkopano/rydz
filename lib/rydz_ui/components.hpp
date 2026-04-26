@@ -55,8 +55,8 @@ struct SizeValue {
   SizeKind kind = SizeKind::Auto;
   float value = 0.0f;
 
-  static SizeValue auto_() { return {SizeKind::Auto, 0.0}; }
-  static SizeValue px(float val) { return {SizeKind::Px, val}; }
+  static auto auto_() -> SizeValue { return {.kind = SizeKind::Auto, .value = 0.0}; }
+  static auto px(float val) -> SizeValue { return {.kind = SizeKind::Px, .value = val}; }
 };
 
 struct Size2 {
@@ -82,7 +82,7 @@ struct Style {
   UiRect margin{};
   Display display = Display::Flex;
   float gap = 0.0;
-  Size2 size = {{SizeKind::Auto, 0.0}, {SizeKind::Auto, 0.0}};
+  Size2 size = {.width = {SizeKind::Auto, 0.0}, .height = {SizeKind::Auto, 0.0}};
 };
 
 struct Panel {
@@ -90,14 +90,14 @@ struct Panel {
 };
 
 struct Label {
-  std::string text = "";
+  std::string text;
   float font_size = 16.0;
   rlColor color = rlColor{rlColor{.r = 0, .g = 0, .b = 0, .a = 255}};
-  std::string font_path = "";
+  std::string font_path;
   float spacing = 1.0f;
 };
 
-inline std::string make_label_cache_key(Label const& label) {
+inline auto make_label_cache_key(Label const& label) -> std::string {
   return label.text + "|" + std::to_string(label.font_size) + "|" +
          std::to_string(label.color.r) + "," + std::to_string(label.color.g) + "," +
          std::to_string(label.color.b) + "," + std::to_string(label.color.a) + "|" +

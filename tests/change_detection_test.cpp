@@ -52,7 +52,8 @@ TEST(ChangeDetectionTest, ChangedDetectsMutation) {
 
   Tick last_run = world.read_change_tick();
 
-  // Move past insertion tick
+  // Move past insertion tick (need 2-tick gap for inclusive Changed semantics)
+  world.increment_change_tick();
   world.increment_change_tick();
   Tick this_run = world.read_change_tick();
   EXPECT_FALSE(
@@ -66,7 +67,14 @@ TEST(ChangeDetectionTest, ChangedDetectsMutation) {
   EXPECT_TRUE(
       (QueryFilterTraits<Changed<Health>>::matches(world, entity, last_run, this_run)));
 
-  // After incrementing tick, Changed should no longer match
+  // After 1 tick, Changed still matches (inclusive: last_run == changed)
+  last_run = this_run;
+  world.increment_change_tick();
+  this_run = world.read_change_tick();
+  EXPECT_TRUE(
+      (QueryFilterTraits<Changed<Health>>::matches(world, entity, last_run, this_run)));
+
+  // After 2 ticks from change, Changed no longer matches
   last_run = this_run;
   world.increment_change_tick();
   this_run = world.read_change_tick();
@@ -210,7 +218,15 @@ TEST(ChangeDetectionTest, ChangedDetectsAcrossMultipleRuns) {
   EXPECT_TRUE(
       (QueryFilterTraits<Changed<Health>>::matches(world, entity, last_run, this_run)));
 
-  // Drugie uruchomienie - bez zmian
+  // Drugie uruchomienie - inclusive semantics: still detects (last_run == changed)
+  last_run = this_run;
+  world.increment_change_tick();
+  this_run = world.read_change_tick();
+
+  EXPECT_TRUE(
+      (QueryFilterTraits<Changed<Health>>::matches(world, entity, last_run, this_run)));
+
+  // Trzecie uruchomienie - now 2 ticks past change, no longer detected
   last_run = this_run;
   world.increment_change_tick();
   this_run = world.read_change_tick();
@@ -218,7 +234,7 @@ TEST(ChangeDetectionTest, ChangedDetectsAcrossMultipleRuns) {
   EXPECT_FALSE(
       (QueryFilterTraits<Changed<Health>>::matches(world, entity, last_run, this_run)));
 
-  // Trzecie uruchomienie - z modyfikacją między uruchomieniami
+  // Czwarte uruchomienie - z modyfikacją
   last_run = this_run;
   world.increment_change_tick();
   this_run = world.read_change_tick();
@@ -229,7 +245,15 @@ TEST(ChangeDetectionTest, ChangedDetectsAcrossMultipleRuns) {
   EXPECT_TRUE(
       (QueryFilterTraits<Changed<Health>>::matches(world, entity, last_run, this_run)));
 
-  // Czwarte uruchomienie - bez nowych zmian
+  // Piąte uruchomienie - inclusive: still detects
+  last_run = this_run;
+  world.increment_change_tick();
+  this_run = world.read_change_tick();
+
+  EXPECT_TRUE(
+      (QueryFilterTraits<Changed<Health>>::matches(world, entity, last_run, this_run)));
+
+  // Szóste uruchomienie - 2 ticks past, no longer detected
   last_run = this_run;
   world.increment_change_tick();
   this_run = world.read_change_tick();
@@ -304,4 +328,47 @@ TEST(ChangeDetectionTest, ChangedDoesNotDetectOldChanges) {
   // Ale jeśli last_run = tick0, to zmiana powinna być wykryta
   EXPECT_TRUE(
       (QueryFilterTraits<Changed<Health>>::matches(world, entity, tick0, tick3)));
+}
+
+TEST(ChangeDetectionTest, ChangedWorksRegardlessOfOrdering) {
+  // Symuluje scenariusz: system B (z Changed<T>) uruchamia się PRZED
+  // systemem A (który modyfikuje T) w tym samym frame'u.
+  // Changed powinien wykryć zmianę w następnym frame'u.
+  World world;
+  auto entity = world.spawn();
+  world.insert_component(entity, Health{100});
+
+  // Skip past insertion
+  world.increment_change_tick();
+  world.increment_change_tick();
+
+  // Frame K (tick = current)
+  Tick tick_k = world.read_change_tick();
+
+  // System B runs FIRST in frame K — no change yet
+  Tick b_last_run = tick_k; // B ran at tick_k, sets its last_run
+
+  // System A runs AFTER B in frame K — modifies at tick_k
+  auto &storage = world.ensure_storage_exist<Health>();
+  storage.mark_changed(entity, tick_k);
+
+  // Frame K+1
+  world.increment_change_tick();
+  Tick tick_k1 = world.read_change_tick();
+
+  // System B runs in frame K+1 with last_run = tick_k
+  // Changed should STILL detect the modification at tick_k
+  EXPECT_TRUE(
+      (QueryFilterTraits<Changed<Health>>::matches(world, entity, b_last_run, tick_k1)));
+
+  // System B acknowledges — updates last_run
+  b_last_run = tick_k1;
+
+  // Frame K+2
+  world.increment_change_tick();
+  Tick tick_k2 = world.read_change_tick();
+
+  // Now Changed should no longer match (change was 2 ticks ago)
+  EXPECT_FALSE(
+      (QueryFilterTraits<Changed<Health>>::matches(world, entity, b_last_run, tick_k2)));
 }

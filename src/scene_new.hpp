@@ -132,8 +132,7 @@ inline void spawn_ground(
   Cmd cmd,
   Res<AssetServer> server,
   ResMut<Assets<ecs::Mesh>> meshes,
-  ResMut<Assets<ecs::Material>> materials,
-  NonSendMarker
+  ResMut<Assets<ecs::Material>> materials
 ) {
   auto tex = server->load<Texture>("res/texture/brick.jpg");
   auto plane_h = meshes->add(Mesh::plane(20.0f, 20.0f, 1, 1));
@@ -146,8 +145,7 @@ inline void spawn_player(
   Cmd cmd,
   Res<AssetServer> server,
   ResMut<Assets<ecs::Mesh>> meshes,
-  ResMut<Assets<ecs::Material>> materials,
-  NonSendMarker
+  ResMut<Assets<ecs::Material>> materials
 ) {
   auto tex = server->load<Texture>("res/texture/stone.jpg");
   auto cube_h = meshes->add(Mesh::cube(1.0f, 1.0f, 1.0f));
@@ -161,9 +159,10 @@ inline void spawn_player(
   );
 }
 
-void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
-  if (!root.ptr)
+inline void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
+  if (root.ptr == nullptr) {
     return;
+  }
 
   cmd.entity(root->root)
     .insert(
@@ -224,7 +223,7 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
       )
       .id();
 
-  auto spawn_key = [&](int keycode, std::string const& label_text) {
+  auto spawn_key = [&](int keycode, std::string const& label_text) -> void {
     Entity key_box =
       cmd
         .spawn(
@@ -265,17 +264,18 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
 void show_player_position_ui(
   Res<rydz::ui::UiRoot> root,
   Cmd cmd,
-  Query<Transform, Player, Changed<Transform>> player_query,
+  Query<Transform, With<Player>, Changed<Transform>> player_query,
   Query<UiMarker, Mut<rydz::ui::Label>> panel_query
 ) {
-
   Vec3 player_pos = Vec3::ZERO;
-  for (auto [pt, _] : player_query.iter()) {
+
+  for (auto [pt] : player_query.iter()) {
     player_pos = pt->translation;
     break;
   }
   std::string player_pos_string =
     std::format("Pos: {:.2f}, {:.2f}, {:.2f}", player_pos.x, player_pos.y, player_pos.z);
+
   info("{}", player_pos_string);
 
   auto result = panel_query.single();
@@ -321,11 +321,8 @@ inline void scene_plugin(App& app) {
   app.add_systems(ScheduleLabel::Startup, spawn_entity_models);
 
   app.add_systems(ScheduleLabel::Startup, setup_ui);
-  app.add_systems(
-    ScheduleLabel::Update,
-    ecs::group(show_player_position_ui, update_wasd_ui_system)
-      .after(player_movement_system)
-  );
+  app.add_systems(ScheduleLabel::Update, show_player_position_ui);
+  app.add_systems(ScheduleLabel::Update, update_wasd_ui_system);
 
   app.add_systems(
     ScheduleLabel::Update,
