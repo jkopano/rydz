@@ -13,6 +13,8 @@ using KeyCode = i32;
 struct MouseState {
   f32 delta_x = 0.0f;
   f32 delta_y = 0.0f;
+  f32 x = 0.0f;
+  f32 y = 0.0f;
 };
 
 struct Input {
@@ -54,6 +56,11 @@ public:
     mouse_.delta_y = dy;
   }
 
+  auto set_mouse_position(f32 x, f32 y) -> void {
+    mouse_.x = x;
+    mouse_.y = y;
+  }
+
   auto keys_down() -> std::unordered_set<KeyCode>& { return keys_down_; }
 
   static auto input_polling_system(ResMut<Input> input, NonSendMarker) -> void {
@@ -77,6 +84,9 @@ public:
 
     rl::Vector2 md = rl::GetMouseDelta();
     input->set_mouse_delta(md.x, md.y);
+
+    rl::Vector2 mp = rl::GetMousePosition();
+    input->set_mouse_position(mp.x, mp.y);
   }
 
 private:

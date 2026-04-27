@@ -64,6 +64,7 @@ using ::DisableCursor;
 using ::EnableCursor;
 using ::GetKeyPressed;
 using ::GetMouseDelta;
+using ::GetMousePosition;
 using ::IsKeyDown;
 using ::IsKeyPressed;
 using ::IsKeyUp;
