@@ -13,6 +13,16 @@ extern "C" {
 #include <external/raylib/src/raylib.h>
 
 namespace scripting {
+
+    //helper do walidacji metatabeli
+    static ecs::World* get_world_from_global(lua_State* L) {
+        lua_getglobal(L, "_world");
+        if (lua_isnil(L, -1)) { lua_pop(L, 1); return nullptr; }
+        auto* ud = (WorldUserdata*)luaL_testudata(L, -1, WORLD_MT);
+        lua_pop(L, 1);
+        return ud ? ud->world : nullptr;
+    }
+
 	inline void register_input_table(lua_State* L) {
 		lua_newtable(L);
 
@@ -21,11 +31,9 @@ namespace scripting {
         // is_key_down(keycode) -> bool
         lua_pushcfunction(L, [](lua_State* L) -> int {
             ecs::KeyCode key = (ecs::KeyCode)luaL_checkinteger(L, 1);
-            lua_getglobal(L, "_world");
-            if (lua_isnil(L, -1)) { lua_pop(L, 1); lua_pushboolean(L, 0); return 1; }
-            auto* ud = (WorldUserdata*)lua_touserdata(L, -1);
-            lua_pop(L, 1);
-            auto* input = ud->world->get_resource<ecs::Input>();
+            auto* world = get_world_from_global(L);
+            if (!world) { lua_pushboolean(L, 0); return 1; }
+            auto* input = world->get_resource<ecs::Input>();
             lua_pushboolean(L, input && input->key_down(key) ? 1 : 0);
             return 1;
             });
@@ -34,11 +42,9 @@ namespace scripting {
         // is_key_pressed(keycode) -> bool (tylko w tej klatce)
         lua_pushcfunction(L, [](lua_State* L) -> int {
             ecs::KeyCode key = (ecs::KeyCode)luaL_checkinteger(L, 1);
-            lua_getglobal(L, "_world");
-            if (lua_isnil(L, -1)) { lua_pop(L, 1); lua_pushboolean(L, 0); return 1; }
-            auto* ud = (WorldUserdata*)lua_touserdata(L, -1);
-            lua_pop(L, 1);
-            auto* input = ud->world->get_resource<ecs::Input>();
+            auto* world = get_world_from_global(L);
+            if (!world) { lua_pushboolean(L, 0); return 1; }
+            auto* input = world->get_resource<ecs::Input>();
             lua_pushboolean(L, input && input->key_pressed(key) ? 1 : 0);
             return 1;
             });
@@ -47,11 +53,9 @@ namespace scripting {
         // is_key_released(keycode) -> bool
         lua_pushcfunction(L, [](lua_State* L) -> int {
             ecs::KeyCode key = (ecs::KeyCode)luaL_checkinteger(L, 1);
-            lua_getglobal(L, "_world");
-            if (lua_isnil(L, -1)) { lua_pop(L, 1); lua_pushboolean(L, 0); return 1; }
-            auto* ud = (WorldUserdata*)lua_touserdata(L, -1);
-            lua_pop(L, 1);
-            auto* input = ud->world->get_resource<ecs::Input>();
+            auto* world = get_world_from_global(L);
+            if (!world) { lua_pushboolean(L, 0); return 1; }
+            auto* input = world->get_resource<ecs::Input>();
             lua_pushboolean(L, input && input->key_released(key) ? 1 : 0);
             return 1;
             });
