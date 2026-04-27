@@ -114,7 +114,9 @@ inline auto spawn_map(Cmd cmd, Res<AssetServer> asset_server) -> void {
   );
 
   cmd.spawn(
-    SceneRoot{asset_server->load<Scene>("res/models/curtains.gltf")}, Parent(map.id())
+    SceneRoot{asset_server->load<Scene>("res/models/curtains.gltf")},
+    Transform{},
+    Parent(map.id())
   );
 }
 
