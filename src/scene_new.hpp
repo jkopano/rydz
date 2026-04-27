@@ -175,8 +175,8 @@ inline void scene_plugin(App &app) {
       }
   });
 
-  app.add_systems(ecs::ScheduleLabel::Startup, scripting::lua_startup_runner);
-  app.add_systems(ecs::ScheduleLabel::Update, scripting::lua_update_runner);
+  app.add_systems(ecs::ScheduleLabel::Startup,
+    group(init_lua_scripting, scripting::lua_startup_runner).chain());
 
   app.add_systems(Update, group(player_movement_system,
                                 update_isometric_camera_target_system)
