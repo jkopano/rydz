@@ -63,19 +63,20 @@ namespace scripting {
 
 
         //Stale klawiszy jako pola tabeli input
-        lua_pushinteger(L, KEY_W);              lua_setfield(L, -2, "KEY_W");
-        lua_pushinteger(L, KEY_S);              lua_setfield(L, -2, "KEY_S");
-        lua_pushinteger(L, KEY_A);              lua_setfield(L, -2, "KEY_A");
-        lua_pushinteger(L, KEY_D);              lua_setfield(L, -2, "KEY_D");
-        lua_pushinteger(L, KEY_SPACE);          lua_setfield(L, -2, "KEY_SPACE");
-        lua_pushinteger(L, KEY_ENTER);          lua_setfield(L, -2, "KEY_ENTER");
-        lua_pushinteger(L, KEY_ESCAPE);         lua_setfield(L, -2, "KEY_ESCAPE");
-        lua_pushinteger(L, KEY_UP);             lua_setfield(L, -2, "KEY_UP");
-        lua_pushinteger(L, KEY_DOWN);           lua_setfield(L, -2, "KEY_DOWN");
-        lua_pushinteger(L, KEY_LEFT);           lua_setfield(L, -2, "KEY_LEFT");
-        lua_pushinteger(L, KEY_RIGHT);          lua_setfield(L, -2, "KEY_RIGHT");
-        lua_pushinteger(L, KEY_LEFT_SHIFT);     lua_setfield(L, -2, "KEY_SHIFT");
-        lua_pushinteger(L, KEY_LEFT_CONTROL);   lua_setfield(L, -2, "KEY_CTRL");
+        struct KeyEntry { const char* name; int code; };
+        static const KeyEntry keys[] = {
+            {"KEY_W", KEY_W}, {"KEY_S", KEY_S}, {"KEY_A", KEY_A}, {"KEY_D", KEY_D},
+            {"KEY_SPACE", KEY_SPACE}, {"KEY_ENTER", KEY_ENTER}, {"KEY_ESCAPE", KEY_ESCAPE},
+            {"KEY_UP", KEY_UP}, {"KEY_DOWN", KEY_DOWN}, {"KEY_LEFT", KEY_LEFT}, {"KEY_RIGHT", KEY_RIGHT},
+            {"KEY_SHIFT", KEY_LEFT_SHIFT}, {"KEY_CTRL", KEY_LEFT_CONTROL},
+            {"KEY_Q", KEY_Q}, {"KEY_E", KEY_E}, {"KEY_F", KEY_F}, {"KEY_R", KEY_R},
+            {"KEY_TAB", KEY_TAB}, {"KEY_BACKSPACE", KEY_BACKSPACE}
+        };
+
+        for (const auto& k : keys) {
+            lua_pushinteger(L, k.code);
+            lua_setfield(L, -2, k.name);
+        }
 
         lua_setglobal(L, "Input");
 	}
