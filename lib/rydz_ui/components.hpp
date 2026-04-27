@@ -6,6 +6,7 @@
 #include "rydz_ecs/entity.hpp"
 #include "rydz_ecs/fwd.hpp"
 #include "rydz_graphics/mod.hpp"
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -45,6 +46,49 @@ struct ComputedUiNode {
   math::Vec2 size;
   math::Vec2 content_size;
 };
+
+struct UiPointerState {
+  using T = ecs::Resource;
+
+  math::Vec2 cursor{};
+  bool primary_down = false;
+  bool primary_pressed = false;
+  bool primary_released = false;
+  int primary_button = 0;
+
+  auto clear_frame() -> void {
+    primary_pressed = false;
+    primary_released = false;
+  }
+
+  auto set_cursor(math::Vec2 value) -> void { cursor = value; }
+
+  auto set_primary_down(int button = 0) -> void {
+    if (!primary_down) {
+      primary_pressed = true;
+    }
+    primary_down = true;
+    primary_button = button;
+  }
+
+  auto set_primary_up(int button = 0) -> void {
+    if (primary_down) {
+      primary_released = true;
+    }
+    primary_down = false;
+    primary_button = button;
+  }
+};
+
+struct UiInteractionState {
+  using T = ecs::Resource;
+
+  std::optional<ecs::Entity> hovered_entity{};
+  std::optional<ecs::Entity> focused_entity{};
+  std::optional<ecs::Entity> pressed_entity{};
+};
+
+enum struct UiSystemSet { Prepare, Layout, Interaction, PostLayout, Render };
 
 enum struct Direction { Row, Column };
 enum struct Align { Start, Center, End };

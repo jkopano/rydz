@@ -1,14 +1,3 @@
-// something like this if we want to use written layout algorithms not our
-// class LayoutSystem {
-//   // Use a layout library like yoga or flexbox-layout
-//   std::unordered_map<Entity, LayoutNode> layout_nodes;
-//
-//   void updateLayout(World &world) {
-//     // Update layout based on UiNode components
-//     // Store results in ComputedUiNode
-//   }
-// };
-
 #pragma once
 #include "math.hpp"
 #include "rydz_ecs/core/hierarchy.hpp"
@@ -22,7 +11,7 @@ namespace rydz::ui {
 namespace helpers {
 // placeholder for text measure, before adding rydz_text
 // TODO: replace with real font metrics
-inline math::Vec2 measure_text(const std::string &text, float fontSize) {
+inline math::Vec2 measure_text(std::string const& text, float fontSize) {
   float width = static_cast<float>(text.length()) * fontSize * 0.6f;
   float height = fontSize;
 
@@ -51,8 +40,9 @@ inline float cross_axis(math::Vec2 v, Direction direction) {
   return 0.0;
 }
 
-inline math::Vec2 make_vec2(float main_axis, float cross_axis,
-                            Direction direction) {
+inline math::Vec2 make_vec2(
+  float main_axis, float cross_axis, Direction direction
+) {
   if (Direction::Row == direction) {
     return {main_axis, cross_axis};
   }
@@ -63,20 +53,21 @@ inline math::Vec2 make_vec2(float main_axis, float cross_axis,
 }
 
 // default Style is defined in struct values
-inline const Style &default_style() {
-  static const Style s{};
+inline Style const& default_style() {
+  static Style const s{};
   return s;
 }
 
-inline const Style &get_style_or_default(const ecs::World &world,
-                                         ecs::Entity e) {
-  if (auto *s = world.get_component<Style>(e)) {
+inline Style const& get_style_or_default(
+  ecs::World const& world, ecs::Entity e
+) {
+  if (auto* s = world.get_component<Style>(e)) {
     return *s;
   }
   return default_style();
 }
 
-inline float main_padding(const Style &style, Direction direction) {
+inline float main_padding(Style const& style, Direction direction) {
   if (Direction::Row == direction) {
     return style.padding.left + style.padding.right;
   }
@@ -86,7 +77,7 @@ inline float main_padding(const Style &style, Direction direction) {
   return 0.0f;
 }
 
-inline float cross_padding(const Style &style, Direction direction) {
+inline float cross_padding(Style const& style, Direction direction) {
   if (Direction::Row == direction) {
     return style.padding.bottom + style.padding.top;
   }
@@ -96,7 +87,7 @@ inline float cross_padding(const Style &style, Direction direction) {
   return 0.0f;
 }
 
-inline float main_margin(const Style &style, Direction direction) {
+inline float main_margin(Style const& style, Direction direction) {
   if (Direction::Row == direction) {
     return style.margin.left + style.margin.right;
   }
@@ -106,7 +97,7 @@ inline float main_margin(const Style &style, Direction direction) {
   return 0.0f;
 }
 
-inline float cross_margin(const Style &style, Direction direction) {
+inline float cross_margin(Style const& style, Direction direction) {
   if (Direction::Row == direction) {
     return style.margin.bottom + style.margin.top;
   }
@@ -116,8 +107,9 @@ inline float cross_margin(const Style &style, Direction direction) {
   return 0.0f;
 }
 
-inline float resolve_main_size(const Style &style, math::Vec2 content_size,
-                               Direction direction) {
+inline float resolve_main_size(
+  Style const& style, math::Vec2 content_size, Direction direction
+) {
   float main = 0.0;
 
   if (Direction::Row == direction) {
@@ -130,8 +122,9 @@ inline float resolve_main_size(const Style &style, math::Vec2 content_size,
   return main;
 }
 
-inline float resolve_cross_size(const Style &style, math::Vec2 content_size,
-                                Direction direction) {
+inline float resolve_cross_size(
+  Style const& style, math::Vec2 content_size, Direction direction
+) {
   float cross = 0.0;
 
   if (Direction::Row == direction) {
@@ -147,10 +140,10 @@ inline float resolve_cross_size(const Style &style, math::Vec2 content_size,
 } // namespace helpers
 
 namespace algorithms {
-inline void measure_node(ecs::World &world, ecs::Entity entity) {
-  const Style &style = helpers::get_style_or_default(world, entity);
+inline void measure_node(ecs::World& world, ecs::Entity entity) {
+  Style const& style = helpers::get_style_or_default(world, entity);
 
-  auto *c = world.get_component<ComputedUiNode>(entity);
+  auto* c = world.get_component<ComputedUiNode>(entity);
   // hide from display
   if (nullptr != c) {
     if (style.display == Display::None) {
@@ -164,27 +157,28 @@ inline void measure_node(ecs::World &world, ecs::Entity entity) {
 
   // now label can't have child so, it need to be the last one
   // so this is the reason for this return
-  auto *l = world.get_component<Label>(entity);
+  auto* l = world.get_component<Label>(entity);
   if (nullptr != l) {
-    auto *text_cache = world.get_resource<UiTextCache>();
-    auto *textures =
-        world.get_resource<ecs::Assets<ecs::Texture>>(); // ← nowy typ
+    auto* text_cache = world.get_resource<UiTextCache>();
+    auto* textures = world.get_resource<ecs::Assets<ecs::Texture>>();
 
     if (text_cache && textures) {
-      const std::string key = make_label_cache_key(*l);
+      std::string const key = make_label_cache_key(*l);
       auto it = text_cache->items.find(key);
       if (it == text_cache->items.end()) {
-        rl::Image img = rl::ImageText(l->text.c_str(),
-                                      static_cast<int>(l->font_size), l->color);
-        gl::Texture tex = rl::LoadTextureFromImage(img); // ← gl::Texture
+        rl::Image img = rl::ImageText(
+          l->text.c_str(), static_cast<int>(l->font_size), l->color
+        );
+        gl::Texture tex = rl::LoadTextureFromImage(img);
         rl::UnloadImage(img);
         auto handle = textures->add(tex);
         it = text_cache->items.emplace(key, handle).first;
       }
 
-      if (const ecs::Texture *t = textures->get(it->second)) { // ← nowy typ
-        c->content_size = math::Vec2(static_cast<float>(t->width),
-                                     static_cast<float>(t->height));
+      if (ecs::Texture const* t = textures->get(it->second)) {
+        c->content_size = math::Vec2(
+          static_cast<float>(t->width), static_cast<float>(t->height)
+        );
         return;
       }
     }
@@ -204,12 +198,12 @@ inline void measure_node(ecs::World &world, ecs::Entity entity) {
     float child_main = 0.0f;
     float child_cross = 0.0f;
 
-    const Style &child_style = helpers::get_style_or_default(world, child);
+    Style const& child_style = helpers::get_style_or_default(world, child);
     if (Display::None == child_style.display) {
       continue;
     }
 
-    auto *c_child = world.get_component<ComputedUiNode>(child);
+    auto* c_child = world.get_component<ComputedUiNode>(child);
     if (nullptr == c_child) {
       continue;
     }
@@ -231,30 +225,31 @@ inline void measure_node(ecs::World &world, ecs::Entity entity) {
   }
 
   float content_main =
-      total_main + helpers::main_padding(style, style.direction);
+    total_main + helpers::main_padding(style, style.direction);
   float content_cross =
-      max_cross + helpers::cross_padding(style, style.direction);
+    max_cross + helpers::cross_padding(style, style.direction);
 
   c->content_size =
-      helpers::make_vec2(content_main, content_cross, style.direction);
+    helpers::make_vec2(content_main, content_cross, style.direction);
 }
 
-inline void layout_node(ecs::World &world, ecs::Entity entity,
-                        math::Vec2 position, math::Vec2 size) {
-  const Style &style = helpers::get_style_or_default(world, entity);
+inline void layout_node(
+  ecs::World& world, ecs::Entity entity, math::Vec2 position, math::Vec2 size
+) {
+  Style const& style = helpers::get_style_or_default(world, entity);
 
-  auto get_main_margins = [&](const Style &s) {
+  auto get_main_margins = [&](Style const& s) {
     if (style.direction == Direction::Row) {
       return std::pair<float, float>{s.margin.left, s.margin.right};
     }
     return std::pair<float, float>{s.margin.top, s.margin.bottom};
   };
 
-  auto get_cross_margin = [&](const Style &s) {
+  auto get_cross_margin = [&](Style const& s) {
     return (style.direction == Direction::Row) ? s.margin.top : s.margin.left;
   };
 
-  auto *c = world.get_component<ComputedUiNode>(entity);
+  auto* c = world.get_component<ComputedUiNode>(entity);
   // hide from display
   if (nullptr != c) {
     if (style.display == Display::None) {
@@ -286,22 +281,23 @@ inline void layout_node(ecs::World &world, ecs::Entity entity,
   int count = 0;
 
   for (auto child : children) {
-    const Style &child_style = helpers::get_style_or_default(world, child);
+    Style const& child_style = helpers::get_style_or_default(world, child);
     float child_main = 0.0f;
 
     if (Display::None == child_style.display) {
       continue;
     }
 
-    auto *c_child = world.get_component<ComputedUiNode>(child);
+    auto* c_child = world.get_component<ComputedUiNode>(child);
     if (nullptr == c_child) {
       continue;
     }
 
     auto [margin_before, margin_after] = get_main_margins(child_style);
 
-    child_main = helpers::resolve_main_size(child_style, c_child->content_size,
-                                            style.direction);
+    child_main = helpers::resolve_main_size(
+      child_style, c_child->content_size, style.direction
+    );
     child_main += margin_before + margin_after;
 
     total_main += child_main;
@@ -313,7 +309,7 @@ inline void layout_node(ecs::World &world, ecs::Entity entity,
   }
 
   float free_space =
-      helpers::main_axis(inner_size, style.direction) - total_main;
+    helpers::main_axis(inner_size, style.direction) - total_main;
   float offset = 0.0f;
   if (Justify::Center == style.justify) {
     offset = free_space * 0.5f;
@@ -331,36 +327,37 @@ inline void layout_node(ecs::World &world, ecs::Entity entity,
   float cross_pos = 0.0f;
 
   for (auto child : children) {
-    const Style &child_style = helpers::get_style_or_default(world, child);
+    Style const& child_style = helpers::get_style_or_default(world, child);
     if (Display::None == child_style.display) {
       continue;
     }
 
-    auto *c_child = world.get_component<ComputedUiNode>(child);
+    auto* c_child = world.get_component<ComputedUiNode>(child);
     if (nullptr == c_child) {
       continue;
     }
 
-    child_main = helpers::resolve_main_size(child_style, c_child->content_size,
-                                            style.direction);
+    child_main = helpers::resolve_main_size(
+      child_style, c_child->content_size, style.direction
+    );
     child_cross = helpers::resolve_cross_size(
-        child_style, c_child->content_size, style.direction);
+      child_style, c_child->content_size, style.direction
+    );
     auto [margin_before, margin_after] = get_main_margins(child_style);
     float margin_cross = get_cross_margin(child_style);
 
     cursor += margin_before;
 
     cross_pos =
-        helpers::cross_axis(inner_position, style.direction) + margin_cross;
+      helpers::cross_axis(inner_position, style.direction) + margin_cross;
 
     if (Align::Center == style.align) {
       cross_pos +=
-          (helpers::cross_axis(inner_size, style.direction) - child_cross) *
-          0.5f;
+        (helpers::cross_axis(inner_size, style.direction) - child_cross) * 0.5f;
     }
     if (Align::End == style.align) {
       cross_pos +=
-          (helpers::cross_axis(inner_size, style.direction) - child_cross);
+        (helpers::cross_axis(inner_size, style.direction) - child_cross);
     }
 
     child_pos = helpers::make_vec2(cursor, cross_pos, style.direction);
@@ -368,7 +365,6 @@ inline void layout_node(ecs::World &world, ecs::Entity entity,
 
     layout_node(world, child, child_pos, child_size);
 
-    // przesuwamy cursor o child_main + margin_after + gap
     cursor += child_main;
     cursor += margin_after;
     cursor += style.gap;
@@ -376,8 +372,9 @@ inline void layout_node(ecs::World &world, ecs::Entity entity,
 }
 
 // main alghorithm to compute layout
-inline void compute_layout(ecs::World &world, ecs::Entity root,
-                           math::Vec2 root_size) {
+inline void compute_layout(
+  ecs::World& world, ecs::Entity root, math::Vec2 root_size
+) {
   measure_node(world, root);
   layout_node(world, root, {0.0f, 0.0f}, root_size);
 }
