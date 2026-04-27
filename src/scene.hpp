@@ -108,18 +108,13 @@ inline void camera_mouse_system(
 inline auto spawn_map(Cmd cmd, Res<AssetServer> asset_server) -> void {
   auto map = cmd.spawn(
     MapTag{},
-    CameraState{FreeLook{}},
     // SceneRoot{asset_server->load<Scene>("res/models/sponza.glb")},
     SceneRoot{asset_server->load<Scene>("res/models/new_sponza.gltf")},
     Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}}
   );
 
   cmd.spawn(
-    MapTag{},
-    CameraState{FreeLook{}},
-    SceneRoot{asset_server->load<Scene>("res/models/curtains.gltf")},
-    Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}},
-    Parent(map.id())
+    SceneRoot{asset_server->load<Scene>("res/models/curtains.gltf")}, Parent(map.id())
   );
 }
 
