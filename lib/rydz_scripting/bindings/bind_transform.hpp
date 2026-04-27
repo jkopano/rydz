@@ -115,11 +115,16 @@ namespace scripting {
     }
 
     inline int register_transform_in_registry() {
-        return ComponentRegistry::get().register_component<Transform>("Transform",
+
+        static int handle = -1;
+        if (handle >= 0) return handle;
+
+        handle =  ComponentRegistry::get().register_component<Transform>("Transform",
             [](lua_State* L, ecs::World* world, ecs::Entity e) -> int {
                 return push_transform_proxy(L, world, e);
             }
         );
+        return handle;
     }
 }
 
