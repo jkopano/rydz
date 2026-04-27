@@ -65,9 +65,13 @@ using ::EnableCursor;
 using ::GetKeyPressed;
 using ::GetMouseDelta;
 using ::GetMousePosition;
+using ::GetMouseWheelMove;
 using ::IsKeyDown;
 using ::IsKeyPressed;
 using ::IsKeyUp;
+using ::IsMouseButtonDown;
+using ::IsMouseButtonPressed;
+using ::IsMouseButtonReleased;
 using ::rlHideCursor;
 using ::rlShowCursor;
 
