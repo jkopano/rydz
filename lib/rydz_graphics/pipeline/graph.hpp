@@ -132,7 +132,7 @@ public:
     }
 
     ensure_resources(
-      static_cast<u32>(ctx.framebuffer.width), static_cast<u32>(ctx.framebuffer.height)
+      static_cast<u32>(ctx.frame.framebuffer.width), static_cast<u32>(ctx.frame.framebuffer.height)
     );
 
     for (auto& node : nodes_) {

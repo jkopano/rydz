@@ -79,37 +79,40 @@ public:
       : ctx_(ctx), material_ctx_{.frame_data = &ctx, .instanced = instanced},
         pass_config_(config) {
     last_prepared_ = {};
-    ctx_.render_state.apply(pass_config_);
+    ctx_.frame.render_state.apply(pass_config_);
   }
   auto end(RenderConfig const& config = RenderConfig{}) -> void {
-    ctx_.render_state.apply(config);
+    ctx_.frame.render_state.apply(config);
   }
 
   auto begin(RenderConfig const& config) -> void {}
 
   auto draw(RenderCommand const& cmd, ShaderSpec const& shader_spec) -> void {
-    auto const* mesh = ctx_.mesh_assets.get(cmd.mesh);
+    auto const* mesh = ctx_.assets.mesh_assets.get(cmd.mesh);
     if (mesh == nullptr) {
       return;
     }
-    if (cmd.material_index >= ctx_.extracted_meshes.materials.size()) {
+    if (cmd.material_index >= ctx_.assets.extracted_meshes.materials.size()) {
       return;
     }
-    auto const& material_item = ctx_.extracted_meshes.materials[cmd.material_index];
+    auto const& material_item =
+      ctx_.assets.extracted_meshes.materials[cmd.material_index];
     auto const& material = material_item.material;
 
     pass_config_.cull = material.cull_state();
-    ctx_.render_state.apply(pass_config_);
+    ctx_.frame.render_state.apply(pass_config_);
 
-    ShaderProgram& shader = resolve_shader(ctx_.marker, ctx_.shader_cache, shader_spec);
+    ShaderProgram& shader =
+      resolve_shader(ctx_.frame.marker, ctx_.assets.shader_cache, shader_spec);
     bool const shader_changed = (last_shader_ != &shader);
 
     if (shader_changed) {
       last_shader_ = &shader;
-      ctx_.shadow_uniforms.bind_shader(shader);
-      ctx_.shadow_resources.bind_shader(shader);
-      if (ctx_.scene_depth_texture != nullptr && ctx_.scene_depth_texture->ready()) {
-        ctx_.scene_depth_texture->bind(SCENE_DEPTH_TEXTURE_SLOT);
+      ctx_.lighting.shadow_uniforms.bind_shader(shader);
+      ctx_.lighting.shadow_resources.bind_shader(shader);
+      if (ctx_.frame.scene_depth_texture != nullptr &&
+          ctx_.frame.scene_depth_texture->ready()) {
+        ctx_.frame.scene_depth_texture->bind(SCENE_DEPTH_TEXTURE_SLOT);
         shader.set_sampler("u_scene_depth", SCENE_DEPTH_TEXTURE_SLOT);
       }
       apply_slot_uniforms_per_view(material_ctx_, material, shader);
@@ -133,10 +136,10 @@ public:
   }
 
   auto draw(RenderCommand const& cmd) -> void {
-    if (cmd.material_index >= ctx_.extracted_meshes.materials.size()) {
+    if (cmd.material_index >= ctx_.assets.extracted_meshes.materials.size()) {
       return;
     }
-    draw(cmd, ctx_.extracted_meshes.materials[cmd.material_index].material.shader);
+    draw(cmd, ctx_.assets.extracted_meshes.materials[cmd.material_index].material.shader);
   }
 
 private:
@@ -156,7 +159,7 @@ public:
     builder.write(main_target_);
   }
   auto execute(PassContext& ctx, RenderGraphRuntime& runtime) -> void override {
-    rl::ClearBackground(ctx.view.clear_color);
+    rl::ClearBackground(ctx.frame.view.clear_color);
   }
 
 private:
@@ -167,68 +170,71 @@ class ShadowPass : public RenderPass {
 public:
   auto setup(RenderGraphBuilder&) -> void override {}
   auto execute(PassContext& ctx, RenderGraphRuntime&) -> void override {
-    auto* state = ctx.execution_state;
+    auto* state = ctx.frame.execution_state;
     if ((state == nullptr) || !state->world_pass_active) {
       return;
     }
-    if (ctx.shadow_phase.commands.empty()) {
+    if (ctx.phases.shadow.commands.empty()) {
       return;
     }
 
-    ctx.shadow_resources.ensure(ctx.shadow_settings);
+    ctx.lighting.shadow_resources.ensure(ctx.lighting.shadow_settings);
 
-    if (ctx.shadows.has_directional) {
-      ctx.shadow_resources.allocate_cascades(
-        const_cast<ExtractedShadows&>(ctx.shadows), ctx.shadow_settings, ctx.view
+    if (ctx.lighting.shadows.has_directional) {
+      ctx.lighting.shadow_resources.allocate_cascades(
+        const_cast<ExtractedShadows&>(ctx.lighting.shadows),
+        ctx.lighting.shadow_settings,
+        ctx.frame.view
       );
     }
 
-    if (!ctx.shadows.point_shadows.empty()) {
-      ctx.shadow_resources.allocate_point_lights(
-        const_cast<ExtractedShadows&>(ctx.shadows),
-        ctx.shadow_settings,
-        ctx.view,
-        ctx.lights
+    if (!ctx.lighting.shadows.point_shadows.empty()) {
+      ctx.lighting.shadow_resources.allocate_point_lights(
+        const_cast<ExtractedShadows&>(ctx.lighting.shadows),
+        ctx.lighting.shadow_settings,
+        ctx.frame.view,
+        ctx.lighting.lights
       );
     }
 
-    if (ctx.shadows.cascade_count > 0 && ctx.shadow_resources.directional_atlas.ready()) {
-      ctx.shadow_resources.directional_atlas.begin();
-      for (i32 cascade_index = 0; cascade_index < ctx.shadows.cascade_count;
+    if (ctx.lighting.shadows.cascade_count > 0 &&
+        ctx.lighting.shadow_resources.directional_atlas.ready()) {
+      ctx.lighting.shadow_resources.directional_atlas.begin();
+      for (i32 cascade_index = 0; cascade_index < ctx.lighting.shadows.cascade_count;
            ++cascade_index) {
-        auto const tile = ctx.shadow_resources.directional_tile(cascade_index);
-        ctx.shadow_resources.directional_atlas.begin_tile(tile);
+        auto const tile = ctx.lighting.shadow_resources.directional_tile(cascade_index);
+        ctx.lighting.shadow_resources.directional_atlas.begin_tile(tile);
         render_shadow_commands(
           ctx,
-          ctx.shadows.directional_cascades[cascade_index].shadow_view,
+          ctx.lighting.shadows.directional_cascades[cascade_index].shadow_view,
           directional_shadow_shader_spec()
         );
       }
-      ctx.shadow_resources.directional_atlas.end();
+      ctx.lighting.shadow_resources.directional_atlas.end();
     }
 
-    for (usize point_index = 0; point_index < ctx.shadows.point_shadows.size();
+    for (usize point_index = 0; point_index < ctx.lighting.shadows.point_shadows.size();
          ++point_index) {
-      auto const& point_shadow = ctx.shadows.point_shadows[point_index];
+      auto const& point_shadow = ctx.lighting.shadows.point_shadows[point_index];
 
-      if (!ctx.shadow_resources.point_maps.ready()) {
+      if (!ctx.lighting.shadow_resources.point_maps.ready()) {
         break;
       }
 
       for (i32 face_index = 0; face_index < POINT_SHADOW_FACE_COUNT; ++face_index) {
-        ctx.shadow_resources.point_maps.begin_face(
+        ctx.lighting.shadow_resources.point_maps.begin_face(
           static_cast<i32>(point_index), face_index
         );
         render_point_shadow_commands(
           ctx, point_shadow, face_index, point_shadow_shader_spec()
         );
-        ctx.shadow_resources.point_maps.end();
+        ctx.lighting.shadow_resources.point_maps.end();
       }
     }
 
-    ctx.render_state.reset();
-    ctx.render_state.begin_view(main_render_view(ctx.view));
-    ctx.render_state.apply(RenderConfig::get_default());
+    ctx.frame.render_state.reset();
+    ctx.frame.render_state.begin_view(main_render_view(ctx.frame.view));
+    ctx.frame.render_state.apply(RenderConfig::get_default());
   }
 
 private:
@@ -259,19 +265,19 @@ private:
     PassContext& ctx, ShadowView const& shadow_view, ShaderSpec const& shader_spec
   ) -> void {
     auto const planes = shadow_frustum_planes(shadow_view);
-    ctx.render_state.reset();
-    ctx.render_state.begin_view(shadow_render_view(shadow_view));
+    ctx.frame.render_state.reset();
+    ctx.frame.render_state.begin_view(shadow_render_view(shadow_view));
 
     PassRenderer renderer{ctx, RenderConfig::depth_prepass()};
-    for (auto const& cmd : ctx.shadow_phase.commands) {
+    for (auto const& cmd : ctx.phases.shadow.commands) {
       if (!shadow_command_visible(cmd, planes)) {
         continue;
       }
       renderer.draw(cmd, shader_spec);
     }
     renderer.end(RenderConfig::post_depth_prepass());
-    ctx.render_state.end_view();
-    ctx.render_state.reset();
+    ctx.frame.render_state.end_view();
+    ctx.frame.render_state.reset();
   }
 
   static auto render_point_shadow_commands(
@@ -282,22 +288,23 @@ private:
   ) -> void {
     auto const& shadow_view = point_shadow.faces[static_cast<usize>(face_index)];
     auto const planes = shadow_frustum_planes(shadow_view);
-    ctx.render_state.reset();
-    ctx.render_state.begin_view(shadow_render_view(shadow_view));
+    ctx.frame.render_state.reset();
+    ctx.frame.render_state.begin_view(shadow_render_view(shadow_view));
 
     PassRenderer renderer{ctx, RenderConfig::depth_prepass()};
-    for (auto const& cmd : ctx.shadow_phase.commands) {
+    for (auto const& cmd : ctx.phases.shadow.commands) {
       if (!shadow_command_visible(cmd, planes)) {
         continue;
       }
-      ShaderProgram& shader = resolve_shader(ctx.marker, ctx.shader_cache, shader_spec);
+      ShaderProgram& shader =
+        resolve_shader(ctx.frame.marker, ctx.assets.shader_cache, shader_spec);
       shader.set("u_light_pos", point_shadow.position);
       shader.set("u_far_plane", point_shadow.far_plane);
       renderer.draw(cmd, shader_spec);
     }
     renderer.end(RenderConfig::post_depth_prepass());
-    ctx.render_state.end_view();
-    ctx.render_state.reset();
+    ctx.frame.render_state.end_view();
+    ctx.frame.render_state.reset();
   }
 };
 
@@ -311,26 +318,26 @@ public:
   }
 
   auto execute(PassContext& ctx, RenderGraphRuntime& runtime) -> void override {
-    auto const* renderer = ctx.environment_renderer;
+    auto const* renderer = ctx.frame.environment_renderer;
     if ((renderer == nullptr) || !renderer->skybox.ready() ||
-        (ctx.view.active_environment == nullptr) ||
-        !ctx.view.active_environment->has_skybox()) {
+        (ctx.frame.view.active_environment == nullptr) ||
+        !ctx.frame.view.active_environment->has_skybox()) {
       return;
     }
 
-    ctx.render_state.begin_view(ctx.render_state.view());
-    auto const& active_view = ctx.render_state.view();
+    ctx.frame.render_state.begin_view(ctx.frame.render_state.view());
+    auto const& active_view = ctx.frame.render_state.view();
 
     glDepthMask(GL_FALSE);
 
     renderer->skybox.draw(
-      ctx.view.active_environment->skybox, active_view.view, active_view.projection
+      ctx.frame.view.active_environment->skybox, active_view.view, active_view.projection
     );
 
     glDepthMask(GL_TRUE);
 
-    ctx.render_state.end_view();
-    ctx.render_state.reset();
+    ctx.frame.render_state.end_view();
+    ctx.frame.render_state.reset();
   }
 
 private:
@@ -364,25 +371,26 @@ template <> inline auto MeshPass<OpaqueTag>::render_config() -> RenderConfig {
 template <>
 inline auto MeshPass<OpaqueTag>::execute(PassContext& ctx, RenderGraphRuntime& runtime)
   -> void {
-  auto* state = ctx.execution_state;
+  auto* state = ctx.frame.execution_state;
   if ((state == nullptr) || !state->world_pass_active) {
     return;
   }
-  if (ctx.opaque_phase.commands.empty()) {
+  if (ctx.phases.opaque.commands.empty()) {
     return;
   }
   auto const& scene_depth_texture = runtime.get_texture(scene_depth_);
-  ctx.scene_depth_texture = scene_depth_texture.ready() ? &scene_depth_texture : nullptr;
+  ctx.frame.scene_depth_texture =
+    scene_depth_texture.ready() ? &scene_depth_texture : nullptr;
 
-  ctx.render_state.begin_view(ctx.render_state.view());
-  ctx.view_uniforms.bind();
+  ctx.frame.render_state.begin_view(ctx.frame.render_state.view());
+  ctx.lighting.view_uniforms.bind();
   PassRenderer renderer{ctx, MeshPass<OpaqueTag>::render_config()};
-  for (auto const& cmd : ctx.opaque_phase.commands) {
+  for (auto const& cmd : ctx.phases.opaque.commands) {
     renderer.draw(cmd);
   }
   renderer.end();
-  ctx.render_state.end_view();
-  ctx.scene_depth_texture = nullptr;
+  ctx.frame.render_state.end_view();
+  ctx.frame.scene_depth_texture = nullptr;
 }
 
 template <>
@@ -400,24 +408,25 @@ template <>
 inline auto MeshPass<TransparentTag>::execute(
   PassContext& ctx, RenderGraphRuntime& runtime
 ) -> void {
-  auto* state = ctx.execution_state;
+  auto* state = ctx.frame.execution_state;
   if ((state == nullptr) || !state->world_pass_active) {
     return;
   }
-  if (ctx.transparent_phase.commands.empty()) {
+  if (ctx.phases.transparent.commands.empty()) {
     return;
   }
   auto const& scene_depth_texture = runtime.get_texture(scene_depth_);
-  ctx.scene_depth_texture = scene_depth_texture.ready() ? &scene_depth_texture : nullptr;
-  ctx.render_state.begin_view(ctx.render_state.view());
-  ctx.view_uniforms.bind();
+  ctx.frame.scene_depth_texture =
+    scene_depth_texture.ready() ? &scene_depth_texture : nullptr;
+  ctx.frame.render_state.begin_view(ctx.frame.render_state.view());
+  ctx.lighting.view_uniforms.bind();
   PassRenderer renderer{ctx, MeshPass<TransparentTag>::render_config()};
-  for (auto const& cmd : ctx.transparent_phase.commands) {
+  for (auto const& cmd : ctx.phases.transparent.commands) {
     renderer.draw(cmd);
   }
   renderer.end();
-  ctx.render_state.end_view();
-  ctx.scene_depth_texture = nullptr;
+  ctx.frame.render_state.end_view();
+  ctx.frame.scene_depth_texture = nullptr;
 }
 
 using OpaquePass = MeshPass<OpaqueTag>;
@@ -434,12 +443,12 @@ public:
   }
 
   auto execute(PassContext& ctx, RenderGraphRuntime& runtime) -> void override {
-    auto* state = ctx.execution_state;
+    auto* state = ctx.frame.execution_state;
     if (!state || !state->world_pass_active) {
       return;
     }
 
-    if (ctx.opaque_phase.commands.empty()) {
+    if (ctx.phases.opaque.commands.empty()) {
       return;
     }
 
@@ -453,33 +462,33 @@ public:
     glBindFramebuffer(GL_FRAMEBUFFER, main.id);
     glViewport(0, 0, main.texture.width, main.texture.height);
 
-    ctx.render_state.begin_view(ctx.render_state.view());
-    ctx.view_uniforms.bind();
+    ctx.frame.render_state.begin_view(ctx.frame.render_state.view());
+    ctx.lighting.view_uniforms.bind();
 
     PassRenderer renderer{ctx, RenderConfig::depth_prepass()};
-    for (auto const& cmd : ctx.opaque_phase.commands) {
+    for (auto const& cmd : ctx.phases.opaque.commands) {
       renderer.draw(cmd, depth_prepass_shader_spec());
     }
     renderer.end(RenderConfig::post_depth_prepass());
-    ctx.render_state.end_view();
+    ctx.frame.render_state.end_view();
 
     glBindFramebuffer(GL_FRAMEBUFFER, depth_color.id);
     glViewport(0, 0, depth_color.texture.width, depth_color.texture.height);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    ctx.render_state.begin_view(ctx.render_state.view());
-    ctx.view_uniforms.bind();
+    ctx.frame.render_state.begin_view(ctx.frame.render_state.view());
+    ctx.lighting.view_uniforms.bind();
 
     PassRenderer depth_color_renderer{ctx, RenderConfig::depth_to_color()};
-    for (auto const& cmd : ctx.opaque_phase.commands) {
+    for (auto const& cmd : ctx.phases.opaque.commands) {
       depth_color_renderer.draw(cmd, depth_to_color_shader_spec());
     }
     depth_color_renderer.end();
-    ctx.render_state.end_view();
+    ctx.frame.render_state.end_view();
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    ctx.render_state.reset();
+    ctx.frame.render_state.reset();
   }
 
 private:
@@ -503,13 +512,17 @@ class ClusterBuildPass : public RenderPass {
 public:
   auto setup(RenderGraphBuilder&) -> void override {}
   auto execute(PassContext& ctx, RenderGraphRuntime&) -> void override {
-    auto* state = ctx.execution_state;
+    auto* state = ctx.frame.execution_state;
     if (!state || !state->world_pass_active) {
       return;
     }
 
-    ctx.cluster_state.build_cluster_buffers(
-      ctx.marker, ctx.view, ctx.lights, ctx.shadows, ctx.cluster_config
+    ctx.lighting.cluster_state.build_cluster_buffers(
+      ctx.frame.marker,
+      ctx.frame.view,
+      ctx.lighting.lights,
+      ctx.lighting.shadows,
+      ctx.lighting.cluster_config
     );
   }
 };
@@ -619,34 +632,45 @@ struct FramePass {
     shadow_uniforms->update(*shadows, *shadow_settings, *shadow_resources);
 
     PassContext ctx{
-      .marker = marker,
-      .render_state = *render_state,
-      .framebuffer =
-        gl::Rectangle{
-          0, 0, static_cast<f32>(window->width), static_cast<f32>(window->height)
+      .frame =
+        {
+          .marker = marker,
+          .render_state = *render_state,
+          .framebuffer =
+            gl::Rectangle{
+              0, 0, static_cast<f32>(window->width), static_cast<f32>(window->height)
+            },
+          .view = *view,
+          .time = *time,
+          .scene_depth_texture = nullptr,
+          .execution_state = state.ptr,
+          .environment_renderer = environment_renderer.ptr,
         },
-      .view = *view,
-      .lights = *lights,
-      .shadows = *shadows,
-      .time = *time,
-      .extracted_meshes = *extracted_meshes,
-      .mesh_assets = *mesh_assets,
-      .texture_assets = *texture_assets,
-      .shader_cache = *shader_cache,
-      .view_uniforms = *view_uniforms,
-      .shadow_uniforms = *shadow_uniforms,
-      .slot_registry = *slot_registry,
-      .opaque_phase = *opaque_phase,
-      .transparent_phase = *transparent_phase,
-      .shadow_phase = *shadow_phase,
-      .ui_phase = *ui_phase,
-      .cluster_config = *cluster_config,
-      .shadow_settings = *shadow_settings,
-      .cluster_state = *cluster_state,
-      .shadow_resources = *shadow_resources,
-      .scene_depth_texture = nullptr,
-      .execution_state = state.ptr,
-      .environment_renderer = environment_renderer.ptr,
+      .assets =
+        {
+          .extracted_meshes = *extracted_meshes,
+          .mesh_assets = *mesh_assets,
+          .texture_assets = *texture_assets,
+          .shader_cache = *shader_cache,
+          .slot_registry = *slot_registry,
+        },
+      .lighting =
+        {
+          .lights = *lights,
+          .shadows = *shadows,
+          .cluster_config = *cluster_config,
+          .shadow_settings = *shadow_settings,
+          .cluster_state = *cluster_state,
+          .shadow_resources = *shadow_resources,
+          .view_uniforms = *view_uniforms,
+          .shadow_uniforms = *shadow_uniforms,
+        },
+      .phases = {
+        .opaque = *opaque_phase,
+        .transparent = *transparent_phase,
+        .shadow = *shadow_phase,
+        .ui = *ui_phase,
+      }
     };
     graph->execute(ctx);
   }
@@ -691,14 +715,14 @@ public:
     builder.write(screen_);
   }
   auto execute(PassContext& ctx, RenderGraphRuntime& runtime) -> void override {
-    auto* state = ctx.execution_state;
+    auto* state = ctx.frame.execution_state;
 
     if (!state) {
       return;
     }
 
     if (state->world_pass_active) {
-      WorldPass::end(ctx.marker, ctx.render_state);
+      WorldPass::end(ctx.frame.marker, ctx.frame.render_state);
       state->world_pass_active = false;
     }
 
@@ -708,7 +732,7 @@ public:
       state->backbuffer_active = true;
     }
 
-    if (!ctx.view.active) {
+    if (!ctx.frame.view.active) {
       return;
     }
 
@@ -717,8 +741,14 @@ public:
       return;
     }
 
-    draw_postprocess_pass(ctx.marker, main_color, ctx.shader_cache, ctx.view, ctx.time);
-    ctx.render_state.reset();
+    draw_postprocess_pass(
+      ctx.frame.marker,
+      main_color,
+      ctx.assets.shader_cache,
+      ctx.frame.view,
+      ctx.frame.time
+    );
+    ctx.frame.render_state.reset();
   }
 
 private:
@@ -798,7 +828,7 @@ public:
     builder.write(screen_);
   }
   auto execute(PassContext& ctx, RenderGraphRuntime&) -> void override {
-    auto* state = ctx.execution_state;
+    auto* state = ctx.frame.execution_state;
 
     if (!state) {
       return;
@@ -809,10 +839,10 @@ public:
       state->backbuffer_active = true;
     }
 
-    ctx.render_state.apply(RenderConfig{});
+    ctx.frame.render_state.apply(RenderConfig{});
 
-    for (auto const& item : ctx.ui_phase.items) {
-      auto const* texture = ctx.texture_assets.get(item.texture);
+    for (auto const& item : ctx.phases.ui.items) {
+      auto const* texture = ctx.assets.texture_assets.get(item.texture);
       if (texture == nullptr) {
         continue;
       }

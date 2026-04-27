@@ -61,7 +61,7 @@ add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")
 add_requires("fmt", "spdlog", { configs = { external_fmt = true } })
 
 if is_plat("windows") then
-    add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", {force = true})
+	add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", { force = true })
 end
 
 if tracy_enabled then
@@ -158,11 +158,15 @@ set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
 add_packages("taskflow", "joltphysics", "glaze", "glm", "spdlog", "fmt")
-if is_plat("windows") then
-	add_packages("luajit")
-elseif is_plat("linux") then
+
+if is_plat("windows") or is_plat("linux") then
 	add_packages("luajit")
 end
+
+if has_config("gpu_debug") then
+	add_defines("DEBUG_GPU")
+end
+
 add_tracy()
 set_pcxxheader("lib/pch.hpp")
 

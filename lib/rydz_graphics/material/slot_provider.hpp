@@ -38,7 +38,7 @@ struct MaterialContext {
   PassContext const* frame_data = nullptr;
   bool instanced = false;
 
-  [[nodiscard]] auto frame() const -> PassContext const&;
+  [[nodiscard]] auto pass_ctx() const -> PassContext const&;
   [[nodiscard]] auto textures() const -> Assets<Texture> const&;
   [[nodiscard]] auto view() const -> ExtractedView const&;
   [[nodiscard]] auto lights() const -> ExtractedLights const&;

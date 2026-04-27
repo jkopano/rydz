@@ -109,7 +109,8 @@ inline auto spawn_map(Cmd cmd, Res<AssetServer> asset_server) -> void {
   cmd.spawn(
     MapTag{},
     CameraState{FreeLook{}},
-    SceneRoot{asset_server->load<Scene>("res/models/sponza.glb")},
+    // SceneRoot{asset_server->load<Scene>("res/models/sponza.glb")},
+    SceneRoot{asset_server->load<Scene>("res/models/new_sponza.gltf")},
     Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}}
   );
 }
