@@ -1,4 +1,4 @@
-﻿//Definiuje funkcję rejestrującą gobalne API silnika w VM Lua oraz strukturę LuaResource ktora jest zasobem ECS opakowującym VM Lua
+//Definiuje funkcję rejestrującą gobalne API silnika w VM Lua oraz strukturę LuaResource ktora jest zasobem ECS opakowującym VM Lua
 
 #pragma once
 
@@ -47,7 +47,19 @@ namespace scripting {
 		lua_pushcfunction(L, [](lua_State* L) -> int {
 			const char* schedule = luaL_checkstring(L, 1);
 			luaL_checktype(L, 2, LUA_TFUNCTION);
-			const char* name = luaL_optstring(L, 3, schedule);
+			
+			std::string sys_name;
+			if (lua_gettop(L) >= 3 && lua_type(L, 3) == LUA_TSTRING) {
+				sys_name = lua_tostring(L, 3);
+			} else {
+				lua_Debug ar;
+				if (lua_getstack(L, 1, &ar) && lua_getinfo(L, "Sl", &ar)) {
+					sys_name = std::string(ar.short_src) + ":" + std::to_string(ar.currentline);
+				} else {
+					static int anon_counter = 0;
+					sys_name = std::string(schedule) + "_anon_" + std::to_string(++anon_counter);
+				}
+			}
 
 			lua_pushvalue(L, 2);
 			int func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -58,7 +70,7 @@ namespace scripting {
 			lua_pop(L, 1);
 
 			if (reg) {
-				reg->register_system(schedule, name, func_ref);
+				reg->register_system(schedule, sys_name, func_ref);
 			}
 			else {
 				fprintf(stderr, "[Lua] register_system: wywolaj po ustawieniu _sys_registry!\n");
@@ -70,6 +82,16 @@ namespace scripting {
 		// Rydz.on_startup(function) — skrót
 		lua_pushcfunction(L, [](lua_State* L) -> int {
 			luaL_checktype(L, 1, LUA_TFUNCTION);
+			
+			std::string sys_name;
+			lua_Debug ar;
+			if (lua_getstack(L, 1, &ar) && lua_getinfo(L, "Sl", &ar)) {
+				sys_name = std::string(ar.short_src) + ":" + std::to_string(ar.currentline);
+			} else {
+				static int startup_counter = 0;
+				sys_name = "startup_anon_" + std::to_string(++startup_counter);
+			}
+
 			lua_pushvalue(L, 1);
 			int func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
@@ -77,7 +99,7 @@ namespace scripting {
 			auto* reg = (scripting::LuaSystemRegistry*)lua_touserdata(L, -1);
 			lua_pop(L, 1);
 
-			if (reg) reg->register_system("Startup", "startup", func_ref);
+			if (reg) reg->register_system("Startup", sys_name, func_ref);
 			return 0;
 			});
 		lua_setfield(L, -2, "on_startup");

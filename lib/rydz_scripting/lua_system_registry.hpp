@@ -1,4 +1,4 @@
-//Rejestr systemów Lua
+//Rejestr systemów Lua, wspiera hot-reload skryptów .lua
 #pragma once
 
 extern "C" {
@@ -25,7 +25,16 @@ namespace scripting {
 		std::unordered_map<std::string, std::vector<LuaSystem>> systems;
 
 		void register_system(const std::string& schedule, const std::string& name, int func_ref) {
-			systems[schedule].push_back(LuaSystem{ name, func_ref });
+			auto& sys_list = systems[schedule];
+
+			for (auto& sys : sys_list) {
+				if (sys.name == name) {
+					sys.func_ref = func_ref;
+					return;
+				}
+			}
+
+			sys_list.push_back(LuaSystem{ name, func_ref });
 		}
 
 		const std::vector<LuaSystem>* get_systems(const std::string& schedule) const {
