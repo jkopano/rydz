@@ -115,13 +115,11 @@ namespace scripting {
 			return *this;
 		}
 
-		LuaResource() = default;
-
-		//init - stworzenie vm, otwarcie bibliotek i rejestracja api silnika
-		void init() {
+		//stworzenie vm, otwarcie bibliotek
+		LuaResource() {
 			L = luaL_newstate();
+			if (!L) fprintf(stderr, "[Scripting] Nie mozna utworzyc Lua VM\n");
 			luaL_openlibs(L);
-			register_rydz_api(L);
 		}
 
 		//Wczytanie i kompilacja pliku skryptowego lua, w przypadku bledu jego obsluga, jesli ok wykonanie poprzez pcall
@@ -156,6 +154,12 @@ namespace scripting {
 		~LuaResource() {
 			if (L) lua_close(L);
 		}
-
 	};
+
+	//Plugin - odpowiednik console::scripting_plugin
+	inline void scripting_plugin(ecs::App& app) {
+		if (!app.world().has_resource<LuaResource>()) {
+			app.insert_resource(LuaResource{});
+		}
+	}
 }

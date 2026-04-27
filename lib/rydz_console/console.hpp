@@ -3,11 +3,12 @@
 #include "rl.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "scripting.hpp"
+#include "rydz_scripting/lua_resource.hpp"
 #include <sstream>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace console {
 
 inline bool is_console_toggle_char(i32 codepoint) {
   return codepoint == '`' || codepoint == '~';
@@ -56,7 +57,7 @@ struct ConsoleState {
 };
 
 inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
-                                ecs::ResMut<LuaResource> lua,
+                                ecs::ResMut<scripting::LuaResource> lua,
                                 ecs::ResMut<ecs::Input> input,
                                 ecs::Res<ecs::Time> time) {
   // klawisze otwarcia
@@ -196,12 +197,12 @@ inline void ConsoleUpdateSystem(ecs::ResMut<ConsoleState> console,
       cmd += "()";
     }
 
-    int result = luaL_dostring(lua->vm, cmd.c_str());
+    int result = luaL_dostring(lua->L, cmd.c_str());
     if (result != LUA_OK) {
-      const char *error_msg = lua_tostring(lua->vm, -1);
+      const char *error_msg = lua_tostring(lua->L, -1);
       console->log("[Blad] " +
                    std::string(error_msg ? error_msg : "Nieznany błąd"));
-      lua_pop(lua->vm, 1);
+      lua_pop(lua->L, 1);
     }
   }
 }

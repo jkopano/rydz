@@ -145,7 +145,7 @@ inline void spawn_player(Cmd cmd, ResMut<Assets<ecs::Mesh>> meshes,
 inline void scene_plugin(App &app) {
   app.add_plugin(Input::install);
   app.add_plugin(system_multithreading({true}));
-  app.add_plugin(engine::scripting_plugin);
+  app.add_plugin(scripting::scripting_plugin);
   app.add_plugin(engine::console_plugin);
   app.add_plugin(camera_plugin);
 
@@ -157,21 +157,21 @@ inline void scene_plugin(App &app) {
   app.insert_resource(scripting::LuaSystemRegistry{});
 
   app.add_systems(Startup, [](ecs::World& world) {
-      auto* lua = world.get_resource<engine::LuaResource>();
+      auto* lua = world.get_resource<scripting::LuaResource>();
       auto* reg = world.get_resource<scripting::LuaSystemRegistry>();
       if (lua) {
-          scripting::register_rydz_api(lua->vm);
-          scripting::expose_world_global(lua->vm, &world);
+          scripting::register_rydz_api(lua->L);
+          scripting::expose_world_global(lua->L, &world);
       }
 
       if (reg) {
-          lua_pushlightuserdata(lua->vm, reg);
-          lua_setfield(lua->vm, LUA_REGISTRYINDEX, "_sys_registry");
+          lua_pushlightuserdata(lua->L, reg);
+          lua_setfield(lua->L, LUA_REGISTRYINDEX, "_sys_registry");
       }
 
-      if (luaL_dofile(lua->vm, "res/scripts/test.lua") != LUA_OK) {
-          fprintf(stderr, "[Lua] %s\n", lua_tostring(lua->vm, -1));
-          lua_pop(lua->vm, 1);
+      if (luaL_dofile(lua->L, "res/scripts/test.lua") != LUA_OK) {
+          fprintf(stderr, "[Lua] %s\n", lua_tostring(lua->L, -1));
+          lua_pop(lua->L, 1);
       }
   });
 

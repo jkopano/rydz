@@ -9,14 +9,14 @@
 namespace scripting {
 
 	inline void run_lua_systems(ecs::World& world, const std::string& schedule) {
-		auto* lua_res = world.get_resource<engine::LuaResource>();
+		auto* lua_res = world.get_resource<scripting::LuaResource>();
 		auto* registry = world.get_resource<LuaSystemRegistry>();
 		if (!lua_res || !registry) return;
 
 		const auto* systems = registry->get_systems(schedule);
 		if (!systems || systems->empty()) return;
 
-		lua_State* L = lua_res->vm;
+		lua_State* L = lua_res->L;
 
 		for (const auto& sys : *systems) {
 			lua_rawgeti(L, LUA_REGISTRYINDEX, sys.func_ref);
@@ -34,10 +34,10 @@ namespace scripting {
 	}
 
 	inline void lua_update_runner(ecs::World& world) {
-		auto* lua_res = world.get_resource<engine::LuaResource>();
+		auto* lua_res = world.get_resource<scripting::LuaResource>();
 		if (!lua_res) return;
 
-		update_time_table(lua_res->vm, world);
+		update_time_table(lua_res->L, world);
 
 		run_lua_systems(world, "Update");
 	}

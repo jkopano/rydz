@@ -84,7 +84,7 @@ inline void camera_plugin(App& app) {
 
     app.add_systems(ScheduleLabel::Startup, [](World& world) {
 
-        engine::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
+        console::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
             return [zoom_level](Query<Mut<Camera3DComponent>> query) {
                 for (auto [cam] : query.iter()) {
                     if (cam->is_orthographic()) {
@@ -94,7 +94,7 @@ inline void camera_plugin(App& app) {
                 };
             });
 
-        engine::BindCommand<float>::to(world, "set_cam_speed", [](float speed) {
+        console::BindCommand<float>::to(world, "set_cam_speed", [](float speed) {
             return [speed](Query<Mut<IsometricCamera>> query) {
                 for (auto [iso_cam] : query.iter()) {
                     iso_cam->follow_speed = speed;

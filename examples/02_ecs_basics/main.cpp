@@ -122,10 +122,10 @@ void kill_all_enemies_logic(Query<Mut<Health>, With<EnemyTag>> query) {
 void bind_lua_commands(World &world) {
 
   // Rejestracja komendy bez parametrów
-  engine::ConsoleAPI::bind_system(world, "kill_all", kill_all_enemies_logic);
+  console::ConsoleAPI::bind_system(world, "kill_all", kill_all_enemies_logic);
 
   // Rejestracja komendy z parametrem int
-  engine::BindCommand<int>::to(world, "spawn", [](int amount) {
+  console::BindCommand<int>::to(world, "spawn", [](int amount) {
     return [amount](Cmd cmd, ResMut<EnemyCount> count) {
       spawn_enemies(std::move(cmd), count, amount);
     };
@@ -141,8 +141,8 @@ int main() {
       .insert_resource(EnemyCount{0})
       .add_plugin(time_plugin)
       .add_plugin(RenderPlugin::install)
-      .add_plugin(engine::scripting_plugin)
-      .add_plugin(engine::console_plugin)
+      .add_plugin(scripting::scripting_plugin)
+      .add_plugin(console::console_plugin)
       .add_systems(Startup, bind_lua_commands)
       // Update - wypisujemy stan co sekundę (patrz % 2 != 0)
       .add_systems(Update, group(print_enemies))

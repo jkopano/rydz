@@ -22,7 +22,7 @@ using namespace math;
 
 // ── Run condition ─────────────────────────────────────────────────────────────
 
-inline bool is_gameplay_active(Res<engine::ConsoleState> console) {
+inline bool is_gameplay_active(Res<console::ConsoleState> console) {
     return !console->is_open;
 }
 
@@ -85,7 +85,7 @@ inline void spawn_ground(Cmd cmd,
 // wykonania — rejestrujemy go jako pierwszy startup system skryptowy.
 
 inline void init_lua_scripting(ecs::World& world) {
-    auto* lua = world.get_resource<engine::LuaResource>();
+    auto* lua = world.get_resource<scripting::LuaResource>();
     auto* reg = world.get_resource<scripting::LuaSystemRegistry>();
     if (!lua) {
         fprintf(stderr, "[Scripting] Brak LuaResource!\n");
@@ -98,16 +98,16 @@ inline void init_lua_scripting(ecs::World& world) {
     );
 
     // 1. Zarejestruj całe API silnika (metatabelki, Components, Input, Time, Rydz, Schedule)
-    scripting::register_rydz_api(lua->vm);
+    scripting::register_rydz_api(lua->L);
 
     // 2. Eksponuj _world — musi być przed luaL_dofile bo skrypty mogą go użyć
-    scripting::expose_world_global(lua->vm, &world);
+    scripting::expose_world_global(lua->L, &world);
 
     // 3. Ustaw wskaźnik do rejestru systemów — musi być przed luaL_dofile
     //    bo skrypty wywołują Rydz.register_system() podczas ładowania
     if (reg) {
-        lua_pushlightuserdata(lua->vm, reg);
-        lua_setfield(lua->vm, LUA_REGISTRYINDEX, "_sys_registry");
+        lua_pushlightuserdata(lua->L, reg);
+        lua_setfield(lua->L, LUA_REGISTRYINDEX, "_sys_registry");
     }
 
     // 4. Załaduj wszystkie pliki .lua z res/scripts/ (nierekurencyjnie)
@@ -123,11 +123,11 @@ inline void init_lua_scripting(ecs::World& world) {
         std::string path = entry.path().string();
         fprintf(stdout, "[Scripting] Ladowanie: %s\n", path.c_str());
 
-        if (luaL_dofile(lua->vm, path.c_str()) != LUA_OK) {
+        if (luaL_dofile(lua->L, path.c_str()) != LUA_OK) {
             fprintf(stderr, "[Lua] Blad w %s:\n  %s\n",
                 path.c_str(),
-                lua_tostring(lua->vm, -1));
-            lua_pop(lua->vm, 1);
+                lua_tostring(lua->L, -1));
+            lua_pop(lua->L, 1);
             // Kontynuujemy — błąd w jednym skrypcie nie blokuje pozostałych
         }
     }
@@ -139,8 +139,8 @@ inline void scene_lua_plugin(App& app) {
     // Pluginy infrastrukturalne
     app.add_plugin(Input::install);
     app.add_plugin(system_multithreading({ true }));
-    app.add_plugin(engine::scripting_plugin); // tworzy engine::LuaResource
-    app.add_plugin(engine::console_plugin);   // tworzy ConsoleState
+    app.add_plugin(scripting::scripting_plugin); // tworzy scripting::LuaResource
+    app.add_plugin(console::console_plugin);   // tworzy ConsoleState
     app.add_plugin(camera_plugin);
 
     // Zasób rejestru systemów Lua — musi być wstawiony przed Startup
@@ -170,5 +170,5 @@ inline void scene_lua_plugin(App& app) {
 
     // Konsola — renderowanie na końcu
     app.add_systems(RenderPassSet::Cleanup,
-        group(engine::ConsoleRenderSystem).before(FramePass::end));
+        group(console::ConsoleRenderSystem).before(FramePass::end));
 }
