@@ -61,6 +61,10 @@ public:
     mouse_.y = y;
   }
 
+  auto mouse_position() const -> math::Vec2 { return math::Vec2{mouse_.x, mouse_.y}; }
+  auto mouse_x() const -> f32 { return mouse_.x; }
+  auto mouse_y() const -> f32 { return mouse_.y; }
+
   auto keys_down() -> std::unordered_set<KeyCode>& { return keys_down_; }
 
   static auto input_polling_system(ResMut<Input> input, NonSendMarker) -> void {
