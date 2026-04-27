@@ -40,9 +40,14 @@ let
     typst
     plantuml
   ];
+
+  debugDeps = with pkgs; [
+    gdb
+    gdb-dashboard
+  ];
 in
 {
-  packages = raylibDeps ++ compDeps ++ typstDeps;
+  packages = raylibDeps ++ compDeps ++ typstDeps ++ debugDeps;
 
   languages.cplusplus.enable = true;
 
