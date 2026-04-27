@@ -28,6 +28,39 @@ Rydz.on_startup(function(world)
  
     print("[test.lua] Wszystkie testy podstawowe ZALICZONE!")
 end)
+
+Rydz.on_startup(function(world)
+    -- kilka encji z różnymi danymi
+    local e1 = world:spawn()
+    world:set_lua_component(e1, { tag = "gracz", active = true, hp = 100 })
+
+    local e2 = world:spawn()
+    world:set_lua_component(e2, { tag = "wrog", active = true, hp = 50 })
+
+    local e3 = world:spawn()
+    world:set_lua_component(e3, { tag = "gracz", active = false, hp = 80 })
+
+    -- Test filtrowania po boolean
+    local count_active = 0
+    for e in world:each_lua_with("active", true) do
+        count_active = count_active + 1
+    end
+    print("[Test each_lua_with] active=true: " .. count_active .. " (oczekiwane: 2 + gracz z player.lua)")
+
+    -- Test filtrowania po stringu
+    local count_gracz = 0
+    for e in world:each_lua_with("tag", "gracz") do
+        count_gracz = count_gracz + 1
+    end
+    print("[Test each_lua_with] tag=gracz: " .. count_gracz .. " (oczekiwane: 2)")
+
+    -- Test filtrowania po nieistniejącym polu
+    local count_none = 0
+    for e in world:each_lua_with("nieistniejace_pole", true) do
+        count_none = count_none + 1
+    end
+    print("[Test each_lua_with] nieistniejace_pole: " .. count_none .. " (oczekiwane: 0)")
+end)
  
 -- System sprawdzający Input i Time co sekundę
 local timer = 0.0

@@ -145,6 +145,58 @@ namespace scripting {
 			});
 		lua_setfield(L, -2, "each_lua");
 
+		// world:each_lua_with("is_player", true) -> iterator
+		// Zwraca tylko encje których LuaComponent.key == value
+		lua_pushcfunction(L, [](lua_State* L) -> int {
+			ecs::World* world = check_world(L, 1);
+			const char* key = luaL_checkstring(L, 2);
+
+			auto* storage = world->get_storage<scripting::LuaComponent>();
+
+			lua_newtable(L); // tabela encji wynikowych [pozycja 4 na stosie]
+			int count = 1;
+
+			if (storage) {
+				for (const ecs::Entity& e : storage->entities()) {
+					auto* comp = world->get_component<scripting::LuaComponent>(e);
+					if (!comp || comp->table_ref == LUA_NOREF) continue;
+
+					//pobranie pola `key` z tabeli LuaComponent
+					lua_rawgeti(L, LUA_REGISTRYINDEX, comp->table_ref); 
+					lua_getfield(L, -1, key);                          
+
+					bool match = false;
+					if (lua_type(L, -1) == lua_type(L, 3)) {
+						match = (lua_equal(L, -1, 3) != 0);
+					}
+
+					lua_pop(L, 2);
+
+					if (match) {
+						push_entity(L, e);
+						lua_rawseti(L, -2, count++); // tabela wynikowa[-1] = entity
+					}
+				}
+			}
+
+			//tabela wynikowa jako upvalue [1]
+			lua_pushinteger(L, 0); // indeks jako upvalue [2]
+
+			lua_pushcclosure(L, [](lua_State* L) -> int {
+				lua_Integer idx = lua_tointeger(L, lua_upvalueindex(2)) + 1;
+				lua_rawgeti(L, lua_upvalueindex(1), (int)idx);
+				if (lua_isnil(L, -1)) {
+					return 1;
+				}
+				lua_pushinteger(L, idx);
+				lua_replace(L, lua_upvalueindex(2));
+				return 1;
+				}, 2);
+
+			return 1;
+			});
+		lua_setfield(L, -2, "each_lua_with");
+
 		//world:get_component(entity, Components.Transform) -> proxy lub nil
 		lua_pushcfunction(L, [](lua_State* L) -> int {
 			ecs::World* world = check_world(L, 1);

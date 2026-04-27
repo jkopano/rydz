@@ -47,41 +47,35 @@ end)
 -- ── System ruchu ─────────────────────────────────────────────────────────────
  
 local function PlayerMovement(world)
-    if not player_entity then return end
- 
-    local data = world:get_lua_component(player_entity)
-    if not data or not data.is_player then return end
- 
-    local t = world:get_component(player_entity, Components.Transform)
-    if not t then return end  -- encja może nie mieć Transform jeszcze
- 
-    local speed = data.speed * Time.delta
-    local dx, dz = 0.0, 0.0
- 
-    if Input.is_key_down(Input.KEY_W) then
-        dx = dx + ISO_FORWARD.x * speed
-        dz = dz + ISO_FORWARD.z * speed
-    end
-    if Input.is_key_down(Input.KEY_S) then
-        dx = dx - ISO_FORWARD.x * speed
-        dz = dz - ISO_FORWARD.z * speed
-    end
-    if Input.is_key_down(Input.KEY_D) then
-        dx = dx + ISO_RIGHT.x * speed
-        dz = dz + ISO_RIGHT.z * speed
-    end
-    if Input.is_key_down(Input.KEY_A) then
-        dx = dx - ISO_RIGHT.x * speed
-        dz = dz - ISO_RIGHT.z * speed
-    end
- 
-    if dx ~= 0 or dz ~= 0 then
-        local pos = t.translation
-        t.translation = {
-            x = pos.x + dx,
-            y = pos.y,
-            z = pos.z + dz,
-        }
+    for entity in world:each_lua_with("is_player", true) do
+        local data = world:get_lua_component(entity)
+        local t    = world:get_component(entity, Components.Transform)
+        if not t then return end
+
+        local speed = data.speed * Time.delta
+        local dx, dz = 0.0, 0.0
+
+        if Input.is_key_down(Input.KEY_W) then
+            dx = dx + ISO_FORWARD.x * speed
+            dz = dz + ISO_FORWARD.z * speed
+        end
+        if Input.is_key_down(Input.KEY_S) then
+            dx = dx - ISO_FORWARD.x * speed
+            dz = dz - ISO_FORWARD.z * speed
+        end
+        if Input.is_key_down(Input.KEY_D) then
+            dx = dx + ISO_RIGHT.x * speed
+            dz = dz + ISO_RIGHT.z * speed
+        end
+        if Input.is_key_down(Input.KEY_A) then
+            dx = dx - ISO_RIGHT.x * speed
+            dz = dz - ISO_RIGHT.z * speed
+        end
+
+        if dx ~= 0 or dz ~= 0 then
+            local pos = t.translation
+            t.translation = { x = pos.x + dx, y = pos.y, z = pos.z + dz }
+        end
     end
 end
  
@@ -92,14 +86,12 @@ Rydz.register_system(Schedule.Update, PlayerMovement, "PlayerMovement")
 local frame = 0
 local function DebugHUD(world)
     frame = frame + 1
-    if frame % 300 == 0 then  -- co 300 klatek (~5s przy 60fps)
-        if player_entity then
-            local data = world:get_lua_component(player_entity)
-            if data then
-                print(string.format("[HUD] Klatka %d | HP: %d/%d | FPS: %.0f",
-                    frame, data.health, data.max_health, 1.0 / Time.delta))
-            end
-        end
+    if frame % 300 ~= 0 then return end
+
+    for entity in world:each_lua_with("is_player", true) do
+        local data = world:get_lua_component(entity)
+        print(string.format("[HUD] Klatka %d | HP: %d/%d | FPS: %.0f",
+            frame, data.health, data.max_health, 1.0 / Time.delta))
     end
 end
  
