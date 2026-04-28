@@ -1,6 +1,7 @@
 #pragma once
 #include "rydz_console/console.hpp"
 #include "rydz_console/scripting.hpp"
+#include "rydz_scripting/lua_resource.hpp"
 #include "rydz_ecs/mod.hpp"
 #include <functional>
 #include <string>
@@ -12,7 +13,7 @@ extern "C" {
 #include "lualib.h"
 }
 
-namespace engine {
+namespace console {
 
 using LuaCommand = std::function<std::string(lua_State *)>;
 inline std::unordered_map<std::string, LuaCommand> lua_commands;
@@ -32,14 +33,14 @@ inline int lua_command_gateway(lua_State *L) {
   return 0;
 }
 
-inline void register_lua_command(lua_State *vm, const std::string &name,
+inline void register_lua_command(lua_State *L, const std::string &name,
                                  LuaCommand lcmd) {
 
   lua_commands[name] = std::move(lcmd);
 
-  lua_pushstring(vm, name.c_str());
-  lua_pushcclosure(vm, lua_command_gateway, 1);
-  lua_setglobal(vm, name.c_str());
+  lua_pushstring(L, name.c_str());
+  lua_pushcclosure(L, lua_command_gateway, 1);
+  lua_setglobal(L, name.c_str());
 }
 
 template <typename T> T lua_get(lua_State *L, int idx);
@@ -74,7 +75,7 @@ public:
   static void bind_system(ecs::World &world, const std::string &command_name,
                           Func ecs_system) {
 
-    auto *lua = world.get_resource<LuaResource>();
+    auto *lua = world.get_resource<scripting::LuaResource>();
     auto *console = world.get_resource<ConsoleState>();
     if (!lua)
       return;
@@ -82,7 +83,7 @@ public:
     ecs::World *w_ptr = &world;
 
     register_lua_command(
-        lua->vm, command_name,
+        lua->L, command_name,
         [w_ptr, console, command_name, ecs_system](lua_State *) -> std::string {
           auto sys = ecs::make_system(ecs_system);
           sys->run(*w_ptr);
@@ -98,7 +99,7 @@ template <typename... LuaArgs> struct BindCommand {
   static void to(ecs::World &world, const std::string &command_name,
                  BuilderFunc builder) {
 
-    auto *lua = world.get_resource<LuaResource>();
+    auto *lua = world.get_resource<scripting::LuaResource>();
     auto *console = world.get_resource<ConsoleState>();
     if (!lua)
       return;
@@ -106,7 +107,7 @@ template <typename... LuaArgs> struct BindCommand {
     ecs::World *w_ptr = &world;
 
     register_lua_command(
-        lua->vm, command_name,
+        lua->L, command_name,
         [w_ptr, console, command_name, builder](lua_State *L) -> std::string {
           int arg_count = lua_gettop(L);
           int expected_count = (int)sizeof...(LuaArgs);

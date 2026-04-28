@@ -12,6 +12,9 @@
 #include "rydz_graphics/plugin.hpp"
 #include "rydz_levelLoader/rydz_levelLoader.hpp"
 #include "rydz_ui/mod.hpp"
+#include "rydz_scripting/lua_resource.hpp"
+#include "rydz_scripting/script_scheduler.hpp"
+#include "rydz_scripting/lua_system_registry.hpp"
 #include <algorithm>
 #include <print>
 
@@ -308,9 +311,30 @@ inline void scene_plugin(App& app) {
   app.add_plugin(InputPlugin{});
   app.add_plugin(UiPlugin::install);
   app.add_plugin(system_multithreading({true}));
-  app.add_plugin(engine::scripting_plugin);
+  app.add_plugin(scripting::scripting_plugin);
   app.add_plugin(engine::console_plugin);
   app.add_plugin(camera_plugin);
+
+  app.insert_resource(scripting::LuaSystemRegistry{});
+
+  app.add_systems(Startup, [](ecs::World& world) {
+      auto* lua = world.get_resource<scripting::LuaResource>();
+      auto* reg = world.get_resource<scripting::LuaSystemRegistry>();
+      if (lua) {
+          scripting::register_rydz_api(lua->L);
+          scripting::expose_world_global(lua->L, &world);
+      }
+
+      if (reg) {
+          lua_pushlightuserdata(lua->L, reg);
+          lua_setfield(lua->L, LUA_REGISTRYINDEX, "_sys_registry");
+      }
+
+      if (luaL_dofile(lua->L, "res/scripts/test.lua") != LUA_OK) {
+          fprintf(stderr, "[Lua] %s\n", lua_tostring(lua->L, -1));
+          lua_pop(lua->L, 1);
+      }
+  });
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
   app.add_systems(ScheduleLabel::Startup, setup_lighting);
@@ -324,13 +348,13 @@ inline void scene_plugin(App& app) {
   app.add_systems(ScheduleLabel::Update, show_player_position_ui);
   app.add_systems(ScheduleLabel::Update, update_wasd_ui_system);
 
-  app.add_systems(
-    ScheduleLabel::Update,
-    ecs::group(player_movement_system, update_isometric_camera_target_system)
-      .run_if(is_gameplay_active)
-  );
 
-  app.add_systems(
-    RenderPassSet::Cleanup, group(engine::ConsoleRenderSystem).before(FramePass::end)
-  );
+  app.add_systems(ecs::ScheduleLabel::Startup,
+    group(init_lua_scripting, scripting::lua_startup_runner).chain());
+
+  app.add_systems(Update, group(player_movement_system,
+                                update_isometric_camera_target_system)
+                              .run_if(is_gameplay_active));
+  app.add_systems(RenderPassSet::Cleanup,
+                  group(engine::ConsoleRenderSystem).before(FramePass::end));
 }

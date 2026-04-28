@@ -94,14 +94,25 @@ inline auto camera_plugin(App& app) -> void {
       };
     });
 
-    engine::BindCommand<float>::to(world, "set_cam_speed", [](float speed) {
-      return [speed](Query<Mut<IsometricCamera>> query) -> void {
-        for (auto [iso_cam] : query.iter()) {
-          iso_cam->follow_speed = speed;
-        }
-      };
-    });
-  });
+        console::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
+            return [zoom_level](Query<Mut<Camera3DComponent>> query) {
+                for (auto [cam] : query.iter()) {
+                    if (cam->is_orthographic()) {
+                        cam->orthographic_height = zoom_level;
+                    }
+                }
+                };
+            });
+
+        console::BindCommand<float>::to(world, "set_cam_speed", [](float speed) {
+            return [speed](Query<Mut<IsometricCamera>> query) {
+                for (auto [iso_cam] : query.iter()) {
+                    iso_cam->follow_speed = speed;
+                }
+                };
+            });
+
+        });
 }
 
 } // namespace ecs
