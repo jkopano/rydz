@@ -35,6 +35,14 @@ public:
     mouse_.delta_y = 0.0f;
   }
 
+  auto clear() -> void {
+    keys_down_.clear();
+    keys_pressed_.clear();
+    keys_released_.clear();
+    mouse_.delta_x = 0.0f;
+    mouse_.delta_y = 0.0f;
+  }
+
   auto set_key_down(KeyCode key) -> void {
     if (!keys_down_.contains(key)) {
       keys_pressed_.insert(key);
