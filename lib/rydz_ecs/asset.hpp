@@ -11,6 +11,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -83,7 +84,7 @@ public:
 
   auto set(Handle<AssetT> handle, AssetT item) -> void {
     if (handle.id >= items_.size()) {
-      items_.resize(handle.id + 1, std::nullopt);
+      items_.resize(handle.id + 1);
     }
     if (deleter_ && items_[handle.id].has_value()) {
       deleter_(items_[handle.id].value());

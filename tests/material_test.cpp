@@ -215,7 +215,7 @@ TEST(MaterialTest, PrepareMaterialPreservesAuthoredTextureOverFallback) {
   texture.height = 1;
   texture.mipmaps = 1;
   texture.format = gl::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
-  auto const roughness_texture = textures.add(texture);
+  auto const roughness_texture = textures.add(std::move(texture));
 
   ecs::CompiledMaterial material;
   material.maps.push_back(

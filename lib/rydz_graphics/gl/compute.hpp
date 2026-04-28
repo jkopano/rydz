@@ -42,14 +42,14 @@ public:
 
     char* source = rl::LoadFileText(path);
     if (source == nullptr) {
-      warn("Forward+: failed to load compute shader '{}'", path);
+      warn("failed to load compute shader '{}'", path);
       return false;
     }
 
     u32 const shader_id = rl::rlCompileShader(source, RL_COMPUTE_SHADER);
     rl::UnloadFileText(source);
     if (shader_id == 0) {
-      warn("Forward+: failed to compile compute shader '{}'", path);
+      warn("failed to compile compute shader '{}'", path);
       return false;
     }
 
@@ -57,7 +57,7 @@ public:
     glDeleteShader(shader_id);
 
     if (id_ == 0) {
-      warn("Forward+: failed to link compute shader '{}'", path);
+      warn("failed to link compute shader '{}'", path);
       return false;
     }
 

@@ -189,6 +189,8 @@ public:
   auto raw() -> Shader& { return shader_; }
   auto raw() const -> Shader const& { return shader_; }
 
+  [[nodiscard]] auto ready() const -> bool { return shader_.ready(); }
+
   auto uniform_location(std::string_view const name) -> int {
     std::string owned_name{name};
     auto iter = uniform_locations_.find(owned_name);
@@ -219,7 +221,7 @@ public:
       return iter->second;
     }
 
-    unsigned int const index = glGetUniformBlockIndex(shader_.id, owned_name.c_str());
+    unsigned int const index = rl::GetUniformBlockIndex(shader_.id, owned_name.c_str());
     uniform_block_indices_.emplace(std::move(owned_name), index);
     return index;
   }
@@ -227,6 +229,9 @@ public:
   auto bind_uniform_block(std::string_view const name, unsigned int binding) -> bool {
     unsigned int const index = uniform_block_index(name);
     if (index == GL_INVALID_INDEX) {
+      warn(
+        "ShaderProgram::bind_uniform_block: uniform block '{}' not found in shader", name
+      );
       return false;
     }
 
@@ -235,7 +240,7 @@ public:
       return true;
     }
 
-    glUniformBlockBinding(shader_.id, index, binding);
+    rl::UniformBlockBinding(shader_.id, index, binding);
     uniform_block_bindings_.insert_or_assign(index, binding);
     return true;
   }
@@ -306,9 +311,25 @@ public:
   auto set_sampler(std::string_view const name, int unit) -> void {
     int const location = uniform_location(name);
     if (location >= 0) {
-      glUseProgram(shader_.id);
-      glUniform1i(location, unit);
+      rl::SetShaderValue(shader_, location, &unit, SHADER_UNIFORM_INT);
     }
+  }
+
+  auto bind_texture(std::string_view const name, Texture const& texture, int slot)
+    -> void {
+    if (!texture.ready()) {
+      warn("ShaderProgram::bind_texture: texture is not ready");
+      return;
+    }
+
+    int const location = uniform_location(name);
+    if (location < 0) {
+      warn("ShaderProgram::bind_texture: uniform '{}' not found in shader", name);
+      return;
+    }
+
+    texture.bind(slot);
+    set_sampler(name, slot);
   }
 
   template <ecs::ShaderUniformBinding Binding, typename T>

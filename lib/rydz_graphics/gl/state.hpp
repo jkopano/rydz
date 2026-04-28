@@ -127,15 +127,9 @@ struct Cull {
   bool enabled = true;
   Face face = Face::Back;
 
-  static constexpr auto none() -> Cull {
-    return {.enabled = false, .face = Face::Back};
-  }
-  static constexpr auto back() -> Cull {
-    return {.enabled = true, .face = Face::Back};
-  }
-  static constexpr auto front() -> Cull {
-    return {.enabled = true, .face = Face::Front};
-  }
+  static constexpr auto none() -> Cull { return {.enabled = false, .face = Face::Back}; }
+  static constexpr auto back() -> Cull { return {.enabled = true, .face = Face::Back}; }
+  static constexpr auto front() -> Cull { return {.enabled = true, .face = Face::Front}; }
 
   auto operator==(Cull const&) const -> bool = default;
 

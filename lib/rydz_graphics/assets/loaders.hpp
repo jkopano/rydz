@@ -27,7 +27,7 @@ struct TextureLoader : public AssetLoader<TextureLoader, Texture> {
     auto* assets = world.get_resource<Assets<Texture>>();
     if (assets != nullptr) {
       auto texture = Texture(path.c_str());
-      assets->set(Handle<Texture>{handle_id}, texture);
+      assets->set(Handle<Texture>{.id = handle_id}, texture);
     }
   }
 

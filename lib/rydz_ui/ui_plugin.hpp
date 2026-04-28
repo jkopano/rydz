@@ -3,10 +3,135 @@
 #include "rydz_ecs/app.hpp"
 #include "rydz_graphics/extract/systems.hpp"
 #include "rydz_graphics/spatial/transform.hpp"
-#include "rydz_ui/system_sets.hpp"
 
 struct UiPlugin {
 public:
+  static auto ui_node_contains_cursor(
+    rydz::ui::ComputedUiNode const& node, math::Vec2 cursor
+  ) -> bool {
+    return cursor.x >= node.pos.x && cursor.x <= (node.pos.x + node.size.x) &&
+           cursor.y >= node.pos.y && cursor.y <= (node.pos.y + node.size.y);
+  }
+
+  static auto hit_test_ui(ecs::World& world, math::Vec2 cursor)
+    -> std::optional<ecs::Entity> {
+    auto* nodes = world.get_storage<rydz::ui::UiNode>();
+    if (!nodes) {
+      return std::nullopt;
+    }
+
+    auto best = std::optional<ecs::Entity>{};
+    auto best_z = std::numeric_limits<int>::min();
+
+    nodes->for_each([&](ecs::Entity e, rydz::ui::UiNode const& node) {
+      auto* computed = world.get_component<rydz::ui::ComputedUiNode>(e);
+      if (!computed) {
+        return;
+      }
+
+      if (
+        auto* style = world.get_component<rydz::ui::Style>(e);
+        style != nullptr && style->display == rydz::ui::Display::None
+      ) {
+        return;
+      }
+
+      if (computed->size.x <= 0.0f || computed->size.y <= 0.0f) {
+        return;
+      }
+
+      if (!ui_node_contains_cursor(*computed, cursor)) {
+        return;
+      }
+
+      if (node.z_index >= best_z) {
+        best_z = node.z_index;
+        best = e;
+      }
+    });
+
+    return best;
+  }
+
+  static void update_hover_state(
+    ecs::World& world,
+    rydz::ui::UiPointerState const& pointer,
+    rydz::ui::UiInteractionState& state,
+    std::optional<ecs::Entity> next_hovered
+  ) {
+    if (state.hovered_entity == next_hovered) {
+      return;
+    }
+
+    if (state.hovered_entity) {
+      world.trigger(
+        rydz::ui::UiHoverLeave{
+          .target = *state.hovered_entity,
+          .cursor = pointer.cursor,
+        }
+      );
+    }
+
+    if (next_hovered) {
+      world.trigger(
+        rydz::ui::UiHoverEnter{
+          .target = *next_hovered,
+          .cursor = pointer.cursor,
+        }
+      );
+    }
+
+    state.hovered_entity = next_hovered;
+  }
+
+  static void update_focus_state(
+    ecs::World& world,
+    rydz::ui::UiPointerState const& pointer,
+    rydz::ui::UiInteractionState& state,
+    std::optional<ecs::Entity> next_focused
+  ) {
+    if (state.focused_entity == next_focused) {
+      return;
+    }
+
+    if (state.focused_entity) {
+      world.trigger(rydz::ui::UiFocusLost{.target = *state.focused_entity});
+    }
+
+    if (next_focused) {
+      world.trigger(rydz::ui::UiFocusGained{.target = *next_focused});
+    }
+
+    state.focused_entity = next_focused;
+  }
+
+  static void ui_interaction_system(ecs::World& world) {
+    auto* pointer = world.get_resource<rydz::ui::UiPointerState>();
+    auto* state = world.get_resource<rydz::ui::UiInteractionState>();
+    if (!pointer || !state) {
+      return;
+    }
+
+    auto next_hovered = hit_test_ui(world, pointer->cursor);
+    update_hover_state(world, *pointer, *state, next_hovered);
+
+    if (pointer->primary_pressed && next_hovered) {
+      state->pressed_entity = next_hovered;
+      world.trigger(
+        rydz::ui::UiClick{
+          .target = *next_hovered,
+          .cursor = pointer->cursor,
+          .button = pointer->primary_button,
+        }
+      );
+      update_focus_state(world, *pointer, *state, next_hovered);
+    }
+
+    if (pointer->primary_released) {
+      state->pressed_entity.reset();
+    }
+  }
+
   static void ui_init_system(ecs::World& world) {
     if (world.has_resource<rydz::ui::UiWhiteTexture>())
       return;
@@ -19,7 +144,7 @@ public:
     gl::Texture tex = rl::LoadTextureFromImage(img);
     rl::UnloadImage(img);
 
-    world.insert_resource(rydz::ui::UiWhiteTexture{textures->add(tex)});
+    world.insert_resource(rydz::ui::UiWhiteTexture{textures->add(std::move(tex))});
   }
 
   static void ui_prepare_system(ecs::World& world) {
@@ -137,7 +262,7 @@ public:
 
         gl::Texture raw_tex = rl::LoadTextureFromImage(img);
         rl::UnloadImage(img);
-        it = text_cache->items.emplace(key, textures->add(raw_tex)).first;
+        it = text_cache->items.emplace(key, textures->add(std::move(raw_tex))).first;
       }
 
       sprite->handle = it->second;
@@ -155,6 +280,7 @@ public:
       ecs::configure(
         rydz::ui::UiSystemSet::Prepare,
         rydz::ui::UiSystemSet::Layout,
+        rydz::ui::UiSystemSet::Interaction,
         rydz::ui::UiSystemSet::PostLayout
       )
         .chain()
@@ -173,9 +299,22 @@ public:
     if (!world.has_resource<rydz::ui::UiFontCache>())
       world.insert_resource(rydz::ui::UiFontCache{});
 
+    if (!world.has_resource<rydz::ui::UiPointerState>())
+      world.insert_resource(rydz::ui::UiPointerState{});
+
+    if (!world.has_resource<rydz::ui::UiInteractionState>())
+      world.insert_resource(rydz::ui::UiInteractionState{});
+
+    app.add_event<rydz::ui::UiHoverEnter>()
+      .add_event<rydz::ui::UiHoverLeave>()
+      .add_event<rydz::ui::UiClick>()
+      .add_event<rydz::ui::UiFocusGained>()
+      .add_event<rydz::ui::UiFocusLost>();
+
     app.add_systems(ecs::ScheduleLabel::Startup, ui_init_system);
     app.add_systems(rydz::ui::UiSystemSet::Prepare, ui_prepare_system)
       .add_systems(rydz::ui::UiSystemSet::Layout, ui_layout_system)
+      .add_systems(rydz::ui::UiSystemSet::Interaction, ui_interaction_system)
       .add_systems(rydz::ui::UiSystemSet::PostLayout, ui_post_layout_system);
   }
 };
