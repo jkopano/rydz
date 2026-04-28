@@ -4,7 +4,7 @@
 #include "rydz_graphics/assets/scene_graph.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/material/standard_material.hpp"
-#include "rydz_graphics/transform.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
 #include <algorithm>
 #include <array>
 #include <external/cgltf.h>
@@ -34,9 +34,8 @@ inline auto transform_from_cgltf_node(cgltf_node const& node) -> Transform {
   }
 
   if (node.has_rotation != 0) {
-    transform.rotation = Quat(
-      node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]
-    );
+    transform.rotation =
+      Quat(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
   }
 
   if (node.has_scale) {
@@ -100,9 +99,8 @@ inline auto apply_gltf_material_properties(
   case cgltf_alpha_mode_mask:
     material_desc.render_method = RenderMethod::AlphaCutout;
     material_desc.casts_shadows = true;
-    material_desc.alpha_cutoff = material->alpha_cutoff > 0.0F
-                                   ? material->alpha_cutoff
-                                   : DEFAULT_ALPHACUTOFF;
+    material_desc.alpha_cutoff =
+      material->alpha_cutoff > 0.0F ? material->alpha_cutoff : DEFAULT_ALPHACUTOFF;
     break;
   case cgltf_alpha_mode_opaque:
   default:
@@ -114,20 +112,22 @@ inline auto apply_gltf_material_properties(
 
 inline auto transfer_texture(
   Assets<Texture>& textures,
-  gl::Texture const& texture,
+  ::rlTexture const& raw_texture,
   std::unordered_map<unsigned int, Handle<Texture>>& texture_cache
 ) -> Handle<Texture> {
-  if (!texture.ready()) {
+  if (raw_texture.id == 0) {
     return {};
   }
 
-  auto cached = texture_cache.find(texture.id);
+  auto cached = texture_cache.find(raw_texture.id);
   if (cached != texture_cache.end()) {
     return cached->second;
   }
 
-  auto handle = textures.add(texture);
-  texture_cache.emplace(texture.id, handle);
+  gl::Texture owned_texture{raw_texture};
+  u32 const texture_id = owned_texture.id;
+  auto handle = textures.add(std::move(owned_texture));
+  texture_cache.emplace(texture_id, handle);
   return handle;
 }
 
@@ -145,48 +145,61 @@ inline auto material_from_backend_material(
 
   if (material.maps != nullptr) {
     auto* maps = material.maps;
-    material_value.base_color =
-      maps[material_map_index(MaterialMap::Albedo)].color;
-    material_value.emissive_color =
-      maps[material_map_index(MaterialMap::Emission)].color;
+    material_value.base_color = maps[material_map_index(MaterialMap::Albedo)].color;
+    material_value.emissive_color = maps[material_map_index(MaterialMap::Emission)].color;
     material_value.texture = transfer_texture(
-      textures,
-      maps[material_map_index(MaterialMap::Albedo)].texture,
-      texture_cache
+      textures, maps[material_map_index(MaterialMap::Albedo)].texture, texture_cache
     );
     material_value.normal_map = transfer_texture(
-      textures,
-      maps[material_map_index(MaterialMap::Normal)].texture,
-      texture_cache
+      textures, maps[material_map_index(MaterialMap::Normal)].texture, texture_cache
     );
     material_value.metallic_map = transfer_texture(
-      textures,
-      maps[material_map_index(MaterialMap::Metalness)].texture,
-      texture_cache
+      textures, maps[material_map_index(MaterialMap::Metalness)].texture, texture_cache
     );
     material_value.roughness_map = transfer_texture(
-      textures,
-      maps[material_map_index(MaterialMap::Roughness)].texture,
-      texture_cache
+      textures, maps[material_map_index(MaterialMap::Roughness)].texture, texture_cache
     );
     material_value.occlusion_map = transfer_texture(
-      textures,
-      maps[material_map_index(MaterialMap::Occlusion)].texture,
-      texture_cache
+      textures, maps[material_map_index(MaterialMap::Occlusion)].texture, texture_cache
     );
     material_value.emissive_map = transfer_texture(
-      textures,
-      maps[material_map_index(MaterialMap::Emission)].texture,
-      texture_cache
+      textures, maps[material_map_index(MaterialMap::Emission)].texture, texture_cache
     );
-    material_value.metallic =
-      maps[material_map_index(MaterialMap::Metalness)].value;
-    material_value.roughness =
-      maps[material_map_index(MaterialMap::Roughness)].value;
-    material_value.normal_scale =
-      maps[material_map_index(MaterialMap::Normal)].value;
-    material_value.occlusion_strength =
-      maps[material_map_index(MaterialMap::Occlusion)].value;
+    material_value.metallic = maps[material_map_index(MaterialMap::Metalness)].value;
+    material_value.roughness = maps[material_map_index(MaterialMap::Roughness)].value;
+    material_value.normal_scale = maps[material_map_index(MaterialMap::Normal)].value;
+  }
+
+  if (gltf_material != nullptr) {
+    if (gltf_material->has_pbr_metallic_roughness) {
+      material_value.metallic = gltf_material->pbr_metallic_roughness.metallic_factor;
+      material_value.roughness = gltf_material->pbr_metallic_roughness.roughness_factor;
+    }
+
+    if (gltf_material->normal_texture.texture != nullptr) {
+      material_value.normal_scale = gltf_material->normal_texture.scale;
+    } else {
+      material_value.normal_scale = -1.0F;
+    }
+
+    if (gltf_material->occlusion_texture.texture != nullptr) {
+      material_value.occlusion_strength = gltf_material->occlusion_texture.scale;
+    } else {
+      material_value.occlusion_strength = -1.0F;
+    }
+
+    material_value.emissive_color = Color{
+      static_cast<unsigned char>(
+        std::clamp(gltf_material->emissive_factor[0], 0.0F, 1.0F) * 255.0F
+      ),
+      static_cast<unsigned char>(
+        std::clamp(gltf_material->emissive_factor[1], 0.0F, 1.0F) * 255.0F
+      ),
+      static_cast<unsigned char>(
+        std::clamp(gltf_material->emissive_factor[2], 0.0F, 1.0F) * 255.0F
+      ),
+      255,
+    };
   }
 
   CompiledMaterial compiled = Material{material_value}.compiled;
@@ -200,11 +213,11 @@ inline auto material_from_backend_material(
 
 class SceneLoader : public IAssetLoader {
 public:
-  auto extensions() const -> std::vector<std::string> override {
+  [[nodiscard]] auto extensions() const -> std::vector<std::string> override {
     return {"gltf", "glb"};
   }
 
-  auto is_async() const -> bool override { return false; }
+  [[nodiscard]] auto is_async() const -> bool override { return false; }
 
   auto load(std::vector<uint8_t> const& /*data*/, std::string const& path)
     -> std::any override {
@@ -233,14 +246,12 @@ public:
 
     cgltf_options options{};
     cgltf_data* data = nullptr;
-    if (cgltf_parse_file(&options, file_path.c_str(), &data) !=
-        cgltf_result_success) {
+    if (cgltf_parse_file(&options, file_path.c_str(), &data) != cgltf_result_success) {
       rl::UnloadModel(model);
       return;
     }
 
-    if (cgltf_load_buffers(&options, data, file_path.c_str()) !=
-        cgltf_result_success) {
+    if (cgltf_load_buffers(&options, data, file_path.c_str()) != cgltf_result_success) {
       cgltf_free(data);
       rl::UnloadModel(model);
       return;
@@ -250,8 +261,7 @@ public:
     scene.nodes.resize(data->nodes_count);
 
     std::unordered_map<unsigned int, Handle<Texture>> texture_cache;
-    usize const material_count =
-      static_cast<usize>(std::max(model.materialCount, 1));
+    usize const material_count = static_cast<usize>(std::max(model.materialCount, 1));
     scene.materials.reserve(material_count);
     for (int i = 0; i < static_cast<int>(material_count); ++i) {
       std::string material_name;
@@ -290,18 +300,15 @@ public:
 
     std::vector<std::vector<ScenePrimitive>> node_primitives(data->nodes_count);
     int model_mesh_index = 0;
-    for (cgltf_size node_index = 0; node_index < data->nodes_count;
-         ++node_index) {
+    for (cgltf_size node_index = 0; node_index < data->nodes_count; ++node_index) {
       cgltf_node& node = data->nodes[node_index];
-      if (!node.mesh) {
+      if (node.mesh == nullptr) {
         continue;
       }
 
-      for (cgltf_size primitive_index = 0;
-           primitive_index < node.mesh->primitives_count;
+      for (cgltf_size primitive_index = 0; primitive_index < node.mesh->primitives_count;
            ++primitive_index) {
-        cgltf_primitive const& primitive =
-          node.mesh->primitives[primitive_index];
+        cgltf_primitive const& primitive = node.mesh->primitives[primitive_index];
         if (primitive.type != cgltf_primitive_type_triangles) {
           continue;
         }
@@ -309,15 +316,13 @@ public:
           break;
         }
 
-        Handle<Mesh> mesh_handle =
-          mesh_assets->add(model.meshes[model_mesh_index]);
+        Handle<Mesh> mesh_handle = mesh_assets->add(model.meshes[model_mesh_index]);
         model.meshes[model_mesh_index] = gl::Mesh{};
 
         usize material_index = 0;
         if (model.meshMaterial && model_mesh_index < model.meshCount &&
             model.meshMaterial[model_mesh_index] >= 0) {
-          material_index =
-            static_cast<usize>(model.meshMaterial[model_mesh_index]);
+          material_index = static_cast<usize>(model.meshMaterial[model_mesh_index]);
         }
         material_index = std::min(material_index, scene.materials.size() - 1);
 
@@ -340,19 +345,15 @@ public:
     std::unordered_map<std::string, i32> bone_index_by_name;
     bone_index_by_name.reserve(model.skeleton.boneCount);
     scene.bones.reserve(model.skeleton.boneCount);
-    for (int bone_index = 0; bone_index < model.skeleton.boneCount;
-         ++bone_index) {
+    for (int bone_index = 0; bone_index < model.skeleton.boneCount; ++bone_index) {
       SceneBoneData bone;
       bone.name = model.skeleton.bones[bone_index].name;
       bone.parent = model.skeleton.bones[bone_index].parent;
 
       if (model.skeleton.bindPose) {
         auto const& bind_pose = model.skeleton.bindPose[bone_index];
-        bone.bind_pose.translation = Vec3(
-          bind_pose.translation.x,
-          bind_pose.translation.y,
-          bind_pose.translation.z
-        );
+        bone.bind_pose.translation =
+          Vec3(bind_pose.translation.x, bind_pose.translation.y, bind_pose.translation.z);
         bone.bind_pose.rotation = Quat(
           bind_pose.rotation.x,
           bind_pose.rotation.y,
@@ -367,18 +368,15 @@ public:
       scene.bones.push_back(std::move(bone));
     }
 
-    for (cgltf_size node_index = 0; node_index < data->nodes_count;
-         ++node_index) {
+    for (cgltf_size node_index = 0; node_index < data->nodes_count; ++node_index) {
       cgltf_node const& node = data->nodes[node_index];
       auto& scene_node = scene.nodes[node_index];
       scene_node.name = node.name ? node.name : "";
       scene_node.local_transform = detail::transform_from_cgltf_node(node);
-      scene_node.parent =
-        node.parent ? static_cast<i32>(node.parent - data->nodes) : -1;
+      scene_node.parent = node.parent ? static_cast<i32>(node.parent - data->nodes) : -1;
       scene_node.primitives = std::move(node_primitives[node_index]);
 
-      for (cgltf_size child_index = 0; child_index < node.children_count;
-           ++child_index) {
+      for (cgltf_size child_index = 0; child_index < node.children_count; ++child_index) {
         scene_node.children.push_back(
           static_cast<usize>(node.children[child_index] - data->nodes)
         );
@@ -392,8 +390,7 @@ public:
         auto bone_it = bone_index_by_name.find(node.name);
         if (bone_it != bone_index_by_name.end()) {
           scene_node.bone_index = bone_it->second;
-          scene.bones[bone_it->second].node_index =
-            static_cast<i32>(node_index);
+          scene.bones[bone_it->second].node_index = static_cast<i32>(node_index);
         }
       }
     }
@@ -408,10 +405,8 @@ public:
 
       Mat4 local = scene.nodes[node_index].local_transform.compute_matrix();
       if (scene.nodes[node_index].parent >= 0) {
-        local = compute_node_world(
-                  static_cast<usize>(scene.nodes[node_index].parent)
-                ) *
-                local;
+        local =
+          compute_node_world(static_cast<usize>(scene.nodes[node_index].parent)) * local;
       }
 
       node_world_transforms[node_index] = local;
@@ -421,8 +416,7 @@ public:
 
     for (usize node_index = 0; node_index < scene.nodes.size(); ++node_index) {
       Mat4 node_world = compute_node_world(node_index);
-      Transform primitive_local =
-        detail::transform_from_matrix(node_world.inverse());
+      Transform primitive_local = detail::transform_from_matrix(node_world.inverse());
 
       for (auto& primitive : scene.nodes[node_index].primitives) {
         primitive.local_transform = primitive_local;
@@ -430,8 +424,7 @@ public:
     }
 
     scene.skins.reserve(data->skins_count);
-    for (cgltf_size skin_index = 0; skin_index < data->skins_count;
-         ++skin_index) {
+    for (cgltf_size skin_index = 0; skin_index < data->skins_count; ++skin_index) {
       cgltf_skin const& skin = data->skins[skin_index];
       SceneSkin scene_skin;
       scene_skin.name = skin.name ? skin.name : "";
@@ -439,8 +432,7 @@ public:
         skin.skeleton ? static_cast<i32>(skin.skeleton - data->nodes) : -1;
       scene_skin.bone_indices.reserve(skin.joints_count);
 
-      for (cgltf_size joint_index = 0; joint_index < skin.joints_count;
-           ++joint_index) {
+      for (cgltf_size joint_index = 0; joint_index < skin.joints_count; ++joint_index) {
         cgltf_node const* joint = skin.joints[joint_index];
         i32 bone_index = -1;
         if (joint && joint->name) {
@@ -453,18 +445,13 @@ public:
       }
 
       if (skin.inverse_bind_matrices) {
-        scene_skin.inverse_bind_matrices.resize(
-          skin.inverse_bind_matrices->count
-        );
+        scene_skin.inverse_bind_matrices.resize(skin.inverse_bind_matrices->count);
         for (cgltf_size matrix_index = 0;
              matrix_index < skin.inverse_bind_matrices->count;
              ++matrix_index) {
           std::array<float, 16> values{};
           cgltf_accessor_read_float(
-            skin.inverse_bind_matrices,
-            matrix_index,
-            values.data(),
-            values.size()
+            skin.inverse_bind_matrices, matrix_index, values.data(), values.size()
           );
           scene_skin.inverse_bind_matrices[matrix_index] = values;
         }

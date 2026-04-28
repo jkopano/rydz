@@ -1,182 +1,100 @@
 #pragma once
 
+#include "rydz_graphics/gl/buffers.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/gl/shader.hpp"
-#include <cstddef>
-#include <cstring>
-#include <string>
+#include "rydz_graphics/gl/textures.hpp"
+#include <array>
 
 namespace gl {
 
 class Skybox {
-  static constexpr u32 FACE_COUNT = 6;
-
 public:
-  struct Config {
-    std::string right;
-    std::string left;
-    std::string top;
-    std::string bottom;
-    std::string front;
-    std::string back;
-
-    static auto from_directory(
-      std::string const& dir, std::string const& ext = ".jpg"
-    ) -> Config {
-      return {
-        .right = dir + "/right" + ext,
-        .left = dir + "/left" + ext,
-        .top = dir + "/top" + ext,
-        .bottom = dir + "/bottom" + ext,
-        .front = dir + "/front" + ext,
-        .back = dir + "/back" + ext
-      };
-    }
-  };
-
-  u32 cubemap_id{};
-  VAO vao{};
-  VBO vbo{};
-  bool loaded{};
-
   Skybox() = default;
 
-  static auto from(Config cfg) -> Skybox {
-    Skybox skybox{};
-    std::array<std::string, FACE_COUNT> const paths = {
-      cfg.right, cfg.left, cfg.top, cfg.bottom, cfg.front, cfg.back
-    };
+  static auto create(ShaderProgram shader) -> Skybox;
 
-    skybox.cubemap_id = load_cubemap_from_paths(paths);
-    skybox.create_cube_vao();
-    skybox.loaded = (skybox.cubemap_id != 0);
+  Skybox(Skybox const&) = delete;
+  auto operator=(Skybox const&) -> Skybox& = delete;
+  Skybox(Skybox&&) noexcept = default;
+  auto operator=(Skybox&&) noexcept -> Skybox& = default;
+  ~Skybox() = default;
 
-    return skybox;
+  [[nodiscard]] auto ready() const -> bool {
+    return vao_.ready() && shader_.raw().ready();
   }
 
-  static auto from(std::string const& directory_path) -> Skybox {
-    return Skybox::from(Config::from_directory(directory_path));
-  }
-
-  auto draw(math::Mat4 view, math::Mat4 proj) const -> void {
-    if (!loaded) {
-      return;
-    }
-
-    ShaderProgram& shader = get_skybox_shader();
-
-    rl::rlDisableBackfaceCulling();
-    rl::rlDisableDepthMask();
-
-    active_texture_slot(0);
-    enable_texture_cubemap(cubemap_id);
-
-    shader.with_enabled([&] -> void {
-      shader.set("matView", view);
-      shader.set("matProjection", proj);
-      shader.set("u_skybox", 0);
-      if (vao.bind()) {
-        vao.draw(0, 36);
-        VAO::unbind();
-      }
-    });
-
-    disable_texture_cubemap();
-    rl::rlEnableDepthMask();
-    rl::rlEnableBackfaceCulling();
-  }
+  auto draw(CubeMap const& cubemap, math::Mat4 view, math::Mat4 proj) const -> void;
 
   auto unload() -> void {
-    if (cubemap_id != 0) {
-      unload_texture_id(cubemap_id);
-      cubemap_id = 0;
-    }
-    vao.reset();
-    vbo.reset();
-    loaded = false;
+    vao_.reset();
+    vbo_.reset();
+    shader_ = ShaderProgram{};
   }
 
 private:
-  static auto get_skybox_shader() -> ShaderProgram& {
-    static ShaderProgram shader = [] -> ShaderProgram {
-      ShaderProgram program = ShaderProgram::load(
-        ShaderSpec::from("res/shaders/skybox.vert", "res/shaders/skybox.frag")
-      );
-      int value = 0;
-      program.set("u_skybox", value);
-      return program;
-    }();
-    return shader;
-  }
+  VAO vao_{};
+  VBO vbo_{};
+  mutable ShaderProgram shader_{};
 
-  auto create_cube_vao() -> void {
-    std::array<f32, 108> vertices = {
-      -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,
-      -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f,
-      1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f,
-      -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
-      -1.0f, 1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
-      -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,
-      1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f,
-      -1.0f, 1.0f,  -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f,  1.0f,
-      1.0f,  1.0f,  1.0f,  1.0f,  -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f,
-      -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
-      -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f
-    };
-
-    vao = VAO::create();
-    if (vao.bind()) {
-      vbo = VBO::create(vertices.data(), sizeof(vertices), false);
-      set_vertex_attribute(0, 3, RL_FLOAT, false, 0, 0);
-      enable_vertex_attribute(0);
-      VAO::unbind();
-    }
-  }
-
-  static auto load_cubemap_from_paths(
-    std::array<std::string, FACE_COUNT> const& paths
-  ) -> unsigned int {
-    std::array<Image, FACE_COUNT> images;
-
-    for (usize i = 0; i < images.size(); ++i) {
-      images.at(i) = load_image(paths.at(i));
-      if (images.at(i).data == nullptr) {
-        for (usize j = 0; j < i; ++j) {
-          unload_image(images.at(j));
-        }
-        return 0;
-      }
-      if (images.at(i).format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
-        image_format(images.at(i), PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-      }
-    }
-
-    u32 width = images[0].width;
-    u32 height = images[0].height;
-    u32 pixel_size = 4U;
-
-    std::vector<u8> data((width * height * FACE_COUNT * pixel_size));
-
-    for (usize i = 0; i < FACE_COUNT; ++i) {
-      u32 size = width * height * pixel_size;
-      usize offset = i * size;
-      std::memcpy(
-        data.data() + offset,
-        images.at(i).data,
-        static_cast<size_t>(width * height) * pixel_size
-      );
-      unload_image(images.at(i));
-    }
-
-    unsigned int id = load_texture_cubemap(
-      data.data(), width, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1
-    );
-
-    return id;
-  }
+  auto build_cube_geometry() -> void;
 };
 
-} // namespace gl
-namespace ecs {
-using Skybox = gl::Skybox;
+inline auto Skybox::create(ShaderProgram shader) -> Skybox {
+  Skybox skybox{};
+  skybox.shader_ = std::move(shader);
+  skybox.build_cube_geometry();
+  return skybox;
 }
+
+inline auto Skybox::build_cube_geometry() -> void {
+
+  std::array<f32, 108> vertices = {
+    -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f,
+    1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f,
+    -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
+    1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
+    1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,
+    1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,
+    -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
+    -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,
+    1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f,
+  };
+
+  vao_ = VAO::create();
+  if (vao_.bind()) {
+    vbo_ = VBO::create(vertices.data(), sizeof(vertices), false);
+    set_vertex_attribute(0, 3, RL_FLOAT, false, 0, 0);
+    enable_vertex_attribute(0);
+    VAO::unbind();
+  }
+}
+
+inline auto Skybox::draw(CubeMap const& cubemap, math::Mat4 view, math::Mat4 proj) const
+  -> void {
+  if (!ready()) {
+    return;
+  }
+
+  rl::rlDisableBackfaceCulling();
+  rl::rlDisableDepthMask();
+
+  cubemap.bind(0);
+
+  shader_.with_enabled([&] -> void {
+    shader_.set("u_mat_view", view);
+    shader_.set("u_mat_projection", proj);
+    shader_.set("u_skybox", 0);
+    if (vao_.bind()) {
+      vao_.draw(0, 36);
+      VAO::unbind();
+    }
+  });
+
+  cubemap.unbind();
+
+  rl::rlEnableDepthMask();
+  rl::rlEnableBackfaceCulling();
+}
+
+} // namespace gl

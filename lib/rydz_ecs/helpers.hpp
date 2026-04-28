@@ -8,8 +8,8 @@
 #include <type_traits>
 #include <typeinfo>
 
-// Sprawdzamy, czy nie jesteśmy na MSVC przed dołączeniem nagłówka
-#if !defined(_MSC_VER)
+// Symbol lookup helpers are not available on Windows builds in this codebase.
+#if !defined(_WIN32)
 #include <cxxabi.h>
 #include <dlfcn.h>
 #endif
@@ -18,6 +18,8 @@ namespace ecs {
 
 inline auto demangle(char const* mangled) -> std::string {
 #if defined(_MSC_VER)
+  return mangled;
+#elif defined(_WIN32)
   return mangled;
 #else
   int status = 0;
@@ -42,7 +44,7 @@ template <typename Fn> auto system_name_of(Fn&& fn) -> std::string {
   using D = decay_t<Fn>;
   if constexpr (std::is_pointer_v<D> &&
                 std::is_function_v<std::remove_pointer_t<D>>) {
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(_WIN32)
     return std::to_string(reinterpret_cast<std::uintptr_t>(fn));
 #else
     Dl_info info{};

@@ -1,11 +1,14 @@
 #pragma once
 
 #include "hash.hpp"
-#include "rydz_graphics/gl/core.hpp"
-#include "rydz_graphics/shader_bindings.hpp"
+#include "rydz_graphics/components/color.hpp"
+#include "rydz_graphics/gl/primitives.hpp"
+#include "rydz_graphics/gl/shader_bindings.hpp"
+#include "rydz_graphics/gl/textures.hpp"
 #include <algorithm>
 #include <array>
 #include <concepts>
+#include <external/glad.h>
 #include <functional>
 #include <span>
 #include <string>
@@ -24,8 +27,7 @@ struct ShaderSpec {
 
   auto operator==(ShaderSpec const& other) const -> bool = default;
 
-  static auto from(std::string vertex_path, std::string fragment_path)
-    -> ShaderSpec {
+  static auto from(std::string vertex_path, std::string fragment_path) -> ShaderSpec {
     return {
       .vertex_path = std::move(vertex_path),
       .fragment_path = std::move(fragment_path),
@@ -73,17 +75,21 @@ struct Uniform {
     float_data[2] = z;
   }
 
-  Uniform(float x, float y, float z, float w)
-      : type(UniformType::Vec4), float_data{} {
+  Uniform(float x, float y, float z, float w) : type(UniformType::Vec4), float_data{} {
     float_data[0] = x;
     float_data[1] = y;
     float_data[2] = z;
     float_data[3] = w;
   }
 
-  explicit Uniform(int v) : type(UniformType::Int), int_data{} {
-    int_data[0] = v;
+  Uniform(ecs::Color color) : type(UniformType::Vec4), float_data{} {
+    float_data[0] = color.r / 255;
+    float_data[1] = color.g / 255;
+    float_data[2] = color.b / 255;
+    float_data[3] = color.a / 255;
   }
+
+  explicit Uniform(int v) : type(UniformType::Int), int_data{} { int_data[0] = v; }
 
   Uniform(int x, int y) : type(UniformType::IVec2), int_data{} {
     int_data[0] = x;
@@ -135,9 +141,10 @@ public:
   auto operator=(ShaderProgram const&) -> ShaderProgram& = delete;
 
   ShaderProgram(ShaderProgram&& other) noexcept
-      : shader_(other.shader_),
-        uniform_locations_(std::move(other.uniform_locations_)),
+      : shader_(other.shader_), uniform_locations_(std::move(other.uniform_locations_)),
         attribute_locations_(std::move(other.attribute_locations_)),
+        uniform_block_indices_(std::move(other.uniform_block_indices_)),
+        uniform_block_bindings_(std::move(other.uniform_block_bindings_)),
         owns_resource_(other.owns_resource_) {
     other.shader_ = Shader{};
     other.owns_resource_ = false;
@@ -152,6 +159,8 @@ public:
     shader_ = other.shader_;
     uniform_locations_ = std::move(other.uniform_locations_);
     attribute_locations_ = std::move(other.attribute_locations_);
+    uniform_block_indices_ = std::move(other.uniform_block_indices_);
+    uniform_block_bindings_ = std::move(other.uniform_block_bindings_);
     owns_resource_ = other.owns_resource_;
     other.shader_ = Shader{};
     other.owns_resource_ = false;
@@ -180,6 +189,8 @@ public:
   auto raw() -> Shader& { return shader_; }
   auto raw() const -> Shader const& { return shader_; }
 
+  [[nodiscard]] auto ready() const -> bool { return shader_.ready(); }
+
   auto uniform_location(std::string_view const name) -> int {
     std::string owned_name{name};
     auto iter = uniform_locations_.find(owned_name);
@@ -201,6 +212,37 @@ public:
     int const location = rl::GetShaderLocationAttrib(shader_, name);
     attribute_locations_.emplace(name, location);
     return location;
+  }
+
+  auto uniform_block_index(std::string_view const name) -> unsigned int {
+    std::string owned_name{name};
+    auto iter = uniform_block_indices_.find(owned_name);
+    if (iter != uniform_block_indices_.end()) {
+      return iter->second;
+    }
+
+    unsigned int const index = rl::GetUniformBlockIndex(shader_.id, owned_name.c_str());
+    uniform_block_indices_.emplace(std::move(owned_name), index);
+    return index;
+  }
+
+  auto bind_uniform_block(std::string_view const name, unsigned int binding) -> bool {
+    unsigned int const index = uniform_block_index(name);
+    if (index == GL_INVALID_INDEX) {
+      warn(
+        "ShaderProgram::bind_uniform_block: uniform block '{}' not found in shader", name
+      );
+      return false;
+    }
+
+    auto iter = uniform_block_bindings_.find(index);
+    if (iter != uniform_block_bindings_.end() && iter->second == binding) {
+      return true;
+    }
+
+    rl::UniformBlockBinding(shader_.id, index, binding);
+    uniform_block_bindings_.insert_or_assign(index, binding);
+    return true;
   }
 
   auto set(std::string_view const name, float value) -> void {
@@ -266,6 +308,30 @@ public:
     }
   }
 
+  auto set_sampler(std::string_view const name, int unit) -> void {
+    int const location = uniform_location(name);
+    if (location >= 0) {
+      rl::SetShaderValue(shader_, location, &unit, SHADER_UNIFORM_INT);
+    }
+  }
+
+  auto bind_texture(std::string_view const name, Texture const& texture, int slot)
+    -> void {
+    if (!texture.ready()) {
+      warn("ShaderProgram::bind_texture: texture is not ready");
+      return;
+    }
+
+    int const location = uniform_location(name);
+    if (location < 0) {
+      warn("ShaderProgram::bind_texture: uniform '{}' not found in shader", name);
+      return;
+    }
+
+    texture.bind(slot);
+    set_sampler(name, slot);
+  }
+
   template <ecs::ShaderUniformBinding Binding, typename T>
   auto set(Binding binding, T&& value) -> void {
     set(map_uniform_binding(binding), std::forward<T>(value));
@@ -298,10 +364,7 @@ public:
       break;
     case UniformType::Vec3:
       set(
-        name,
-        Vec3{
-          uniform.float_data[0], uniform.float_data[1], uniform.float_data[2]
-        }
+        name, Vec3{uniform.float_data[0], uniform.float_data[1], uniform.float_data[2]}
       );
       break;
     case UniformType::Vec4:
@@ -324,9 +387,7 @@ public:
     case UniformType::IVec3:
       set(
         name,
-        std::array<int, 3>{
-          uniform.int_data[0], uniform.int_data[1], uniform.int_data[2]
-        }
+        std::array<int, 3>{uniform.int_data[0], uniform.int_data[1], uniform.int_data[2]}
       );
       break;
     case UniformType::IVec4:
@@ -408,19 +469,19 @@ private:
   Shader shader_;
   std::unordered_map<std::string, int> uniform_locations_;
   std::unordered_map<std::string, int> attribute_locations_;
+  std::unordered_map<std::string, unsigned int> uniform_block_indices_;
+  std::unordered_map<unsigned int, unsigned int> uniform_block_bindings_;
   bool owns_resource_ = false;
 
   auto unload() -> void {
-    if (owns_resource_ && shader_.id != 0 &&
-        shader_.id != Shader::default_id()) {
+    if (owns_resource_ && shader_.id != 0 && shader_.id != Shader::default_id()) {
       ::UnloadShader(shader_);
     }
     shader_ = Shader{};
     owns_resource_ = false;
   }
 
-  auto set_value(std::string_view const name, void const* value, int type)
-    -> void {
+  auto set_value(std::string_view const name, void const* value, int type) -> void {
     int const location = uniform_location(name);
     if (location >= 0) {
       rl::SetShaderValue(shader_, location, value, type);
@@ -432,8 +493,7 @@ inline auto shader_location(Shader const& shader, char const* name) -> int {
   return rl::GetShaderLocation(shader, name);
 }
 
-inline auto shader_location_attrib(Shader const& shader, char const* name)
-  -> int {
+inline auto shader_location_attrib(Shader const& shader, char const* name) -> int {
   return rl::GetShaderLocationAttrib(shader, name);
 }
 

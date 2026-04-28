@@ -9,7 +9,7 @@
 
 namespace rydz_platform {
 
-struct RayPlugin {
+struct RayPlugin : ecs::IPlugin {
   using T = ecs::Resource;
 
   ecs::Window window{
@@ -20,23 +20,21 @@ struct RayPlugin {
   };
   i32 trace_log_level = LOG_NONE;
 
-  static auto install(RayPlugin config) {
-    return [config = std::move(config)](ecs::App& app) mutable -> void {
-      app.insert_resource(config.window);
-      app.insert_resource(config);
-      app.insert_resource(
-        ecs::AppRunner{
-          .run = [](ecs::App& app_ref) -> void {
-            auto* runner = app_ref.world().get_resource<RayPlugin>();
-            if (!runner) {
-              std::fputs("RayPlugin not installed.\n", stderr);
-              return;
-            }
-            runner->run_app(app_ref);
-          },
-        }
-      );
-    };
+  void build(ecs::App& app) {
+    app.insert_resource(window);
+    app.insert_resource(*this);
+    app.insert_resource(
+      ecs::AppRunner{
+        .run = [](ecs::App& app_ref) -> void {
+          auto* runner = app_ref.world().get_resource<RayPlugin>();
+          if (!runner) {
+            std::println(stderr, "RayPlugin not installed.\n");
+            return;
+          }
+          runner->run_app(app_ref);
+        },
+      }
+    );
   }
 
 private:
@@ -57,6 +55,7 @@ private:
 
     window->width = static_cast<u32>(rl::GetScreenWidth());
     window->height = static_cast<u32>(rl::GetScreenHeight());
+    //window->fullscreen = rl::IsWindowFullscreen();
   }
 
   auto run_app(ecs::App& app) const -> void {
@@ -64,11 +63,20 @@ private:
 
     app.add_plugin(LogPlugin{});
     // init_logging();
+    ClearWindowState(FLAG_FULLSCREEN_MODE);
+    rl::SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    //if (config.fullscreen) {
+    //  rl::SetConfigFlags(rl::FLAG_FULLSCREEN_MODE);
+    //} else {
+    //  rl::SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    //}
+
     rl::InitWindow(
       static_cast<int>(config.width),
       static_cast<int>(config.height),
       config.title.c_str()
     );
+
     rl::SetTargetFPS(static_cast<int>(config.target_fps));
     if (!rl::IsWindowReady()) {
       std::println(stderr, "InitWindow failed; aborting run loop.");
@@ -85,7 +93,7 @@ private:
     }
 
     app.world().resources.clear();
-    rl::CloseWindow();
+    rl::rlCloseWindow();
   }
 };
 

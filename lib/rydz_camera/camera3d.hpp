@@ -1,8 +1,8 @@
 #pragma once
 #include "math.hpp"
 #include "rydz_ecs/requires.hpp"
-#include "rydz_graphics/color.hpp"
-#include "rydz_graphics/transform.hpp"
+#include "rydz_graphics/components/color.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
 #include <algorithm>
 
 namespace ecs {
@@ -23,7 +23,7 @@ struct Camera3d {
   float far_plane = 1000.0f;
 
   static constexpr auto perspective(
-    float fov_y_deg = 45.0f, float near_plane = 0.1f, float far_plane = 1000.0f
+    float fov_y_deg = 25.0f, float near_plane = 0.1f, float far_plane = 1000.0f
   ) -> Camera3d {
     return {
       .projection = CameraProjection3D::Perspective,
@@ -68,19 +68,13 @@ inline auto compute_camera_aspect_ratio(float width, float height) -> float {
   return std::max(aspect, 0.0001f);
 }
 
-inline auto compute_camera_projection(Camera3d const& comp, float aspect)
-  -> Mat4 {
+inline auto compute_camera_projection(Camera3d const& comp, float aspect) -> Mat4 {
   if (comp.is_orthographic()) {
     float height = std::max(comp.orthographic_height, 0.0001f);
     float half_height = height * 0.5f;
     float half_width = half_height * aspect;
     return Mat4::orthographic_rh(
-      -half_width,
-      half_width,
-      -half_height,
-      half_height,
-      comp.near_plane,
-      comp.far_plane
+      -half_width, half_width, -half_height, half_height, comp.near_plane, comp.far_plane
     );
   }
 
@@ -96,18 +90,15 @@ inline auto compute_camera_view(
   return {.view = view, .proj = proj, .position = position};
 }
 
-inline auto compute_camera_view(
-  Transform const& t, Camera3d const& comp, float aspect
-) -> CameraView {
+inline auto compute_camera_view(Transform const& t, Camera3d const& comp, float aspect)
+  -> CameraView {
   return compute_camera_view(t.translation, t.forward(), t.up(), comp, aspect);
 }
 
 inline auto compute_camera_view(
   GlobalTransform const& t, Camera3d const& comp, float aspect
 ) -> CameraView {
-  return compute_camera_view(
-    t.translation(), t.forward(), t.up(), comp, aspect
-  );
+  return compute_camera_view(t.translation(), t.forward(), t.up(), comp, aspect);
 }
 
 } // namespace ecs

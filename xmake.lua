@@ -8,6 +8,10 @@ set_showmenu(true)
 set_description("Enable Tracy profiler")
 option_end()
 
+-- common language / warnings
+set_languages("c++23")
+set_warnings("all", "extra")
+
 -- toolchains (clangd likes clang compile commands)
 if is_plat("windows") then
 	set_toolchains("clang-cl")
@@ -30,8 +34,11 @@ local function is_msvc_like()
 	return tc == "msvc" or tc == "clang-cl"
 end
 
--- local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
-local tracy_enabled = false
+if not is_plat("windows") then
+	local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
+end
+
+-- local tracy_enabled = false
 local function add_tracy()
 	if tracy_enabled then
 		add_packages("tracy")
@@ -43,10 +50,7 @@ local function add_tracy()
 	end
 end
 
--- common language / warnings
-set_languages("c++23")
 add_includedirs("lib")
-set_warnings("all", "extra")
 
 if is_plat("windows") then
 	-- Dla clang-cl / msvc (jeśli używasz clang-cl, to zrozumie te flagi)
@@ -57,11 +61,12 @@ else
 end
 
 -- common dependencies
+add_requireconfs("*", { configs = { languages = "c++23" } })
 add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")
 add_requires("fmt", "spdlog", { configs = { external_fmt = true } })
 
 if is_plat("windows") then
-    add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", {force = true})
+	add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", { force = true })
 end
 
 if tracy_enabled then
@@ -158,11 +163,15 @@ set_rundir("$(projectdir)")
 add_files("src/*.cpp")
 add_deps("raylib")
 add_packages("taskflow", "joltphysics", "glaze", "glm", "spdlog", "fmt")
-if is_plat("windows") then
-	add_packages("luajit")
-elseif is_plat("linux") then
+
+if is_plat("windows") or is_plat("linux") then
 	add_packages("luajit")
 end
+
+if has_config("gpu_debug") then
+	add_defines("DEBUG_GPU")
+end
+
 add_tracy()
 set_pcxxheader("lib/pch.hpp")
 
@@ -172,11 +181,11 @@ set_default(false)
 add_headerfiles("lib/rydz_**/*.hpp")
 -- add_deps("raylib")
 -- add_packages("taskflow", "joltphysics", "glaze")
--- if is_plat("windows") then
--- 	add_packages("luajit")
--- elseif is_plat("linux") then
--- 	add_packages("luajit")
--- end
+if is_plat("windows") then
+	add_packages("luajit")
+elseif is_plat("linux") then
+	add_packages("luajit")
+end
 
 target("tests")
 set_kind("binary")
@@ -206,6 +215,7 @@ local examples = {
 	"11_sets",
 	"12_observers",
 	"13_physics",
+	"14_audio_system",
 }
 
 for _, name in ipairs(examples) do

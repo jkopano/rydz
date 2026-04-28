@@ -16,8 +16,8 @@
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_graphics/render_plugin.hpp"
-#include "rydz_graphics/transform.hpp"
+#include "rydz_graphics/plugin.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -45,7 +45,6 @@ inline void isometric_camera_system(
     Vec3 desired = cam->target + cam->offset;
 
     if (cam->smooth_follow) {
-      // Exponential smoothing gives stable feel across different frame rates.
       f32 alpha = 1.0f - std::exp(-cam->follow_speed * dt);
       t->translation = t->translation + (desired - t->translation) * alpha;
     } else {
@@ -70,16 +69,13 @@ struct IsometricCameraBundle {
     f32 follow_speed = 5.0f
   ) -> IsometricCameraBundle {
     return IsometricCameraBundle{
-      .camera_component = Camera3d::orthographic(ortho_height),
+      .camera_component = Camera3d::orthographic(),
       .active_camera = ActiveCamera{},
       .transform =
-        Transform::from_xyz(
-          target.x + offset.x, target.y + offset.y, target.z + offset.z
-        )
+        Transform::from_xyz(target.x + offset.x, target.y + offset.y, target.z + offset.z)
           .look_at(target),
-      .iso = IsometricCamera{
-        .target = target, .offset = offset, .follow_speed = follow_speed
-      }
+      .iso =
+        IsometricCamera{.target = target, .offset = offset, .follow_speed = follow_speed}
     };
   }
 };
@@ -88,24 +84,26 @@ inline auto camera_plugin(App& app) -> void {
   app.add_systems(ScheduleLabel::Update, isometric_camera_system);
 
   app.add_systems(ScheduleLabel::Startup, [](World& world) -> void {
-    engine::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
-      return [zoom_level](Query<Mut<Camera3d>> query) -> void {
-        for (auto [cam] : query.iter()) {
-          if (cam->is_orthographic()) {
-            cam->orthographic_height = zoom_level;
-          }
-        }
-      };
-    });
 
-    engine::BindCommand<float>::to(world, "set_cam_speed", [](float speed) {
-      return [speed](Query<Mut<IsometricCamera>> query) -> void {
-        for (auto [iso_cam] : query.iter()) {
-          iso_cam->follow_speed = speed;
-        }
-      };
-    });
-  });
+        console::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
+            return [zoom_level](Query<Mut<ecs::Camera3d>> query) {
+                for (auto [cam] : query.iter()) {
+                    if (cam->is_orthographic()) {
+                        cam->orthographic_height = zoom_level;
+                    }
+                }
+                };
+            });
+
+        console::BindCommand<float>::to(world, "set_cam_speed", [](float speed) {
+            return [speed](Query<Mut<IsometricCamera>> query) {
+                for (auto [iso_cam] : query.iter()) {
+                    iso_cam->follow_speed = speed;
+                }
+                };
+            });
+
+        });
 }
 
 } // namespace ecs

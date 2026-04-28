@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
-#include "rydz_graphics/render_graph.hpp"
+#include "rydz_graphics/pipeline/graph.hpp"
+#include "rydz_graphics/pipeline/pass_context.hpp"
+#include "rydz_graphics/pipeline/phase.hpp"
+#include "rydz_graphics/material/render_material.hpp"
 #include <string>
 #include <utility>
 #include <vector>
@@ -31,7 +34,7 @@ public:
     }
   }
 
-  auto execute(RenderPassContext&, RenderGraphRuntime&) -> void override {
+  auto execute(PassContext&, RenderGraphRuntime&) -> void override {
     execution_order_->push_back(name_);
   }
 
@@ -56,11 +59,51 @@ auto add_recording_pass(
 
 auto execute(RenderGraph& graph) -> void {
   gl::RenderState render_state;
-  RenderFrameContext frame{
+  ExtractedView view{};
+  ExtractedLights lights{};
+  ExtractedShadows shadows{};
+  Time time{};
+  ExtractedMeshes extracted_meshes{};
+  Assets<Mesh> mesh_assets;
+  Assets<Texture> texture_assets;
+  ShaderCache shader_cache;
+  ViewUniformState view_uniforms;
+  ShadowUniformState shadow_uniforms;
+  SlotProviderRegistry slot_registry;
+  OpaquePhase opaque_phase{};
+  TransparentPhase transparent_phase{};
+  ShadowPhase shadow_phase{};
+  UiPhase ui_phase{};
+  gl::ClusterConfig cluster_config{};
+  ShadowSettings shadow_settings{};
+  ShadowResources shadow_resources{};
+  gl::ClusteredLightingState cluster_state{};
+  PassContext ctx{
     .marker = NonSendMarker{},
     .render_state = render_state,
+    .framebuffer = {},
+    .view = view,
+    .lights = lights,
+    .shadows = shadows,
+    .time = time,
+    .extracted_meshes = extracted_meshes,
+    .mesh_assets = mesh_assets,
+    .texture_assets = texture_assets,
+    .shader_cache = shader_cache,
+    .view_uniforms = view_uniforms,
+    .shadow_uniforms = shadow_uniforms,
+    .slot_registry = slot_registry,
+    .opaque_phase = opaque_phase,
+    .transparent_phase = transparent_phase,
+    .shadow_phase = shadow_phase,
+    .ui_phase = ui_phase,
+    .cluster_config = cluster_config,
+    .shadow_settings = shadow_settings,
+    .cluster_state = cluster_state,
+    .shadow_resources = shadow_resources,
+    .scene_depth_texture = nullptr,
   };
-  graph.execute(frame);
+  graph.execute(ctx);
 }
 
 } // namespace
@@ -119,4 +162,77 @@ TEST(RenderGraphTest, BackbufferImportDoesNotAllocateTextureTarget) {
 
   EXPECT_EQ(order.size(), 1U);
   EXPECT_FALSE(graph.runtime().get_texture(screen).ready());
+}
+
+TEST(RenderGraphTest, ReusesTransientTexturesWithDisjointLifetimes) {
+  RenderGraph graph;
+  std::vector<std::string> order;
+  auto const first =
+    graph.create_texture(TextureDesc{.width = 64, .height = 64, .transient = true}, "A");
+  auto const second =
+    graph.create_texture(TextureDesc{.width = 64, .height = 64, .transient = true}, "B");
+
+  add_recording_pass(graph, "write-a", {}, {first}, order);
+  add_recording_pass(graph, "read-a", {first}, {}, order);
+  add_recording_pass(graph, "write-b", {}, {second}, order);
+  add_recording_pass(graph, "read-b", {second}, {}, order);
+
+  graph.compile();
+
+  auto const first_slot = graph.debug_physical_slot(first, 64, 64);
+  auto const second_slot = graph.debug_physical_slot(second, 64, 64);
+  ASSERT_TRUE(first_slot.has_value());
+  ASSERT_TRUE(second_slot.has_value());
+  EXPECT_EQ(first_slot, second_slot);
+}
+
+TEST(RenderGraphTest, DoesNotAliasOverlappingTransientTextures) {
+  RenderGraph graph;
+  std::vector<std::string> order;
+  auto const first =
+    graph.create_texture(TextureDesc{.width = 64, .height = 64, .transient = true}, "A");
+  auto const second =
+    graph.create_texture(TextureDesc{.width = 64, .height = 64, .transient = true}, "B");
+
+  add_recording_pass(graph, "write-a", {}, {first}, order);
+  add_recording_pass(graph, "write-b", {}, {second}, order);
+  add_recording_pass(graph, "read-a", {first}, {}, order);
+
+  graph.compile();
+
+  auto const first_slot = graph.debug_physical_slot(first, 64, 64);
+  auto const second_slot = graph.debug_physical_slot(second, 64, 64);
+  ASSERT_TRUE(first_slot.has_value());
+  ASSERT_TRUE(second_slot.has_value());
+  EXPECT_NE(first_slot, second_slot);
+}
+
+TEST(RenderGraphTest, DoesNotAliasTransientTexturesWithDifferentDescriptors) {
+  RenderGraph graph;
+  std::vector<std::string> order;
+  auto const first =
+    graph.create_texture(TextureDesc{.width = 64, .height = 64, .transient = true}, "A");
+  auto const second =
+    graph.create_texture(TextureDesc{.width = 128, .height = 64, .transient = true}, "B");
+
+  add_recording_pass(graph, "write-a", {}, {first}, order);
+  add_recording_pass(graph, "read-a", {first}, {}, order);
+  add_recording_pass(graph, "write-b", {}, {second}, order);
+
+  graph.compile();
+
+  auto const first_slot = graph.debug_physical_slot(first, 64, 64);
+  auto const second_slot = graph.debug_physical_slot(second, 64, 64);
+  ASSERT_TRUE(first_slot.has_value());
+  ASSERT_TRUE(second_slot.has_value());
+  EXPECT_NE(first_slot, second_slot);
+}
+
+TEST(RenderGraphTest, BackbufferDoesNotHavePhysicalSlot) {
+  RenderGraph graph;
+  auto const screen = graph.import_backbuffer("Screen");
+
+  graph.compile();
+
+  EXPECT_FALSE(graph.debug_physical_slot(screen, 1, 1).has_value());
 }

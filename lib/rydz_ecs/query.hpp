@@ -142,15 +142,13 @@ private:
   template <typename... Items, typename Fetchers>
   static auto fetch_all(Fetchers const& fetchers, Entity entity) {
     return std::apply(
-      [&](auto const&... f) -> auto { return Tuple{f.fetch(entity)...}; },
-      fetchers
+      [&](auto const&... f) -> auto { return Tuple{f.fetch(entity)...}; }, fetchers
     );
   }
 
   template <typename... Items>
-  static auto all_valid(
-    Tuple<typename WorldQueryTraits<Items>::Item...> const& items
-  ) -> bool {
+  static auto all_valid(Tuple<typename WorldQueryTraits<Items>::Item...> const& items)
+    -> bool {
     return [&]<size_t... I>(std::index_sequence<I...>) -> auto {
       return (WorldQueryTraits<Items>::is_valid(std::get<I>(items)) && ...);
     }(std::index_sequence_for<Items...>{});
@@ -158,31 +156,25 @@ private:
 
   template <typename... Items>
   static auto try_fetch(
-    auto const& fetchers,
-    Entity entity,
-    World const& world,
-    Tick last_run,
-    Tick this_run
+    auto const& fetchers, Entity entity, World const& world, Tick last_run, Tick this_run
   ) -> std::optional<Tuple<typename WorldQueryTraits<Items>::Item...>> {
     auto items = fetch_all<Items...>(fetchers, entity);
-    if (!all_valid<Items...>(items) || !QueryFilterTraits<FilterT>::matches(
-                                         world, entity, last_run, this_run
-                                       )) {
+    if (!all_valid<Items...>(items) ||
+        !QueryFilterTraits<FilterT>::matches(world, entity, last_run, this_run)) {
       return std::nullopt;
     }
     return items;
   }
 
   template <typename... Items> auto single_impl(Tuple<Items...>) const {
-    using Result = typename ResultTypeFor<
-      Tuple<typename WorldQueryTraits<Items>::Item...>>::type;
+    using Result =
+      typename ResultTypeFor<Tuple<typename WorldQueryTraits<Items>::Item...>>::type;
     auto const& prepared = prepared_query();
 
     Result result{};
     for (Entity entity : prepared.candidates) {
-      auto fetched = try_fetch<Items...>(
-        prepared.fetchers, entity, *world_, last_run_, this_run_
-      );
+      auto fetched =
+        try_fetch<Items...>(prepared.fetchers, entity, *world_, last_run_, this_run_);
       if (!fetched) {
         continue;
       }
@@ -200,14 +192,11 @@ private:
     return result;
   }
 
-  template <typename... Items>
-  auto is_empty_impl(Tuple<Items...>) const -> bool {
+  template <typename... Items> auto is_empty_impl(Tuple<Items...>) const -> bool {
     auto const& prepared = prepared_query();
 
     for (Entity entity : prepared.candidates) {
-      if (try_fetch<Items...>(
-            prepared.fetchers, entity, *world_, last_run_, this_run_
-          )) {
+      if (try_fetch<Items...>(prepared.fetchers, entity, *world_, last_run_, this_run_)) {
         return false;
       }
     }
@@ -215,14 +204,12 @@ private:
     return true;
   }
 
-  template <typename... Items>
-  auto get_impl(Tuple<Items...>, Entity entity) const {
-    using Result = typename ResultTypeFor<
-      Tuple<typename WorldQueryTraits<Items>::Item...>>::type;
+  template <typename... Items> auto get_impl(Tuple<Items...>, Entity entity) const {
+    using Result =
+      typename ResultTypeFor<Tuple<typename WorldQueryTraits<Items>::Item...>>::type;
     auto const& prepared = prepared_query();
-    auto fetched = try_fetch<Items...>(
-      prepared.fetchers, entity, *world_, last_run_, this_run_
-    );
+    auto fetched =
+      try_fetch<Items...>(prepared.fetchers, entity, *world_, last_run_, this_run_);
     if (!fetched) {
       return Result{std::nullopt};
     }
@@ -238,13 +225,9 @@ private:
            std::views::transform(
              [fetchers, world = world_, lr = last_run_, tr = this_run_](
                Entity entity
-             ) -> auto {
-               return try_fetch<Items...>(fetchers, entity, *world, lr, tr);
-             }
+             ) -> auto { return try_fetch<Items...>(fetchers, entity, *world, lr, tr); }
            ) |
-           std::views::filter([](auto const& opt) -> auto {
-             return opt.has_value();
-           }) |
+           std::views::filter([](auto const& opt) -> auto { return opt.has_value(); }) |
            std::views::transform([](auto&& opt) -> auto {
              return *std::forward<decltype(opt)>(opt);
            });
@@ -255,9 +238,8 @@ private:
     auto const& prepared = prepared_query();
 
     for (Entity entity : prepared.candidates) {
-      auto fetched = try_fetch<Items...>(
-        prepared.fetchers, entity, *world_, last_run_, this_run_
-      );
+      auto fetched =
+        try_fetch<Items...>(prepared.fetchers, entity, *world_, last_run_, this_run_);
       if (!fetched) {
         continue;
       }
@@ -270,8 +252,7 @@ private:
     (WorldQueryTraits<Items>::access(acc), ...);
   }
 
-  template <typename... Items>
-  static auto flatten_result(Tuple<Items...> items) {
+  template <typename... Items> static auto flatten_result(Tuple<Items...> items) {
     if constexpr (sizeof...(Items) == 1) {
       return std::get<0>(std::move(items));
     } else {

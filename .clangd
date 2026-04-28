@@ -12,6 +12,8 @@ CompileFlags:
     - "-I/home/kuba/.xmake/packages/s/spdlog/v1.17.0/3fa7b85c2b654633a261398ce4940a63/include"
     - "-I/home/kuba/.xmake/packages/f/fmt/12.1.0/d3ea32b4d32e4cfbab907f41436b0b1d/include"
     - "-I/nix/store/7rk2ic67w77kvirns0c14151q253jxra-luajit-2.1.1741730670/include/luajit-2.1"
+    - "-IC:/Users/Kuba/AppData/Local/.xmake/packages/l/luajit/v2.1/cad57d38f8d84d638df17982b5b3fa73/include"
+    - "-IC:/Users/Kuba/AppData/Local/.xmake/packages/l/luajit/v2.1/cad57d38f8d84d638df17982b5b3fa73/include/luajit"
     - "-Wall"
     - "-Wextra"
     - "-Wpedantic"

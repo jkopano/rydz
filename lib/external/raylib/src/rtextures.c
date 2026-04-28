@@ -145,7 +145,7 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb_image.h" // Required for: stbi_load_from_file()
-  // NOTE: Used to read image data (multiple formats support)
+// NOTE: Used to read image data (multiple formats support)
 
 #if defined(__GNUC__) // GCC and Clang
 #pragma GCC diagnostic pop
@@ -167,7 +167,7 @@
 #define RL_GPUTEX_SHOW_LOG_INFO
 #define RL_GPUTEX_IMPLEMENTATION
 #include "external/rl_gputex.h" // Required for: rl_load_xxx_from_memory()
-  // NOTE: Used to read compressed textures data (multiple formats support)
+// NOTE: Used to read compressed textures data (multiple formats support)
 #if defined(__GNUC__) // GCC and Clang
 #pragma GCC diagnostic pop
 #endif
@@ -1181,9 +1181,9 @@ Image GenImageWhiteNoise(int width, int height, float factor) {
 
   for (int i = 0; i < width * height; i++) {
     if (GetRandomValue(0, 99) < (int) (factor * 100.0f))
-      pixels[i] = WHITE;
+      pixels[i] = RLWHITE;
     else
-      pixels[i] = BLACK;
+      pixels[i] = RLBLACK;
   }
 
   Image image = {
@@ -1733,7 +1733,7 @@ Image ImageText(char const* text, int fontSize, rlColor color) {
   ); // WARNING: Module required: rtext
 #else
   imText = GenImageColor(
-    200, 60, BLACK
+    200, 60, RLBLACK
   ); // Generating placeholder black image rectangle
   TRACELOG(LOG_WARNING, "IMAGE: ImageTextEx() requires module: rtext");
 #endif
@@ -1762,7 +1762,7 @@ Image ImageTextEx(
   Vector2 textSize = MeasureTextEx(font, text, fontSize, spacing);
 
   // Create image to store text
-  imText = GenImageColor((int) imSize.x, (int) imSize.y, BLANK);
+  imText = GenImageColor((int) imSize.x, (int) imSize.y, RLBLANK);
 
   for (int i = 0; i < textLength;) {
     // Get next codepoint from byte string and glyph index in font
@@ -1825,7 +1825,7 @@ Image ImageTextEx(
   }
 #else
   imText = GenImageColor(
-    200, 60, BLACK
+    200, 60, RLBLACK
   ); // Generating placeholder black image rectangle
   TRACELOG(LOG_WARNING, "IMAGE: ImageTextEx() requires module: rtext");
 #endif
@@ -2905,8 +2905,8 @@ void ImageDither(Image* image, int rBpp, int gBpp, int bBpp, int aBpp) {
       image->width * image->height * sizeof(unsigned short)
     );
 
-    rlColor oldPixel = WHITE;
-    rlColor newPixel = WHITE;
+    rlColor oldPixel = RLWHITE;
+    rlColor newPixel = RLWHITE;
 
     int rError = 0;
     int gError = 0;
@@ -3678,7 +3678,7 @@ rlColor* LoadImagePalette(Image image, int maxPaletteSize, int* colorCount) {
     palette = (rlColor*) RL_MALLOC(maxPaletteSize * sizeof(rlColor));
 
     for (int i = 0; i < maxPaletteSize; i++)
-      palette[i] = BLANK; // Set all colors to BLANK
+      palette[i] = RLBLANK; // Set all colors to RLBLANK
 
     for (int i = 0; i < image.width * image.height; i++) {
       if (pixels[i].a > 0) {
@@ -4880,7 +4880,7 @@ void ImageDrawTextEx(
     position.x, position.y, (float) imText.width, (float) imText.height
   };
 
-  ImageDraw(dst, imText, srcRec, dstRec, WHITE);
+  ImageDraw(dst, imText, srcRec, dstRec, RLWHITE);
 
   UnloadImage(imText);
 }
@@ -5014,7 +5014,7 @@ TextureCubemap LoadTextureCubemap(Image image, int layout) {
       // Convert image data to 6 faces in a vertical column, that's the optimum
       // layout for loading NOTE: Image formatting does not work with compressed
       // textures
-      faces = GenImageColor(size, size * 6, MAGENTA);
+      faces = GenImageColor(size, size * 6, RLMAGENTA);
       ImageFormat(&faces, image.format);
 
       Image mipmapped = ImageCopy(image);
@@ -5029,7 +5029,7 @@ TextureCubemap LoadTextureCubemap(Image image, int layout) {
           mipmapped,
           faceRecs[i],
           (rlRectangle) {0, (float) size * i, (float) size, (float) size},
-          WHITE
+          RLWHITE
         );
 
       UnloadImage(mipmapped);
@@ -6074,7 +6074,7 @@ rlColor ColorAlpha(rlColor color, float alpha) {
 
 // Get src alpha-blended into dst color with tint
 rlColor ColorAlphaBlend(rlColor dst, rlColor src, rlColor tint) {
-  rlColor out = WHITE;
+  rlColor out = RLWHITE;
 
   // Apply color tint to source color
   src.r =

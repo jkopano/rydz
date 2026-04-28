@@ -6,69 +6,22 @@
 #include <spdlog/spdlog.h>
 #include <string>
 
-template <typename... Args>
-auto trace(fmt::format_string<Args...> fmt, Args&&... args) -> void {
-  spdlog::trace(fmt, std::forward<Args>(args)...);
-}
-
-template <typename... Args>
-auto debug(fmt::format_string<Args...> fmt, Args&&... args) -> void {
-  spdlog::debug(fmt, std::forward<Args>(args)...);
-}
-
-template <typename... Args>
-auto info(fmt::format_string<Args...> fmt, Args&&... args) -> void {
-  spdlog::info(fmt, std::forward<Args>(args)...);
-}
-
-template <typename... Args>
-auto warn(fmt::format_string<Args...> fmt, Args&&... args) -> void {
-  spdlog::warn(fmt, std::forward<Args>(args)...);
-}
-
-template <typename... Args>
-auto error(fmt::format_string<Args...> fmt, Args&&... args) -> void {
-  spdlog::error(fmt, std::forward<Args>(args)...);
-}
-
-// Runtime format string support
-template <typename... Args>
-auto trace(fmt::runtime_format_string<Args...> fmt, Args&&... args) -> void {
-  spdlog::trace(fmt, std::forward<Args>(args)...);
-}
-
-template <typename... Args>
-auto debug(fmt::runtime_format_string<Args...> fmt, Args&&... args) -> void {
-  spdlog::debug(fmt, std::forward<Args>(args)...);
-}
-
-template <typename... Args>
-auto info(fmt::runtime_format_string<Args...> fmt, Args&&... args) -> void {
-  spdlog::info(fmt, std::forward<Args>(args)...);
-}
-
-template <typename... Args>
-auto warn(fmt::runtime_format_string<Args...> fmt, Args&&... args) -> void {
-  spdlog::warn(fmt, std::forward<Args>(args)...);
-}
-
-template <typename... Args>
-auto error(fmt::runtime_format_string<Args...> fmt, Args&&... args) -> void {
-  spdlog::error(fmt, std::forward<Args>(args)...);
-}
+#define trace(...) spdlog::trace(__VA_ARGS__)
+#define debug(...) spdlog::debug(__VA_ARGS__)
+#define info(...) spdlog::info(__VA_ARGS__)
+#define warn(...) spdlog::warn(__VA_ARGS__)
+#define error(...) spdlog::error(__VA_ARGS__)
 
 template <typename... Args>
 auto log(
-  spdlog::level::level_enum level,
-  fmt::runtime_format_string<Args...> fmt,
-  Args&&... args
+  spdlog::level::level_enum level, fmt::runtime_format_string<Args...> fmt, Args&&... args
 ) -> void {
   spdlog::log(level, fmt, std::forward<Args>(args)...);
 }
 
 namespace detail {
 inline auto init_logging() -> void {
-  spdlog::set_pattern("%^[%T] [%l] %v%$");
+  spdlog::set_pattern("%^[%T] [%l] [%s:%#] %v%$");
 
   char const* env_level = std::getenv("RYDZ_LOG");
 
@@ -96,12 +49,10 @@ inline auto init_logging() -> void {
 
   spdlog::set_level(level);
 
-  spdlog::info(
-    "Logging level set to: {}", spdlog::level::to_string_view(level)
-  );
+  info("Logging level set to: {}", spdlog::level::to_string_view(level));
 }
 } // namespace detail
 
 struct LogPlugin : public ecs::IPlugin {
-  auto build(ecs::App&) -> void override { detail::init_logging(); }
+  auto build(ecs::App&) -> void { detail::init_logging(); }
 };
