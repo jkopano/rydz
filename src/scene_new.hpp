@@ -11,10 +11,10 @@
 #include "rydz_graphics/mod.hpp"
 #include "rydz_graphics/plugin.hpp"
 #include "rydz_levelLoader/rydz_levelLoader.hpp"
-#include "rydz_ui/mod.hpp"
 #include "rydz_scripting/lua_resource.hpp"
-#include "rydz_scripting/script_scheduler.hpp"
 #include "rydz_scripting/lua_system_registry.hpp"
+#include "rydz_scripting/script_scheduler.hpp"
+#include "rydz_ui/mod.hpp"
 #include <algorithm>
 #include <print>
 
@@ -33,6 +33,10 @@ struct WasdKeyMarker {
   int keycode;
 };
 
+struct CameraTarget {
+  using Storage = ecs::SparseSetStorage<CameraTarget>;
+};
+
 // Isometric camera offset from the player
 static float const kCamOffX = 50.0f;
 static float const kCamOffY = 85.0f;
@@ -42,7 +46,7 @@ static float const kCamOffZ = 50.0f;
 
 // Run condition - Only run gameplay systems when console is closed
 
-inline bool is_gameplay_active(Res<engine::ConsoleState> console) {
+inline bool is_gameplay_active(Res<console::ConsoleState> console) {
   return !console->is_open;
 }
 
@@ -305,6 +309,61 @@ void update_wasd_ui_system(
   }
 }
 
+// ── Startup: inicjalizacja modułu skryptowania ────────────────────────────────
+//
+// WAŻNE: ten system musi wykonać się PRZED lua_startup_runner.
+// Kolejność rejestracji w add_systems(Startup, ...) wyznacza kolejność
+// wykonania — rejestrujemy go jako pierwszy startup system skryptowy.
+
+inline void init_lua_scripting(ecs::World& world) {
+  auto* lua = world.get_resource<scripting::LuaResource>();
+  auto* reg = world.get_resource<scripting::LuaSystemRegistry>();
+  if (!lua) {
+    fprintf(stderr, "[Scripting] Brak LuaResource!\n");
+    return;
+  }
+
+  // Rejestracja znacznika kamery
+  scripting::ComponentRegistry::get().register_component<CameraTarget>(
+    "CameraTarget", [](lua_State* L, ecs::World* w, ecs::Entity e) { return 0; }
+  );
+
+  // 1. Zarejestruj całe API silnika (metatabelki, Components, Input, Time, Rydz,
+  // Schedule)
+  scripting::register_rydz_api(lua->L);
+
+  // 2. Eksponuj _world — musi być przed luaL_dofile bo skrypty mogą go użyć
+  scripting::expose_world_global(lua->L, &world);
+
+  // 3. Ustaw wskaźnik do rejestru systemów — musi być przed luaL_dofile
+  //    bo skrypty wywołują Rydz.register_system() podczas ładowania
+  if (reg) {
+    lua_pushlightuserdata(lua->L, reg);
+    lua_setfield(lua->L, LUA_REGISTRYINDEX, "_sys_registry");
+  }
+
+  // 4. Załaduj wszystkie pliki .lua z res/scripts/ (nierekurencyjnie)
+  std::string const scripts_dir = "res/scripts/";
+  if (!std::filesystem::exists(scripts_dir)) {
+    fprintf(stderr, "[Scripting] Katalog '%s' nie istnieje!\n", scripts_dir.c_str());
+    return;
+  }
+
+  for (auto& entry : std::filesystem::directory_iterator(scripts_dir)) {
+    if (entry.path().extension() != ".lua")
+      continue;
+
+    std::string path = entry.path().string();
+    fprintf(stdout, "[Scripting] Ladowanie: %s\n", path.c_str());
+
+    if (luaL_dofile(lua->L, path.c_str()) != LUA_OK) {
+      fprintf(stderr, "[Lua] Blad w %s:\n  %s\n", path.c_str(), lua_tostring(lua->L, -1));
+      lua_pop(lua->L, 1);
+      // Kontynuujemy — błąd w jednym skrypcie nie blokuje pozostałych
+    }
+  }
+}
+
 // ── Plugin ───────────────────────────────────────────────────────────────────
 
 inline void scene_plugin(App& app) {
@@ -312,28 +371,28 @@ inline void scene_plugin(App& app) {
   app.add_plugin(UiPlugin::install);
   app.add_plugin(system_multithreading({true}));
   app.add_plugin(scripting::scripting_plugin);
-  app.add_plugin(engine::console_plugin);
+  app.add_plugin(console::console_plugin);
   app.add_plugin(camera_plugin);
 
   app.insert_resource(scripting::LuaSystemRegistry{});
 
   app.add_systems(Startup, [](ecs::World& world) {
-      auto* lua = world.get_resource<scripting::LuaResource>();
-      auto* reg = world.get_resource<scripting::LuaSystemRegistry>();
-      if (lua) {
-          scripting::register_rydz_api(lua->L);
-          scripting::expose_world_global(lua->L, &world);
-      }
+    auto* lua = world.get_resource<scripting::LuaResource>();
+    auto* reg = world.get_resource<scripting::LuaSystemRegistry>();
+    if (lua) {
+      scripting::register_rydz_api(lua->L);
+      scripting::expose_world_global(lua->L, &world);
+    }
 
-      if (reg) {
-          lua_pushlightuserdata(lua->L, reg);
-          lua_setfield(lua->L, LUA_REGISTRYINDEX, "_sys_registry");
-      }
+    if (reg) {
+      lua_pushlightuserdata(lua->L, reg);
+      lua_setfield(lua->L, LUA_REGISTRYINDEX, "_sys_registry");
+    }
 
-      if (luaL_dofile(lua->L, "res/scripts/test.lua") != LUA_OK) {
-          fprintf(stderr, "[Lua] %s\n", lua_tostring(lua->L, -1));
-          lua_pop(lua->L, 1);
-      }
+    if (luaL_dofile(lua->L, "res/scripts/test.lua") != LUA_OK) {
+      fprintf(stderr, "[Lua] %s\n", lua_tostring(lua->L, -1));
+      lua_pop(lua->L, 1);
+    }
   });
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
@@ -348,13 +407,17 @@ inline void scene_plugin(App& app) {
   app.add_systems(ScheduleLabel::Update, show_player_position_ui);
   app.add_systems(ScheduleLabel::Update, update_wasd_ui_system);
 
+  app.add_systems(
+    ecs::ScheduleLabel::Startup,
+    group(init_lua_scripting, scripting::lua_startup_runner).chain()
+  );
 
-  app.add_systems(ecs::ScheduleLabel::Startup,
-    group(init_lua_scripting, scripting::lua_startup_runner).chain());
-
-  app.add_systems(Update, group(player_movement_system,
-                                update_isometric_camera_target_system)
-                              .run_if(is_gameplay_active));
-  app.add_systems(RenderPassSet::Cleanup,
-                  group(engine::ConsoleRenderSystem).before(FramePass::end));
+  app.add_systems(
+    Update,
+    group(player_movement_system, update_isometric_camera_target_system)
+      .run_if(is_gameplay_active)
+  );
+  app.add_systems(
+    RenderPassSet::Cleanup, group(console::ConsoleRenderSystem).before(FramePass::end)
+  );
 }

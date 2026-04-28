@@ -8,6 +8,10 @@ set_showmenu(true)
 set_description("Enable Tracy profiler")
 option_end()
 
+-- common language / warnings
+set_languages("c++23")
+set_warnings("all", "extra")
+
 -- toolchains (clangd likes clang compile commands)
 if is_plat("windows") then
 	set_toolchains("clang-cl")
@@ -46,10 +50,7 @@ local function add_tracy()
 	end
 end
 
--- common language / warnings
-set_languages("c++23")
 add_includedirs("lib")
-set_warnings("all", "extra")
 
 if is_plat("windows") then
 	-- Dla clang-cl / msvc (jeśli używasz clang-cl, to zrozumie te flagi)
@@ -60,11 +61,12 @@ else
 end
 
 -- common dependencies
+add_requireconfs("*", { configs = { languages = "c++23" } })
 add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")
 add_requires("fmt", "spdlog", { configs = { external_fmt = true } })
 
 if is_plat("windows") then
-    add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", {force = true})
+	add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", { force = true })
 end
 
 if tracy_enabled then
@@ -176,9 +178,9 @@ add_headerfiles("lib/rydz_**/*.hpp")
 -- add_deps("raylib")
 -- add_packages("taskflow", "joltphysics", "glaze")
 if is_plat("windows") then
-add_packages("luajit")
+	add_packages("luajit")
 elseif is_plat("linux") then
-add_packages("luajit")
+	add_packages("luajit")
 end
 
 target("tests")
