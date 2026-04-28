@@ -14,19 +14,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
-      # - name: Install Nix
-      #   uses: DeterminateSystems/nix-installer-action@v16
+      - name: Setup xmake
+        uses: xmake-io/github-action-setup-xmake@v1
 
       - name: Build tests and main
         shell: bash
         run: |
-          xmake clang --run '
-            xmake f -y -m debug &&
-            xmake build tests &&
-            xmake build main
-          '
+          xmake f -y -p linux -a x86_64 -m debug
+          xmake build tests
+          xmake build main
 
   # nixos:
   #   name: nixos
@@ -51,12 +49,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup MSVC Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Setup xmake
         uses: xmake-io/github-action-setup-xmake@v1
 
       - name: Build tests and main
-        shell: bash
+        shell: pwsh
         run: |
-          xmake f -y -m debug
+          xmake f -y -p windows -a x64 -m debug
           xmake build tests
           xmake build main
