@@ -16,11 +16,12 @@ jobs:
         - name: Checkout
           uses: actions/checkout@v4
 
-        - name: Install dependencies
+        - name: Install GCC 15 and dependencies
           run: |
+            sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
             sudo apt-get update
             sudo apt-get install -y \
-              build-essential \
+              gcc-15 g++-15 \
               libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev \
               libgl1-mesa-dev libglu1-mesa-dev libasound2-dev libpulse-dev
 
@@ -32,7 +33,8 @@ jobs:
         - name: Build tests and main
           shell: bash
           run: |
-            xmake f -y -p linux -a x86_64 -m debug
+            # Wymuszamy GCC 15 dla projektu i wszystkich zależności
+            xmake f -y -p linux -a x86_64 -m debug --cc=gcc-15 --cxx=g++-15
             xmake build -y tests
             xmake build -y main
 
