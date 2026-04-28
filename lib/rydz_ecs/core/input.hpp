@@ -49,43 +49,6 @@ struct Input {
   }
   auto mouse_delta_x() const -> f32 { return mouse_.delta_x; }
   auto mouse_delta_y() const -> f32 { return mouse_.delta_y; }
-
-public:
-  auto clear_frame() -> void {
-    keys_pressed_.clear();
-    keys_released_.clear();
-    mouse_.delta_x = 0.0f;
-    mouse_.delta_y = 0.0f;
-  }
-
-  auto clear() -> void {
-    keys_down_.clear();
-    keys_pressed_.clear();
-    keys_released_.clear();
-    mouse_.delta_x = 0.0f;
-    mouse_.delta_y = 0.0f;
-  }
-
-  auto set_key_down(KeyCode key) -> void {
-    if (!keys_down_.contains(key)) {
-      keys_pressed_.insert(key);
-    }
-    keys_down_.insert(key);
-  }
-
-  auto set_key_up(KeyCode key) -> void {
-    if (keys_down_.contains(key)) {
-      keys_released_.insert(key);
-    }
-    keys_down_.erase(key);
-  }
-
-  auto set_mouse_delta(f32 dx, f32 dy) -> void {
-    mouse_.delta_x = dx;
-    mouse_.delta_y = dy;
-  }
-
-  auto keys_down() -> std::unordered_set<KeyCode>& { return keys_down_; }
   auto mouse_scroll() const -> f32 { return mouse_.scroll; }
 
   static auto input_polling_system(ResMut<Input> input, NonSendMarker) -> void {
@@ -122,6 +85,14 @@ public:
     input->set_mouse_position(mp.x, mp.y);
 
     input->set_mouse_scroll(rl::GetMouseWheelMove());
+  }
+
+  auto clear() -> void {
+    keys_down_.clear();
+    keys_pressed_.clear();
+    keys_released_.clear();
+    mouse_.delta_x = 0.0f;
+    mouse_.delta_y = 0.0f;
   }
 
 private:
