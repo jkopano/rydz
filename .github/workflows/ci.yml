@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Build tests and main
+        shell: bash
+        run: |
+          nix-shell -p xmake clang --run '
+            xmake f -y -m debug &&
+            xmake build tests &&
+            xmake build main
+          '
+
+  # nixos:
+  #   name: nixos
+  #   runs-on: [self-hosted, nixos]
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Build tests and main
+  #       shell: bash
+  #       run: |
+  #         nix-shell -p xmake clang --run '
+  #           xmake f -y -m debug &&
+  #           xmake build tests &&
+  #           xmake build main
+  #         '
+
+  windows:
+    name: windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+
+      - name: Build tests and main
+        shell: bash
+        run: |
+          xmake f -y -m debug
+          xmake build tests
+          xmake build main

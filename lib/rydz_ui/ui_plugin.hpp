@@ -3,7 +3,6 @@
 #include "rydz_ecs/app.hpp"
 #include "rydz_graphics/extract/systems.hpp"
 #include "rydz_graphics/spatial/transform.hpp"
-#include "rydz_ui/system_sets.hpp"
 
 struct UiPlugin {
 public:
@@ -14,9 +13,8 @@ public:
            cursor.y >= node.pos.y && cursor.y <= (node.pos.y + node.size.y);
   }
 
-  static auto hit_test_ui(
-    ecs::World& world, math::Vec2 cursor
-  ) -> std::optional<ecs::Entity> {
+  static auto hit_test_ui(ecs::World& world, math::Vec2 cursor)
+    -> std::optional<ecs::Entity> {
     auto* nodes = world.get_storage<rydz::ui::UiNode>();
     if (!nodes) {
       return std::nullopt;
@@ -31,8 +29,10 @@ public:
         return;
       }
 
-      if (auto* style = world.get_component<rydz::ui::Style>(e);
-          style != nullptr && style->display == rydz::ui::Display::None) {
+      if (
+        auto* style = world.get_component<rydz::ui::Style>(e);
+        style != nullptr && style->display == rydz::ui::Display::None
+      ) {
         return;
       }
 
@@ -64,17 +64,21 @@ public:
     }
 
     if (state.hovered_entity) {
-      world.trigger(rydz::ui::UiHoverLeave{
-        .target = *state.hovered_entity,
-        .cursor = pointer.cursor,
-      });
+      world.trigger(
+        rydz::ui::UiHoverLeave{
+          .target = *state.hovered_entity,
+          .cursor = pointer.cursor,
+        }
+      );
     }
 
     if (next_hovered) {
-      world.trigger(rydz::ui::UiHoverEnter{
-        .target = *next_hovered,
-        .cursor = pointer.cursor,
-      });
+      world.trigger(
+        rydz::ui::UiHoverEnter{
+          .target = *next_hovered,
+          .cursor = pointer.cursor,
+        }
+      );
     }
 
     state.hovered_entity = next_hovered;
@@ -113,11 +117,13 @@ public:
 
     if (pointer->primary_pressed && next_hovered) {
       state->pressed_entity = next_hovered;
-      world.trigger(rydz::ui::UiClick{
-        .target = *next_hovered,
-        .cursor = pointer->cursor,
-        .button = pointer->primary_button,
-      });
+      world.trigger(
+        rydz::ui::UiClick{
+          .target = *next_hovered,
+          .cursor = pointer->cursor,
+          .button = pointer->primary_button,
+        }
+      );
       update_focus_state(world, *pointer, *state, next_hovered);
     }
 
