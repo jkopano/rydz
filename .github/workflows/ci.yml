@@ -20,7 +20,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@v16
 
       - name: Install devenv.sh
-        uses: devenv-io/devenv-action@v1
+        uses: cachix/devenv-action@v1
 
       - name: Build tests and main
         run: |
