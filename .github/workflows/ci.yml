@@ -19,10 +19,16 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v16
 
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: devenv
+
       - name: Install devenv.sh
-        uses: cachix/devenv-action@v1
+        run: nix profile add nixpkgs#devenv
 
       - name: Build tests and main
+        shell: devenv shell bash -- -e {0}
         run: |
           xmake global --clean
           xmake f -y -p linux -a x86_64 -m debug
