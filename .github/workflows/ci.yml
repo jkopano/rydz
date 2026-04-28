@@ -9,34 +9,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  linux:
-      name: linux
-      runs-on: ubuntu-24.04
+  linux-nix:
+      name: linux (nix)
+      runs-on: ubuntu-latest
       steps:
         - name: Checkout
           uses: actions/checkout@v4
 
-        - name: Install GCC 15 and dependencies
-          run: |
-            sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-            sudo apt-get update
-            sudo apt-get install -y \
-              gcc-15 g++-15 \
-              libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev \
-              libgl1-mesa-dev libglu1-mesa-dev libasound2-dev libpulse-dev
-
-        - name: Setup xmake
-          uses: xmake-io/github-action-setup-xmake@v1
+        - name: Install Nix
+          uses: cachix/install-nix-action@v25
           with:
-            xmake-version: latest
+            nix_path: nixpkgs=channel:nixos-unstable
 
-        - name: Build tests and main
-          shell: bash
+        - name: Build with Xmake inside Nix
           run: |
-            # Wymuszamy GCC 15 dla projektu i wszystkich zależności
-            xmake f -y -p linux -a x86_64 -m debug --cc=gcc-15 --cxx=g++-15
-            xmake build -y tests
-            xmake build -y main
+            nix-shell --run "xmake f -y -m debug && xmake build -y tests main"
 
   windows:
     name: windows
