@@ -229,7 +229,7 @@ void spawn_model(Cmd cmd, Res<AssetServer> server) {
   // auto model_handle = server->load<Scene>("res/models/old_house.glb");
   cmd.spawn(
     SceneRoot{server->load<Scene>("res/levels/testLevel.glb")},
-    ecs::Transform{.scale = {0.2f, 0.2f, 0.2f}}
+    ecs::Transform{.scale = {0.1f, 0.1f, 0.1f}}
   );
 }
 
@@ -246,7 +246,7 @@ void spawn_entity_models(Cmd cmd, Res<AssetServer> server) {
     cmd.spawn(
       SceneRoot{server->load<Scene>("res/" + prop_static.modelPath)},
       ecs::Transform{
-        .translation = prop_static.position, .scale = {0.2f, 0.2f, 0.2f}
+        .translation = prop_static.position * 0.1f, .scale = {0.1f, 0.1f, 0.1f}
       }
     );
   }
