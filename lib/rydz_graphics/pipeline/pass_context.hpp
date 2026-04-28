@@ -17,32 +17,48 @@ struct RenderExecutionState;
 struct ShaderCache;
 struct ViewUniformState;
 
-struct PassContext {
+struct FrameContext {
   NonSendMarker marker;
   gl::RenderState& render_state;
   gl::Rectangle framebuffer;
   ExtractedView const& view;
-  ExtractedLights const& lights;
-  ExtractedShadows const& shadows;
   Time const& time;
+  gl::Texture const* scene_depth_texture{};
+  RenderExecutionState* execution_state{};
+  EnvironmentRenderer const* environment_renderer{};
+};
+
+struct AssetContext {
   ExtractedMeshes const& extracted_meshes;
   Assets<Mesh> const& mesh_assets;
   Assets<Texture> const& texture_assets;
   ShaderCache& shader_cache;
-  ViewUniformState& view_uniforms;
-  ShadowUniformState& shadow_uniforms;
   SlotProviderRegistry const& slot_registry;
-  OpaquePhase const& opaque_phase;
-  TransparentPhase const& transparent_phase;
-  ShadowPhase const& shadow_phase;
-  UiPhase const& ui_phase;
+};
+
+struct LightingContext {
+  ExtractedLights const& lights;
+  ExtractedShadows const& shadows;
   ClusterConfig const& cluster_config;
   ShadowSettings const& shadow_settings;
   ClusteredLightingState& cluster_state;
   ShadowResources& shadow_resources;
-  gl::Texture const* scene_depth_texture{};
-  RenderExecutionState* execution_state{};
-  EnvironmentRenderer const* environment_renderer{};
+  ViewUniformState& view_uniforms;
+  ShadowUniformState& shadow_uniforms;
+};
+
+struct PhaseContext {
+  OpaquePhase const& opaque;
+  TransparentPhase const& transparent;
+  ShadowPhase const& shadow;
+  UiPhase const& ui;
+};
+
+struct PassContext {
+  FrameContext frame;
+  AssetContext assets;
+  LightingContext lighting;
+  PhaseContext phases;
 };
 
 } // namespace ecs

@@ -127,34 +127,34 @@ struct ShaderCache {
   std::unordered_map<ShaderSpec, ShaderProgram> shaders;
 };
 
-inline auto MaterialContext::frame() const -> PassContext const& { return *frame_data; }
+inline auto MaterialContext::pass_ctx() const -> PassContext const& { return *frame_data; }
 
 inline auto MaterialContext::textures() const -> Assets<Texture> const& {
-  return frame().texture_assets;
+  return pass_ctx().assets.texture_assets;
 }
 
-inline auto MaterialContext::view() const -> ExtractedView const& { return frame().view; }
+inline auto MaterialContext::view() const -> ExtractedView const& { return pass_ctx().frame.view; }
 
 inline auto MaterialContext::lights() const -> ExtractedLights const& {
-  return frame().lights;
+  return pass_ctx().lighting.lights;
 }
 
 inline auto MaterialContext::cluster_config() const -> ClusterConfig const& {
-  return frame().cluster_config;
+  return pass_ctx().lighting.cluster_config;
 }
 
 inline auto MaterialContext::clustered_lighting() const -> ClusteredLightingState const& {
-  return frame().cluster_state;
+  return pass_ctx().lighting.cluster_state;
 }
 
-inline auto MaterialContext::time() const -> Time const& { return frame().time; }
+inline auto MaterialContext::time() const -> Time const& { return pass_ctx().frame.time; }
 
 inline auto MaterialContext::view_uniforms() const -> ViewUniformState const& {
-  return frame().view_uniforms;
+  return pass_ctx().lighting.view_uniforms;
 }
 
 inline auto MaterialContext::slots() const -> SlotProviderRegistry const& {
-  return frame().slot_registry;
+  return pass_ctx().assets.slot_registry;
 }
 
 inline auto pbr_fallback_textures() -> PbrFallbackTextures& {
@@ -199,7 +199,7 @@ inline auto apply_default_material_map_textures(gl::Material& material) -> void 
   auto* maps = material.maps;
   for (auto const map : DEFAULT_MATERIAL_MAPS) {
     auto& material_map = maps[material_map_index(map)];
-    if (material_map.texture.ready()) {
+    if (material_map.texture.id > 0) {
       continue;
     }
 
@@ -288,13 +288,13 @@ inline auto prepare_material(
   ShaderSpec const& shader_spec,
   PreparedMaterial& prepared
 ) -> ShaderProgram& {
-  auto const& src_mat = gl::Material::fallback_material(material_ctx.frame().marker);
+  auto const& src_mat = gl::Material::fallback_material(material_ctx.pass_ctx().frame.marker);
   prepared.material = src_mat;
   std::memcpy(prepared.local_maps.data(), src_mat.maps, sizeof(prepared.local_maps));
   prepared.material.maps = prepared.local_maps.data();
 
   ShaderProgram& shader = resolve_shader(
-    material_ctx.frame().marker, material_ctx.frame().shader_cache, shader_spec
+    material_ctx.pass_ctx().frame.marker, material_ctx.pass_ctx().assets.shader_cache, shader_spec
   );
   initialize_material_map_locations(shader);
   prepared.material.shader = shader.raw();
