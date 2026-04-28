@@ -1,6 +1,7 @@
 #pragma once
 #include "math.hpp"
 #include "rl.hpp"
+#include "rydz_ai/enemy_plugin.hpp"
 #include "rydz_camera/mod.hpp"
 #include "rydz_console/console.hpp"
 #include "rydz_console/scripting.hpp"
@@ -8,6 +9,7 @@
 #include "rydz_ecs/mod.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
+#include "rydz_graphics/mesh3d.hpp"
 #include "rydz_graphics/mod.hpp"
 #include "rydz_graphics/plugin.hpp"
 #include "rydz_levelLoader/rydz_levelLoader.hpp"
@@ -22,11 +24,6 @@ using namespace ecs;
 using namespace math;
 
 // ── Components ──────────────────────────────────────────────────────────────
-
-struct Player {
-  using Storage = SparseSetStorage<Player>;
-  f32 move_speed = 8.0f;
-};
 
 struct UiMarker {};
 struct WasdKeyMarker {
@@ -129,9 +126,6 @@ inline void setup_lighting(Cmd cmd, NonSendMarker, ResMut<Assets<ecs::Mesh>> mes
   cmd.spawn(
     PointLight{.color = {0, 255, 0, 255}, .intensity = 90.f, .range = 600.0f},
     Transform::from_xyz(0.0f, 3.0f, 0.0f)
-
-    // Mesh3d{meshes->add(mesh::cube(0.5f, 0.5f,
-    // 0.5f)))}
   );
 }
 
@@ -371,6 +365,7 @@ inline void scene_plugin(App& app) {
   app.add_plugin(scripting::scripting_plugin);
   app.add_plugin(console::console_plugin);
   app.add_plugin(camera_plugin);
+  app.add_plugin(ai::enemy_ai_plugin);
 
   app.insert_resource(scripting::LuaSystemRegistry{});
 
