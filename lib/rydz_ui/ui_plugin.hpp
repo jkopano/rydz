@@ -6,6 +6,14 @@
 
 struct UiPlugin {
 public:
+  static auto ui_input_bridge(
+    rydz::ui::UiPointerState pointer, ecs::Res<ecs::Input> input
+  ) -> void {
+    pointer.set_cursor(input->mouse_position());
+    pointer.set_primary_down(input->mouse_down(0));
+    pointer.set_primary_up(input->mouse_down(0));
+  }
+
   static auto ui_node_contains_cursor(
     rydz::ui::ComputedUiNode const& node, math::Vec2 cursor
   ) -> bool {

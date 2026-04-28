@@ -78,6 +78,13 @@ struct UiPointerState {
     primary_down = false;
     primary_button = button;
   }
+
+  auto set_primary_released(int button = 0) -> void {
+    if (!primary_down) {
+      primary_released = true;
+    }
+    primary_down = false;
+  }
 };
 
 struct UiInteractionState {

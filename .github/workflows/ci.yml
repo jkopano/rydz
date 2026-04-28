@@ -53,7 +53,7 @@ jobs:
           xmake-version: latest
 
       - name: Build tests and main
-        shell: pwsh
+        shell: bash 
         run: |
           xmake global --clean
           xmake f -y -p windows -a x64 -m debug
