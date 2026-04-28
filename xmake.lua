@@ -63,11 +63,7 @@ end
 -- common dependencies
 add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")
 add_requires("fmt", "spdlog", { configs = { external_fmt = true } })
-
--- dump
--- if is_plat("linux") then
--- 	add_requireconfs("glaze", { configs = { languages = "c++23" } })
--- end
+add_requireconfs("*", { configs = { languages = "c++23" } })
 
 if is_plat("windows") then
 	add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", { force = true })
