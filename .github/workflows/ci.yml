@@ -10,45 +10,31 @@ concurrency:
 
 jobs:
   linux:
-    name: linux
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      name: linux
+      runs-on: ubuntu-24.04
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev
+        - name: Install dependencies
+          run: |
+            sudo apt-get update
+            sudo apt-get install -y \
+              build-essential \
+              libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev \
+              libgl1-mesa-dev libglu1-mesa-dev libasound2-dev libpulse-dev
 
-      - name: Setup xmake
-        uses: xmake-io/github-action-setup-xmake@v1
-        with:
-          xmake-version: latest
+        - name: Setup xmake
+          uses: xmake-io/github-action-setup-xmake@v1
+          with:
+            xmake-version: latest
 
-
-      - name: Build tests and main
-        shell: bash
-        run: |
-          xmake f -y -p linux -a x86_64 -m debug
-          xmake build -y tests
-          xmake build -y main
-
-  # nixos:
-  #   name: nixos
-  #   runs-on: [self-hosted, nixos]
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Build tests and main
-  #       shell: bash
-  #       run: |
-  #         nix-shell -p xmake clang --run '
-  #           xmake f -y -m debug &&
-  #           xmake build tests &&
-  #           xmake build main
-  #         '
+        - name: Build tests and main
+          shell: bash
+          run: |
+            xmake f -y -p linux -a x86_64 -m debug
+            xmake build -y tests
+            xmake build -y main
 
   windows:
     name: windows
