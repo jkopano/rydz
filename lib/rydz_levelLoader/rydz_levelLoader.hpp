@@ -1,9 +1,6 @@
 #pragma once
 /*
- * rydz_camera - Isometric camera system for rydz ECS engine
- *
- * Provides IsometricCamera component, controller system, and setup helper.
- * Single header for top-down games and RPGs.
+ * rydz_levelLoader - Used for parsing and loading all map geometry + entities
  */
 
 #include "math.hpp"
