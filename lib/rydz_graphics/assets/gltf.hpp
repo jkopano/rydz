@@ -112,20 +112,22 @@ inline auto apply_gltf_material_properties(
 
 inline auto transfer_texture(
   Assets<Texture>& textures,
-  gl::Texture const& texture,
+  ::rlTexture const& raw_texture,
   std::unordered_map<unsigned int, Handle<Texture>>& texture_cache
 ) -> Handle<Texture> {
-  if (!texture.ready()) {
+  if (raw_texture.id == 0) {
     return {};
   }
 
-  auto cached = texture_cache.find(texture.id);
+  auto cached = texture_cache.find(raw_texture.id);
   if (cached != texture_cache.end()) {
     return cached->second;
   }
 
-  auto handle = textures.add(texture);
-  texture_cache.emplace(texture.id, handle);
+  gl::Texture owned_texture{raw_texture};
+  u32 const texture_id = owned_texture.id;
+  auto handle = textures.add(std::move(owned_texture));
+  texture_cache.emplace(texture_id, handle);
   return handle;
 }
 
@@ -170,10 +172,8 @@ inline auto material_from_backend_material(
 
   if (gltf_material != nullptr) {
     if (gltf_material->has_pbr_metallic_roughness) {
-      material_value.metallic =
-        gltf_material->pbr_metallic_roughness.metallic_factor;
-      material_value.roughness =
-        gltf_material->pbr_metallic_roughness.roughness_factor;
+      material_value.metallic = gltf_material->pbr_metallic_roughness.metallic_factor;
+      material_value.roughness = gltf_material->pbr_metallic_roughness.roughness_factor;
     }
 
     if (gltf_material->normal_texture.texture != nullptr) {

@@ -152,7 +152,7 @@ public:
     gl::Texture tex = rl::LoadTextureFromImage(img);
     rl::UnloadImage(img);
 
-    world.insert_resource(rydz::ui::UiWhiteTexture{textures->add(tex)});
+    world.insert_resource(rydz::ui::UiWhiteTexture{textures->add(std::move(tex))});
   }
 
   static void ui_prepare_system(ecs::World& world) {
@@ -270,7 +270,7 @@ public:
 
         gl::Texture raw_tex = rl::LoadTextureFromImage(img);
         rl::UnloadImage(img);
-        it = text_cache->items.emplace(key, textures->add(raw_tex)).first;
+        it = text_cache->items.emplace(key, textures->add(std::move(raw_tex))).first;
       }
 
       sprite->handle = it->second;

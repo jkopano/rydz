@@ -46,6 +46,15 @@ end)
  
 -- ── System ruchu ─────────────────────────────────────────────────────────────
  
+function ResetPos(world)
+    for entity in world:each_lua_with("is_player", true) do
+    local data = world:get_lua_component(entity)
+        local t    = world:get_component(entity, Components.Transform)
+        if not t then return end
+        t.translation = { x = 0.0, y = 0.5, z = 0.0 }
+    end
+end
+
 local function PlayerMovement(world)
     for entity in world:each_lua_with("is_player", true) do
         local data = world:get_lua_component(entity)

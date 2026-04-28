@@ -1,9 +1,11 @@
 #pragma once
 
 #include "rl.hpp"
+#include "rydz_graphics/components/color.hpp"
 #include "rydz_graphics/gl/primitives.hpp"
 #include "rydz_log/mod.hpp"
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <external/glad.h>
 #include <string>
@@ -14,6 +16,8 @@
 namespace gl {
 
 struct Texture;
+class TextureBuilder;
+class RenderTargetBuilder;
 
 struct Image {
   void* data{};
@@ -63,15 +67,17 @@ struct Texture {
   i32 mipmaps = 0;
   i32 format = 0;
 
+public:
   constexpr Texture() = default;
 
   constexpr Texture(::rlTexture const& raw) noexcept
-      : Texture(detail::raylib_cast<Texture>(raw)) {}
+      : id(raw.id), width(raw.width), height(raw.height), mipmaps(raw.mipmaps),
+        format(raw.format) {}
   constexpr Texture(char const* path) { *this = rl::LoadTexture(path); }
   constexpr Texture(std::string const& path) : Texture(path.c_str()) {}
 
   constexpr operator ::rlTexture() const noexcept {
-    return detail::raylib_cast<::rlTexture>(*this);
+    return ::rlTexture{id, width, height, mipmaps, format};
   }
 
   auto operator=(::rlTexture const& raw) noexcept -> Texture& {
@@ -81,14 +87,55 @@ struct Texture {
 
   [[nodiscard]] auto ready() const -> bool { return id > 0; }
 
+  /// Example usage:
+  /// ```cpp
+  /// auto texture = Texture::builder()
+  ///   .from_file("path/to/texture.png")
+  ///   .with_filter(TextureFilter::Trilinear)
+  ///   .with_wrap(TextureWrap::Repeat)
+  ///   .with_mipmaps(true)
+  ///   .build();
+  /// ```
+  ///
+  /// @return A default-constructed TextureBuilder ready for configuration
+  static auto builder() -> TextureBuilder;
+
   auto unload() -> void {
     if (ready()) {
       rl::UnloadTexture(*this);
-      *this = Texture{};
+      id = 0;
+      width = 0;
+      height = 0;
+      mipmaps = 0;
+      format = 0;
     }
   }
 
-  auto set_filter(i32 filter) const -> void { rl::SetTextureFilter(*this, filter); }
+  auto set_filter(i32 filter) const -> void {
+    if (!ready()) {
+      return;
+    }
+    rl::SetTextureParameteri(id, GL_TEXTURE_MIN_FILTER, filter);
+    rl::SetTextureParameteri(id, GL_TEXTURE_MAG_FILTER, filter);
+  }
+
+  auto set_wrap(i32 wrap) const -> void {
+    if (!ready()) {
+      return;
+    }
+    rl::SetTextureParameteri(id, GL_TEXTURE_WRAP_S, wrap);
+    rl::SetTextureParameteri(id, GL_TEXTURE_WRAP_T, wrap);
+  }
+
+  auto generate_mipmaps() -> void {
+    if (!ready()) {
+      return;
+    }
+    rl::GenTextureMipmaps(id);
+
+    i32 const max_dim = std::max(width, height);
+    mipmaps = static_cast<i32>(std::floor(std::log2(static_cast<f32>(max_dim)))) + 1;
+  }
 
   [[nodiscard]] auto rect() const -> Rectangle {
     return {0.0F, 0.0F, static_cast<f32>(width), static_cast<float>(height)};
@@ -108,7 +155,6 @@ struct Texture {
 
 static_assert(sizeof(Texture) == sizeof(::rlTexture));
 static_assert(alignof(Texture) == alignof(::rlTexture));
-static_assert(std::is_trivially_copyable_v<Texture>);
 
 inline auto Image::load_texture() const -> Texture {
   return rl::LoadTextureFromImage(*this);
@@ -119,12 +165,46 @@ struct RenderTarget {
   Texture texture{};
   Texture depth{};
 
+public:
   constexpr RenderTarget() = default;
   constexpr RenderTarget(::RenderTexture const& raw) noexcept
-      : RenderTarget(detail::raylib_cast<RenderTarget>(raw)) {}
+      : id(raw.id), texture(raw.texture), depth(raw.depth) {}
 
   RenderTarget(u32 width, u32 height)
       : RenderTarget(rl::LoadRenderTexture(width, height)) {}
+
+  RenderTarget(RenderTarget const&) = delete;
+  auto operator=(RenderTarget const&) -> RenderTarget& = delete;
+
+  RenderTarget(RenderTarget&& o) noexcept
+      : id(std::exchange(o.id, 0)), texture(std::move(o.texture)),
+        depth(std::move(o.depth)) {}
+
+  auto operator=(RenderTarget&& o) noexcept -> RenderTarget& {
+    if (this != &o) {
+      unload();
+      id = std::exchange(o.id, 0);
+      texture = std::move(o.texture);
+      depth = std::move(o.depth);
+    }
+    return *this;
+  }
+
+  ~RenderTarget() { unload(); }
+
+  /// Returns a RenderTargetBuilder for fluent API construction
+  ///
+  /// Example usage:
+  /// ```cpp
+  /// auto render_target = RenderTarget::builder()
+  ///   .with_size(1920, 1080)
+  ///   .with_color_format(RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8)
+  ///   .with_depth_texture(true)
+  ///   .build();
+  /// ```
+  ///
+  /// @return A default-constructed RenderTargetBuilder ready for configuration
+  static auto builder() -> RenderTargetBuilder;
 
   static auto with_depth_texture(
     u32 width, u32 height, i32 color_format = RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
@@ -161,9 +241,7 @@ struct RenderTarget {
       target.id, target.depth.id, RL_ATTACHMENT_DEPTH, RL_ATTACHMENT_TEXTURE2D, 0
     );
 
-    rl::rlEnableTexture(target.depth.id);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-    rl::rlDisableTexture();
+    rl::SetTextureParameteri(target.depth.id, GL_TEXTURE_COMPARE_MODE, GL_NONE);
 
     if (!rl::rlFramebufferComplete(target.id)) {
       warn("RenderTarget::with_depth_texture: FBO incomplete");
@@ -175,7 +253,9 @@ struct RenderTarget {
   }
 
   constexpr operator ::RenderTexture() const noexcept {
-    return detail::raylib_cast<::RenderTexture>(*this);
+    return ::RenderTexture{
+      id, static_cast<::rlTexture>(texture), static_cast<::rlTexture>(depth)
+    };
   }
 
   auto operator=(::RenderTexture const& raw) noexcept -> RenderTarget& {
@@ -185,17 +265,56 @@ struct RenderTarget {
 
   [[nodiscard]] auto ready() const -> bool { return id != 0; }
 
+  [[nodiscard]] auto is_complete() const -> bool {
+    if (!ready()) {
+      return false;
+    }
+
+    u32 const prev_fbo = 0;
+    rl::BindFramebuffer(GL_FRAMEBUFFER, id);
+    u32 const status = rl::CheckFramebufferStatus(GL_FRAMEBUFFER);
+    rl::BindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
+
+    return status == GL_FRAMEBUFFER_COMPLETE;
+  }
+
   auto unload() -> void {
-    if (RenderTarget::ready()) {
+    if (ready()) {
       rl::UnloadRenderTexture(*this);
-      *this = RenderTarget{};
+      id = 0;
+      texture = Texture{};
+      depth = Texture{};
     }
   }
 
-  auto begin() const -> void { rl::BeginTextureMode(*this); }
-  auto end() const -> void { rl::EndTextureMode(); };
+  auto begin() const -> void {
+    if (!ready()) {
+      return;
+    }
+    rl::BeginTextureMode(*this);
+  }
+
+  auto end() const -> void {
+    if (!ready()) {
+      return;
+    }
+    rl::EndTextureMode();
+  }
+
+  auto clear(ecs::Color color) const -> void {
+    if (!ready()) {
+      return;
+    }
+    begin();
+    rl::ClearBackground(color);
+    end();
+  }
 
   auto resize(u32 w, u32 h) -> void {
+    if (!ready()) {
+      warn("RenderTarget::resize: cannot resize invalid render target");
+      return;
+    }
     unload();
     *this = RenderTarget(w, h);
   }
@@ -203,7 +322,6 @@ struct RenderTarget {
 
 static_assert(sizeof(RenderTarget) == sizeof(::RenderTexture));
 static_assert(alignof(RenderTarget) == alignof(::RenderTexture));
-static_assert(std::is_trivially_copyable_v<RenderTarget>);
 
 class CubeMap {
   static constexpr u32 FACE_COUNT = 6;
@@ -302,5 +420,16 @@ public:
     });
   }
 };
+
+} // namespace gl
+
+#include "rydz_graphics/gl/texture_builder.hpp"
+
+namespace gl {
+
+inline auto Texture::builder() -> TextureBuilder { return TextureBuilder{}; }
+inline auto RenderTarget::builder() -> RenderTargetBuilder {
+  return RenderTargetBuilder{};
+}
 
 } // namespace gl

@@ -26,6 +26,12 @@ inline bool is_gameplay_active(Res<console::ConsoleState> console) {
     return !console->is_open;
 }
 
+inline void block_input_if_console_open(ResMut<ecs::Input> input, Res<console::ConsoleState> console) {
+    if (console->is_open) {
+        input->clear();
+    }
+}
+
 // ── Components & Systems ──
 
 struct CameraTarget {
@@ -159,6 +165,9 @@ inline void scene_lua_plugin(App& app) {
         group(init_lua_scripting, scripting::lua_startup_runner).chain());
 
     // ── Update ───────────────────────────────────────────────────────────────
+
+    // Blokujemy ecs::Input zanim jakiekolwiek systemy zaczną go czytać
+    app.add_systems(ecs::ScheduleLabel::PreUpdate, block_input_if_console_open);
 
     // Uruchomienie systemów update zarejestrowanych przez skrypty
     // (run_if nie jest tu potrzebne — skrypt sam może sprawdzić stan konsoli)
