@@ -1,10 +1,9 @@
 #pragma once
 #include "mod.hpp"
 #include "rydz_ecs/app.hpp"
-#include "rydz_graphics/render_extract.hpp"
-#include "rydz_graphics/transform.hpp"
-#include <limits>
-#include <optional>
+#include "rydz_graphics/extract/systems.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
+#include "rydz_ui/system_sets.hpp"
 
 struct UiPlugin {
 public:
@@ -236,9 +235,8 @@ public:
           font = fit->second;
         }
 
-        rl::Vector2 text_size = rl::MeasureTextEx(
-          font, label.text.c_str(), label.font_size, label.spacing
-        );
+        rl::Vector2 text_size =
+          rl::MeasureTextEx(font, label.text.c_str(), label.font_size, label.spacing);
 
         rl::Image img = rl::GenImageColor(
           static_cast<int>(text_size.x),

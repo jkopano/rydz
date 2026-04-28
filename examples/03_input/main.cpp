@@ -5,7 +5,7 @@
 #include "rl.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/plugin.hpp"
 #include "rydz_platform/mod.hpp"
 #include <print>
 
@@ -30,7 +30,7 @@ void setup(
   );
 
   // ładowanko mesha
-  auto cube_mesh = meshes->add(mesh::cube(1, 1, 1));
+  auto cube_mesh = meshes->add(Mesh::cube(1, 1, 1));
   auto cube_mat =
     materials->add(StandardMaterial::from_color({255, 255, 255, 255}));
 

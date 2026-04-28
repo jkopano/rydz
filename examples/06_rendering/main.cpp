@@ -1,12 +1,12 @@
 // 06 - Rendering
-// Pokazuje: mesh::cube/sphere/cylinder, Mesh3d,
+// Pokazuje: Mesh::cube/sphere/cylinder, Mesh3d,
 //           MeshMaterial3d<>, Transform3D,
-//           Skybox, Assets, AssetServer (GLTF), Textures
+//           Environment, Assets, AssetServer (GLTF), Textures
 #include "math.hpp"
 #include "rl.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/plugin.hpp"
 #include "rydz_platform/mod.hpp"
 
 using namespace ecs;
@@ -22,18 +22,16 @@ void setup(
   ResMut<Assets<ecs::Material>> materials,
   NonSendMarker
 ) {
-  // kamera ze skyboxem — Skybox ładuje 6 tekstur z folderu (kinda słabe do
-  // poprawy) (right/left/top/bottom/front/back.jpg) Skybox na razie musi być w
-  // kamerze, chyba dobre rozwiązanie, ale do ugadania
+  // kamera ze środowiskiem sceny
   cmd.spawn(
     Camera3d::perspective(60.0f),
     ActiveCamera{},
     ecs::Transform::from_xyz(0, 5, 12).look_at(Vec3::ZERO),
-    Skybox::from("res/hdri/skybox")
+    ecs::Environment::from_directory("res/hdri/skybox")
   );
 
   // cube - czerwona
-  auto cube_h = meshes->add(mesh::cube(2, 2, 2));
+  auto cube_h = meshes->add(Mesh::cube(2, 2, 2));
   auto cube_mat = materials->add(StandardMaterial::from_color(ecs::Color::RED));
   cmd.spawn(
     Mesh3d{cube_h},
@@ -43,7 +41,7 @@ void setup(
   );
 
   // kula - zielona
-  auto sphere_h = meshes->add(mesh::sphere(1.0f));
+  auto sphere_h = meshes->add(Mesh::sphere(1.0f));
   auto sphere_mat =
     materials->add(StandardMaterial::from_color(ecs::Color::GREEN));
   cmd.spawn(
@@ -53,14 +51,14 @@ void setup(
   );
 
   // cylinder - niebieski
-  auto cyl_h = meshes->add(mesh::cylinder(0.8f, 2.0f));
+  auto cyl_h = meshes->add(Mesh::cylinder(0.8f, 2.0f));
   auto cyl_mat = materials->add(StandardMaterial::from_color(ecs::Color::BLUE));
   cmd.spawn(
     Mesh3d{cyl_h}, MeshMaterial3d{cyl_mat}, ecs::Transform::from_xyz(4, 1, 0)
   );
 
   // floor
-  auto floor_h = meshes->add(mesh::plane(20, 20));
+  auto floor_h = meshes->add(Mesh::plane(20, 20));
   auto floor_mat =
     materials->add(StandardMaterial::from_color(ecs::Color::DARKGRAY));
   cmd.spawn(
@@ -70,7 +68,7 @@ void setup(
   );
 
   // torus
-  auto torus_h = meshes->add(mesh::torus(1.0f, 0.3f));
+  auto torus_h = meshes->add(Mesh::torus(1.0f, 0.3f));
   auto torus_mat =
     materials->add(StandardMaterial::from_color(ecs::Color::PURPLE));
   cmd.spawn(
@@ -116,7 +114,7 @@ void load_textured_cube(
   // materiał z teksturą
   auto mat = materials->add(StandardMaterial::from_texture(tex_handle));
 
-  auto cube_h = meshes->add(mesh::cube(2, 2, 2));
+  auto cube_h = meshes->add(Mesh::cube(2, 2, 2));
 
   cmd.spawn(
     Mesh3d{cube_h},

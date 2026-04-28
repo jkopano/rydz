@@ -30,8 +30,11 @@ local function is_msvc_like()
 	return tc == "msvc" or tc == "clang-cl"
 end
 
--- local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
-local tracy_enabled = false
+if not is_plat("windows") then
+	local tracy_enabled = has_config("tracy") and get_config("tracy") or is_mode("profile")
+end
+
+-- local tracy_enabled = false
 local function add_tracy()
 	if tracy_enabled then
 		add_packages("tracy")
@@ -172,11 +175,11 @@ set_default(false)
 add_headerfiles("lib/rydz_**/*.hpp")
 -- add_deps("raylib")
 -- add_packages("taskflow", "joltphysics", "glaze")
--- if is_plat("windows") then
--- 	add_packages("luajit")
--- elseif is_plat("linux") then
--- 	add_packages("luajit")
--- end
+if is_plat("windows") then
+add_packages("luajit")
+elseif is_plat("linux") then
+add_packages("luajit")
+end
 
 target("tests")
 set_kind("binary")
@@ -206,6 +209,7 @@ local examples = {
 	"11_sets",
 	"12_observers",
 	"13_physics",
+	"14_audio_system",
 }
 
 for _, name in ipairs(examples) do

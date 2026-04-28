@@ -136,7 +136,7 @@ template <typename T> struct QueryFilterTraits<Changed<T>> {
     if (!ticks) {
       return false;
     }
-    return ticks->changed.is_newer_than(last_run, this_run);
+    return ticks->changed.is_newer_or_equal(last_run, this_run);
   }
 
   static auto access(SystemAccess& acc) -> void {

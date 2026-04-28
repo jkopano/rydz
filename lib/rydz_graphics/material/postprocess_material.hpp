@@ -46,9 +46,8 @@ struct DefaultPostProcessMaterial {
   [[nodiscard]]
   auto describe() const -> PostProcessDescriptor {
     PostProcessDescriptor descriptor;
-    descriptor.shader = ShaderSpec::from(
-      "res/shaders/postprocess.vert", "res/shaders/postprocess.frag"
-    );
+    descriptor.shader =
+      ShaderSpec::from("res/shaders/postprocess.vert", "res/shaders/postprocess.frag");
     descriptor.enabled = enabled;
     descriptor._uniforms.insert_or_assign("u_exposure", Uniform{exposure});
     descriptor._uniforms.insert_or_assign("u_contrast", Uniform{contrast});

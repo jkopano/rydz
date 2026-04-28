@@ -1,16 +1,118 @@
 #pragma once
 
-#include "rydz_graphics/clustered_lighting.hpp"
+#include "rydz_graphics/extract/data.hpp"
+#include "rydz_graphics/gl/buffers.hpp"
 #include "rydz_graphics/gl/resources.hpp"
 #include "rydz_graphics/gl/state.hpp"
+#include "rydz_graphics/lighting/clustered_lighting.hpp"
 #include "rydz_graphics/material/slot_provider.hpp"
-#include "rydz_graphics/render_batches.hpp"
-#include "rydz_graphics/extracted_data.hpp"
+#include "rydz_graphics/pipeline/batches.hpp"
+#include "rydz_graphics/pipeline/graph.hpp"
+#include "rydz_graphics/pipeline/pass_context.hpp"
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
 
 namespace ecs {
+
+inline constexpr unsigned int VIEW_UNIFORM_BINDING = 0;
+inline constexpr std::string_view VIEW_UNIFORM_BLOCK_NAME = "ViewUniforms";
+
+struct alignas(16) ViewUniformData {
+  Vec4 camera_position = Vec4::ZERO;
+  Mat4 view = Mat4::IDENTITY;
+  Mat4 projection = Mat4::IDENTITY;
+  Vec4 directional_direction = Vec4::ZERO;
+  Vec4 directional_color_intensity = Vec4::ZERO;
+  Vec4 ambient_color_intensity = Vec4::ZERO;
+  std::array<int, 4> cluster_dimensions = {0, 0, 0, 0};
+  Vec4 cluster_screen_size_near_far = Vec4::ZERO;
+  std::array<int, 4> view_flags = {0, 0, 0, 0};
+};
+
+static_assert(sizeof(ViewUniformData) % 16 == 0);
+
+struct ViewUniformState {
+  using T = Resource;
+
+  gl::UBO buffer{};
+  ViewUniformData data{};
+
+  auto update(
+    ExtractedView const& view,
+    ExtractedLights const& lights,
+    ClusterConfig const& cluster_config
+  ) -> void {
+    data.camera_position = Vec4{
+      view.camera_view.position.x,
+      view.camera_view.position.y,
+      view.camera_view.position.z,
+      0.0F,
+    };
+    data.view = view.camera_view.view;
+    data.projection = view.camera_view.proj;
+
+    Vec3 const light_direction = lights.dir_light.direction.normalized();
+    data.directional_direction = Vec4{
+      light_direction.x,
+      light_direction.y,
+      light_direction.z,
+      0.0F,
+    };
+    data.directional_color_intensity = Vec4{
+      lights.dir_light.color.r / 255.0F,
+      lights.dir_light.color.g / 255.0F,
+      lights.dir_light.color.b / 255.0F,
+      lights.dir_light.intensity,
+    };
+    data.ambient_color_intensity = Vec4{
+      lights.ambient_light.color.r / 255.0F,
+      lights.ambient_light.color.g / 255.0F,
+      lights.ambient_light.color.b / 255.0F,
+      lights.ambient_light.intensity,
+    };
+    data.cluster_dimensions = {
+      cluster_config.tile_count_x_clamped(),
+      cluster_config.tile_count_y_clamped(),
+      cluster_config.slice_count_z_clamped(),
+      0,
+    };
+    data.cluster_screen_size_near_far = Vec4{
+      std::max(view.viewport.width, 1.0F),
+      std::max(view.viewport.height, 1.0F),
+      std::max(view.near_plane, 0.001F),
+      std::max(view.far_plane, view.near_plane + 0.001F),
+    };
+    data.view_flags = {
+      lights.has_directional ? 1 : 0,
+      static_cast<int>(cluster_config.max_lights_per_cluster_clamped()),
+      view.orthographic ? 1 : 0,
+      0,
+    };
+
+    if (!buffer.ready()) {
+      buffer = gl::UBO(
+        static_cast<unsigned int>(sizeof(ViewUniformData)), &data, RL_DYNAMIC_DRAW
+      );
+    } else {
+      buffer.update(&data, static_cast<unsigned int>(sizeof(ViewUniformData)), 0);
+    }
+  }
+
+  auto bind() const -> void {
+    if (buffer.ready()) {
+      buffer.bind(VIEW_UNIFORM_BINDING);
+    }
+  }
+
+  auto bind_shader(ShaderProgram& shader) const -> bool {
+    if (!buffer.ready()) {
+      return false;
+    }
+    bind();
+    return shader.bind_uniform_block(VIEW_UNIFORM_BLOCK_NAME, VIEW_UNIFORM_BINDING);
+  }
+};
 
 struct PbrFallbackTextures {
   gl::Texture metallic_black;
@@ -24,6 +126,36 @@ struct ShaderCache {
   using T = Resource;
   std::unordered_map<ShaderSpec, ShaderProgram> shaders;
 };
+
+inline auto MaterialContext::frame() const -> PassContext const& { return *frame_data; }
+
+inline auto MaterialContext::textures() const -> Assets<Texture> const& {
+  return frame().texture_assets;
+}
+
+inline auto MaterialContext::view() const -> ExtractedView const& { return frame().view; }
+
+inline auto MaterialContext::lights() const -> ExtractedLights const& {
+  return frame().lights;
+}
+
+inline auto MaterialContext::cluster_config() const -> ClusterConfig const& {
+  return frame().cluster_config;
+}
+
+inline auto MaterialContext::clustered_lighting() const -> ClusteredLightingState const& {
+  return frame().cluster_state;
+}
+
+inline auto MaterialContext::time() const -> Time const& { return frame().time; }
+
+inline auto MaterialContext::view_uniforms() const -> ViewUniformState const& {
+  return frame().view_uniforms;
+}
+
+inline auto MaterialContext::slots() const -> SlotProviderRegistry const& {
+  return frame().slot_registry;
+}
 
 inline auto pbr_fallback_textures() -> PbrFallbackTextures& {
   static PbrFallbackTextures textures = [] -> PbrFallbackTextures {
@@ -45,52 +177,41 @@ inline auto pbr_fallback_textures() -> PbrFallbackTextures& {
   return textures;
 }
 
-inline auto apply_pbr_defaults(gl::Material& material) -> void {
-  auto* maps = material.maps;
-  if (maps[material_map_index(MaterialMap::Albedo)].color.a == 0) {
-    maps[material_map_index(MaterialMap::Albedo)].color = Color::WHITE;
-  }
-  if (maps[material_map_index(MaterialMap::Roughness)].value <= 0.0F &&
-      !maps[material_map_index(MaterialMap::Roughness)].texture.ready()) {
-    maps[material_map_index(MaterialMap::Roughness)].value = 1.0F;
-  }
-  if (maps[material_map_index(MaterialMap::Normal)].value <= 0.0f) {
-    maps[material_map_index(MaterialMap::Normal)].value = 1.0f;
-  }
-  if (maps[material_map_index(MaterialMap::Occlusion)].value <= 0.0f) {
-    maps[material_map_index(MaterialMap::Occlusion)].value = 1.0f;
-  }
-}
-
-inline auto apply_pbr_fallback_textures(gl::Material& material) -> void {
+inline auto fallback_texture(MaterialMap map) -> gl::Texture const* {
   auto& fallbacks = pbr_fallback_textures();
-
-  auto* maps = material.maps;
-  if (!maps[material_map_index(MaterialMap::Metalness)].texture.ready()) {
-    maps[material_map_index(MaterialMap::Metalness)].texture =
-      fallbacks.metallic_black;
-  }
-  if (!maps[material_map_index(MaterialMap::Roughness)].texture.ready()) {
-    maps[material_map_index(MaterialMap::Roughness)].texture =
-      fallbacks.roughness_white;
-  }
-  if (!maps[material_map_index(MaterialMap::Normal)].texture.ready()) {
-    maps[material_map_index(MaterialMap::Normal)].texture =
-      fallbacks.normal_flat;
-  }
-  if (!maps[material_map_index(MaterialMap::Occlusion)].texture.ready()) {
-    maps[material_map_index(MaterialMap::Occlusion)].texture =
-      fallbacks.occlusion_white;
-  }
-  if (!maps[material_map_index(MaterialMap::Emission)].texture.ready()) {
-    maps[material_map_index(MaterialMap::Emission)].texture =
-      fallbacks.emission_black;
+  switch (map) {
+  case MaterialMap::Metalness:
+    return &fallbacks.metallic_black;
+  case MaterialMap::Normal:
+    return &fallbacks.normal_flat;
+  case MaterialMap::Roughness:
+    return &fallbacks.roughness_white;
+  case MaterialMap::Occlusion:
+    return &fallbacks.occlusion_white;
+  case MaterialMap::Emission:
+    return &fallbacks.emission_black;
+  default:
+    return nullptr;
   }
 }
 
-inline auto resolve_shader(
-  NonSendMarker, ShaderCache& cache, ShaderSpec const& spec
-) -> ShaderProgram& {
+inline auto apply_default_material_map_textures(gl::Material& material) -> void {
+  auto* maps = material.maps;
+  for (auto const map : DEFAULT_MATERIAL_MAPS) {
+    auto& material_map = maps[material_map_index(map)];
+    if (material_map.texture.ready()) {
+      continue;
+    }
+
+    auto const* fallback = fallback_texture(map);
+    if (fallback != nullptr) {
+      material_map.texture = *fallback;
+    }
+  }
+}
+
+inline auto resolve_shader(NonSendMarker, ShaderCache& cache, ShaderSpec const& spec)
+  -> ShaderProgram& {
   auto [it, inserted] = cache.shaders.try_emplace(spec);
   if (inserted) {
     it->second = ShaderProgram::load(spec);
@@ -98,9 +219,8 @@ inline auto resolve_shader(
   return it->second;
 }
 
-inline auto initialize_material_map_location(
-  ShaderProgram& shader, MaterialMap map
-) -> void {
+inline auto initialize_material_map_location(ShaderProgram& shader, MaterialMap map)
+  -> void {
   auto& raw = shader.raw();
   if (raw.locs == nullptr) {
     return;
@@ -108,8 +228,7 @@ inline auto initialize_material_map_location(
 
   int const location_index = shader_location_index(map);
   if (raw.locs[location_index] < 0) {
-    raw.locs[location_index] =
-      shader.uniform_location(map_texture_binding(map));
+    raw.locs[location_index] = shader.uniform_location(map_texture_binding(map));
   }
 }
 
@@ -157,41 +276,38 @@ inline auto lookup_slot_provider(
   }
 
   throw std::runtime_error(
-    "Missing slot provider for '" + slot.debug_name +
-    "' required by material '" + material.material_type_name + "' (" +
-    material.shader.vertex_path + ", " + material.shader.fragment_path + ")"
+    "Missing slot provider for '" + slot.debug_name + "' required by material '" +
+    material.material_type_name + "' (" + material.shader.vertex_path + ", " +
+    material.shader.fragment_path + ")"
   );
 }
 
 inline auto prepare_material(
-  NonSendMarker marker,
+  MaterialContext const& material_ctx,
   CompiledMaterial const& material,
-  Assets<Texture> const& texture_assets,
-  ShaderCache& shader_cache,
-  SlotProviderRegistry const& slot_registry,
-  SlotPrepareContext const& prepare_ctx,
   ShaderSpec const& shader_spec,
   PreparedMaterial& prepared
 ) -> ShaderProgram& {
-  auto const& src_mat = gl::Material::fallback_material(marker);
+  auto const& src_mat = gl::Material::fallback_material(material_ctx.frame().marker);
   prepared.material = src_mat;
-  std::memcpy(
-    prepared.local_maps.data(), src_mat.maps, sizeof(prepared.local_maps)
-  );
+  std::memcpy(prepared.local_maps.data(), src_mat.maps, sizeof(prepared.local_maps));
   prepared.material.maps = prepared.local_maps.data();
 
-  ShaderProgram& shader = resolve_shader(marker, shader_cache, shader_spec);
+  ShaderProgram& shader = resolve_shader(
+    material_ctx.frame().marker, material_ctx.frame().shader_cache, shader_spec
+  );
   initialize_material_map_locations(shader);
   prepared.material.shader = shader.raw();
 
   for (auto const& binding : material.maps) {
-    apply_material_map_binding(prepared.material, binding, texture_assets);
+    apply_material_map_binding(prepared.material, binding, material_ctx.textures());
   }
+  apply_default_material_map_textures(prepared.material);
 
   for (auto const& slot : material.slots) {
-    auto const& provider = lookup_slot_provider(slot_registry, slot, material);
+    auto const& provider = lookup_slot_provider(material_ctx.slots(), slot, material);
     if (provider.prepare) {
-      provider.prepare(prepare_ctx, material, prepared, shader);
+      provider.prepare(material_ctx, material, prepared, shader);
     }
   }
 
@@ -199,30 +315,28 @@ inline auto prepare_material(
 }
 
 inline auto apply_slot_uniforms_per_view(
-  SlotProviderRegistry const& slot_registry,
-  RenderSlotContext const& render_ctx,
+  MaterialContext const& material_ctx,
   CompiledMaterial const& material,
   ShaderProgram& shader
 ) -> void {
   for (auto const& slot : material.slots) {
-    auto const& provider = lookup_slot_provider(slot_registry, slot, material);
+    auto const& provider = lookup_slot_provider(material_ctx.slots(), slot, material);
     if (provider.apply_per_view) {
-      provider.apply_per_view(render_ctx, shader);
+      provider.apply_per_view(material_ctx, shader);
     }
   }
 }
 
 inline auto apply_slot_uniforms_per_material(
-  SlotProviderRegistry const& slot_registry,
-  RenderSlotContext const& render_ctx,
+  MaterialContext const& material_ctx,
   CompiledMaterial const& material,
   PreparedMaterial const& prepared,
   ShaderProgram& shader
 ) -> void {
   for (auto const& slot : material.slots) {
-    auto const& provider = lookup_slot_provider(slot_registry, slot, material);
+    auto const& provider = lookup_slot_provider(material_ctx.slots(), slot, material);
     if (provider.apply_per_material) {
-      provider.apply_per_material(render_ctx, material, prepared, shader);
+      provider.apply_per_material(material_ctx, material, prepared, shader);
     }
   }
 }
@@ -230,88 +344,33 @@ inline auto apply_slot_uniforms_per_material(
 inline auto HasCamera::slot_provider() -> SlotProvider {
   SlotProvider provider;
   provider.apply_per_view = [](
-                              RenderSlotContext const& ctx,
-                              ShaderProgram& shader
-                            ) -> void {
-    shader.set(CameraUniform::Position, ctx.view().camera_view.position);
-    shader.set(CameraUniform::ViewMatrix, ctx.view().camera_view.view);
-    shader.set(CameraUniform::ProjectionMatrix, ctx.view().camera_view.proj);
-  };
+                              MaterialContext const& ctx, ShaderProgram& shader
+                            ) -> void { ctx.view_uniforms().bind_shader(shader); };
   return provider;
 }
 
 inline auto HasTime::slot_provider() -> SlotProvider {
   SlotProvider provider;
-  provider.apply_per_view = [](
-                              RenderSlotContext const& ctx,
-                              ShaderProgram& shader
-                            ) -> void {
-    shader.set("u_time", ctx.view().camera_view.position);
+  provider.apply_per_view =
+    [](MaterialContext const& ctx, ShaderProgram& shader) -> void {
+    shader.set("u_time", ctx.time().elapsed_seconds);
   };
   return provider;
 }
 
 inline auto HasPBR::slot_provider() -> SlotProvider {
   SlotProvider provider;
-  provider.prepare = [](
-                       SlotPrepareContext const&,
-                       CompiledMaterial const&,
-                       PreparedMaterial& prepared,
-                       ShaderProgram&
-                     ) -> void {
-    apply_pbr_defaults(prepared.material);
-    apply_pbr_fallback_textures(prepared.material);
-  };
-  provider.apply_per_view = [](
-                              RenderSlotContext const& ctx,
-                              ShaderProgram& shader
-                            ) -> void {
-    auto const& view = ctx.view();
-    auto const& lights = ctx.lights();
-    auto const& cluster_config = ctx.cluster_config();
-
-    int has_directional = lights.has_directional ? 1 : 0;
-    Vec3 dir_color = lights.dir_light.color;
-    Vec3 dir_dir = lights.dir_light.direction.normalized();
-    float dir_intensity = lights.dir_light.intensity;
-    Vec2 cluster_screen_size = {
-      std::max(view.viewport.width, 1.0F),
-      std::max(view.viewport.height, 1.0F),
-    };
-    Vec2 cluster_near_far = {
-      std::max(view.near_plane, 0.001f),
-      std::max(view.far_plane, view.near_plane + 0.001f),
-    };
-    std::array<int, 4> cluster_dimensions = {
-      cluster_config.tile_count_x_clamped(),
-      cluster_config.tile_count_y_clamped(),
-      cluster_config.slice_count_z_clamped(),
-      0
-    };
-    int cluster_max_lights =
-      static_cast<int>(cluster_config.max_lights_per_cluster_clamped());
-    int is_orthographic = view.orthographic ? 1 : 0;
-
+  provider.apply_per_view =
+    [](MaterialContext const& ctx, ShaderProgram& shader) -> void {
+    (void) shader;
     ctx.clustered_lighting().bind();
-    shader.set(PbrLightingUniform::HasDirectional, has_directional);
-    shader.set(PbrLightingUniform::DirectionalDirection, dir_dir);
-    shader.set(PbrLightingUniform::DirectionalIntensity, dir_intensity);
-    shader.set(PbrLightingUniform::DirectionalColor, dir_color);
-    shader.set(PbrLightingUniform::ClusterDimensions, cluster_dimensions);
-    shader.set(PbrLightingUniform::ClusterScreenSize, cluster_screen_size);
-    shader.set(PbrLightingUniform::ClusterNearFar, cluster_near_far);
-    shader.set(PbrLightingUniform::ClusterMaxLights, cluster_max_lights);
-    shader.set(PbrLightingUniform::IsOrthographic, is_orthographic);
   };
   return provider;
 }
 
 template <typename BatchT>
 inline auto draw_batch(
-  ShaderProgram& shader,
-  gl::Mesh const& mesh,
-  gl::Material& material,
-  BatchT const& batch
+  ShaderProgram& shader, gl::Mesh const& mesh, gl::Material& material, BatchT const& batch
 ) -> void {
   (void) shader;
   mesh.draw_instanced(

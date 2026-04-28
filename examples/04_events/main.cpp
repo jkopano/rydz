@@ -3,7 +3,7 @@
 
 #include "rl.hpp"
 #include "rydz_ecs/rydz_ecs.hpp"
-#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/plugin.hpp"
 #include <print>
 
 using namespace ecs;

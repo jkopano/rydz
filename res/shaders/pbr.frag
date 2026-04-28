@@ -23,29 +23,54 @@ uniform sampler2D u_occlusion_texture;
 uniform sampler2D u_emissive_texture;
 
 uniform vec4 u_color;
-uniform vec3 cameraPos;
-uniform mat4 matView;
-
-uniform vec3 u_dir_light_direction;
-uniform float u_dir_light_intensity;
-uniform vec3 u_dir_light_color;
-uniform int u_has_directional;
-
-uniform ivec4 u_cluster_dimensions;
-uniform vec2 u_cluster_screen_size;
-uniform vec2 u_cluster_near_far;
-uniform int u_cluster_max_lights;
-uniform int u_is_orthographic;
-uniform float alphaCutoff;
+uniform float u_alpha_cutoff;
 uniform int u_render_method;
+
+layout(std140, binding = 0) uniform ViewUniforms {
+  vec4 u_camera_pos;
+  mat4 u_mat_view;
+  mat4 u_mat_projection;
+  vec4 u_dir_light_direction;
+  vec4 u_dir_light_color_intensity;
+  vec4 u_ambient_light_color_intensity;
+  ivec4 u_cluster_dimensions;
+  vec4 u_cluster_screen_size_near_far;
+  ivec4 u_view_flags;
+};
+
+layout(std140, binding = 1) uniform ShadowUniforms {
+  mat4 u_dir_light_matrices[4];
+  vec4 u_cascade_splits;
+  vec4 u_cascade_uv_rects[4];
+  ivec4 u_shadow_flags;
+  vec4 u_shadow_params;
+  ivec4 u_point_screen_shadow_flags;
+  vec4 u_point_screen_shadow_params;
+};
+
+uniform sampler2DShadow u_shadow_atlas;
+uniform sampler2D u_scene_depth;
+uniform samplerCubeArray u_point_shadow_maps;
 
 const int RENDER_METHOD_OPAQUE = 0;
 const int RENDER_METHOD_TRANSPARENT = 1;
 const int RENDER_METHOD_ALPHA_CUTOUT = 2;
+const vec2 poissonDisk[16] = vec2[](
+    vec2(-0.94201624, -0.39906216), vec2(0.94558609, -0.76890725),
+    vec2(-0.094184101, -0.92938870), vec2(0.34495938, 0.29387760),
+    vec2(-0.91588581, 0.45771432), vec2(-0.81544232, -0.87912464),
+    vec2(-0.38277543, 0.27676845), vec2(0.97484398, 0.75648379),
+    vec2(0.44323325, -0.97511554), vec2(0.53742981, -0.47373420),
+    vec2(-0.65438281, -0.96679435), vec2(-0.16533552, 0.72837163),
+    vec2(-0.61339245, 0.61592413), vec2(-0.037227324, -0.49558356),
+    vec2(0.30243549, 0.79255139), vec2(0.22330755, -0.15443225)
+  );
 
-struct GpuPointLight {
+struct GpuLocalLight {
   vec4 position_range;
   vec4 color_intensity;
+  vec4 direction_type;
+  vec4 shadow_cone_data;
 };
 
 struct ClusterRecord {
@@ -54,8 +79,8 @@ struct ClusterRecord {
   uvec4 meta;
 };
 
-layout(std430, binding = 0) readonly buffer PointLightBuffer {
-  GpuPointLight u_point_lights[];
+layout(std430, binding = 0) readonly buffer LocalLightBuffer {
+  GpuLocalLight u_local_lights[];
 };
 
 layout(std430, binding = 1) readonly buffer ClusterBuffer {
@@ -67,6 +92,8 @@ layout(std430, binding = 2) readonly buffer ClusterIndexBuffer {
 };
 
 const float PI = 3.14159265359;
+const float LOCAL_LIGHT_TYPE_POINT = 0.5;
+const float LOCAL_LIGHT_TYPE_SPOT = 1.5;
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
   return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
@@ -99,6 +126,110 @@ float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
   float ggx2 = geometrySchlickGGX(NdotV, roughness);
   float ggx1 = geometrySchlickGGX(NdotL, roughness);
   return ggx1 * ggx2;
+}
+
+float sampleDirectionalDepth(int cascadeIndex, vec2 uv, float compareDepth) {
+  vec4 rect = u_cascade_uv_rects[cascadeIndex];
+  vec2 atlasUv = rect.xy + uv * rect.zw;
+  return texture(u_shadow_atlas, vec3(atlasUv, compareDepth));
+}
+
+vec2 directionalTexelSize(int cascadeIndex) {
+  vec2 atlasSize = vec2(textureSize(u_shadow_atlas, 0));
+  return u_cascade_uv_rects[cascadeIndex].zw / atlasSize;
+}
+
+float samplePointShadow(int slot, vec3 dir) {
+  return texture(u_point_shadow_maps, vec4(dir, float(slot))).r;
+}
+
+float pointShadowTexelScale() {
+  return 2.0 / max(float(textureSize(u_point_shadow_maps, 0).x), 1.0);
+}
+
+void buildPointShadowBasis(vec3 dir, out vec3 tangent, out vec3 bitangent) {
+  vec3 up = abs(dir.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
+  tangent = normalize(cross(up, dir));
+  bitangent = cross(dir, tangent);
+}
+
+float computePointShadowBias(float currentDepth, float farPlane, vec3 normal, vec3 lightDir) {
+  float baseBias = u_shadow_params.z;
+  float cosTheta = clamp(dot(normal, lightDir), 0.0, 1.0);
+  float angleFactor = mix(2.0, 1.0, cosTheta);
+  float distanceScale = mix(1.0, 2.0, clamp(currentDepth / farPlane, 0.0, 1.0));
+
+  return (baseBias * angleFactor * distanceScale) / farPlane;
+}
+
+float samplePointShadowPCF(
+  int slot,
+  vec3 lightToFrag,
+  float currentDepth,
+  float farPlane,
+  vec3 normal,
+  vec3 lightDir
+) {
+  if (currentDepth <= 0.001) return 1.0;
+
+  float shadowFade = smoothstep(farPlane, farPlane * 0.9, currentDepth);
+  if (shadowFade <= 0.0) return 1.0;
+
+  int pcfRadius = max(u_point_screen_shadow_flags.z, 0);
+  float currentDepthNormalized = currentDepth / farPlane;
+  float bias = computePointShadowBias(currentDepth, farPlane, normal, lightDir);
+
+  if (pcfRadius <= 0) {
+    float closestDepth = samplePointShadow(slot, lightToFrag);
+    float s = currentDepthNormalized - bias > closestDepth ? 0.0 : 1.0;
+    return mix(1.0, s, shadowFade);
+  }
+
+  vec3 dir = normalize(lightToFrag);
+  vec3 tangent, bitangent;
+  buildPointShadowBasis(dir, tangent, bitangent);
+
+  float texelScale = pointShadowTexelScale();
+  float visibility = 0.0;
+  float sampleCount = 0.0;
+
+  for (int x = -pcfRadius; x <= pcfRadius; ++x) {
+    for (int y = -pcfRadius; y <= pcfRadius; ++y) {
+      vec2 offset = vec2(float(x), float(y)) * texelScale;
+      vec3 sampleDir = normalize(dir + tangent * offset.x + bitangent * offset.y);
+      float closestDepth = samplePointShadow(slot, sampleDir);
+      visibility += currentDepthNormalized - bias > closestDepth ? 0.0 : 1.0;
+      sampleCount += 1.0;
+    }
+  }
+
+  float finalShadow = visibility / max(sampleCount, 1.0);
+  return mix(1.0, finalShadow, shadowFade);
+}
+
+float sceneDepthToViewDepth(float depthSample) {
+  float nearPlane = max(u_cluster_screen_size_near_far.z, 0.001);
+  float farPlane = max(u_cluster_screen_size_near_far.w, nearPlane + 0.001);
+
+  if (u_view_flags.z > 0) {
+    return mix(nearPlane, farPlane, clamp(depthSample, 0.0, 1.0));
+  }
+
+  float z = depthSample * 2.0 - 1.0;
+  float denom = farPlane + nearPlane - z * (farPlane - nearPlane);
+  return (2.0 * nearPlane * farPlane) / max(denom, 0.0001);
+}
+
+vec2 projectViewToUv(vec3 viewPos, out float ndcDepth) {
+  vec4 clip = u_mat_projection * vec4(viewPos, 1.0);
+  if (clip.w <= 0.0001) {
+    ndcDepth = 2.0;
+    return vec2(-1.0);
+  }
+
+  vec3 ndc = clip.xyz / clip.w;
+  ndcDepth = ndc.z;
+  return ndc.xy * 0.5 + 0.5;
 }
 
 vec3 evaluatePBR(
@@ -146,12 +277,143 @@ vec3 sampleNormal(vec3 N, vec3 T, vec3 B, vec2 uv) {
   return normalize(TBN * tangentNormal);
 }
 
+float computeDirectionalShadow(vec3 fragPos, vec3 normal, vec3 lightDir, vec3 viewPos) {
+  if (u_shadow_flags.x <= 0 || u_shadow_flags.y <= 0) {
+    return 1.0;
+  }
+
+  float depth = max(-viewPos.z, max(u_cluster_screen_size_near_far.z, 0.001));
+  int cascadeIndex = 0;
+  int cascadeCount = clamp(u_shadow_flags.y, 1, 4);
+  for (int i = 0; i < cascadeCount - 1; ++i) {
+    if (depth > u_cascade_splits[i]) {
+      cascadeIndex = i + 1;
+    }
+  }
+
+  vec4 shadowClip = u_dir_light_matrices[cascadeIndex] * vec4(fragPos, 1.0);
+  vec3 shadowCoord = shadowClip.xyz / max(shadowClip.w, 0.0001);
+  shadowCoord = shadowCoord * 0.5 + 0.5;
+
+  if (shadowCoord.z > 1.0 || shadowCoord.x < 0.0 || shadowCoord.x > 1.0 ||
+      shadowCoord.y < 0.0 || shadowCoord.y > 1.0) {
+    return 1.0;
+  }
+
+  float bias = max(u_shadow_params.y * (1.0 - max(dot(normal, lightDir), 0.0)), u_shadow_params.x);
+  float currentDepth = shadowCoord.z - bias;
+
+  vec2 texelSize = directionalTexelSize(cascadeIndex);
+  float visibility = 0.0;
+  float sampleCount = 0.0;
+  int pcfRadius = max(u_shadow_flags.w, 0);
+
+  for (int x = -pcfRadius; x <= pcfRadius; ++x) {
+    for (int y = -pcfRadius; y <= pcfRadius; ++y) {
+      vec2 offset = vec2(float(x), float(y)) * texelSize;
+      visibility += sampleDirectionalDepth(cascadeIndex, shadowCoord.xy + offset, currentDepth);
+      sampleCount += 1.0;
+    }
+  }
+
+  return visibility / max(sampleCount, 1.0);
+}
+
+bool isPointLight(GpuLocalLight light) {
+  return light.direction_type.w < LOCAL_LIGHT_TYPE_POINT;
+}
+
+bool isSpotLight(GpuLocalLight light) {
+  return light.direction_type.w >= LOCAL_LIGHT_TYPE_POINT &&
+    light.direction_type.w < LOCAL_LIGHT_TYPE_SPOT;
+}
+
+float computeSpotAttenuation(GpuLocalLight light, vec3 lightDir) {
+  vec3 spotDirection = normalize(light.direction_type.xyz);
+  float innerCos = light.shadow_cone_data.z;
+  float outerCos = light.shadow_cone_data.w;
+  float cosTheta = dot(-lightDir, spotDirection);
+  float cone = clamp(
+      (cosTheta - outerCos) / max(innerCos - outerCos, 0.0001),
+      0.0,
+      1.0
+    );
+  return cone * cone;
+}
+
+float computePointScreenSpaceShadow(vec3 viewPos, vec3 normal, GpuLocalLight pointLight) {
+  if (u_point_screen_shadow_flags.x <= 0) return 1.0;
+
+  vec3 lightViewPos = (u_mat_view * vec4(pointLight.position_range.xyz, 1.0)).xyz;
+
+  vec3 normalView = normalize(mat3(u_mat_view) * normal);
+  vec3 rayStart = viewPos + normalView * 0.05;
+
+  vec3 rayDirFull = lightViewPos - rayStart;
+  float rayLength = length(rayDirFull);
+  vec3 rayDir = rayDirFull / rayLength;
+
+  int steps = max(u_point_screen_shadow_flags.y, 1);
+  float thickness = max(u_point_screen_shadow_params.x, 0.2);
+
+  float jitter = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+
+  float maxOcclusion = 0.0;
+  float accumulatedDistance = 0.02; // Minimalny offset startowy
+
+  for (int step = 0; step < steps; ++step) {
+    float scale = float(step) + jitter;
+    float travel = accumulatedDistance + (rayLength / float(steps)) * scale * 0.5;
+
+    if (travel >= rayLength) break;
+
+    vec3 samplePos = rayStart + rayDir * travel;
+    float ndcDepth = 0.0;
+    vec2 uv = projectViewToUv(samplePos, ndcDepth);
+
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
+
+    float sceneDepthSample = texture(u_scene_depth, uv).r;
+    float sceneDepth = sceneDepthToViewDepth(sceneDepthSample);
+    float rayDepth = -samplePos.z;
+    float diff = rayDepth - sceneDepth;
+
+    if (diff > 0.0 && diff < thickness) {
+      float weight = 1.0 - (diff / thickness);
+      float distWeight = clamp(1.0 - (travel / rayLength), 0.0, 1.0);
+
+      maxOcclusion = max(maxOcclusion, weight * distWeight);
+      if (maxOcclusion >= 0.98) break;
+    }
+  }
+
+  return clamp(1.0 - maxOcclusion, 0.0, 1.0);
+}
+
+float computePointShadow(vec3 fragPos, vec3 viewPos, vec3 normal, GpuLocalLight pointLight) {
+  if (pointLight.shadow_cone_data.y > 0.5) {
+    return computePointScreenSpaceShadow(viewPos, normal, pointLight);
+  }
+
+  if (pointLight.shadow_cone_data.x < 0.0) return 1.0;
+
+  int shadowSlot = int(pointLight.shadow_cone_data.x);
+  if (shadowSlot < 0 || shadowSlot >= u_shadow_flags.z) return 1.0;
+
+  vec3 lightVec = pointLight.position_range.xyz - fragPos;
+  vec3 lightToFrag = -lightVec;
+  float currentDepth = length(lightToFrag);
+  float farPlane = max(pointLight.position_range.w, 0.001);
+
+  return samplePointShadowPCF(shadowSlot, lightToFrag, currentDepth, farPlane, normal, normalize(lightVec));
+}
+
 int computeDepthSlice(float depth, ivec3 dims) {
-  float nearPlane = max(u_cluster_near_far.x, 0.001);
-  float farPlane = max(u_cluster_near_far.y, nearPlane + 0.001);
+  float nearPlane = max(u_cluster_screen_size_near_far.z, 0.001);
+  float farPlane = max(u_cluster_screen_size_near_far.w, nearPlane + 0.001);
   float normalizedDepth = 0.0;
 
-  if (u_is_orthographic > 0) {
+  if (u_view_flags.z > 0) {
     normalizedDepth = (depth - nearPlane) / max(farPlane - nearPlane, 0.001);
   } else {
     normalizedDepth = log(depth / nearPlane) / log(farPlane / nearPlane);
@@ -163,25 +425,26 @@ int computeDepthSlice(float depth, ivec3 dims) {
 
 int computeClusterIndex(vec3 viewPos) {
   ivec3 dims = max(u_cluster_dimensions.xyz, ivec3(1));
-  vec2 tileSize = u_cluster_screen_size / vec2(float(dims.x), float(dims.y));
+  vec2 tileSize =
+    u_cluster_screen_size_near_far.xy / vec2(float(dims.x), float(dims.y));
   tileSize = max(tileSize, vec2(1.0));
 
   ivec2 tile = ivec2(gl_FragCoord.xy / tileSize);
   tile = clamp(tile, ivec2(0), dims.xy - ivec2(1));
 
-  float depth = max(-viewPos.z, max(u_cluster_near_far.x, 0.001));
+  float depth = max(-viewPos.z, max(u_cluster_screen_size_near_far.z, 0.001));
   int slice = computeDepthSlice(depth, dims);
   return (slice * dims.y + tile.y) * dims.x + tile.x;
 }
 
 void main() {
   vec3 normal = normalize(Normal);
-  vec3 viewDir = normalize(cameraPos - FragPos);
+  vec3 viewDir = normalize(u_camera_pos.xyz - FragPos);
 
   vec4 baseColor = colDiffuse;
   vec4 diffTex = texture(texture0, TexCoord);
   baseColor *= diffTex;
-  if (u_render_method != RENDER_METHOD_OPAQUE && baseColor.a < alphaCutoff) {
+  if (u_render_method != RENDER_METHOD_OPAQUE && baseColor.a < u_alpha_cutoff) {
     discard;
   }
   float outputAlpha = baseColor.a;
@@ -208,49 +471,69 @@ void main() {
   emissive *= pow(texture(u_emissive_texture, TexCoord).rgb, vec3(2.2));
 
   vec3 lighting = vec3(0.0);
+  vec3 viewPos = (u_mat_view * vec4(FragPos, 1.0)).xyz;
 
-  if (u_has_directional > 0 && u_dir_light_intensity > 0.0) {
-    vec3 lightDir = normalize(-u_dir_light_direction);
-    vec3 radiance = u_dir_light_color * u_dir_light_intensity;
+  if (u_view_flags.x > 0 && u_dir_light_color_intensity.w > 0.0) {
+    vec3 lightDir = normalize(-u_dir_light_direction.xyz);
+    vec3 radiance =
+      u_dir_light_color_intensity.xyz * u_dir_light_color_intensity.w;
+    float shadow = computeDirectionalShadow(FragPos, normal, lightDir, viewPos);
     lighting += evaluatePBR(
-        normal, viewDir, lightDir, radiance, albedo, metallic, roughness);
+        normal, viewDir, lightDir, radiance * shadow, albedo, metallic, roughness);
   }
 
-  vec3 viewPos = (matView * vec4(FragPos, 1.0)).xyz;
   int clusterIndex = computeClusterIndex(viewPos);
   ClusterRecord cluster = u_clusters[clusterIndex];
-  uint pointLightCount = min(cluster.meta.y, uint(max(u_cluster_max_lights, 0)));
+  uint localLightCount = min(cluster.meta.y, uint(max(u_view_flags.y, 0)));
 
-  for (uint i = 0u; i < pointLightCount; ++i) {
+  for (uint i = 0u; i < localLightCount; ++i) {
     uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
-    GpuPointLight pointLight = u_point_lights[lightIndex];
+    GpuLocalLight localLight = u_local_lights[lightIndex];
 
-    if (pointLight.color_intensity.w <= 0.0) {
+    if (localLight.color_intensity.w <= 0.0) {
       continue;
     }
 
-    vec3 lightVec = pointLight.position_range.xyz - FragPos;
+    vec3 lightVec = localLight.position_range.xyz - FragPos;
     float distance = length(lightVec);
-    if (distance > pointLight.position_range.w) {
+    if (distance <= 0.001) {
       continue;
     }
 
     vec3 lightDir = normalize(lightVec);
-    float attenuation = pointLight.color_intensity.w / (distance * distance + 0.01);
-    float factor = distance / pointLight.position_range.w;
-    float smoothFactor = clamp(1.0 - factor * factor * factor * factor, 0.0, 1.0);
-    attenuation *= smoothFactor * smoothFactor;
+    float attenuation = localLight.color_intensity.w / (distance * distance + 0.01);
+    float factor = distance / localLight.position_range.w;
 
-    vec3 radiance = pointLight.color_intensity.rgb * attenuation;
+    // Debug: visualize distance factor
+    // if (factor > 0.9 && factor < 1.1) {
+    //   lighting += vec3(10.0, 0.0, 0.0);
+    // }
+
+    float smoothFactor = 1.0 / (1.0 + factor * factor * factor * factor);
+    attenuation *= smoothFactor;
+
+    if (isSpotLight(localLight)) {
+      float coneAttenuation = computeSpotAttenuation(localLight, lightDir);
+      if (coneAttenuation <= 0.0) {
+        continue;
+      }
+      attenuation *= coneAttenuation;
+    }
+
+    vec3 radiance = localLight.color_intensity.rgb * attenuation;
+    float shadow = isPointLight(localLight)
+      ? computePointShadow(FragPos, viewPos, normal, localLight) : 1.0;
     lighting += evaluatePBR(
-        normal, viewDir, lightDir, radiance, albedo, metallic, roughness);
+        normal, viewDir, lightDir, radiance * shadow, albedo, metallic, roughness);
   }
 
   vec3 F0 = mix(vec3(0.04), albedo, metallic);
   vec3 F = fresnelSchlickRoughness(max(dot(normal, viewDir), 0.0), F0, roughness);
   vec3 kS = F;
   vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
-  vec3 ambientColor = kD * albedo * 0.03 * ao;
+  vec3 ambientColor =
+    kD * albedo * u_ambient_light_color_intensity.rgb *
+      u_ambient_light_color_intensity.w * ao;
   vec3 color = ambientColor + lighting + emissive;
 
   float strength = u_color.a;
@@ -258,5 +541,49 @@ void main() {
   color = color / (color + vec3(1.0));
   color = pow(color, vec3(1.0 / 2.2));
 
-  FragColor = vec4(color, outputAlpha);
+  // vec2 screenUV = gl_FragCoord.xy / u_cluster_screen_size_near_far.xy;
+  // float rawDepth = texture(u_scene_depth, screenUV).r;
+  // float linearDepth = sceneDepthToViewDepth(rawDepth);
+  // float near = u_cluster_screen_size_near_far.z;
+  // float far = u_cluster_screen_size_near_far.w;
+  // float visualDepth = (linearDepth - near) / (far - near);
+  // color = vec3(clamp(visualDepth, 0.0, 1.0));
+
+  // Debug: visualize light count per cluster
+  // float lightCountVis = float(localLightCount) / 8.0;
+  // color = mix(color, vec3(0.0, 1.0, 0.0), lightCountVis);
+
+  // Debug: visualize total lighting contribution
+  // float lightingVis = length(lighting) / 10.0;
+  // color = vec3(lightingVis);
+
+  // Debug: visualize shadows
+  // Uncomment to see shadow values (red = shadow, green = no shadow)
+  // vec3 shadowDebug = vec3(0.0);
+  // bool hasLights = false;
+  //
+  // for (uint i = 0u; i < localLightCount; ++i) {
+  //   uint lightIndex = u_cluster_light_indices[cluster.meta.x + i];
+  //   GpuLocalLight localLight = u_local_lights[lightIndex];
+  //
+  //   if (localLight.color_intensity.w > 0.0) {
+  //     float s = computePointShadow(FragPos, viewPos, normal, localLight);
+  //     hasLights = true;
+  //
+  //     if (localLight.shadow_cone_data.y > 0.5) {
+  //       shadowDebug.r += (1.0 - s);
+  //     } else {
+  //       shadowDebug.g += (1.0 - s);
+  //     }
+  //   }
+  // }
+  //
+  // if (hasLights) {
+  //   color = shadowDebug;
+  //   color *= 1.0;
+  // } else {
+  //   color = vec3(0.0, 0.0, 0.2);
+  // }
+
+  FragColor = vec4(color, 1.0);
 }

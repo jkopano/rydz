@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "rydz_graphics/clustered_lighting.hpp"
+#include "rydz_graphics/lighting/clustered_lighting.hpp"
+#include "rydz_graphics/lighting/shadow.hpp"
 
 TEST(ClusteredLightingTest, ConfigClampsInvalidDimensions) {
   gl::ClusterConfig config{
@@ -41,11 +42,32 @@ TEST(ClusteredLightingTest, ClusterRecordUsesClampedStrideAndClearsCount) {
     1
   );
 
-  EXPECT_EQ(record.meta[0], 28U);
-  EXPECT_EQ(record.meta[1], 0U);
-  EXPECT_EQ(record.meta[2], 0U);
-  EXPECT_EQ(record.meta[3], 0U);
+  EXPECT_EQ(record.light_index_offset, 28U);
+  EXPECT_EQ(record.light_count, 0U);
+  EXPECT_EQ(record._pad0, 0U);
+  EXPECT_EQ(record._pad1, 0U);
   EXPECT_LT(record.min_bounds.x, record.max_bounds.x);
   EXPECT_LT(record.min_bounds.y, record.max_bounds.y);
   EXPECT_LT(record.min_bounds.z, record.max_bounds.z);
+}
+
+TEST(ClusteredLightingTest, PointShadowedLightCountDefaultsWithinLimits) {
+  ecs::ShadowSettings settings{};
+
+  EXPECT_GE(settings.max_shadowed_point_lights_clamped(), 0);
+  EXPECT_LE(
+    settings.max_shadowed_point_lights_clamped(),
+    ecs::MAX_POINT_SHADOWS
+  );
+}
+
+TEST(ClusteredLightingTest, PointShadowCountCanBeClampedToZero) {
+  ecs::ShadowSettings settings{};
+  settings.max_shadowed_point_lights = 0;
+
+  EXPECT_EQ(settings.max_shadowed_point_lights_clamped(), 0);
+}
+
+TEST(ClusteredLightingTest, LocalLightGpuLayoutRemainsStd430Aligned) {
+  EXPECT_EQ(sizeof(gl::GpuLocalLight), 64U);
 }

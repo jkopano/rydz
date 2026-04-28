@@ -1,11 +1,11 @@
 #pragma once
 #include "math.hpp"
 #include "rl.hpp"
+#include "rydz_audio/mod.hpp"
 #include "rydz_ecs/mod.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_graphics/render_plugin.hpp"
 #include <algorithm>
 #include <print>
 
@@ -40,9 +40,7 @@ struct CameraController {
 };
 
 inline auto camera_controller_system(
-  Query<Mut<Transform>, CameraController> query,
-  Res<Time> time,
-  Res<Input> input
+  Query<Mut<Transform>, CameraController> query, Res<Time> time, Res<Input> input
 ) -> void {
 
   for (auto [t, ctrl] : query.iter()) {
@@ -119,7 +117,7 @@ inline auto spawn_map(Cmd cmd, Res<AssetServer> asset_server) -> void {
 inline auto spawn_model(Cmd cmd, Res<AssetServer> asset_server) -> void {
   cmd.spawn(
     SceneRoot{asset_server->load<Scene>("res/models/hot_sun.glb")},
-    Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}}
+    Transform{.scale = Vec3{10.1f, 10.1f, 10.1f}}.with_translation(Vec3{0., 100., 0.})
   );
 }
 
@@ -130,9 +128,7 @@ inline auto some_shit(Query<CameraState> q) -> void {
     std::visit(
       over{
         [&](FreeLook const& fl) -> void { info("Kamera w trybie FreeLook\n"); },
-        [&](Cinematic const& c) -> void {
-          info("Kamera w trybie Cinematic\n");
-        },
+        [&](Cinematic const& c) -> void { info("Kamera w trybie Cinematic\n"); },
         [&](Locked const& l) -> void { info("Kamera śledzi encję: {}\n", 10); }
       },
       *state
@@ -140,18 +136,32 @@ inline auto some_shit(Query<CameraState> q) -> void {
   }
 }
 
-inline auto spawn_some_texture(
-  Cmd cmd, ResMut<Assets<ecs::Texture>> textures, NonSendMarker
-) -> void {
+inline auto spawn_some_texture(Cmd cmd, Res<AssetServer> server, NonSendMarker) -> void {
+  auto tex = server->load<Texture>("res/textures/stone.jpg");
   cmd.spawn(
-    ecs::Sprite{
-      .handle = textures->add(gl::load_texture("res/textures/stone.jpg"))
-    },
+    ecs::Sprite{.handle = tex},
     Transform{
       .translation = Vec3(10.0f, 10.0f, 0.0f),
       .scale = Vec3::splat(1.0f),
     }
   );
+}
+
+struct MovingLight {
+  f32 radius;
+  f32 speed;
+  f32 offset;
+};
+
+inline auto moving_lights_system(Query<Mut<Transform>, MovingLight> query, Res<Time> time)
+  -> void {
+  f32 t = time->elapsed_seconds;
+  for (auto [transform, light] : query.iter()) {
+    transform->translation.x =
+      (std::cos((t * light->speed) + light->offset) * light->radius);
+    transform->translation.z =
+      (std::sin((t * light->speed) + light->offset) * light->radius / 2.0f);
+  }
 }
 
 struct LightsSpawned {
@@ -160,53 +170,32 @@ struct LightsSpawned {
 };
 
 inline auto spawn_lights_on_input(
-  Cmd cmd,
-  ResMut<Assets<ecs::Texture>> textures,
-  ResMut<Assets<ecs::Mesh>> meshes,
-  ResMut<Assets<ecs::Material>> materials,
-  ResMut<LightsSpawned> lights,
-  Res<Input> input,
-  NonSendMarker
+  Cmd cmd, ResMut<LightsSpawned> lights, Res<Input> input, NonSendMarker
 ) -> void {
   if (lights->done || !input->key_pressed(KEY_L)) {
     return;
   }
 
-  cmd.spawn(
-    DirectionalLight{
-      .color = {255, 242, 230, 255},
-      .direction = Vec3(-0.3f, -1.0f, -0.5f),
-      .intensity = 0.5f,
-    }
-  );
+  for (int i = 0; i < 30; ++i) {
+    f32 const angle = (static_cast<f32>(i) / 30.0f) * 2.0f * PI;
+    f32 const radius = 30.0f + ((i % 2 + 1) * 40.0f);
+    Color color = Color::from_hsv(static_cast<f32>(i * 12), 0.8f, 1.0f);
 
-  auto stone_tex = textures->add(gl::load_texture("res/textures/stone.jpg"));
-  auto stone_mat = materials->add(StandardMaterial::from_texture(stone_tex));
-
-  auto cube_h = meshes->add(mesh::cube());
-
-  cmd.spawn(
-    Mesh3d{cube_h},
-    PointLight{
-      .color = {255, 0, 0, 255}, .intensity = 8800.0f, .range = 2000.0f
-    },
-    Transform::from_xyz(-50.0f, 50.0f, 0.0f)
-  );
-
-  auto cube_h2 = meshes->add(mesh::cube());
-
-  cmd.spawn(
-    Mesh3d{cube_h2},
-    MeshMaterial3d{stone_mat},
-    Transform::from_xyz(50.0f, 50.0f, 0.0f)
-  );
-
-  cmd.spawn(
-    PointLight{
-      .color = {75, 75, 255, 255}, .intensity = 800.0f, .range = 200.0f
-    },
-    Transform::from_xyz(100.0f, 100.0f, 0.0f)
-  );
+    cmd.spawn(
+      PointLight{
+        .color = color,
+        .intensity = 500.0f,
+        .range = 40.0f,
+        .casts_shadows = true,
+      },
+      Transform::from_xyz(0, ((i % 2 == 0 ? 5.f : 40.f)), 0),
+      MovingLight{
+        .radius = radius,
+        .speed = 0.2f,
+        .offset = angle,
+      }
+    );
+  }
 
   lights->done = true;
 }
@@ -218,7 +207,21 @@ inline auto setup_camera(Cmd cmd, NonSendMarker) -> void {
     Transform::from_xyz(8, 6, 8).look_at(Vec3::ZERO),
     CameraController{},
     PostProcessMaterial{DefaultPostProcessMaterial{}},
-    Skybox::from("res/hdri/skybox")
+    Environment::from_directory("res/hdri/skybox")
+      .with_ambient_light(
+        AmbientLight{
+          .color = Color::RAYWHITE,
+          .intensity = 0.2f,
+        }
+      )
+      .with_directional_light(
+        DirectionalLight{
+          .color = Color::WHITE,
+          .direction = Vec3(-0.2f, -1.0f, -0.1f).normalized(),
+          .intensity = 1.0f,
+          .casts_shadows = true,
+        }
+      )
   );
   rl::DisableCursor();
 }
@@ -233,7 +236,7 @@ inline void scene_plugin(App& app) {
 
   app.add_systems(Update, camera_controller_system);
   app.add_systems(Update, camera_mouse_system);
-  // app.add_systems(Update, some_shit);
+  app.add_systems(Update, moving_lights_system);
 
   app.add_systems(Update, spawn_lights_on_input);
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <raylib.h>
+#define RL_MATRIX_TYPE
 #include <rlgl.h>
 
 namespace rl {
@@ -10,15 +11,16 @@ using ::Camera2D;
 using ::Camera3D;
 using ::GltfScene;
 using ::Image;
-using ::Material;
 using ::Matrix;
 using ::Model;
 using ::Quaternion;
 using ::rlColor;
+using ::rlMaterial;
 using ::rlMaterialMap;
 using ::rlMesh;
 using ::rlRectangle;
 using Rectangle = ::rlRectangle;
+using ::AudioStream;
 using ::Font;
 using ::RenderTexture;
 using ::RenderTexture2D;
@@ -35,6 +37,7 @@ using ::BeginShaderMode;
 using ::BeginTextureMode;
 using ::ClearBackground;
 using ::rlCloseWindow;
+using ::ToggleFullscreen;
 inline void CloseWindow() { ::rlCloseWindow(); }
 using ::DrawFPS;
 using ::EndDrawing;
@@ -42,14 +45,20 @@ using ::EndShaderMode;
 using ::EndTextureMode;
 using ::GetFrameTime;
 using ::InitWindow;
+using ::IsWindowFullscreen;
 using ::IsWindowReady;
 using ::LoadFileText;
+using ::SetConfigFlags;
 using ::SetShaderValueTexture;
 using ::SetTargetFPS;
 using ::SetTraceLogLevel;
 using ::TraceLog;
 using ::UnloadFileText;
 using ::WindowShouldClose;
+
+inline constexpr unsigned int FLAG_FULLSCREEN_MODE = ::FLAG_FULLSCREEN_MODE;
+
+using ::ColorFromHSV;
 
 // ---- Input ----
 using ::DisableCursor;
@@ -96,9 +105,7 @@ using ::ImageFormat;
 using ::ImageText;
 using ::ImageTextEx;
 using ::rlLoadImage;
-inline auto LoadImage(char const* fileName) -> Image {
-  return ::rlLoadImage(fileName);
-}
+inline auto LoadImage(char const* fileName) -> Image { return ::rlLoadImage(fileName); }
 using ::LoadRenderTexture;
 using ::LoadTexture;
 using ::LoadTextureFromImage;
@@ -115,7 +122,19 @@ using ::LoadFont;
 using ::MeasureTextEx;
 
 // ---- Audio ----
+using ::CloseAudioDevice;
+using ::InitAudioDevice;
+using ::IsAudioDeviceReady;
+using ::IsSoundPlaying;
 using ::LoadSound;
+using ::PauseSound;
+using ::PlaySound;
+using ::ResumeSound;
+using ::SetSoundPan;
+using ::SetSoundPitch;
+using ::SetSoundVolume;
+using ::StopSound;
+using ::UnloadSound;
 
 // ---- GLTF ----
 using ::LoadGltfScene;
@@ -132,6 +151,7 @@ using ::SetShaderValueV;
 // ---- rlgl functions ----
 using ::rlActiveTextureSlot;
 using ::rlBegin;
+using ::rlBindFramebuffer;
 using ::rlBindShaderBuffer;
 using ::rlCheckRenderBatchLimit;
 using ::rlColor4ub;
@@ -166,12 +186,17 @@ using ::rlEnableVertexAttribute;
 using ::rlEnableVertexBuffer;
 using ::rlEnableVertexBufferElement;
 using ::rlEnableWireMode;
+using ::rlFramebufferAttach;
+using ::rlFramebufferComplete;
 using ::rlGetShaderIdDefault;
 using ::rlGetShaderLocsDefault;
 using ::rlGetTextureIdDefault;
 using ::rlLoadComputeShaderProgram;
+using ::rlLoadFramebuffer;
 using ::rlLoadShaderBuffer;
+using ::rlLoadTexture;
 using ::rlLoadTextureCubemap;
+using ::rlLoadTextureDepth;
 using ::rlLoadVertexArray;
 using ::rlLoadVertexBuffer;
 using ::rlLoadVertexBufferElement;

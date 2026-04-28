@@ -9,9 +9,12 @@
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/plugin.hpp"
 #include "rydz_levelLoader/rydz_levelLoader.hpp"
 #include "rydz_ui/mod.hpp"
+#include "rydz_scripting/lua_resource.hpp"
+#include "rydz_scripting/script_scheduler.hpp"
+#include "rydz_scripting/lua_system_registry.hpp"
 #include <algorithm>
 #include <print>
 
@@ -31,9 +34,9 @@ struct WasdKeyMarker {
 };
 
 // Isometric camera offset from the player
-static float const kCamOffX = 10.0f;
-static float const kCamOffY = 10.0f;
-static float const kCamOffZ = 10.0f;
+static float const kCamOffX = 50.0f;
+static float const kCamOffY = 85.0f;
+static float const kCamOffZ = 50.0f;
 
 // ── Systems ──────────────────────────────────────────────────────────────────
 
@@ -103,9 +106,7 @@ inline void setup_camera(Cmd cmd, NonSendMarker) {
   );
 }
 
-inline void setup_lighting(
-  Cmd cmd, NonSendMarker, ResMut<Assets<ecs::Mesh>> meshes
-) {
+inline void setup_lighting(Cmd cmd, NonSendMarker, ResMut<Assets<ecs::Mesh>> meshes) {
   cmd.spawn(
     AmbientLight{
       .color = {60, 60, 70, 255},
@@ -132,34 +133,26 @@ inline void setup_lighting(
 
 inline void spawn_ground(
   Cmd cmd,
+  Res<AssetServer> server,
   ResMut<Assets<ecs::Mesh>> meshes,
-  ResMut<Assets<ecs::Texture>> textures,
-  ResMut<Assets<ecs::Material>> materials,
-  NonSendMarker
+  ResMut<Assets<ecs::Material>> materials
 ) {
-  auto plane_h = meshes->add(mesh::plane(20.0f, 20.0f, 1, 1));
-  auto plane_mat = materials->add(
-    StandardMaterial::from_texture(
-      textures->add(gl::load_texture("res/textures/brick.png"))
-    )
-  );
+  auto tex = server->load<Texture>("res/texture/brick.jpg");
+  auto plane_h = meshes->add(Mesh::plane(20.0f, 20.0f, 1, 1));
+  auto plane_mat = materials->add(StandardMaterial::from_texture(tex));
 
   cmd.spawn(Mesh3d{plane_h}, MeshMaterial3d{plane_mat}, Transform{});
 }
 
 inline void spawn_player(
   Cmd cmd,
+  Res<AssetServer> server,
   ResMut<Assets<ecs::Mesh>> meshes,
-  ResMut<Assets<ecs::Texture>> textures,
-  ResMut<Assets<ecs::Material>> materials,
-  NonSendMarker
+  ResMut<Assets<ecs::Material>> materials
 ) {
-  auto cube_h = meshes->add(mesh::cube(1.0f, 1.0f, 1.0f));
-  auto cube_mat = materials->add(
-    StandardMaterial::from_texture(
-      textures->add(gl::load_texture("res/textures/stone.jpg"))
-    )
-  );
+  auto tex = server->load<Texture>("res/texture/stone.jpg");
+  auto cube_h = meshes->add(Mesh::cube(1.0f, 1.0f, 1.0f));
+  auto cube_mat = materials->add(StandardMaterial::from_texture(tex));
 
   cmd.spawn(
     Mesh3d{cube_h},
@@ -169,9 +162,10 @@ inline void spawn_player(
   );
 }
 
-void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
-  if (!root.ptr)
+inline void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
+  if (root.ptr == nullptr) {
     return;
+  }
 
   cmd.entity(root->root)
     .insert(
@@ -179,8 +173,7 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
         .direction = rydz::ui::Direction::Row,
         .align = rydz::ui::Align::Start,
         .justify = rydz::ui::Justify::End,
-        .padding =
-          rydz::ui::UiRect{.left = 10, .top = 10, .right = 10, .bottom = 10},
+        .padding = rydz::ui::UiRect{.left = 10, .top = 10, .right = 10, .bottom = 10},
       }
     );
 
@@ -191,10 +184,8 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
         rydz::ui::Panel{rlColor{.r = 200, .g = 60, .b = 60, .a = 128}},
         rydz::ui::Style{
           .direction = rydz::ui::Direction::Column,
-          .padding =
-            rydz::ui::UiRect{.left = 10, .top = 10, .right = 10, .bottom = 10},
-          .margin =
-            rydz::ui::UiRect{.left = 0, .top = 0, .right = 10, .bottom = 0},
+          .padding = rydz::ui::UiRect{.left = 10, .top = 10, .right = 10, .bottom = 10},
+          .margin = rydz::ui::UiRect{.left = 0, .top = 0, .right = 10, .bottom = 0},
           .size =
             {.width = rydz::ui::SizeValue::px(200.0f),
              .height = rydz::ui::SizeValue::px(80.0f)},
@@ -226,8 +217,7 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
           .direction = rydz::ui::Direction::Row,
           .align = rydz::ui::Align::Center,
           .justify = rydz::ui::Justify::Center,
-          .padding =
-            rydz::ui::UiRect{.left = 5, .top = 5, .right = 5, .bottom = 5},
+          .padding = rydz::ui::UiRect{.left = 5, .top = 5, .right = 5, .bottom = 5},
           .size =
             {.width = rydz::ui::SizeValue::px(210.0f),
              .height = rydz::ui::SizeValue::px(60.0F)},
@@ -236,7 +226,7 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
       )
       .id();
 
-  auto spawn_key = [&](int keycode, std::string const& label_text) {
+  auto spawn_key = [&](int keycode, std::string const& label_text) -> void {
     Entity key_box =
       cmd
         .spawn(
@@ -246,8 +236,7 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
             .direction = rydz::ui::Direction::Row,
             .align = rydz::ui::Align::Center,
             .justify = rydz::ui::Justify::Center,
-            .margin =
-              rydz::ui::UiRect{.left = 4, .top = 4, .right = 4, .bottom = 4},
+            .margin = rydz::ui::UiRect{.left = 4, .top = 4, .right = 4, .bottom = 4},
             .size =
               {.width = rydz::ui::SizeValue::px(40.0f),
                .height = rydz::ui::SizeValue::px(40.0f)},
@@ -278,22 +267,24 @@ void setup_ui(Res<rydz::ui::UiRoot> root, Cmd cmd) {
 void show_player_position_ui(
   Res<rydz::ui::UiRoot> root,
   Cmd cmd,
-  Query<Transform, Player> player_query,
+  Query<Transform, With<Player>, Changed<Transform>> player_query,
   Query<UiMarker, Mut<rydz::ui::Label>> panel_query
 ) {
-
   Vec3 player_pos = Vec3::ZERO;
-  for (auto [pt, _] : player_query.iter()) {
+
+  for (auto [pt] : player_query.iter()) {
     player_pos = pt->translation;
     break;
   }
-  std::string player_pos_string = std::format(
-    "Pos: {:.2f}, {:.2f}, {:.2f}", player_pos.x, player_pos.y, player_pos.z
-  );
+  std::string player_pos_string =
+    std::format("Pos: {:.2f}, {:.2f}, {:.2f}", player_pos.x, player_pos.y, player_pos.z);
+
+  info("{}", player_pos_string);
 
   auto result = panel_query.single();
-  if (!result)
+  if (!result) {
     return;
+  }
   auto [_, panel] = *result;
   panel->text = player_pos_string;
 }
@@ -302,10 +293,8 @@ void update_wasd_ui_system(
   Query<Mut<rydz::ui::Panel>, WasdKeyMarker> query, Res<Input> input
 ) {
   // Definiujemy kolory dla stanów przycisku
-  auto color_pressed =
-    rlColor{.r = 255, .g = 255, .b = 255, .a = 255}; // Jasny biały
-  auto color_released =
-    rlColor{.r = 128, .g = 128, .b = 128, .a = 128}; // Półprzezroczysty szary
+  auto color_pressed = Color::WHITE;
+  auto color_released = Color::GRAY;
 
   for (auto [panel, marker] : query.iter()) {
     if (input->key_down(marker->keycode)) {
@@ -319,12 +308,33 @@ void update_wasd_ui_system(
 // ── Plugin ───────────────────────────────────────────────────────────────────
 
 inline void scene_plugin(App& app) {
-  app.add_plugin(Input::install);
+  app.add_plugin(InputPlugin{});
   app.add_plugin(UiPlugin::install);
   app.add_plugin(system_multithreading({true}));
-  app.add_plugin(engine::scripting_plugin);
+  app.add_plugin(scripting::scripting_plugin);
   app.add_plugin(engine::console_plugin);
   app.add_plugin(camera_plugin);
+
+  app.insert_resource(scripting::LuaSystemRegistry{});
+
+  app.add_systems(Startup, [](ecs::World& world) {
+      auto* lua = world.get_resource<scripting::LuaResource>();
+      auto* reg = world.get_resource<scripting::LuaSystemRegistry>();
+      if (lua) {
+          scripting::register_rydz_api(lua->L);
+          scripting::expose_world_global(lua->L, &world);
+      }
+
+      if (reg) {
+          lua_pushlightuserdata(lua->L, reg);
+          lua_setfield(lua->L, LUA_REGISTRYINDEX, "_sys_registry");
+      }
+
+      if (luaL_dofile(lua->L, "res/scripts/test.lua") != LUA_OK) {
+          fprintf(stderr, "[Lua] %s\n", lua_tostring(lua->L, -1));
+          lua_pop(lua->L, 1);
+      }
+  });
 
   app.add_systems(ScheduleLabel::Startup, setup_camera);
   app.add_systems(ScheduleLabel::Startup, setup_lighting);
@@ -338,14 +348,13 @@ inline void scene_plugin(App& app) {
   app.add_systems(ScheduleLabel::Update, show_player_position_ui);
   app.add_systems(ScheduleLabel::Update, update_wasd_ui_system);
 
-  app.add_systems(
-    ScheduleLabel::Update,
-    ecs::group(player_movement_system, update_isometric_camera_target_system)
-      .run_if(is_gameplay_active)
-  );
 
-  app.add_systems(
-    RenderPassSet::Cleanup,
-    group(engine::ConsoleRenderSystem).before(FramePass::end)
-  );
+  app.add_systems(ecs::ScheduleLabel::Startup,
+    group(init_lua_scripting, scripting::lua_startup_runner).chain());
+
+  app.add_systems(Update, group(player_movement_system,
+                                update_isometric_camera_target_system)
+                              .run_if(is_gameplay_active));
+  app.add_systems(RenderPassSet::Cleanup,
+                  group(engine::ConsoleRenderSystem).before(FramePass::end));
 }

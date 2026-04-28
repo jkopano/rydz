@@ -15,10 +15,9 @@
 #include "rydz_ecs/query.hpp"
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
-#include "rydz_graphics/material/standard_material.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_graphics/render_plugin.hpp"
-#include "rydz_graphics/transform.hpp"
+#include "rydz_graphics/plugin.hpp"
+#include "rydz_graphics/spatial/transform.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -122,7 +121,7 @@ std::vector<entity_prop_static> parseMapForProps(std::string const& filePath) {
   return props;
 }
 
-std::vector<brushFace> parseVertices(std::string const& filename) {
+inline auto parseVertices(std::string const& filename) -> std::vector<brushFace> {
   std::vector<brushFace> allFaces;
   std::ifstream file(filename);
 
@@ -143,8 +142,7 @@ std::vector<brushFace> parseVertices(std::string const& filename) {
       size_t lastQuote = line.find("\"", firstQuote + 1);
 
       if (firstQuote != std::string::npos && lastQuote != std::string::npos) {
-        std::string fullPath =
-          line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+        std::string fullPath = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
 
         // lastFoundTexture = "empty";
         size_t lastSlash = fullPath.find_last_of("/\\");
@@ -166,8 +164,7 @@ std::vector<brushFace> parseVertices(std::string const& filename) {
       size_t lastQuote = line.find("\"", firstQuote + 1);
 
       if (firstQuote != std::string::npos && lastQuote != std::string::npos) {
-        std::string coordsStr =
-          line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+        std::string coordsStr = line.substr(firstQuote + 1, lastQuote - firstQuote - 1);
 
         std::stringstream ss(coordsStr);
         Vector3 v;
@@ -184,34 +181,32 @@ std::vector<brushFace> parseVertices(std::string const& filename) {
       face.v2 = tempVertices[2];
       face.v3 = tempVertices[3];
 
-      rl::TraceLog(
-        LOG_DEBUG, (("TEXTURE TO APPLY: " + lastFoundTexture).c_str())
-      );
+      rl::TraceLog(LOG_DEBUG, (("TEXTURE TO APPLY: " + lastFoundTexture).c_str()));
       // face.texturePath = lastFoundTexture;
 
       rl::TraceLog(LOG_DEBUG, "LOADING NEW FACE");
       rl::TraceLog(
         LOG_DEBUG,
-        ("X: " + std::to_string(face.v0.x) + " Y: " +
-         std::to_string(face.v0.z) + " Z: " + std::to_string(face.v0.y))
+        ("X: " + std::to_string(face.v0.x) + " Y: " + std::to_string(face.v0.z) +
+         " Z: " + std::to_string(face.v0.y))
           .c_str()
       );
       rl::TraceLog(
         LOG_DEBUG,
-        ("X: " + std::to_string(face.v1.x) + " Y: " +
-         std::to_string(face.v1.z) + " Z: " + std::to_string(face.v1.y))
+        ("X: " + std::to_string(face.v1.x) + " Y: " + std::to_string(face.v1.z) +
+         " Z: " + std::to_string(face.v1.y))
           .c_str()
       );
       rl::TraceLog(
         LOG_DEBUG,
-        ("X: " + std::to_string(face.v2.x) + " Y: " +
-         std::to_string(face.v2.z) + " Z: " + std::to_string(face.v2.y))
+        ("X: " + std::to_string(face.v2.x) + " Y: " + std::to_string(face.v2.z) +
+         " Z: " + std::to_string(face.v2.y))
           .c_str()
       );
       rl::TraceLog(
         LOG_DEBUG,
-        ("X: " + std::to_string(face.v3.x) + " Y: " +
-         std::to_string(face.v3.z) + " Z: " + std::to_string(face.v3.y))
+        ("X: " + std::to_string(face.v3.x) + " Y: " + std::to_string(face.v3.z) +
+         " Z: " + std::to_string(face.v3.y))
           .c_str()
       );
       allFaces.push_back(face);
@@ -255,14 +250,11 @@ void spawn_entity_models(Cmd cmd, Res<AssetServer> server) {
 // NonSendMarker musi byæ gdy funkcja musi byæ odpalona na g³ównym w¹tku
 // (inn¹ opcj¹ jest dodanie do funkcji World world)
 void setupScene(
-  Cmd cmd,
-  ResMut<Assets<Mesh>> meshes,
-  NonSendMarker,
-  ResMut<Assets<Material>> materials
+  Cmd cmd, ResMut<Assets<Mesh>> meshes, NonSendMarker, ResMut<Assets<Material>> materials
 ) {
 
   // cube - czerwona
-  auto cube_h = meshes->add(mesh::cube(16, 5, 16));
+  auto cube_h = meshes->add(Mesh::cube(16, 5, 16));
   auto material = materials->add(StandardMaterial::from_color(Color::RED));
   cmd.spawn(
     Mesh3d{cube_h},

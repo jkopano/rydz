@@ -4,15 +4,14 @@ in vec3 Normal;
 
 out vec4 FragColor;
 
-uniform vec3 cameraPos;
+uniform vec3 u_camera_pos;
 layout(binding = 5) uniform samplerCube u_environment;
 uniform float u_reflectivity;
 
 void main() {
-  vec3 I = normalize(FragPos - cameraPos);
+  vec3 I = normalize(FragPos - u_camera_pos);
   vec3 N = normalize(Normal);
 
-  // Flip normal if we see the back face (double-sided support)
   if (dot(I, N) > 0.0) {
     N = -N;
   }
@@ -20,7 +19,6 @@ void main() {
   vec3 R = reflect(I, N);
   vec3 envColor = texture(u_environment, R).rgb;
 
-  // Debug fallback: show magenta if the sample is essentially black
   if (length(envColor) < 1e-4) {
     envColor = vec3(1.0, 0.0, 1.0);
   }

@@ -3,28 +3,26 @@
 #include "rydz_ecs/core/hierarchy.hpp"
 #include "rydz_graphics/assets/scene_graph.hpp"
 #include "rydz_graphics/material/standard_material.hpp"
-#include "rydz_graphics/visibility.hpp"
+#include "rydz_graphics/spatial/visibility.hpp"
 #include <algorithm>
 #include <ranges>
 
 namespace ecs {
 
 struct SceneRuntimeSystems {
-  static auto cleanup_orphan_scene_entities_system(World& world) -> void {
+  static auto cleanup_orphan_scene_ent_system(World& world) -> void {
     auto* owned_storage = world.get_storage<SceneOwned>();
     if (owned_storage == nullptr) {
       return;
     }
 
     std::vector<Entity> to_remove;
-    owned_storage->for_each(
-      [&](Entity entity, SceneOwned const& owned) -> void {
-        if (!world.entities.is_alive(owned.root) ||
-            !world.has_component<SceneRoot>(owned.root)) {
-          to_remove.push_back(entity);
-        }
+    owned_storage->for_each([&](Entity entity, SceneOwned const& owned) -> void {
+      if (!world.entities.is_alive(owned.root) ||
+          !world.has_component<SceneRoot>(owned.root)) {
+        to_remove.push_back(entity);
       }
-    );
+    });
 
     std::ranges::sort(to_remove, [](Entity lhs, Entity rhs) -> bool {
       return lhs.index() > rhs.index();
@@ -77,8 +75,7 @@ struct SceneRuntimeSystems {
         continue;
       }
 
-      bool rebuild = (instance == nullptr) ||
-                     (instance->scene != root->scene) ||
+      bool rebuild = (instance == nullptr) || (instance->scene != root->scene) ||
                      (!detail::scene_instance_alive(world, *instance)) ||
                      (!detail::scene_instance_matches_shape(*scene, *instance));
 
@@ -99,18 +96,15 @@ struct SceneRuntimeSystems {
 
 private:
   struct detail {
-    static auto scene_instance_alive(
-      World const& world, SceneInstance const& inst
-    ) -> bool {
-      return std::ranges::all_of(
-        inst.owned_entities,
-        [&](Entity entity) -> bool { return world.entities.is_alive(entity); }
-      );
+    static auto scene_instance_alive(World const& world, SceneInstance const& inst)
+      -> bool {
+      return std::ranges::all_of(inst.owned_entities, [&](Entity entity) -> bool {
+        return world.entities.is_alive(entity);
+      });
     }
 
-    static auto ensure_transform(
-      World& world, Entity entity, Transform const& transform
-    ) -> void {
+    static auto ensure_transform(World& world, Entity entity, Transform const& transform)
+      -> void {
       if (auto* existing = world.get_component<Transform>(entity)) {
         *existing = transform;
       } else {
@@ -118,8 +112,7 @@ private:
       }
     }
 
-    static auto ensure_parent(World& world, Entity entity, Entity parent_entity)
-      -> void {
+    static auto ensure_parent(World& world, Entity entity, Entity parent_entity) -> void {
       if (auto* existing = world.get_component<Parent>(entity)) {
         existing->entity = parent_entity;
       } else {
@@ -135,8 +128,7 @@ private:
       }
     }
 
-    static auto ensure_scene_owned(World& world, Entity entity, Entity root)
-      -> void {
+    static auto ensure_scene_owned(World& world, Entity entity, Entity root) -> void {
       if (auto* owned = world.get_component<SceneOwned>(entity)) {
         owned->root = root;
       } else {
@@ -160,9 +152,7 @@ private:
         if (auto* joint = world.get_component<SceneJoint>(entity)) {
           joint->bone_index = static_cast<usize>(bone_index);
         } else {
-          world.insert_component(
-            entity, SceneJoint{static_cast<usize>(bone_index)}
-          );
+          world.insert_component(entity, SceneJoint{static_cast<usize>(bone_index)});
         }
       } else {
         world.remove_component<SceneJoint>(entity);
@@ -177,8 +167,7 @@ private:
       usize primitive_index,
       i32 skin_index
     ) -> void {
-      if (auto* primitive =
-            world.get_component<ScenePrimitiveInstance>(entity)) {
+      if (auto* primitive = world.get_component<ScenePrimitiveInstance>(entity)) {
         primitive->root = root;
         primitive->node_index = node_index;
         primitive->primitive_index = primitive_index;
@@ -186,9 +175,7 @@ private:
         world.insert_component(
           entity,
           ScenePrimitiveInstance{
-            .root = root,
-            .node_index = node_index,
-            .primitive_index = primitive_index
+            .root = root, .node_index = node_index, .primitive_index = primitive_index
           }
         );
       }
@@ -204,8 +191,7 @@ private:
       }
     }
 
-    static auto ensure_mesh(World& world, Entity entity, Handle<Mesh> mesh)
-      -> void {
+    static auto ensure_mesh(World& world, Entity entity, Handle<Mesh> mesh) -> void {
       if (auto* existing = world.get_component<Mesh3d>(entity)) {
         existing->mesh = mesh;
       } else {
@@ -213,9 +199,8 @@ private:
       }
     }
 
-    static auto ensure_material(
-      World& world, Entity entity, Handle<Material> material
-    ) -> void {
+    static auto ensure_material(World& world, Entity entity, Handle<Material> material)
+      -> void {
       if (auto* existing = world.get_component<MeshMaterial3d<>>(entity)) {
         existing->material = material;
       } else {
@@ -223,10 +208,8 @@ private:
       }
     }
 
-    static auto destroy_scene_instance(World& world, SceneInstance const& inst)
-      -> void {
-      for (auto owned_entitie :
-           std::ranges::reverse_view(inst.owned_entities)) {
+    static auto destroy_scene_instance(World& world, SceneInstance const& inst) -> void {
+      for (auto owned_entitie : std::ranges::reverse_view(inst.owned_entities)) {
         if (world.entities.is_alive(owned_entitie)) {
           world.despawn(owned_entitie);
         }
@@ -234,47 +217,38 @@ private:
     }
 
     static auto build_scene_instance(
-      World& world,
-      Entity root_entity,
-      Scene const& scene,
-      Handle<Scene> scene_handle
+      World& world, Entity root_entity, Scene const& scene, Handle<Scene> scene_handle
     ) -> SceneInstance {
       SceneInstance instance;
       instance.scene = scene_handle;
       instance.node_entities.resize(scene.nodes.size());
       instance.primitive_entities.resize(scene.nodes.size());
 
-      for (usize node_index = 0; node_index < scene.nodes.size();
-           ++node_index) {
+      for (usize node_index = 0; node_index < scene.nodes.size(); ++node_index) {
         Entity entity = world.spawn();
         instance.node_entities[node_index] = entity;
         instance.owned_entities.push_back(entity);
       }
 
-      for (usize node_index = 0; node_index < scene.nodes.size();
-           ++node_index) {
+      for (usize node_index = 0; node_index < scene.nodes.size(); ++node_index) {
         auto const& node = scene.nodes[node_index];
         Entity entity = instance.node_entities[node_index];
         Entity parent_entity =
           node.parent >= 0 ? instance.node_entities[node.parent] : root_entity;
 
         ensure_scene_owned(world, entity, root_entity);
-        ensure_node_instance(
-          world, entity, root_entity, node_index, node.bone_index
-        );
+        ensure_node_instance(world, entity, root_entity, node_index, node.bone_index);
         ensure_visibility(world, entity);
         ensure_transform(world, entity, node.local_transform);
         ensure_parent(world, entity, parent_entity);
       }
 
-      for (usize node_index = 0; node_index < scene.nodes.size();
-           ++node_index) {
+      for (usize node_index = 0; node_index < scene.nodes.size(); ++node_index) {
         auto const& node = scene.nodes[node_index];
         auto& primitive_entities = instance.primitive_entities[node_index];
         primitive_entities.resize(node.primitives.size());
 
-        for (usize primitive_index = 0;
-             primitive_index < node.primitives.size();
+        for (usize primitive_index = 0; primitive_index < node.primitives.size();
              ++primitive_index) {
           auto const& primitive = node.primitives[primitive_index];
           Entity entity = world.spawn();
@@ -286,20 +260,13 @@ private:
 
           ensure_scene_owned(world, entity, root_entity);
           ensure_primitive_instance(
-            world,
-            entity,
-            root_entity,
-            node_index,
-            primitive_index,
-            primitive.skin_index
+            world, entity, root_entity, node_index, primitive_index, primitive.skin_index
           );
           ensure_visibility(world, entity);
           ensure_transform(world, entity, primitive.local_transform);
           ensure_parent(world, entity, instance.node_entities[node_index]);
           ensure_mesh(world, entity, primitive.mesh);
-          ensure_material(
-            world, entity, scene.materials[material_index].material
-          );
+          ensure_material(world, entity, scene.materials[material_index].material);
         }
       }
 
@@ -316,8 +283,7 @@ private:
         return false;
       }
 
-      for (usize node_index = 0; node_index < scene.nodes.size();
-           ++node_index) {
+      for (usize node_index = 0; node_index < scene.nodes.size(); ++node_index) {
         if (instance.primitive_entities[node_index].size() !=
             scene.nodes[node_index].primitives.size()) {
           return false;
@@ -327,56 +293,40 @@ private:
     }
 
     static auto sync_scene_instance(
-      World& world,
-      Entity root_entity,
-      Scene const& scene,
-      SceneInstance& instance
+      World& world, Entity root_entity, Scene const& scene, SceneInstance& instance
     ) -> void {
-      for (usize node_index = 0; node_index < scene.nodes.size();
-           ++node_index) {
+      for (usize node_index = 0; node_index < scene.nodes.size(); ++node_index) {
         auto const& node = scene.nodes[node_index];
         Entity entity = instance.node_entities[node_index];
         Entity parent_entity =
           node.parent >= 0 ? instance.node_entities[node.parent] : root_entity;
 
         ensure_scene_owned(world, entity, root_entity);
-        ensure_node_instance(
-          world, entity, root_entity, node_index, node.bone_index
-        );
+        ensure_node_instance(world, entity, root_entity, node_index, node.bone_index);
         ensure_visibility(world, entity);
         ensure_transform(world, entity, node.local_transform);
         ensure_parent(world, entity, parent_entity);
       }
 
-      for (usize node_index = 0; node_index < scene.nodes.size();
-           ++node_index) {
+      for (usize node_index = 0; node_index < scene.nodes.size(); ++node_index) {
         auto const& node = scene.nodes[node_index];
 
-        for (usize primitive_index = 0;
-             primitive_index < node.primitives.size();
+        for (usize primitive_index = 0; primitive_index < node.primitives.size();
              ++primitive_index) {
           auto const& primitive = node.primitives[primitive_index];
-          Entity entity =
-            instance.primitive_entities[node_index][primitive_index];
+          Entity entity = instance.primitive_entities[node_index][primitive_index];
           auto const material_index =
             std::min(primitive.material_index, scene.materials.size() - 1);
 
           ensure_scene_owned(world, entity, root_entity);
           ensure_primitive_instance(
-            world,
-            entity,
-            root_entity,
-            node_index,
-            primitive_index,
-            primitive.skin_index
+            world, entity, root_entity, node_index, primitive_index, primitive.skin_index
           );
           ensure_visibility(world, entity);
           ensure_transform(world, entity, primitive.local_transform);
           ensure_parent(world, entity, instance.node_entities[node_index]);
           ensure_mesh(world, entity, primitive.mesh);
-          ensure_material(
-            world, entity, scene.materials[material_index].material
-          );
+          ensure_material(world, entity, scene.materials[material_index].material);
         }
       }
     }

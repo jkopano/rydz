@@ -57,8 +57,8 @@ struct function_traits<R (C::*)(Args...) noexcept, void>
     : detail::function_traits_impl<Args...> {};
 
 template <typename C, typename R, typename... Args>
-struct function_traits<R (C::*)(Args...), void>
-    : detail::function_traits_impl<Args...> {};
+struct function_traits<R (C::*)(Args...), void> : detail::function_traits_impl<Args...> {
+};
 
 template <typename C, typename R, typename... Args>
 struct function_traits<R (C::*)(Args...) const noexcept, void>
@@ -73,21 +73,17 @@ struct function_traits<R (*)(Args...) noexcept, void>
     : detail::function_traits_impl<Args...> {};
 
 template <typename R, typename... Args>
-struct function_traits<R (*)(Args...), void>
-    : detail::function_traits_impl<Args...> {};
+struct function_traits<R (*)(Args...), void> : detail::function_traits_impl<Args...> {};
 
 template <typename T>
 concept HasStatefulParamRetrieve = requires(
-  World& w,
-  SystemContext const& ctx,
-  typename SystemParamTraits<bare_t<T>>::State& state
+  World& w, SystemContext const& ctx, typename SystemParamTraits<bare_t<T>>::State& state
 ) { SystemParamTraits<bare_t<T>>::retrieve(w, ctx, state); };
 
 template <typename T>
-concept HasStatelessParamRetrieve =
-  requires(World& w, SystemContext const& ctx) {
-    SystemParamTraits<bare_t<T>>::retrieve(w, ctx);
-  };
+concept HasStatelessParamRetrieve = requires(World& w, SystemContext const& ctx) {
+  SystemParamTraits<bare_t<T>>::retrieve(w, ctx);
+};
 
 template <typename T>
 concept SystemParameter = requires(World& w, SystemAccess& acc) {
@@ -106,15 +102,13 @@ template <typename... Args>
 struct all_system_parameters<Tuple<Args...>>
     : std::bool_constant<(SystemParameter<Args> && ...)> {};
 
-template <typename F, typename = void>
-struct is_system_callable : std::false_type {};
+template <typename F, typename = void> struct is_system_callable : std::false_type {};
 
 template <typename F>
 struct is_system_callable<
   F,
   std::void_t<typename function_traits<decay_t<F>>::args_tuple>>
-    : all_system_parameters<typename function_traits<decay_t<F>>::args_tuple> {
-};
+    : all_system_parameters<typename function_traits<decay_t<F>>::args_tuple> {};
 
 template <typename T> struct is_system_input_descriptor : std::false_type {};
 
@@ -173,9 +167,7 @@ public:
   }
 
   [[nodiscard]] auto name() const -> std::string override { return name_; }
-  [[nodiscard]] auto type_name() const -> std::string override {
-    return type_name_;
-  }
+  [[nodiscard]] auto type_name() const -> std::string override { return type_name_; }
 
   [[nodiscard]] auto access() const -> SystemAccess override {
     SystemAccess acc;
@@ -225,9 +217,8 @@ private:
   }
 
   template <SystemParameter... Args>
-  static auto access_with_args(
-    SystemAccess& acc, std::string const& system_name
-  ) -> void {
+  static auto access_with_args(SystemAccess& acc, std::string const& system_name)
+    -> void {
     std::array<SystemAccess, sizeof...(Args)> per_param;
     std::size_t idx = 0;
     ((SystemParamTraits<bare_t<Args>>::access(per_param[idx]), ++idx), ...);
@@ -244,8 +235,8 @@ private:
             !per_param[a].is_archetype_disjoint(per_param[b])) {
           throw std::runtime_error(
             "System '" + system_name +
-            "': parameter conflict detected between parameters " +
-            std::to_string(a) + " and " + std::to_string(b) +
+            "': parameter conflict detected between parameters " + std::to_string(a) +
+            " and " + std::to_string(b) +
             " (conflicting access to the same component or resource)"
           );
         }
@@ -268,8 +259,7 @@ auto make_system(F&& func, std::string name = "") -> std::unique_ptr<ISystem> {
 
 template <typename F>
   requires(!SystemCallable<F>)
-auto make_system(F&& /*func*/, std::string /*name*/ = "")
-  -> std::unique_ptr<ISystem> {
+auto make_system(F&& /*func*/, std::string /*name*/ = "") -> std::unique_ptr<ISystem> {
   detail::static_assert_valid_system_callable<F>();
   return nullptr;
 }

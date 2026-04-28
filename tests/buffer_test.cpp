@@ -1,16 +1,18 @@
 #include <gtest/gtest.h>
 
-#include "rydz_graphics/gl/core.hpp"
+#include "rydz_graphics/gl/buffers.hpp"
 #include <type_traits>
 
-static_assert(std::is_abstract_v<gl::Buffer>);
-static_assert(std::has_virtual_destructor_v<gl::Buffer>);
-static_assert(!std::is_copy_constructible_v<gl::Buffer>);
-static_assert(!std::is_copy_assignable_v<gl::Buffer>);
+// Buffer abstract base class has been removed (Requirement 6.1).
+// SSBO and UBO are now independent final types (Requirements 6.2, 6.3).
+static_assert(!std::is_abstract_v<gl::SSBO>);
+static_assert(!std::is_abstract_v<gl::UBO>);
 
-static_assert(std::is_base_of_v<gl::Buffer, gl::SSBO>);
-static_assert(std::is_base_of_v<gl::Buffer, gl::UBO>);
+// Both types are final with no base class.
+static_assert(std::is_final_v<gl::SSBO>);
+static_assert(std::is_final_v<gl::UBO>);
 
+// Move semantics preserved (Requirement 6.5).
 static_assert(!std::is_copy_constructible_v<gl::SSBO>);
 static_assert(!std::is_copy_assignable_v<gl::SSBO>);
 static_assert(std::is_move_constructible_v<gl::SSBO>);
@@ -36,6 +38,11 @@ static_assert(!std::is_copy_assignable_v<gl::EBO>);
 static_assert(std::is_move_constructible_v<gl::EBO>);
 static_assert(std::is_move_assignable_v<gl::EBO>);
 
+// GpuBuffer concept satisfaction (Requirement 6.4 / Property 8).
+// **Validates: Requirements 6.4**
+static_assert(gl::GpuBuffer<gl::SSBO>);
+static_assert(gl::GpuBuffer<gl::UBO>);
+
 TEST(GraphicsBufferTest, DefaultBuffersAreEmpty) {
   gl::SSBO ssbo;
   gl::UBO ubo;
@@ -54,8 +61,31 @@ TEST(GraphicsBufferTest, DefaultBuffersAreEmpty) {
   EXPECT_EQ(vertex_array.id(), 0u);
   EXPECT_EQ(vertex_buffer.id(), 0u);
   EXPECT_EQ(element_buffer.id(), 0u);
+}
 
-  const gl::Buffer &base = ssbo;
-  EXPECT_FALSE(base.ready());
-  EXPECT_EQ(base.id(), 0u);
+// Property 2: SSBO/UBO move leaves source empty (Requirement 6.5).
+// **Validates: Requirements 6.5**
+TEST(GraphicsBufferTest, MoveConstructorLeavesSourceEmpty) {
+  // Default-constructed (id == 0) — move should keep source at 0.
+  gl::SSBO ssbo_src;
+  gl::SSBO ssbo_dst{std::move(ssbo_src)};
+  EXPECT_EQ(ssbo_src.id(), 0u); // NOLINT(bugprone-use-after-move)
+  EXPECT_EQ(ssbo_dst.id(), 0u);
+
+  gl::UBO ubo_src;
+  gl::UBO ubo_dst{std::move(ubo_src)};
+  EXPECT_EQ(ubo_src.id(), 0u); // NOLINT(bugprone-use-after-move)
+  EXPECT_EQ(ubo_dst.id(), 0u);
+}
+
+TEST(GraphicsBufferTest, MoveAssignmentLeavesSourceEmpty) {
+  gl::SSBO ssbo_src;
+  gl::SSBO ssbo_dst;
+  ssbo_dst = std::move(ssbo_src);
+  EXPECT_EQ(ssbo_src.id(), 0u); // NOLINT(bugprone-use-after-move)
+
+  gl::UBO ubo_src;
+  gl::UBO ubo_dst;
+  ubo_dst = std::move(ubo_src);
+  EXPECT_EQ(ubo_src.id(), 0u); // NOLINT(bugprone-use-after-move)
 }

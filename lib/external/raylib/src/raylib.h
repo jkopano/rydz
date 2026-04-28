@@ -195,33 +195,33 @@
 
 // Some Basic Colors
 // NOTE: Custom raylib color palette for amazing visuals on WHITE background
-#define LIGHTGRAY CLITERAL(rlColor){200, 200, 200, 255} // Light Gray
-#define GRAY CLITERAL(rlColor){130, 130, 130, 255}      // Gray
-#define DARKGRAY CLITERAL(rlColor){80, 80, 80, 255}     // Dark Gray
-#define YELLOW CLITERAL(rlColor){253, 249, 0, 255}      // Yellow
-#define GOLD CLITERAL(rlColor){255, 203, 0, 255}        // Gold
-#define ORANGE CLITERAL(rlColor){255, 161, 0, 255}      // Orange
-#define PINK CLITERAL(rlColor){255, 109, 194, 255}      // Pink
-#define RED CLITERAL(rlColor){230, 41, 55, 255}         // Red
-#define MAROON CLITERAL(rlColor){190, 33, 55, 255}      // Maroon
-#define GREEN CLITERAL(rlColor){0, 228, 48, 255}        // Green
-#define LIME CLITERAL(rlColor){0, 158, 47, 255}         // Lime
-#define DARKGREEN CLITERAL(rlColor){0, 117, 44, 255}    // Dark Green
-#define SKYBLUE CLITERAL(rlColor){102, 191, 255, 255}   // Sky Blue
-#define BLUE CLITERAL(rlColor){0, 121, 241, 255}        // Blue
-#define DARKBLUE CLITERAL(rlColor){0, 82, 172, 255}     // Dark Blue
-#define PURPLE CLITERAL(rlColor){200, 122, 255, 255}    // Purple
-#define VIOLET CLITERAL(rlColor){135, 60, 190, 255}     // Violet
-#define DARKPURPLE CLITERAL(rlColor){112, 31, 126, 255} // Dark Purple
-#define BEIGE CLITERAL(rlColor){211, 176, 131, 255}     // Beige
-#define BROWN CLITERAL(rlColor){127, 106, 79, 255}      // Brown
-#define DARKBROWN CLITERAL(rlColor){76, 63, 47, 255}    // Dark Brown
+#define RLLIGHTGRAY CLITERAL(rlColor){200, 200, 200, 255} // Light Gray
+#define RLGRAY CLITERAL(rlColor){130, 130, 130, 255}      // Gray
+#define RLDARKGRAY CLITERAL(rlColor){80, 80, 80, 255}     // Dark Gray
+#define RLYELLOW CLITERAL(rlColor){253, 249, 0, 255}      // Yellow
+#define RLGOLD CLITERAL(rlColor){255, 203, 0, 255}        // Gold
+#define RLORANGE CLITERAL(rlColor){255, 161, 0, 255}      // Orange
+#define RLPINK CLITERAL(rlColor){255, 109, 194, 255}      // Pink
+#define RLRED CLITERAL(rlColor){230, 41, 55, 255}         // Red
+#define RLMAROON CLITERAL(rlColor){190, 33, 55, 255}      // Maroon
+#define RLGREEN CLITERAL(rlColor){0, 228, 48, 255}        // Green
+#define RLLIME CLITERAL(rlColor){0, 158, 47, 255}         // Lime
+#define RLDARKGREEN CLITERAL(rlColor){0, 117, 44, 255}    // Dark Green
+#define RLSKYBLUE CLITERAL(rlColor){102, 191, 255, 255}   // Sky Blue
+#define RLBLUE CLITERAL(rlColor){0, 121, 241, 255}        // Blue
+#define RLDARKBLUE CLITERAL(rlColor){0, 82, 172, 255}     // Dark Blue
+#define RLPURPLE CLITERAL(rlColor){200, 122, 255, 255}    // Purple
+#define RLVIOLET CLITERAL(rlColor){135, 60, 190, 255}     // Violet
+#define RLDARKPURPLE CLITERAL(rlColor){112, 31, 126, 255} // Dark Purple
+#define RLBEIGE CLITERAL(rlColor){211, 176, 131, 255}     // Beige
+#define RLBROWN CLITERAL(rlColor){127, 106, 79, 255}      // Brown
+#define RLDARKBROWN CLITERAL(rlColor){76, 63, 47, 255}    // Dark Brown
 
-#define WHITE CLITERAL(rlColor){255, 255, 255, 255} // White
-#define BLACK CLITERAL(rlColor){0, 0, 0, 255}       // Black
-#define BLANK CLITERAL(rlColor){0, 0, 0, 0}         // Blank (Transparent)
-#define MAGENTA CLITERAL(rlColor){255, 0, 255, 255} // Magenta
-#define RAYWHITE                                                               \
+#define RLWHITE CLITERAL(rlColor){255, 255, 255, 255} // White
+#define RLBLACK CLITERAL(rlColor){0, 0, 0, 255}       // Black
+#define RLBLANK CLITERAL(rlColor){0, 0, 0, 0}         // Blank (Transparent)
+#define RLMAGENTA CLITERAL(rlColor){255, 0, 255, 255} // Magenta
+#define RLRAYWHITE                                                             \
   CLITERAL(rlColor){245, 245, 245, 255} // My own White (raylib logo)
 
 //----------------------------------------------------------------------------------
@@ -294,25 +294,25 @@ typedef struct Image {
 } Image;
 
 // Texture, tex data stored in GPU memory (VRAM)
-typedef struct Texture {
+typedef struct rlTexture {
   unsigned int id; // OpenGL texture id
   int width;       // Texture base width
   int height;      // Texture base height
   int mipmaps;     // Mipmap levels, 1 by default
   int format;      // Data format (PixelFormat type)
-} Texture;
+} rlTexture;
 
 // Texture2D, same as Texture
-typedef Texture Texture2D;
+typedef rlTexture Texture2D;
 
 // TextureCubemap, same as Texture
-typedef Texture TextureCubemap;
+typedef rlTexture TextureCubemap;
 
 // RenderTexture, fbo for texture rendering
 typedef struct RenderTexture {
-  unsigned int id; // OpenGL framebuffer object id
-  Texture texture; // Color buffer attachment texture
-  Texture depth;   // Depth buffer attachment texture
+  unsigned int id;   // OpenGL framebuffer object id
+  rlTexture texture; // Color buffer attachment texture
+  rlTexture depth;   // Depth buffer attachment texture
 } RenderTexture;
 
 // RenderTexture2D, same as RenderTexture
@@ -427,14 +427,14 @@ typedef struct rlMaterialMap {
 } rlMaterialMap;
 
 // Material, includes shader and maps
-typedef struct Material {
+typedef struct rlMaterial {
   Shader shader;       // Material shader
   rlMaterialMap* maps; // Material maps array (MAX_MATERIAL_MAPS)
   float params[4];     // Material generic parameters (if required)
-} Material;
+} rlMaterial;
 
 // Transform, vertex transformation data
-typedef struct {
+typedef struct rlTransform {
   Vector3 translation; // Translation
   Quaternion rotation; // Rotation
   Vector3 scale;       // Scale
@@ -460,11 +460,11 @@ typedef struct ModelSkeleton {
 typedef struct Model {
   Matrix transform; // Local transform matrix
 
-  int meshCount;       // Number of meshes
-  int materialCount;   // Number of materials
-  rlMesh* meshes;      // Meshes array
-  Material* materials; // Materials array
-  int* meshMaterial;   // Mesh material number
+  int meshCount;         // Number of meshes
+  int materialCount;     // Number of materials
+  rlMesh* meshes;        // Meshes array
+  rlMaterial* materials; // Materials array
+  int* meshMaterial;     // Mesh material number
 
   // Animation data
   ModelSkeleton skeleton; // Skeleton for animation
@@ -477,12 +477,12 @@ typedef struct Model {
 // GltfScene, parsed GLTF file with hierarchy metadata (meshes have
 // name/id/parentId)
 typedef struct GltfScene {
-  int meshCount;       // Number of meshes
-  int materialCount;   // Number of materials
-  rlMesh* meshes;      // Meshes array (with name/id/parentId populated)
-  Material* materials; // Materials array
-  int* meshMaterial;   // Mesh material number (mesh[i] uses
-                       // materials[meshMaterial[i]])
+  int meshCount;         // Number of meshes
+  int materialCount;     // Number of materials
+  rlMesh* meshes;        // Meshes array (with name/id/parentId populated)
+  rlMaterial* materials; // Materials array
+  int* meshMaterial;     // Mesh material number (mesh[i] uses
+                         // materials[meshMaterial[i]])
 } GltfScene;
 
 // ModelAnimation, contains a full animation sequence
@@ -3277,12 +3277,12 @@ RLAPI void UpdateMeshBuffer(
 RLAPI void UnloadMesh(rlMesh mesh); // Unload mesh data from CPU and GPU
 RLAPI void DrawMesh(
   rlMesh mesh,
-  Material material,
+  rlMaterial material,
   Matrix transform
 ); // Draw a 3d mesh with material and transform
 RLAPI void DrawMeshInstanced(
   rlMesh mesh,
-  Material material,
+  rlMaterial material,
   Matrix const* transforms,
   int instances
 ); // Draw multiple mesh instances with material
@@ -3353,22 +3353,22 @@ RLAPI rlMesh GenMeshCubicmap(
 ); // Generate cubes-based map mesh from image data
 
 // Material loading/unloading functions
-RLAPI Material* LoadMaterials(
+RLAPI rlMaterial* LoadMaterials(
   char const* fileName,
   int* materialCount
 ); // Load materials from model file
-RLAPI Material LoadMaterialDefault(
+RLAPI rlMaterial LoadMaterialDefault(
   void
 ); // Load default material (Supports: DIFFUSE, SPECULAR, NORMAL maps)
 RLAPI bool IsMaterialValid(
-  Material material
+  rlMaterial material
 ); // Check if a material is valid (shader
    // assigned, map textures loaded in GPU)
 RLAPI void UnloadMaterial(
-  Material material
+  rlMaterial material
 ); // Unload material from GPU memory (VRAM)
 RLAPI void SetMaterialTexture(
-  Material* material,
+  rlMaterial* material,
   int mapType,
   Texture2D texture
 ); // Set texture for a material map type
