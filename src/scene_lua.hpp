@@ -92,9 +92,19 @@ inline void init_lua_scripting(ecs::World& world) {
         return;
     }
 
-    // Rejestracja znacznika kamery
+    // Rejestracja znacznika kamery i komponentu skryptowego
     scripting::ComponentRegistry::get().register_component<CameraTarget>("CameraTarget",
         [](lua_State* L, ecs::World* w, ecs::Entity e) { return 0; }
+    );
+    scripting::ComponentRegistry::get().register_component<scripting::LuaComponent>("LuaComponent",
+        [](lua_State* L, ecs::World* w, ecs::Entity e) {
+            auto* comp = w->get_component<scripting::LuaComponent>(e);
+            if (comp) {
+                comp->push(L);
+                return 1;
+            }
+            return 0;
+        }
     );
 
     // 1. Zarejestruj całe API silnika (metatabelki, Components, Input, Time, Rydz, Schedule)

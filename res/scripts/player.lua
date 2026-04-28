@@ -1,56 +1,44 @@
--- Logika gracza — odpowiednik spawn_player + player_movement_system z C++
--- Gracz jest kostką poruszającą się w rzucie izometrycznym
+-- Logika gracza - odpowiednik spawn_player + player_movement_system z C++
+-- Gracz jest kostka poruszajaca sie w rzucie izometrycznym
  
 print("[player.lua] Zaladowany!")
  
--- ── Stałe ────────────────────────────────────────────────────────────────────
+-- ─ Stale ─
  
-local PLAYER_SPEED = 5.0  -- jednostki na sekundę
+local PLAYER_SPEED = 5.0  -- jednostki na sekunde
  
--- Wektory kierunków izometrycznych (identyczne jak w C++ player_movement_system)
+-- Wektory kierunkow izometrycznych (identyczne jak w C++ player_movement_system)
 local ISO_FORWARD = { x = -0.7071, y = 0.0, z = -0.7071 } -- W
 local ISO_RIGHT   = { x =  0.7071, y = 0.0, z = -0.7071 } -- D
  
--- ── Startup: stwórz encję gracza ─────────────────────────────────────────────
+-- ─ Startup: stwórz encje gracza ─
  
 Rydz.on_startup(function(world)
     print("[player.lua] Tworzenie gracza...")
  
-    player_entity = world:spawn()
+    local tex_handle = asset_loader("res/textures/stone.jpg")
  
-    -- Dane skryptowe
-    world:set_lua_component(player_entity, {
-        is_player  = true,
-        speed      = PLAYER_SPEED,
-        health     = 100,
-        max_health = 100,
+    player_entity = world:spawn({
+        { Components.LuaComponent, {
+            is_player  = true,
+            speed      = PLAYER_SPEED,
+            health     = 100,
+            max_health = 100,
+        }},
+        { Components.Mesh3d, Components.Mesh3d.cube(1.0, 1.0, 1.0) },
+        { Components.MeshMaterial3d, Components.MeshMaterial3d.StandardMaterial(tex_handle) },
+        { Components.Transform, { translation = { x = 0.0, y = 0.5, z = 0.0 } } },
+        { Components.CameraTarget }
     })
  
     print("[player.lua] Gracz stworzony, entity ID: " .. tostring(player_entity))
-    
-    -- Dodanie reprezentacji 3D
-    print("[player.lua] Tworzenie grafiki...")
-    local tex_handle = world:load_texture("res/textures/stone.jpg")
-    local mat_handle = world:add_material_from_texture(tex_handle)
-    local mesh_handle = world:add_mesh_cube(1.0, 1.0, 1.0)
-    
-    world:add_mesh3d(player_entity, mesh_handle)
-    world:add_mesh_material3d(player_entity, mat_handle)
-    world:add_transform(player_entity, 0.0, 0.5, 0.0)
-
-    -- Przypisz znacznik kamery do gracza
-    world:insert_component(player_entity, Components.CameraTarget)
-
-    print("[player.lua] Komponenty dodane!")
 end)
  
--- ── System ruchu ─────────────────────────────────────────────────────────────
+-- ─ System ruchu ─
  
 local function PlayerMovement(world)
-    for entity in world:each_lua_with("is_player", true) do
-        local data = world:get_lua_component(entity)
-        local t    = world:get_component(entity, Components.Transform)
-        if not t then return end
+    for entity, data, t in world:each(Components.LuaComponent, Components.Transform) do
+        if not data.is_player then goto continue end
 
         local speed = data.speed * Time.delta
         local dx, dz = 0.0, 0.0
@@ -76,22 +64,24 @@ local function PlayerMovement(world)
             local pos = t.translation
             t.translation = { x = pos.x + dx, y = pos.y, z = pos.z + dz }
         end
+        ::continue::
     end
 end
  
 Rydz.register_system(Schedule.Update, PlayerMovement, "PlayerMovement")
  
--- ── System HUD (debug) ────────────────────────────────────────────────────────
+-- ─ System HUD (debug) ─
  
 local frame = 0
 local function DebugHUD(world)
     frame = frame + 1
     if frame % 300 ~= 0 then return end
 
-    for entity in world:each_lua_with("is_player", true) do
-        local data = world:get_lua_component(entity)
+    for entity, data in world:each(Components.LuaComponent) do
+        if not data.is_player then goto continue end
         print(string.format("[HUD] Klatka %d | HP: %d/%d | FPS: %.0f",
             frame, data.health, data.max_health, 1.0 / Time.delta))
+        ::continue::
     end
 end
  

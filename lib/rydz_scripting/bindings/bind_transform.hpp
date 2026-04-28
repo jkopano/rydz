@@ -16,6 +16,29 @@ namespace scripting {
 
 	static constexpr const char* TRANSFORM_MT = "rydz.Transform";
 
+    inline int push_transform_proxy(lua_State* L, ecs::World* world, ecs::Entity e);
+
+	template<>
+	struct LuaComponentTraits<Transform> {
+		static void bind_methods(lua_State* L) {}
+		static void init_from_lua(lua_State* L, ecs::World* w, ecs::Entity e, int val_idx) {
+			if (lua_istable(L, val_idx)) {
+				// Push proxy
+				push_transform_proxy(L, w, e);
+				int proxy_idx = lua_gettop(L);
+
+				lua_pushnil(L);
+				while (lua_next(L, val_idx) != 0) {
+					lua_pushvalue(L, -2); // key copy
+					lua_pushvalue(L, -2); // value copy
+					lua_settable(L, proxy_idx); // trigger __newindex
+					lua_pop(L, 1); // pop original value
+				}
+				lua_pop(L, 1); // pop proxy
+			}
+		}
+	};
+
 	//Proxy - brak cachowania bo storage moze sie przeniesc, trzymamy world* + entity i pytamy ecs przy kazdym dostepie
 	struct TransformProxy {
 		ecs::World* world;

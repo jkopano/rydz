@@ -34,6 +34,7 @@ namespace scripting {
 		register_input_table(L);
 		register_time_table(L);
 		register_asset_bindings(L);
+		register_assets_in_registry();
 
 		//globalna tabela Components
 		lua_newtable(L);

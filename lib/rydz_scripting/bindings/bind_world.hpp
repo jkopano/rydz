@@ -15,6 +15,18 @@ extern "C" {
 
 namespace scripting {
 
+	template<>
+	struct LuaComponentTraits<scripting::LuaComponent> {
+		static void bind_methods(lua_State* L) {}
+		static void init_from_lua(lua_State* L, ecs::World* w, ecs::Entity e, int val_idx) {
+			if (lua_istable(L, val_idx)) {
+				lua_pushvalue(L, val_idx);
+				int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+				w->insert_component(e, scripting::LuaComponent{ ref });
+			}
+		}
+	};
+
 	//Klucz metatabeli w registry
 	static constexpr const char* WORLD_MT = "rydz.World";
 
@@ -31,7 +43,7 @@ namespace scripting {
 		lua_setmetatable(L, -2);
 	}
 
-	//Pobranie world* ze stosu z weryfikacj¹ metatabeli
+	//Pobranie world* ze stosu z weryfikacjÄ… metatabeli
 	inline ecs::World* check_world(lua_State* L, int idx) {
 		auto* ud = (WorldUserdata*)luaL_checkudata(L, idx, WORLD_MT);
 		return ud->world;
@@ -43,6 +55,31 @@ namespace scripting {
 	inline int lua_world_spawn(lua_State* L) {
 		ecs::World* world = check_world(L, 1);
 		ecs::Entity e = world->spawn();
+
+		if (lua_gettop(L) >= 2 && lua_istable(L, 2)) {
+			lua_pushnil(L);
+			while (lua_next(L, 2) != 0) {
+				if (lua_istable(L, -1)) {
+					lua_rawgeti(L, -1, 1);
+					if (lua_isuserdata(L, -1)) {
+						auto* ud = (ComponentTypeUD*)lua_touserdata(L, -1);
+						const auto* fns = ComponentRegistry::get().lookup(ud->handle);
+						if (fns) {
+							if (fns->insert) fns->insert(world, e);
+							lua_rawgeti(L, -2, 2);
+							int data_idx = lua_gettop(L);
+							if (!lua_isnil(L, data_idx) && fns->init_from_lua) {
+								fns->init_from_lua(L, world, e, data_idx);
+							}
+							lua_pop(L, 1); // pop data
+						}
+					}
+					lua_pop(L, 1); // pop userdata
+				}
+				lua_pop(L, 1); // pop row
+			}
+		}
+
 		push_entity(L, e);
 		return 1;
 	}
@@ -146,7 +183,7 @@ namespace scripting {
 		lua_setfield(L, -2, "each_lua");
 
 		// world:each_lua_with("is_player", true) -> iterator
-		// Zwraca tylko encje których LuaComponent.key == value
+		// Zwraca tylko encje ktÃ³rych LuaComponent.key == value
 		lua_pushcfunction(L, [](lua_State* L) -> int {
 			ecs::World* world = check_world(L, 1);
 			const char* key = luaL_checkstring(L, 2);
@@ -197,21 +234,107 @@ namespace scripting {
 			});
 		lua_setfield(L, -2, "each_lua_with");
 
+		// world:each(Components.Transform, ...) -> iterator
+		lua_pushcfunction(L, [](lua_State* L) -> int {
+			ecs::World* world = check_world(L, 1);
+			
+			std::vector<int> handles;
+			for (int i = 2; i <= lua_gettop(L); i++) {
+				if (lua_isuserdata(L, i)) {
+					auto* ud = (ComponentTypeUD*)lua_touserdata(L, i);
+					handles.push_back(ud->handle);
+				}
+			}
+
+			if (handles.empty()) {
+				lua_pushcclosure(L, [](lua_State* L) { return 0; }, 0);
+				return 1;
+			}
+
+			std::vector<ecs::Entity> best_entities;
+			const auto* fns_first = ComponentRegistry::get().lookup(handles[0]);
+			if (fns_first && fns_first->get_entities) {
+				best_entities = fns_first->get_entities(world);
+			}
+
+			std::vector<ecs::Entity> final_entities;
+			for (auto e : best_entities) {
+				bool has_all = true;
+				for (size_t i = 1; i < handles.size(); i++) {
+					const auto* fns = ComponentRegistry::get().lookup(handles[i]);
+					if (!fns || !fns->has || !fns->has(world, e)) {
+						has_all = false;
+						break;
+					}
+				}
+				if (has_all) final_entities.push_back(e);
+			}
+
+			lua_newtable(L);
+			for (size_t i = 0; i < final_entities.size(); i++) {
+				push_entity(L, final_entities[i]);
+				lua_rawseti(L, -2, (int)i + 1);
+			}
+
+			lua_newtable(L);
+			for (size_t i = 0; i < handles.size(); i++) {
+				lua_pushinteger(L, handles[i]);
+				lua_rawseti(L, -2, (int)i + 1);
+			}
+
+			lua_pushinteger(L, 0); 
+			push_world(L, world);
+
+			lua_pushcclosure(L, [](lua_State* L) -> int {
+				int idx = (int)lua_tointeger(L, lua_upvalueindex(3)) + 1;
+				lua_rawgeti(L, lua_upvalueindex(1), idx);
+				if (lua_isnil(L, -1)) return 0;
+				
+				lua_pushinteger(L, idx);
+				lua_replace(L, lua_upvalueindex(3));
+				
+				ecs::Entity e = check_entity(L, -1);
+				ecs::World* world = check_world(L, lua_upvalueindex(4));
+
+				int num_handles = (int)lua_objlen(L, lua_upvalueindex(2));
+				int returns = 1;
+				
+				for (int i = 1; i <= num_handles; i++) {
+					lua_rawgeti(L, lua_upvalueindex(2), i);
+					int handle = (int)lua_tointeger(L, -1);
+					lua_pop(L, 1);
+
+					const auto* fns = ComponentRegistry::get().lookup(handle);
+					if (fns && fns->push) {
+						returns += fns->push(L, world, e);
+					} else {
+						lua_pushnil(L);
+						returns++;
+					}
+				}
+				return returns;
+			}, 4);
+
+			return 1;
+		});
+		lua_setfield(L, -2, "each");
+
 		//world:get_component(entity, Components.Transform) -> proxy lub nil
 		lua_pushcfunction(L, [](lua_State* L) -> int {
 			ecs::World* world = check_world(L, 1);
 			ecs::Entity e = check_entity(L, 2);
-			int handle = (int)luaL_checkinteger(L, 3);
+			if (!lua_isuserdata(L, 3)) return luaL_error(L, "Expected ComponentTypeUD userdata");
+			auto* ud = (ComponentTypeUD*)lua_touserdata(L, 3);
 
-			const auto* fns = ComponentRegistry::get().lookup(handle);
+			const auto* fns = ComponentRegistry::get().lookup(ud->handle);
 			if (!fns) {
-				return luaL_error(L, "Invalid component handle: %d", handle);
+				return luaL_error(L, "Invalid component handle: %d", ud->handle);
 			}
-			if (!fns->has(world, e)) {
+			if (!fns->has || !fns->has(world, e)) {
 				lua_pushnil(L);
 				return 1;
 			}
-			return fns->push(L, world, e);
+			return fns->push ? fns->push(L, world, e) : 0;
 			});
 		lua_setfield(L, -2, "get_component");
 
@@ -219,11 +342,12 @@ namespace scripting {
 		lua_pushcfunction(L, [](lua_State* L) -> int {
 			ecs::World* world = check_world(L, 1);
 			ecs::Entity e = check_entity(L, 2);
-			int handle = (int)luaL_checkinteger(L, 3);
+			if (!lua_isuserdata(L, 3)) return luaL_error(L, "Expected ComponentTypeUD userdata");
+			auto* ud = (ComponentTypeUD*)lua_touserdata(L, 3);
 
-			const auto* fns = ComponentRegistry::get().lookup(handle);
+			const auto* fns = ComponentRegistry::get().lookup(ud->handle);
 			if (!fns) {
-				return luaL_error(L, "Invalid component handle: %d", handle);
+				return luaL_error(L, "Invalid component handle: %d", ud->handle);
 			}
 
 			if (fns->insert && fns->insert(world, e)) {
@@ -258,7 +382,7 @@ namespace scripting {
 		lua_pop(L, 1);
 	}
 
-	//eksponuje world jako globalna zmienn¹ _world w Lua
+	//eksponuje world jako globalna zmiennÄ… _world w Lua
 	inline void expose_world_global(lua_State* L, ecs::World* world) {
 		push_world(L, world);
 		lua_setglobal(L, "_world");

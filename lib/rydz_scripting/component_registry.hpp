@@ -1,5 +1,4 @@
-//Rejestr komponentów indeksowany liczbami calkowitymi, kazdy komponent c++ dostaje stały ID przypisany podczas rejestracji
-//globalna tabela w Lua eksportuje te ID jako stałe
+//Rejestr komponentow
 #pragma once
 
 extern "C" {
@@ -15,21 +14,36 @@ extern "C" {
 
 namespace scripting {
 
-	struct ComponentFunctions {
-		//Push proxy komponentu na stos Lua. zwraca liczbę pushniętych wartosci
-		using PushFn = std::function<int(lua_State*, ecs::World*, ecs::Entity)>;
-		//Sprawdza czy encja ma komponent
-		using HasFn = std::function<bool(ecs::World*, ecs::Entity)>;
-		//Zwraca true jesli dodanie sie powiodlo
-		using InsertFn = std::function<bool(ecs::World*, ecs::Entity)>;
+	struct ComponentTypeUD {
+		int handle;
+		const char* name;
+	};
 
-		std::string name; //debug
+	template<typename T>
+	struct LuaComponentTraits {
+		static void bind_methods(lua_State* L) {}
+		static void init_from_lua(lua_State* L, ecs::World* w, ecs::Entity e, int val_idx) {
+			// default: nothing
+		}
+	};
+
+	struct ComponentFunctions {
+		using PushFn = std::function<int(lua_State*, ecs::World*, ecs::Entity)>;
+		using HasFn = std::function<bool(ecs::World*, ecs::Entity)>;
+		using InsertFn = std::function<bool(ecs::World*, ecs::Entity)>;
+		using GetEntitiesFn = std::function<std::vector<ecs::Entity>(ecs::World*)>;
+		using InitFromLuaFn = std::function<void(lua_State*, ecs::World*, ecs::Entity, int)>;
+		using BindMethodsFn = std::function<void(lua_State*)>;
+
+		std::string name; 
 		PushFn push;
 		HasFn has;
 		InsertFn insert;
+		GetEntitiesFn get_entities;
+		InitFromLuaFn init_from_lua;
+		BindMethodsFn bind_methods;
 	};
 
-	//Singleton - globalny rejestr komponentów indeksowany przez int, indeksy przydzielane kolejno podczas rejestracji, trafiają do tabeli Components w Lua jako stałe
 	class ComponentRegistry {
 	public:
 		static ComponentRegistry& get() {
@@ -37,42 +51,72 @@ namespace scripting {
 			return instance;
 		}
 
-		//Rejestruje komponent i zwraca jego indeks
 		template<typename T>
-		int register_component(const std::string& name, ComponentFunctions::PushFn push_fn, ComponentFunctions::HasFn has_fn = nullptr, ComponentFunctions::InsertFn insert_fn = nullptr) {
+		int register_component(const std::string& name, ComponentFunctions::PushFn push_fn = nullptr) {
 			ComponentFunctions fns;
 			fns.name = name;
 			fns.push = std::move(push_fn);
-			fns.has = has_fn ? std::move(has_fn) : [](ecs::World* w, ecs::Entity e) -> bool {
+			
+			fns.has = [](ecs::World* w, ecs::Entity e) -> bool {
 				return w->get_component<T>(e) != nullptr;
-				};
-			fns.insert = insert_fn ? std::move(insert_fn) : [](ecs::World* w, ecs::Entity e) -> bool {
+			};
+			
+			fns.insert = [](ecs::World* w, ecs::Entity e) -> bool {
 				if constexpr (std::is_default_constructible_v<T>) {
 					w->insert_component<T>(e, T{});
 					return true;
 				}
 				return false;
-				};
+			};
+
+			fns.get_entities = [](ecs::World* w) {
+				std::vector<ecs::Entity> res;
+				auto* storage = w->get_storage<T>();
+				if (storage) {
+					for (auto e : storage->entities()) res.push_back(e);
+				}
+				return res;
+			};
+
+			fns.init_from_lua = [](lua_State* L, ecs::World* w, ecs::Entity e, int val_idx) {
+				LuaComponentTraits<T>::init_from_lua(L, w, e, val_idx);
+			};
+
+			fns.bind_methods = [](lua_State* L) {
+				LuaComponentTraits<T>::bind_methods(L);
+			};
+
 			int handle = (int)m_components.size();
 			m_components.push_back(std::move(fns));
 			return handle;
 		}
 
-		//Lookup po int, zwraca nullptr jesli poza zakresem
 		const ComponentFunctions* lookup(int handle) const {
 			if (handle < 0 || handle >= (int)m_components.size()) return nullptr;
 			return &m_components[handle];
 		}
 
-		//Wypelnia tabelę Lua na szczycie stosu parami name=handle
 		void fill_lua_table(lua_State* L) const {
 			for (int i = 0; i < (int)m_components.size(); ++i) {
-				lua_pushinteger(L, i);
+				auto* ud = (ComponentTypeUD*)lua_newuserdata(L, sizeof(ComponentTypeUD));
+				ud->handle = i;
+				ud->name = m_components[i].name.c_str();
+
+				std::string mt_name = "rydz.ComponentType." + m_components[i].name;
+				luaL_newmetatable(L, mt_name.c_str());
+				
+				lua_newtable(L);
+				if (m_components[i].bind_methods) {
+					m_components[i].bind_methods(L);
+				}
+				lua_setfield(L, -2, "__index");
+				
+				lua_setmetatable(L, -2);
 				lua_setfield(L, -2, m_components[i].name.c_str());
 			}
 		}
 
-		int count() const { return(int)m_components.size(); }
+		int count() const { return (int)m_components.size(); }
 
 	private:
 		std::vector<ComponentFunctions> m_components;
