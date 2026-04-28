@@ -22,6 +22,7 @@ jobs:
       - name: Build tests and main
         shell: bash
         run: |
+          xmake global --clean
           xmake f -y -p linux -a x86_64 -m debug
           xmake build tests
           xmake build main
@@ -60,6 +61,7 @@ jobs:
       - name: Build tests and main
         shell: pwsh
         run: |
+          xmake global --clean
           xmake f -y -p windows -a x64 -m debug
           xmake build tests
           xmake build main
