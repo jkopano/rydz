@@ -79,9 +79,8 @@ struct UiPointerState {
     primary_button = button;
   }
 
-  auto set_primart_released(int button = 0) -> void {
+  auto set_primary_released(int button = 0) -> void {
     if (primary_released) {
-      p
     }
   }
 };
