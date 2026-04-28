@@ -64,11 +64,10 @@ end
 add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")
 add_requires("fmt", "spdlog", { configs = { external_fmt = true } })
 
-if is_plat("linux") then
-	-- Glaze needs C++23 when built by xmake; use the package language config,
-	-- not raw compiler flags, so the backend can translate it correctly.
-	add_requireconfs("glaze", { configs = { languages = "c++23" } })
-end
+-- dump
+-- if is_plat("linux") then
+-- 	add_requireconfs("glaze", { configs = { languages = "c++23" } })
+-- end
 
 if is_plat("windows") then
 	add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", { force = true })
