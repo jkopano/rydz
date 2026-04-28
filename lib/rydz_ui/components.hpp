@@ -80,8 +80,10 @@ struct UiPointerState {
   }
 
   auto set_primary_released(int button = 0) -> void {
-    if (primary_released) {
+    if (!primary_down) {
+      primary_released = true;
     }
+    primary_down = false;
   }
 };
 
