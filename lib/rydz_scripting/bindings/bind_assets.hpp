@@ -47,7 +47,7 @@ namespace scripting {
             auto* textures = world->get_resource<ecs::Assets<gl::Texture>>();
             if(!textures) return luaL_error(L, "Brak zasobu Assets<Texture> w świecie ECS!");
             
-            auto handle = textures->add(gl::load_texture(path));
+            auto handle = textures->add(gl::Texture(path));
             push_handle<gl::Texture>(L, handle, "rydz.HandleTexture");
             return 1;
         });
@@ -63,7 +63,7 @@ namespace scripting {
             auto* meshes = world->get_resource<ecs::Assets<gl::Mesh>>();
             if(!meshes) return luaL_error(L, "Brak zasobu Assets<Mesh> w świecie ECS!");
             
-            auto handle = meshes->add(ecs::mesh::cube(w, h, l));
+            auto handle = meshes->add(gl::Mesh::cube(w, h, l));
             push_handle<gl::Mesh>(L, handle, "rydz.HandleMesh");
             return 1;
         });

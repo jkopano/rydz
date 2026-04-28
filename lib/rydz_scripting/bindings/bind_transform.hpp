@@ -35,24 +35,24 @@ namespace scripting {
 
         if (strcmp(key, "translation") == 0) {
             lua_newtable(L);
-            lua_pushnumber(L, t->translation.GetX()); lua_setfield(L, -2, "x");
-            lua_pushnumber(L, t->translation.GetY()); lua_setfield(L, -2, "y");
-            lua_pushnumber(L, t->translation.GetZ()); lua_setfield(L, -2, "z");
+            lua_pushnumber(L, t->translation.x); lua_setfield(L, -2, "x");
+            lua_pushnumber(L, t->translation.y); lua_setfield(L, -2, "y");
+            lua_pushnumber(L, t->translation.z); lua_setfield(L, -2, "z");
             return 1;
         }
         if (strcmp(key, "scale") == 0) {
             lua_newtable(L);
-            lua_pushnumber(L, t->scale.GetX()); lua_setfield(L, -2, "x");
-            lua_pushnumber(L, t->scale.GetY()); lua_setfield(L, -2, "y");
-            lua_pushnumber(L, t->scale.GetZ()); lua_setfield(L, -2, "z");
+            lua_pushnumber(L, t->scale.x); lua_setfield(L, -2, "x");
+            lua_pushnumber(L, t->scale.y); lua_setfield(L, -2, "y");
+            lua_pushnumber(L, t->scale.z); lua_setfield(L, -2, "z");
             return 1;
         }
         if (strcmp(key, "rotation") == 0) {
             lua_newtable(L);
-            lua_pushnumber(L, t->rotation.GetX()); lua_setfield(L, -2, "x");
-            lua_pushnumber(L, t->rotation.GetY()); lua_setfield(L, -2, "y");
-            lua_pushnumber(L, t->rotation.GetZ()); lua_setfield(L, -2, "z");
-            lua_pushnumber(L, t->rotation.GetW()); lua_setfield(L, -2, "w");
+            lua_pushnumber(L, t->rotation.x); lua_setfield(L, -2, "x");
+            lua_pushnumber(L, t->rotation.y); lua_setfield(L, -2, "y");
+            lua_pushnumber(L, t->rotation.z); lua_setfield(L, -2, "z");
+            lua_pushnumber(L, t->rotation.w); lua_setfield(L, -2, "w");
             return 1;
         }
         lua_pushnil(L);

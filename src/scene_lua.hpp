@@ -9,7 +9,7 @@
 #include "rydz_ecs/schedule.hpp"
 #include "rydz_ecs/storage.hpp"
 #include "rydz_graphics/mod.hpp"
-#include "rydz_graphics/render_plugin.hpp"
+#include "rydz_graphics/plugin.hpp"
 #include "rydz_scripting/lua_resource.hpp"
 #include "rydz_scripting/lua_system_registry.hpp"
 #include "rydz_scripting/script_scheduler.hpp"
@@ -34,7 +34,7 @@ struct CameraTarget {
 
 inline void update_lua_camera_target_system(Query<Mut<IsometricCamera>> cam_query,
                                             Query<Transform, CameraTarget> target_query) {
-    Vec3 target_pos = Vec3::sZero();
+    Vec3 target_pos = Vec3::ZERO;
     bool found = false;
     for (auto [pt, _] : target_query.iter()) {
         target_pos = pt->translation;
@@ -51,8 +51,8 @@ inline void update_lua_camera_target_system(Query<Mut<IsometricCamera>> cam_quer
 // ── Startup: środowisko 3D (minimalne — oświetlenie + podłoga) ───────────────
 
 inline void setup_camera(Cmd cmd, NonSendMarker) {
-    cmd.spawn(IsometricCameraBundle::setup(
-        Vec3::sZero(), Vec3(10.0f, 10.0f, 10.0f), 20.0f, 12.0f));
+    cmd.spawn(IsometricCameraBundle::setup(Vec3::ZERO, Vec3(10.0f, 10.0f, 10.0f), 20.0f, 12.0f)
+  );
 }
 
 inline void setup_lighting(Cmd cmd, NonSendMarker) {
@@ -62,19 +62,19 @@ inline void setup_lighting(Cmd cmd, NonSendMarker) {
         });
     cmd.spawn(DirectionalLight{
         .color = {255, 244, 220, 255},
-        .direction = Vec3(-0.6f, -1.0f, -0.4f).Normalized(),
+        .direction = Vec3(-0.6f, -1.0f, -0.4f).normalized(),
         .intensity = 0.9f,
         });
 }
 
 inline void spawn_ground(Cmd cmd,
     ResMut<Assets<ecs::Mesh>> meshes,
-    ResMut<Assets<ecs::Texture>> textures,
+    Res<AssetServer> server,
     ResMut<Assets<ecs::Material>> materials,
     NonSendMarker) {
-    auto plane_h = meshes->add(mesh::plane(20.0f, 20.0f, 1, 1));
-    auto plane_mat = materials->add(StandardMaterial::from_texture(
-        textures->add(gl::load_texture("res/textures/brick.png"))));
+    auto x = server->load<Texture>("res/textures/brick.png");
+    auto plane_h = meshes->add(Mesh::plane(20.0f, 20.0f, 1, 1));
+    auto plane_mat = materials->add(StandardMaterial::from_texture(x));
     cmd.spawn(Mesh3d{ plane_h }, MeshMaterial3d{ plane_mat }, Transform{});
 }
 
@@ -137,7 +137,7 @@ inline void init_lua_scripting(ecs::World& world) {
 
 inline void scene_lua_plugin(App& app) {
     // Pluginy infrastrukturalne
-    app.add_plugin(Input::install);
+    app.add_plugin(InputPlugin{});
     app.add_plugin(system_multithreading({ true }));
     app.add_plugin(scripting::scripting_plugin); // tworzy scripting::LuaResource
     app.add_plugin(console::console_plugin);   // tworzy ConsoleState

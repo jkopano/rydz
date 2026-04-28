@@ -55,21 +55,21 @@ private:
 
     window->width = static_cast<u32>(rl::GetScreenWidth());
     window->height = static_cast<u32>(rl::GetScreenHeight());
-    window->fullscreen = rl::IsWindowFullscreen();
+    //window->fullscreen = rl::IsWindowFullscreen();
   }
 
   auto run_app(ecs::App& app) const -> void {
     ecs::Window config = resolve_window(app);
 
-    if (config.is_fullscreen) {
-      rl::SetConfigFlags(FLAG_FULLSCREEN_MODE);
-    }
-
     app.add_plugin(LogPlugin{});
     // init_logging();
-    if (config.fullscreen) {
-      rl::SetConfigFlags(rl::FLAG_FULLSCREEN_MODE);
-    }
+    ClearWindowState(FLAG_FULLSCREEN_MODE);
+    rl::SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    //if (config.fullscreen) {
+    //  rl::SetConfigFlags(rl::FLAG_FULLSCREEN_MODE);
+    //} else {
+    //  rl::SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    //}
 
     rl::InitWindow(
       static_cast<int>(config.width),

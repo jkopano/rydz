@@ -69,7 +69,7 @@ struct IsometricCameraBundle {
     f32 follow_speed = 5.0f
   ) -> IsometricCameraBundle {
     return IsometricCameraBundle{
-      .camera_component = Camera3d::perspective(),
+      .camera_component = Camera3d::orthographic(),
       .active_camera = ActiveCamera{},
       .transform =
         Transform::from_xyz(target.x + offset.x, target.y + offset.y, target.z + offset.z)
@@ -84,18 +84,9 @@ inline auto camera_plugin(App& app) -> void {
   app.add_systems(ScheduleLabel::Update, isometric_camera_system);
 
   app.add_systems(ScheduleLabel::Startup, [](World& world) -> void {
-    engine::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
-      return [zoom_level](Query<Mut<Camera3d>> query) -> void {
-        for (auto [cam] : query.iter()) {
-          if (cam->is_orthographic()) {
-            cam->orthographic_height = zoom_level;
-          }
-        }
-      };
-    });
 
         console::BindCommand<float>::to(world, "set_zoom", [](float zoom_level) {
-            return [zoom_level](Query<Mut<Camera3DComponent>> query) {
+            return [zoom_level](Query<Mut<ecs::Camera3d>> query) {
                 for (auto [cam] : query.iter()) {
                     if (cam->is_orthographic()) {
                         cam->orthographic_height = zoom_level;
