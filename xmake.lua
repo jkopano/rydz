@@ -64,6 +64,11 @@ end
 add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")
 add_requires("fmt", "spdlog", { configs = { external_fmt = true } })
 
+if is_plat("linux") then
+	-- Some upstream packages still need an explicit C++23 flag when built by xmake.
+	add_requireconfs("*", { configs = { cxxflags = "-std=c++23" } })
+end
+
 if is_plat("windows") then
     add_cxflags("-UJPH_FLOATING_POINT_EXCEPTIONS_ENABLED", {force = true})
 end
