@@ -61,7 +61,6 @@ else
 end
 
 -- common dependencies
-add_requireconfs("*", { configs = { cxxflags = "-std=c++23" } })
 add_requires("taskflow", "gtest", "benchmark", "joltphysics", "glaze", "glm")
 add_requires("fmt", "spdlog", { configs = { external_fmt = true } })
 
